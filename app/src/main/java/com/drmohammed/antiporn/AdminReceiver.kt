@@ -17,3 +17,4 @@ class AdminReceiver : DeviceAdminReceiver() {
         return "تحذير: لا يمكن تعطيل حماية AntiPorn لمنع الالتفاف!"
     }
 }
+
