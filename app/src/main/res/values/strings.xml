@@ -59,7 +59,6 @@
     <string name="card_app_suspension_pending">توجد %1$d تطبيقات محظورة بحاجة للتجميد والحذف</string>
     <string name="card_app_suspension_inactive">غير مفعلة (يتطلب صلاحية Device Owner)</string>
     <string name="card_app_suspension_subtext">تجميد وحذف فوري لتطبيقات تليجرام ومتصفحات البروكسي (Firefox, Tor, DuckDuckGo)</string>
-    <string name="shield_app_suspension_success">تم تجميد وإزالة التطبيقات المحظورة بنجاح</string>
     <string name="shield_app_suspension_none_found">تم الفحص: لا توجد أي تطبيقات محظورة مثبتة على الجهاز</string>
     <string name="shield_app_suspension_blocked_count">تم تجميد وإلغاء تثبيت %1$d من التطبيقات المحظورة بنجاح</string>
 </resources>

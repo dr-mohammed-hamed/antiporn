@@ -92,9 +92,9 @@ object SystemTamperShield : ProtectionShield {
 
         return try {
             val restrictions = dpm.getUserRestrictions(admin)
-            val isSafeBootBlocked = restrictions.getBoolean(UserManager.DISALLOW_SAFE_BOOT, false)
-            val isFactoryResetBlocked = restrictions.getBoolean(UserManager.DISALLOW_FACTORY_RESET, false)
-            val isAddUserBlocked = restrictions.getBoolean(UserManager.DISALLOW_ADD_USER, false)
+            val isSafeBootBlocked = restrictions?.getBoolean(UserManager.DISALLOW_SAFE_BOOT, false) ?: false
+            val isFactoryResetBlocked = restrictions?.getBoolean(UserManager.DISALLOW_FACTORY_RESET, false) ?: false
+            val isAddUserBlocked = restrictions?.getBoolean(UserManager.DISALLOW_ADD_USER, false) ?: false
             val isUninstallBlocked = try {
                 dpm.isUninstallBlocked(admin, context.packageName)
             } catch (e: Exception) {

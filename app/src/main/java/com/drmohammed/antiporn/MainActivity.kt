@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
@@ -22,9 +23,14 @@ import com.drmohammed.antiporn.ui.binder.MainViewBinder
 class MainActivity : AppCompatActivity() {
 
     private lateinit var viewBinder: MainViewBinder
-    private var isReceiverRegistered = false
 
-    private val packageUpdateReceiver = object : BroadcastReceiver() {
+    private val packageChangeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            refreshUi(isEnforcing = false)
+        }
+    }
+
+    private val uninstallStatusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             refreshUi(isEnforcing = false)
         }
@@ -45,15 +51,10 @@ class MainActivity : AppCompatActivity() {
             addAction(Intent.ACTION_PACKAGE_REMOVED)
             addDataScheme("package")
         }
-        registerReceiver(packageUpdateReceiver, pkgFilter)
+        registerReceiver(packageChangeReceiver, pkgFilter)
 
         val statusFilter = IntentFilter(AppSuspensionShield.ACTION_UNINSTALL_STATUS)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(packageUpdateReceiver, statusFilter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(packageUpdateReceiver, statusFilter)
-        }
-        isReceiverRegistered = true
+        ContextCompat.registerReceiver(this, uninstallStatusReceiver, statusFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     override fun onResume() {
@@ -70,13 +71,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (isReceiverRegistered) {
-            try {
-                unregisterReceiver(packageUpdateReceiver)
-            } catch (e: IllegalArgumentException) {
-                // Receiver was not registered or already unregistered
-            }
-            isReceiverRegistered = false
+        try {
+            unregisterReceiver(packageChangeReceiver)
+        } catch (e: Exception) {
+            // Receiver was not registered or already unregistered
+        }
+        try {
+            unregisterReceiver(uninstallStatusReceiver)
+        } catch (e: Exception) {
+            // Receiver was not registered or already unregistered
         }
     }
 

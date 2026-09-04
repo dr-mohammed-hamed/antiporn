@@ -51,13 +51,15 @@ object ProtectionEngine {
      * Prevents UI freezing and drops no callbacks by safely queuing concurrent requests.
      */
     fun applyAllAsync(context: Context, onComplete: ((List<ShieldResult>) -> Unit)? = null) {
-        if (onComplete != null) {
-            pendingCallbacks.add(onComplete)
-        }
+        synchronized(pendingCallbacks) {
+            if (onComplete != null) {
+                pendingCallbacks.add(onComplete)
+            }
 
-        if (!isEnforcing.compareAndSet(false, true)) {
-            Log.i(TAG, "Enforcement in progress, queued callback for completion notification")
-            return
+            if (!isEnforcing.compareAndSet(false, true)) {
+                Log.i(TAG, "Enforcement in progress, queued callback for completion notification")
+                return
+            }
         }
 
         val appContext = context.applicationContext
@@ -76,9 +78,12 @@ object ProtectionEngine {
             }
 
             mainHandler.post {
-                val callbacks = ArrayList(pendingCallbacks)
-                pendingCallbacks.clear()
-                isEnforcing.set(false)
+                val callbacks = mutableListOf<(List<ShieldResult>) -> Unit>()
+                synchronized(pendingCallbacks) {
+                    callbacks.addAll(pendingCallbacks)
+                    pendingCallbacks.clear()
+                    isEnforcing.set(false)
+                }
 
                 for (cb in callbacks) {
                     try {

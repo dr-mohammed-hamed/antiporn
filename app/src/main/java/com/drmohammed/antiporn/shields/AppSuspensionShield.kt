@@ -40,13 +40,12 @@ object AppSuspensionShield : ProtectionShield {
 
     fun isPackageInstalled(pm: PackageManager, packageName: String): Boolean {
         return try {
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                PackageManager.MATCH_UNINSTALLED_PACKAGES
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(PackageManager.MATCH_UNINSTALLED_PACKAGES.toLong()))
             } else {
                 @Suppress("DEPRECATION")
-                PackageManager.GET_UNINSTALLED_PACKAGES
+                pm.getPackageInfo(packageName, PackageManager.MATCH_UNINSTALLED_PACKAGES)
             }
-            pm.getPackageInfo(packageName, flags)
             true
         } catch (e: Exception) {
             false

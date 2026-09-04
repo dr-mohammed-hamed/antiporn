@@ -44,7 +44,8 @@ class NetworkWatchdog {
                 }
             }
 
-            connectivityManager?.registerNetworkCallback(request, networkCallback!!)
+            val callback = networkCallback ?: return
+            connectivityManager?.registerNetworkCallback(request, callback)
             Log.i(TAG, "NetworkWatchdog registered successfully.")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to register NetworkWatchdog callback", e)

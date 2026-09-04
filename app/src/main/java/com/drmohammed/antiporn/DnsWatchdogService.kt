@@ -134,11 +134,13 @@ class DnsWatchdogService : Service() {
             val modeUri = Settings.Global.getUriFor("private_dns_mode")
             val specifierUri = Settings.Global.getUriFor("private_dns_specifier")
 
+            val observer = dnsObserver ?: return
+
             if (modeUri != null) {
-                contentResolver.registerContentObserver(modeUri, false, dnsObserver!!)
+                contentResolver.registerContentObserver(modeUri, false, observer)
             }
             if (specifierUri != null) {
-                contentResolver.registerContentObserver(specifierUri, false, dnsObserver!!)
+                contentResolver.registerContentObserver(specifierUri, false, observer)
             }
             Log.i(TAG, "ContentObserver registered for DNS settings")
         } catch (e: Exception) {
