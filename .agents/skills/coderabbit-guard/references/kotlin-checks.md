@@ -53,3 +53,17 @@ This reference document outlines strict anti-patterns and failure modes unique t
 - **Defect**: Enforcing DNS but forgetting Safe Boot, Multi-User, System Cloner, or Browser Incognito restrictions.
 - **Impact**: User bypasses protection via Safe Mode or Incognito tabs.
 - **Rule**: Enforce full bypass matrix: Safe Boot (`DISALLOW_SAFE_BOOT`), Multi-User (`DISALLOW_ADD_USER`), Factory Reset (`DISALLOW_FACTORY_RESET`), Uninstall (`setUninstallBlocked`), and Browser Restrictions (`setApplicationRestrictions`).
+
+---
+
+## 4. Architecture & AI-Maintainability Anti-Patterns
+
+### Anti-Pattern 4.1: God Class Aggregation (Violates Pluggable Shield Architecture)
+- **Defect**: Stacking multiple protection domains (DNS, VPN, browser policies, app suspension) inside a single manager or activity file exceeding 250 lines.
+- **Impact**: AI context window degradation, high token burn, and regression of existing features when modifying unrelated logic.
+- **Rule**: Every security feature must implement `ProtectionShield` in an isolated file (< 200 lines). Modifying or adding features must strictly follow zero-collateral-damage principles.
+
+### Anti-Pattern 4.2: File Bloat & Missing Canonical Decomposition
+- **Defect**: Allowing any single file to approach or exceed 1000 lines without systematic decomposition.
+- **Impact**: Context window truncation, high cognitive load, and hallucinations in LLMs.
+- **Rule**: Files must NEVER reach 1000 lines (target 300–500 lines). Decompose using canonical naming: `...Shield`, `...Engine`, `...Watcher`, `...Bridge`, `...Handler`, `...ViewBinder`, `...Ext`.

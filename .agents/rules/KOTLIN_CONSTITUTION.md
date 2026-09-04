@@ -10,4 +10,6 @@ All AI agents working on this repository MUST strictly comply with the project c
 4. **Check Before Write**: Prevent infinite observer loops by verifying system settings before writing.
 5. **No Exception Swallowing**: Never leave empty `catch` blocks or return fake fallbacks.
 6. **Strings in Resources**: All user-facing strings must reside in `res/values/strings.xml`.
-7. **Empirical Gate**: Verify using `.\gradlew.bat compileDebugSources` and `.\gradlew.bat lintDebug` (0 errors) before presenting.
+7. **Mandatory Pluggable Shield Architecture**: Every protection feature must be encapsulated in an isolated `ProtectionShield` file (< 200 lines) with zero collateral damage to existing shields.
+8. **File Size Ceiling & Modular Naming**: Files must NEVER reach 1000 lines (target 300–500 lines). Decompose using canonical suffixes (`...Shield`, `...Engine`, `...Watcher`, `...Bridge`, `...Handler`, `...ViewBinder`, `...Ext`).
+9. **Empirical Gate**: Verify using `.\gradlew.bat compileDebugSources` and `.\gradlew.bat lintDebug` (0 errors) before presenting.

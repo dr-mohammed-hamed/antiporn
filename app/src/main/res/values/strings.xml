@@ -42,5 +42,24 @@
     <string name="watchdog_notification_title">حماية AntiPorn نشطة 🛡️</string>
     <string name="watchdog_notification_desc">مراقبة الـ DNS والشبكة تعمل في الخلفية</string>
     <string name="admin_disable_warning">تحذير أمني: لا يمكن تعطيل حماية AntiPorn لمنع الالتفاف على المحتوى المحظور!</string>
+    <string name="card_system_tamper_title">🛡️ حماية النظام ومنع الالتفاف (Anti-Tamper)</string>
+    <string name="card_system_tamper_active">الوضع الآمن والفورمات وإلغاء التثبيت محظورة ومقفولة 🛡️</string>
+    <string name="card_system_tamper_inactive">غير مفعلة (يتطلب صلاحية Device Owner)</string>
+    <string name="card_system_tamper_pending">حماية النظام بحاجة للتطبيق</string>
+    <string name="card_system_tamper_subtext">حظر الوضع الآمن وإعادة ضبط المصنع وتعدد المستخدمين ومنع إلغاء التثبيت</string>
+    <string name="shield_dns_success">تم فرض خادم NextDNS وحظر تغيير الإعدادات بنجاح</string>
+    <string name="shield_vpn_success">تم حظر تطبيقات الـ VPN ومنع التجاوز بنجاح</string>
+    <string name="shield_browser_success">تم قفل التصفح المتخفي وفرض البحث الآمن بنجاح</string>
+    <string name="shield_system_tamper_success">تم قفل الوضع الآمن ومنع الفورمات وإلغاء التثبيت بنجاح</string>
+    <string name="shield_dns_unsupported">ميزة Private DNS تتطلب أندرويد 10 (API 29) أو أحدث</string>
     <string name="default_dns_text">تلقائي</string>
+    <string name="card_app_suspension_title">🚫 حظر وتجميد التطبيقات غير المقيدة (App Blocker)</string>
+    <string name="card_app_suspension_active">تليجرام والمتصفحات غير المقيدة محظورة ومجمدة بالكامل 🚫</string>
+    <string name="card_app_suspension_suspended">تم تجميد %1$d من التطبيقات المحظورة وجاري إزالتها</string>
+    <string name="card_app_suspension_pending">توجد %1$d تطبيقات محظورة بحاجة للتجميد والحذف</string>
+    <string name="card_app_suspension_inactive">غير مفعلة (يتطلب صلاحية Device Owner)</string>
+    <string name="card_app_suspension_subtext">تجميد وحذف فوري لتطبيقات تليجرام ومتصفحات البروكسي (Firefox, Tor, DuckDuckGo)</string>
+    <string name="shield_app_suspension_success">تم تجميد وإزالة التطبيقات المحظورة بنجاح</string>
+    <string name="shield_app_suspension_none_found">تم الفحص: لا توجد أي تطبيقات محظورة مثبتة على الجهاز</string>
+    <string name="shield_app_suspension_blocked_count">تم تجميد وإلغاء تثبيت %1$d من التطبيقات المحظورة بنجاح</string>
 </resources>

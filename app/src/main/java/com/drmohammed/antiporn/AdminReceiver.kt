@@ -52,7 +52,7 @@ class AdminReceiver : DeviceAdminReceiver() {
         val pendingResult = goAsync()
         bgExecutor.execute {
             try {
-                DnsManager.applyPoliciesSync(context.applicationContext)
+                com.drmohammed.antiporn.core.engine.ProtectionEngine.applyAllSync(context.applicationContext)
             } finally {
                 pendingResult.finish()
             }

@@ -143,7 +143,107 @@
 
 ---
 
-## 📋 الباب الثالث: مصفوفة المتصفحات وقفل التصفح المتخفي (Browser Hardening Matrix)
+## 🏛️ الباب الثالث: المعمارية الهندسية الإلزامية لمشاريع مكافحة الإدمان
+**(Mandatory Pluggable Shield Architecture)**
+
+> [!IMPORTANT]
+> **قاعدة معمارية إلزامية لجميع نماذج الذكاء الاصطناعي:**  
+> يُحظر منعاً باتاً تجميع الميزات الأمنية المختلفة في ملف واحد ضخم (God Class).  
+> يجب أن يتبع المستودع حصراً **معمارية الدروع النمطية (Pluggable Shield Architecture)** القائمة على مبادئ Clean Architecture و UDF لضمان صغر حجم الملفات (< 200 سطر)، وحماية المشاريع من تخريب نماذج الذكاء الاصطناعي للميزات السابقة.
+
+```mermaid
+flowchart TD
+    subgraph UI["1. طبقة الواجهة (UI / Presentation)"]
+        Activity["MainActivity"]
+        State["ProtectionUiState (Sealed Interface)"]
+    end
+
+    subgraph Core["2. المحرك المنسق المركزي (Engine Layer)"]
+        Engine["ProtectionEngine"]
+        Engine -->|ينسق الفحص والتطبيق| AllShields["قائمة الدروع المسجلة"]
+    end
+
+    subgraph Shields["3. الدروع النمطية المستقلة (Pluggable Shields Layer)"]
+        S1["DnsShield.kt"]
+        S2["VpnShield.kt"]
+        S3["BrowserShield.kt"]
+        S4["SystemTamperShield.kt"]
+        S5["AppBlockerShield.kt (مستقبلاً)"]
+    end
+
+    subgraph Bridge["4. جسر نظام أندرويد (OS Bridge Layer)"]
+        DPM["DevicePolicyManager & System APIs"]
+    end
+
+    Activity --> Engine
+    Engine --> S1 & S2 & S3 & S4 & S5
+    S1 & S2 & S3 & S4 & S5 --> DPM
+```
+
+### 1. عقد الدرع المعياري الإلزامي (Standard ProtectionShield Contract)
+كل ميزة حماية في التطبيق يجب أن تُبنى ككائن أو كلاس مستقل ينفذ العقد الموحد التالي:
+
+```kotlin
+interface ProtectionShield {
+    val id: String
+    val titleResId: Int
+    val descriptionResId: Int
+    
+    /**
+     * تطبيق سياسة الحماية الخاصة بهذا الدرع على خيط خلفي حصراً
+     */
+    fun apply(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldApplyResult
+    
+    /**
+     * التحقق من الحالة الحالية للدرع وإرجاع تقرير فوري
+     */
+    fun checkStatus(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldStatusReport
+}
+```
+
+### 2. قانون عدم التخريب العرضي (Zero Collateral Damage Rule)
+* عند مطالبة أي نموذج ذكاء اصطناعي بإضافة ميزة حماية جديدة (مثل حظر تنزيل تطبيقات معينة، أو تجميد شبكات التواصل، أو حظر البحث الصوتي):
+  * **يُمنع منعاً باتاً** التعديل المباشر داخل أكواد الدروع الحالية المستقرة (`DnsShield` أو `BrowserShield`).
+  * **الإجراء الإلزامي:** إنشاء ملف درع جديد مستقل (مثال: `AppSuspensionShield.kt`) وتسجيله في قائمة المحرك المركزي `ProtectionEngine`.
+  * هذا العزل يضمن عدم كسر أي ميزة مستقرة ويقلل استهلاك الـ Tokens وسياق الـ AI إلى أقل من 20%.
+
+### 3. نمط تدفق البيانات أحادي الاتجاه (UDF & Sealed Interfaces)
+تعتمد طبقة العرض والواجهة حصراً على كائنات الحالة المغلقة غير القابلة للتعديل (`Sealed Interfaces`)، مما يجبر نماذج الـ AI عبر مترجم كوتلين على معالجة كافة الحالات بصورة قطعية:
+
+```kotlin
+sealed interface ShieldStatus {
+    data class Active(val detail: String) : ShieldStatus
+    data class NeedsEnforcement(val reason: String) : ShieldStatus
+    data class Disabled(val warning: String) : ShieldStatus
+    data class Unsupported(val minSdkRequired: Int) : ShieldStatus
+}
+```
+
+### 4. قانون سقف حجم الملفات والتفكيك المعياري (File Size Ceiling & Modular Decomposition)
+> [!CAUTION]
+> **السقف الحجمي المطلق للكود:**  
+> يُمنع منعاً باتاً وصول أي ملف كود في هذا المشروع إلى **1000 سطر**.  
+> السقف الموصى به والمستهدف لأي وحدة هو **300 إلى 500 سطر** (ولملفات الدروع أقل من 200 سطر).  
+> بمجرد اقتراب أي ملف من هذا السقف، **يجب إلزامياً تفكيكه فوراً** إلى وحدات أصغر وفقاً لدليل التسميات المعياري المعتمد أدناه.
+
+#### 🏷️ دليل التسميات المعيارية للوحدات المفككة (Canonical Unit Naming Conventions):
+عند تجزئة الملفات الكبيرة، يجب على المطور ونماذج الذكاء الاصطناعي استخدام اللاحقات والأنماط المعيارية التالية بحسب المسؤولية:
+
+| الطبقة / الدور | اللاحقة المعيارية (Suffix) | الوظيفة الدقيقة | أمثلة تطبيقية للمشروع |
+| :--- | :--- | :--- | :--- |
+| **دروع الحماية** | `...Shield` | تمثيل ميزة أمنية مستقلة ومنعزلة | `DnsShield.kt`, `BrowserShield.kt`, `VpnShield.kt` |
+| **المحرك والمنسق** | `...Engine` أو `...Coordinator` | الربط بين عدة دروع وتنسيق التدفق العام | `ProtectionEngine.kt`, `ShieldCoordinator.kt` |
+| **مراقبو الأحداث** | `...Watcher` أو `...Observer` | رصد تغيرات النظام والشبكة والإعدادات | `NetworkWatcher.kt`, `DnsSettingsObserver.kt` |
+| **جسور النظام** | `...Bridge` أو `...Controller` | واجهة التعامل المباشر مع خدمات أندرويد و DPM | `DevicePolicyBridge.kt`, `UserManagerBridge.kt` |
+| **معالجة العمليات** | `...Handler` | معالجة إجراء أو حدث محدد ومعزول | `PolicyApplyHandler.kt`, `ActionDispatcher.kt` |
+| **ربط الواجهة (UI)** | `...ViewBinder` أو `...Delegate` | عزل منطق ربط عناصر الشاشة عن الـ Activity | `StatusCardViewBinder.kt`, `ShieldListViewBinder.kt` |
+| **سجل المكونات** | `...Registry` | تسجيل وحفظ الدروع والسياسات المتاحة | `ShieldRegistry.kt` |
+| **تحويل ونقل البيانات** | `...Mapper` | تحويل كائنات النظام المعقدة إلى نماذج واجهة | `ShieldStatusMapper.kt` |
+| **الدوال المساعدة** | `...Ext` أو `...Extensions` | دوال كوتلين التوسيعية النقية المعزولة | `ContextExt.kt`, `DpmExt.kt`, `BundleExt.kt` |
+
+---
+
+## 📋 الباب الرابع: مصفوفة المتصفحات وقفل التصفح المتخفي (Browser Hardening Matrix)
 
 لحظر التصفح المتخفي وفرض البحث الآمن، يجب تطبيق حزمة الإعدادات المؤسسية التالية على كافة المتصفحات المستهدفة:
 
@@ -167,7 +267,7 @@ val bundle = Bundle().apply {
 
 ---
 
-## 🛠️ الباب الرابع: بروتوكول إلغاء القفل وحالات الطوارئ (Emergency Protocol)
+## 🛠️ الباب الخامس: بروتوكول إلغاء القفل وحالات الطوارئ (Emergency Protocol)
 
 بما أن التطبيق يمنع إلغاء التثبيت ويمنع الفورمات من داخل الهاتف لمنع أي محاولة للالتفاف، فإن الطريقة الوحيدة والمصرح بها حصرياً لصاحب الجهاز هي عبر سطر أوامر ADB من الحاسوب الشخصي:
 
@@ -181,15 +281,16 @@ adb uninstall com.drmohammed.antiporn
 
 ---
 
-## ✅ الباب الخامس: قائمة التحقق الصارمة للـ AI قبل اعتماد أي كود (AI Pre-Commit Gate)
+## ✅ الباب السادس: قائمة التحقق الصارمة للـ AI قبل اعتماد أي كود (AI Pre-Commit Gate)
 
 قبل أن يُعلن أي وكيل ذكاء اصطناعي اكتمال أي مهمة في هذا المشروع، يجب أن يجيب بـ "نعم" موثقة على الأسئلة التالية:
 
 1. [ ] هل تأكدت من أن خيارات المطور وتصحيح أخطاء USB لم تُمس ولم تُعطل؟
-2. [ ] هل استعلمت عن دوال الـ SDK بحذر مع التحقق من احتمالية رجوع `null`؟
-3. [ ] هل تحققت من أن الـ Singletons لا تحتفظ بـ `Activity Context`؟
-4. [ ] هل فحصت إعدادات النظام قبل الكتابة لتفادي حلقة الـ Observer اللانهائية؟
-5. [ ] هل تم وضع كافة النصوص داخل `strings.xml`؟
-6. [ ] هل تم تشغيل `.\gradlew.bat compileDebugSources` بنجاح؟
-7. [ ] هل تم تشغيل `.\gradlew.bat lintDebug` وحقق صفر أخطاء؟
-8. [ ] هل تم تثبيت التطبيق وتجريبه على الجهاز المتصل فعلياً؟
+2. [ ] هل تم تطبيق التعديلات باتباع معمارية الدروع النمطية (`ProtectionShield`) دون التعديل العرضي على الدروع الأخرى؟
+3. [ ] هل استعلمت عن دوال الـ SDK بحذر مع التحقق من احتمالية رجوع `null`؟
+4. [ ] هل تحققت من أن الـ Singletons لا تحتفظ بـ `Activity Context`؟
+5. [ ] هل فحصت إعدادات النظام قبل الكتابة لتفادي حلقة الـ Observer اللانهائية؟
+6. [ ] هل تم وضع كافة النصوص داخل `strings.xml`؟
+7. [ ] هل تم تشغيل `.\gradlew.bat compileDebugSources` بنجاح؟
+8. [ ] هل تم تشغيل `.\gradlew.bat lintDebug` وحقق صفر أخطاء؟
+9. [ ] هل تم تثبيت التطبيق وتجريبه على الجهاز المتصل فعلياً؟

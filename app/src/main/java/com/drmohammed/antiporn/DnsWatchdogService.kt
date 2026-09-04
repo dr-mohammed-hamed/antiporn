@@ -3,15 +3,10 @@ package com.drmohammed.antiporn
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.database.ContentObserver
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -21,6 +16,9 @@ import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.drmohammed.antiporn.core.engine.ProtectionEngine
+import com.drmohammed.antiporn.services.NetworkWatchdog
+import com.drmohammed.antiporn.shields.DnsShield
 
 class DnsWatchdogService : Service() {
 
@@ -54,11 +52,10 @@ class DnsWatchdogService : Service() {
 
     private val debounceHandler = Handler(Looper.getMainLooper())
     private val checkRunnable = Runnable {
-        checkAndEnforceDns()
+        checkAndEnforceProtection()
     }
     private var dnsObserver: ContentObserver? = null
-    private var connectivityManager: ConnectivityManager? = null
-    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private val networkWatchdog = NetworkWatchdog()
 
     override fun onCreate() {
         super.onCreate()
@@ -66,8 +63,8 @@ class DnsWatchdogService : Service() {
         Log.i(TAG, "DnsWatchdogService created")
         startForegroundNotification()
         registerDnsObserver()
-        registerNetworkCallback()
-        checkAndEnforceDns()
+        registerNetworkWatchdog()
+        checkAndEnforceProtection()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -85,7 +82,7 @@ class DnsWatchdogService : Service() {
         Log.w(TAG, "DnsWatchdogService destroyed")
         debounceHandler.removeCallbacks(checkRunnable)
         unregisterDnsObserver()
-        unregisterNetworkCallback()
+        networkWatchdog.unregister()
     }
 
     private fun startForegroundNotification() {
@@ -143,7 +140,7 @@ class DnsWatchdogService : Service() {
             if (specifierUri != null) {
                 contentResolver.registerContentObserver(specifierUri, false, dnsObserver!!)
             }
-            Log.i(TAG, "ContentObserver registered for private_dns_mode and private_dns_specifier")
+            Log.i(TAG, "ContentObserver registered for DNS settings")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to register ContentObserver for DNS settings", e)
         }
@@ -161,69 +158,28 @@ class DnsWatchdogService : Service() {
         }
     }
 
-    private fun registerNetworkCallback() {
-        if (networkCallback != null) return
-        try {
-            connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-
-            networkCallback = object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    Log.i(TAG, "Internet connection available! Debouncing DNS verification...")
-                    debounceHandler.removeCallbacks(checkRunnable)
-                    debounceHandler.postDelayed(checkRunnable, 1000L)
-                }
-            }
-            connectivityManager?.registerNetworkCallback(request, networkCallback!!)
-            Log.i(TAG, "NetworkCallback registered successfully")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to register NetworkCallback", e)
+    private fun registerNetworkWatchdog() {
+        networkWatchdog.register(this) {
+            Log.i(TAG, "Network became available! Debouncing protection check...")
+            debounceHandler.removeCallbacks(checkRunnable)
+            debounceHandler.postDelayed(checkRunnable, 1000L)
         }
     }
 
-    private fun unregisterNetworkCallback() {
-        networkCallback?.let {
-            try {
-                connectivityManager?.unregisterNetworkCallback(it)
-                Log.i(TAG, "NetworkCallback unregistered")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to unregister NetworkCallback", e)
-            }
-            networkCallback = null
-        }
-    }
-
-    private fun checkAndEnforceDns() {
-        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
-        if (!dpm.isDeviceOwnerApp(packageName)) {
-            Log.d(TAG, "Not Device Owner, skipping watchdog DNS enforcement")
+    private fun checkAndEnforceProtection() {
+        if (!ProtectionEngine.isDeviceOwner(this)) {
+            Log.d(TAG, "Not Device Owner, skipping watchdog enforcement")
             return
         }
 
-        val admin = DnsManager.getAdminComponent(this)
-        var needsEnforce = false
+        var needsEnforce = !ProtectionEngine.isSystemFullyProtected(this)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            try {
-                val mode = dpm.getGlobalPrivateDnsMode(admin)
-                val host = dpm.getGlobalPrivateDnsHost(admin)
-                if (mode != DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME || host != DnsManager.NEXTDNS_HOST) {
-                    Log.w(TAG, "DPM reports DNS mismatch: mode=$mode, host=$host. Needs re-enforce.")
-                    needsEnforce = true
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error checking DNS mode via DPM", e)
-            }
-        }
-
-        // Secondary verification via Settings.Global
+        // Verify Settings.Global directly for DNS settings
         try {
             val mode = Settings.Global.getString(contentResolver, "private_dns_mode")
             val specifier = Settings.Global.getString(contentResolver, "private_dns_specifier")
             if (mode != null && specifier != null) {
-                if (mode != "hostname" || specifier != DnsManager.NEXTDNS_HOST) {
+                if (mode != "hostname" || specifier != DnsShield.NEXTDNS_HOST) {
                     Log.w(TAG, "Settings.Global reports DNS mismatch: mode=$mode, specifier=$specifier")
                     needsEnforce = true
                 }
@@ -232,15 +188,9 @@ class DnsWatchdogService : Service() {
             Log.d(TAG, "Could not read Settings.Global directly", e)
         }
 
-        // Tertiary verification: ensure browser restrictions are applied
-        if (!DnsManager.checkBrowserRestrictions(this, dpm, admin)) {
-            Log.w(TAG, "Watchdog detected browser restrictions missing or tampered! Needs re-enforce.")
-            needsEnforce = true
-        }
-
         if (needsEnforce) {
-            Log.i(TAG, "Tampering or desync detected in DNS/browser settings! Re-enforcing policies...")
-            DnsManager.applyPoliciesAsync(applicationContext)
+            Log.i(TAG, "Tampering or desync detected in protection shields! Re-enforcing via ProtectionEngine...")
+            ProtectionEngine.applyAllAsync(applicationContext)
         }
     }
 }

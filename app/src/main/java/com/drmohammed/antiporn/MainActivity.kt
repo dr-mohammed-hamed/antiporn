@@ -1,171 +1,127 @@
 package com.drmohammed.antiporn
 
+import android.app.admin.DevicePolicyManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
-import android.view.View
-import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.card.MaterialCardView
+import com.drmohammed.antiporn.core.engine.ProtectionEngine
+import com.drmohammed.antiporn.shields.AppSuspensionShield
+import com.drmohammed.antiporn.shields.DnsShield
+import com.drmohammed.antiporn.ui.ProtectionUiState
+import com.drmohammed.antiporn.ui.binder.MainViewBinder
 
+/**
+ * Main application dashboard activity.
+ * Coordinates user actions with [ProtectionEngine] and delegates UI presentation to [MainViewBinder].
+ */
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var tvOverallStatusBadge: TextView
-    private lateinit var tvOverallStatusDesc: TextView
-    private lateinit var layoutMainStatus: LinearLayout
-    private lateinit var cardMainStatus: MaterialCardView
+    private lateinit var viewBinder: MainViewBinder
+    private var isReceiverRegistered = false
 
-    private lateinit var tvDeviceOwnerStatus: TextView
-    private lateinit var tvDnsHostStatus: TextView
-    private lateinit var tvDnsLockSubtext: TextView
-    private lateinit var tvVpnStatus: TextView
-    private lateinit var tvBrowserStatus: TextView
-    private lateinit var tvBrowserSubtext: TextView
-    private lateinit var cardAdbHelp: MaterialCardView
-    private lateinit var btnEnforceNow: MaterialButton
+    private val packageUpdateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            refreshUi(isEnforcing = false)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        initViews()
+        viewBinder = MainViewBinder(findViewById(android.R.id.content))
         setupListeners()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val pkgFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addDataScheme("package")
+        }
+        registerReceiver(packageUpdateReceiver, pkgFilter)
+
+        val statusFilter = IntentFilter(AppSuspensionShield.ACTION_UNINSTALL_STATUS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(packageUpdateReceiver, statusFilter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(packageUpdateReceiver, statusFilter)
+        }
+        isReceiverRegistered = true
     }
 
     override fun onResume() {
         super.onResume()
-        val currentStatus = DnsManager.checkStatus(this)
-        if (currentStatus.isDeviceOwner) {
+        val isDeviceOwner = ProtectionEngine.isDeviceOwner(this)
+        if (isDeviceOwner) {
             DnsWatchdogService.startService(this)
-            if (!currentStatus.isDnsConfigured || !currentStatus.isVpnBlocked || !currentStatus.isBrowserRestricted) {
-                btnEnforceNow.isEnabled = false
-                btnEnforceNow.setText(R.string.btn_enforcing)
-                DnsManager.applyPoliciesAsync(this) { result ->
-                    if (!isFinishing && !isDestroyed) {
-                        btnEnforceNow.isEnabled = true
-                        btnEnforceNow.setText(R.string.btn_enforce_now)
-                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
-                        refreshUi()
-                    }
-                }
+            if (!ProtectionEngine.isSystemFullyProtected(this)) {
+                triggerEnforcement(showToast = false)
             }
         }
-        refreshUi()
+        refreshUi(isEnforcing = false)
     }
 
-    private fun initViews() {
-        tvOverallStatusBadge = findViewById(R.id.tvOverallStatusBadge)
-        tvOverallStatusDesc = findViewById(R.id.tvOverallStatusDesc)
-        layoutMainStatus = findViewById(R.id.layoutMainStatus)
-        cardMainStatus = findViewById(R.id.cardMainStatus)
-
-        tvDeviceOwnerStatus = findViewById(R.id.tvDeviceOwnerStatus)
-        tvDnsHostStatus = findViewById(R.id.tvDnsHostStatus)
-        tvDnsLockSubtext = findViewById(R.id.tvDnsLockSubtext)
-        tvVpnStatus = findViewById(R.id.tvVpnStatus)
-        tvBrowserStatus = findViewById(R.id.tvBrowserStatus)
-        tvBrowserSubtext = findViewById(R.id.tvBrowserSubtext)
-        cardAdbHelp = findViewById(R.id.cardAdbHelp)
-        btnEnforceNow = findViewById(R.id.btnEnforceNow)
+    override fun onStop() {
+        super.onStop()
+        if (isReceiverRegistered) {
+            try {
+                unregisterReceiver(packageUpdateReceiver)
+            } catch (e: IllegalArgumentException) {
+                // Receiver was not registered or already unregistered
+            }
+            isReceiverRegistered = false
+        }
     }
 
     private fun setupListeners() {
-        btnEnforceNow.setOnClickListener {
-            btnEnforceNow.isEnabled = false
-            btnEnforceNow.setText(R.string.btn_enforcing)
-            DnsManager.applyPoliciesAsync(this) { result ->
-                if (!isFinishing && !isDestroyed) {
-                    btnEnforceNow.isEnabled = true
-                    btnEnforceNow.setText(R.string.btn_enforce_now)
-                    Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
-                    refreshUi()
+        viewBinder.btnEnforceNow.setOnClickListener {
+            triggerEnforcement(showToast = true)
+        }
+    }
+
+    private fun triggerEnforcement(showToast: Boolean) {
+        refreshUi(isEnforcing = true)
+        ProtectionEngine.applyAllAsync(this) { results ->
+            if (!isFinishing && !isDestroyed) {
+                val allSuccess = results.all { it.success }
+                val message = if (allSuccess) {
+                    getString(R.string.toast_enforce_success, DnsShield.NEXTDNS_HOST)
+                } else {
+                    results.firstOrNull { !it.success }?.message
+                        ?: getString(R.string.status_need_enforce_desc)
                 }
+
+                if (showToast) {
+                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+                }
+                refreshUi(isEnforcing = false)
             }
         }
     }
 
-    private fun refreshUi() {
-        val status = DnsManager.checkStatus(this)
+    private fun refreshUi(isEnforcing: Boolean) {
+        val isDo = ProtectionEngine.isDeviceOwner(this)
+        val shields = ProtectionEngine.evaluateSystemStatus(this)
 
-        val greenColor = ContextCompat.getColor(this, R.color.status_green)
-        val greenBgColor = ContextCompat.getColor(this, R.color.status_green_bg)
-        val orangeColor = ContextCompat.getColor(this, R.color.status_orange)
-        val orangeBgColor = ContextCompat.getColor(this, R.color.status_orange_bg)
+        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
+        val admin = ProtectionEngine.getAdminComponent(this)
+        val currentDnsHost = if (dpm != null && isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try { dpm.getGlobalPrivateDnsHost(admin) } catch (e: Exception) { null }
+        } else null
 
-        if (status.isDeviceOwner) {
-            cardAdbHelp.visibility = View.GONE
-            tvDeviceOwnerStatus.text = getString(R.string.card_device_owner_active)
-            tvDeviceOwnerStatus.setTextColor(greenColor)
-
-            if (status.isDnsConfigured && status.isVpnBlocked && status.isBrowserRestricted) {
-                tvOverallStatusBadge.text = getString(R.string.status_active_title)
-                tvOverallStatusBadge.setTextColor(greenColor)
-                tvOverallStatusDesc.text = getString(R.string.status_active_desc)
-                layoutMainStatus.setBackgroundColor(greenBgColor)
-                cardMainStatus.strokeColor = greenColor
-            } else {
-                tvOverallStatusBadge.text = getString(R.string.status_need_enforce_title)
-                tvOverallStatusBadge.setTextColor(orangeColor)
-                tvOverallStatusDesc.text = getString(R.string.status_need_enforce_desc)
-                layoutMainStatus.setBackgroundColor(orangeBgColor)
-                cardMainStatus.strokeColor = orangeColor
-            }
-
-            if (status.isDnsConfigured) {
-                tvDnsHostStatus.text = getString(R.string.card_nextdns_active, DnsManager.NEXTDNS_HOST)
-                tvDnsHostStatus.setTextColor(greenColor)
-                tvDnsLockSubtext.text = if (status.isPrivateDnsLocked) {
-                    getString(R.string.card_nextdns_locked)
-                } else {
-                    getString(R.string.card_nextdns_unlocked)
-                }
-            } else {
-                val currentHostDisplay = status.currentDnsHost ?: getString(R.string.default_dns_text)
-                tvDnsHostStatus.text = getString(R.string.card_nextdns_pending, currentHostDisplay, DnsManager.NEXTDNS_HOST)
-                tvDnsHostStatus.setTextColor(orangeColor)
-            }
-
-            if (status.isVpnBlocked) {
-                tvVpnStatus.text = getString(R.string.card_vpn_blocked)
-                tvVpnStatus.setTextColor(greenColor)
-            } else {
-                tvVpnStatus.text = getString(R.string.card_vpn_unblocked)
-                tvVpnStatus.setTextColor(orangeColor)
-            }
-
-            if (status.isBrowserRestricted) {
-                tvBrowserStatus.text = getString(R.string.card_browser_active)
-                tvBrowserStatus.setTextColor(greenColor)
-                tvBrowserSubtext.text = getString(R.string.card_browser_subtext)
-            } else {
-                tvBrowserStatus.text = getString(R.string.card_browser_unblocked)
-                tvBrowserStatus.setTextColor(orangeColor)
-                tvBrowserSubtext.text = getString(R.string.card_browser_subtext)
-            }
-
-        } else {
-            // Not Device Owner
-            cardAdbHelp.visibility = View.VISIBLE
-            tvOverallStatusBadge.text = getString(R.string.status_no_device_owner_title)
-            tvOverallStatusBadge.setTextColor(orangeColor)
-            tvOverallStatusDesc.text = getString(R.string.status_no_device_owner_desc)
-            layoutMainStatus.setBackgroundColor(orangeBgColor)
-            cardMainStatus.strokeColor = orangeColor
-
-            tvDeviceOwnerStatus.text = getString(R.string.card_device_owner_inactive)
-            tvDeviceOwnerStatus.setTextColor(orangeColor)
-
-            tvDnsHostStatus.text = getString(R.string.card_nextdns_inactive)
-            tvDnsHostStatus.setTextColor(orangeColor)
-
-            tvVpnStatus.text = getString(R.string.card_vpn_inactive)
-            tvVpnStatus.setTextColor(orangeColor)
-
-            tvBrowserStatus.text = getString(R.string.card_browser_inactive)
-            tvBrowserStatus.setTextColor(orangeColor)
-            tvBrowserSubtext.text = getString(R.string.card_browser_subtext)
-        }
+        val state = ProtectionUiState.Success(
+            isDeviceOwner = isDo,
+            shields = shields,
+            currentDnsHost = currentDnsHost,
+            isEnforcing = isEnforcing
+        )
+        viewBinder.bind(state)
     }
 }
