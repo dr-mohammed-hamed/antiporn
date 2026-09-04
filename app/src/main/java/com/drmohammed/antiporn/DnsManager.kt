@@ -4,6 +4,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.UserManager
@@ -13,6 +14,22 @@ import java.util.concurrent.Executors
 object DnsManager {
     private const val TAG = "AntiPorn_DnsManager"
     const val NEXTDNS_HOST = "family.cloudflare-dns.com"
+
+    val TARGET_BROWSER_PACKAGES = listOf(
+        "com.android.chrome",
+        "com.chrome.beta",
+        "com.chrome.dev",
+        "com.chrome.canary",
+        "com.brave.browser",
+        "com.brave.browser_beta",
+        "com.brave.browser_nightly",
+        "com.microsoft.emmx",
+        "com.microsoft.emmx.canary",
+        "com.sec.android.app.sbrowser",
+        "com.opera.browser",
+        "com.opera.mini.native",
+        "com.vivaldi.browser"
+    )
 
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -25,7 +42,8 @@ object DnsManager {
         val isDeviceOwner: Boolean,
         val dnsSetStatus: Int = -1,
         val isVpnBlocked: Boolean = false,
-        val isDnsLocked: Boolean = false
+        val isDnsLocked: Boolean = false,
+        val isBrowserRestricted: Boolean = false
     )
 
     data class ProtectionStatus(
@@ -34,7 +52,8 @@ object DnsManager {
         val currentDnsHost: String?,
         val isPrivateDnsLocked: Boolean,
         val isVpnBlocked: Boolean,
-        val isUsbDebuggingKeptOpen: Boolean = true
+        val isUsbDebuggingKeptOpen: Boolean = true,
+        val isBrowserRestricted: Boolean = false
     )
 
     fun getAdminComponent(context: Context): ComponentName {
@@ -56,21 +75,27 @@ object DnsManager {
         }
         val appContext = context.applicationContext
         executor.execute {
-            try {
-                val result = applyPoliciesSync(appContext)
-                mainHandler.post {
-                    val callbacks = ArrayList(pendingCallbacks)
-                    pendingCallbacks.clear()
-                    for (cb in callbacks) {
-                        try {
-                            cb.invoke(result)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error invoking completion callback", e)
-                        }
+            val result = try {
+                applyPoliciesSync(appContext)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Fatal error executing applyPoliciesSync", t)
+                PolicyApplyResult(
+                    success = false,
+                    message = appContext.getString(R.string.toast_error_applying, t.localizedMessage ?: "Unknown"),
+                    isDeviceOwner = true
+                )
+            }
+            mainHandler.post {
+                val callbacks = ArrayList(pendingCallbacks)
+                pendingCallbacks.clear()
+                isEnforcing.set(false)
+                for (cb in callbacks) {
+                    try {
+                        cb.invoke(result)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error invoking completion callback", e)
                     }
                 }
-            } finally {
-                isEnforcing.set(false)
             }
         }
     }
@@ -103,12 +128,20 @@ object DnsManager {
         var dnsSetResult = -1
         var isDnsLocked = false
         var isVpnBlocked = false
+        var isBrowserRestricted = false
 
         try {
             // 1. Enforce NextDNS hostname device-wide (Requires Android 10 / API 29+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                dnsSetResult = dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, NEXTDNS_HOST)
-                Log.i(TAG, "setGlobalPrivateDnsModeSpecifiedHost result: $dnsSetResult")
+                val currentMode = try { dpm.getGlobalPrivateDnsMode(admin) } catch (e: Exception) { -1 }
+                val currentHost = try { dpm.getGlobalPrivateDnsHost(admin) } catch (e: Exception) { null }
+                if (currentMode != DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME || currentHost != NEXTDNS_HOST) {
+                    dnsSetResult = dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, NEXTDNS_HOST)
+                    Log.i(TAG, "setGlobalPrivateDnsModeSpecifiedHost result: $dnsSetResult")
+                } else {
+                    dnsSetResult = DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR
+                    Log.d(TAG, "Private DNS already set to $NEXTDNS_HOST, skipping redundant write")
+                }
 
                 // 2. Lock Private DNS settings so user cannot disable or change it in Android Settings
                 dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_PRIVATE_DNS)
@@ -160,7 +193,11 @@ object DnsManager {
                 }
             }
 
-            // 10. Launch watchdog service to continuously monitor DNS and network state
+            // 10. Enforce Browser Incognito Lock and SafeSearch on Chrome, Brave, and Chromium browsers
+            isBrowserRestricted = applyBrowserRestrictions(dpm, admin)
+            Log.i(TAG, "Browser restrictions applied: $isBrowserRestricted")
+
+            // 11. Launch watchdog service to continuously monitor DNS and network state
             if (!DnsWatchdogService.isRunning) {
                 try {
                     DnsWatchdogService.startService(context)
@@ -190,16 +227,122 @@ object DnsManager {
                 isDeviceOwner = true,
                 dnsSetStatus = dnsSetResult,
                 isVpnBlocked = isVpnBlocked,
-                isDnsLocked = isDnsLocked
+                isDnsLocked = isDnsLocked,
+                isBrowserRestricted = isBrowserRestricted
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error applying policies", e)
             return PolicyApplyResult(
                 success = false,
                 message = context.getString(R.string.toast_error_applying, e.localizedMessage ?: "Unknown"),
-                isDeviceOwner = true
+                isDeviceOwner = true,
+                isBrowserRestricted = isBrowserRestricted
             )
         }
+    }
+
+    /**
+     * Builds the enterprise restriction policy bundle for Chromium-based browsers.
+     * Enforces:
+     * - IncognitoModeAvailability = 1 (Integer): Disables Incognito / Private browsing completely
+     * - ForceGoogleSafeSearch = true (Boolean): Enforces SafeSearch for Google queries
+     * - ForceYouTubeSafetyMode = true (Boolean): Enforces YouTube Restricted Mode
+     * - ForceYouTubeRestrict = 2 (Integer): Enforces Strict YouTube Restricted Mode
+     * - SafeSitesFilterBehavior = 1 (Integer): Blocks explicit sites via Google SafeSites filter
+     */
+    fun buildBrowserRestrictionsBundle(): Bundle {
+        return Bundle().apply {
+            putInt("IncognitoModeAvailability", 1)
+            putInt("InPrivateModeAvailability", 1)
+            putBoolean("ForceGoogleSafeSearch", true)
+            putBoolean("ForceYouTubeSafetyMode", true)
+            putInt("ForceYouTubeRestrict", 2)
+            putInt("SafeSitesFilterBehavior", 1)
+            putBoolean("BrowserGuestModeEnabled", false)
+        }
+    }
+
+    /**
+     * Applies enterprise browser policies (disabling Incognito mode and forcing SafeSearch / YouTube Safety)
+     * across all major Chromium-based browsers via DevicePolicyManager.setApplicationRestrictions.
+     */
+    fun applyBrowserRestrictions(dpm: DevicePolicyManager, admin: ComponentName): Boolean {
+        val bundle = buildBrowserRestrictionsBundle()
+        var appliedCount = 0
+        for (pkg in TARGET_BROWSER_PACKAGES) {
+            try {
+                dpm.setApplicationRestrictions(admin, pkg, bundle)
+                appliedCount++
+                Log.d(TAG, "Applied browser restrictions to $pkg")
+            } catch (e: Exception) {
+                Log.d(TAG, "Could not apply browser restrictions to $pkg: ${e.message}")
+            }
+        }
+        Log.i(TAG, "Applied browser restrictions to $appliedCount/${TARGET_BROWSER_PACKAGES.size} packages")
+        return appliedCount > 0
+    }
+
+    /**
+     * Checks if browser restrictions are configured and active across all currently
+     * installed target browsers on the device.
+     */
+    fun checkBrowserRestrictions(context: Context, dpm: DevicePolicyManager, admin: ComponentName): Boolean {
+        val pm = context.packageManager
+        val installedBrowsers = TARGET_BROWSER_PACKAGES.filter { pkg ->
+            try {
+                pm.getPackageInfo(pkg, 0)
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        // If specific target browsers are installed, ensure ALL of them have restrictions active
+        if (installedBrowsers.isNotEmpty()) {
+            for (pkg in installedBrowsers) {
+                try {
+                    val restrictions = dpm.getApplicationRestrictions(admin, pkg)
+                    if (restrictions?.getInt("IncognitoModeAvailability", 0) != 1) {
+                        Log.w(TAG, "Installed browser $pkg is missing Incognito restriction!")
+                        return false
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "Could not check restrictions for $pkg: ${e.message}")
+                    return false
+                }
+            }
+            return true
+        }
+
+        // Fallback when no target browser is installed yet: verify DPM has registered restrictions for target packages
+        for (pkg in TARGET_BROWSER_PACKAGES) {
+            try {
+                val restrictions = dpm.getApplicationRestrictions(admin, pkg)
+                if (restrictions?.getInt("IncognitoModeAvailability", 0) == 1) {
+                    return true
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Could not check restrictions for $pkg: ${e.message}")
+            }
+        }
+        return false
+    }
+
+    /**
+     * Overload for checking restrictions without Context (fallback).
+     */
+    fun checkBrowserRestrictions(dpm: DevicePolicyManager, admin: ComponentName): Boolean {
+        for (pkg in TARGET_BROWSER_PACKAGES) {
+            try {
+                val restrictions = dpm.getApplicationRestrictions(admin, pkg)
+                if (restrictions?.getInt("IncognitoModeAvailability", 0) == 1) {
+                    return true
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Could not check restrictions for $pkg: ${e.message}")
+            }
+        }
+        return false
     }
 
     /**
@@ -212,7 +355,9 @@ object DnsManager {
                 isDnsConfigured = false,
                 currentDnsHost = null,
                 isPrivateDnsLocked = false,
-                isVpnBlocked = false
+                isVpnBlocked = false,
+                isUsbDebuggingKeptOpen = true,
+                isBrowserRestricted = false
             )
 
         val admin = getAdminComponent(context)
@@ -224,7 +369,9 @@ object DnsManager {
                 isDnsConfigured = false,
                 currentDnsHost = null,
                 isPrivateDnsLocked = false,
-                isVpnBlocked = false
+                isVpnBlocked = false,
+                isUsbDebuggingKeptOpen = true,
+                isBrowserRestricted = false
             )
         }
 
@@ -257,13 +404,16 @@ object DnsManager {
             Log.e(TAG, "Error reading VPN restriction", e)
         }
 
+        val isBrowserRestricted = checkBrowserRestrictions(context, dpm, admin)
+
         return ProtectionStatus(
             isDeviceOwner = true,
             isDnsConfigured = isDnsConfigured,
             currentDnsHost = currentHost,
             isPrivateDnsLocked = isDnsLocked,
             isVpnBlocked = isVpnBlocked,
-            isUsbDebuggingKeptOpen = true
+            isUsbDebuggingKeptOpen = true,
+            isBrowserRestricted = isBrowserRestricted
         )
     }
 }

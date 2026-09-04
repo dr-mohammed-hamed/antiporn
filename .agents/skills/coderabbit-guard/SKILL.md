@@ -32,7 +32,7 @@ When triggered (e.g. before `git commit` or when reviewing changes):
    - **Subagent C (API Contracts & Parity)**: Signature changes, call site breakage, Windows Desktop (keyboard/focus) vs Mobile touch parity.
 
 5. **Framework-Specific Guardrails**:
-   Apply rules from [references/flutter-checks.md](references/flutter-checks.md) or project environment rules.
+   Apply rules from [references/kotlin-checks.md](references/kotlin-checks.md) (for Kotlin/Android) or [references/flutter-checks.md](references/flutter-checks.md) (for Flutter), and the project constitution [.specify/memory/constitution.md](../../.specify/memory/constitution.md).
 
 6. **Synthesis & Severity Rating**:
    Consolidate findings into a clean report:

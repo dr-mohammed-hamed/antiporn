@@ -232,8 +232,14 @@ class DnsWatchdogService : Service() {
             Log.d(TAG, "Could not read Settings.Global directly", e)
         }
 
+        // Tertiary verification: ensure browser restrictions are applied
+        if (!DnsManager.checkBrowserRestrictions(this, dpm, admin)) {
+            Log.w(TAG, "Watchdog detected browser restrictions missing or tampered! Needs re-enforce.")
+            needsEnforce = true
+        }
+
         if (needsEnforce) {
-            Log.i(TAG, "Tampering or desync detected in DNS settings! Re-enforcing NextDNS...")
+            Log.i(TAG, "Tampering or desync detected in DNS/browser settings! Re-enforcing policies...")
             DnsManager.applyPoliciesAsync(applicationContext)
         }
     }

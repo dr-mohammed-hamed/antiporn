@@ -21,6 +21,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvDnsHostStatus: TextView
     private lateinit var tvDnsLockSubtext: TextView
     private lateinit var tvVpnStatus: TextView
+    private lateinit var tvBrowserStatus: TextView
+    private lateinit var tvBrowserSubtext: TextView
     private lateinit var cardAdbHelp: MaterialCardView
     private lateinit var btnEnforceNow: MaterialButton
 
@@ -37,7 +39,7 @@ class MainActivity : AppCompatActivity() {
         val currentStatus = DnsManager.checkStatus(this)
         if (currentStatus.isDeviceOwner) {
             DnsWatchdogService.startService(this)
-            if (!currentStatus.isDnsConfigured || !currentStatus.isVpnBlocked) {
+            if (!currentStatus.isDnsConfigured || !currentStatus.isVpnBlocked || !currentStatus.isBrowserRestricted) {
                 btnEnforceNow.isEnabled = false
                 btnEnforceNow.setText(R.string.btn_enforcing)
                 DnsManager.applyPoliciesAsync(this) { result ->
@@ -63,6 +65,8 @@ class MainActivity : AppCompatActivity() {
         tvDnsHostStatus = findViewById(R.id.tvDnsHostStatus)
         tvDnsLockSubtext = findViewById(R.id.tvDnsLockSubtext)
         tvVpnStatus = findViewById(R.id.tvVpnStatus)
+        tvBrowserStatus = findViewById(R.id.tvBrowserStatus)
+        tvBrowserSubtext = findViewById(R.id.tvBrowserSubtext)
         cardAdbHelp = findViewById(R.id.cardAdbHelp)
         btnEnforceNow = findViewById(R.id.btnEnforceNow)
     }
@@ -95,7 +99,7 @@ class MainActivity : AppCompatActivity() {
             tvDeviceOwnerStatus.text = getString(R.string.card_device_owner_active)
             tvDeviceOwnerStatus.setTextColor(greenColor)
 
-            if (status.isDnsConfigured && status.isVpnBlocked) {
+            if (status.isDnsConfigured && status.isVpnBlocked && status.isBrowserRestricted) {
                 tvOverallStatusBadge.text = getString(R.string.status_active_title)
                 tvOverallStatusBadge.setTextColor(greenColor)
                 tvOverallStatusDesc.text = getString(R.string.status_active_desc)
@@ -131,6 +135,16 @@ class MainActivity : AppCompatActivity() {
                 tvVpnStatus.setTextColor(orangeColor)
             }
 
+            if (status.isBrowserRestricted) {
+                tvBrowserStatus.text = getString(R.string.card_browser_active)
+                tvBrowserStatus.setTextColor(greenColor)
+                tvBrowserSubtext.text = getString(R.string.card_browser_subtext)
+            } else {
+                tvBrowserStatus.text = getString(R.string.card_browser_unblocked)
+                tvBrowserStatus.setTextColor(orangeColor)
+                tvBrowserSubtext.text = getString(R.string.card_browser_subtext)
+            }
+
         } else {
             // Not Device Owner
             cardAdbHelp.visibility = View.VISIBLE
@@ -148,6 +162,10 @@ class MainActivity : AppCompatActivity() {
 
             tvVpnStatus.text = getString(R.string.card_vpn_inactive)
             tvVpnStatus.setTextColor(orangeColor)
+
+            tvBrowserStatus.text = getString(R.string.card_browser_inactive)
+            tvBrowserStatus.setTextColor(orangeColor)
+            tvBrowserSubtext.text = getString(R.string.card_browser_subtext)
         }
     }
 }
