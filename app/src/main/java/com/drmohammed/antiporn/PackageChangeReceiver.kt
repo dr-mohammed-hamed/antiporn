@@ -52,6 +52,12 @@ class PackageChangeReceiver : BroadcastReceiver() {
                 }
             }
 
+            Intent.ACTION_PACKAGE_REMOVED -> {
+                val data = intent.data ?: return
+                val packageName = data.schemeSpecificPart ?: return
+                Log.d(TAG, "Package removed notification received: $packageName")
+            }
+
             AppSuspensionShield.ACTION_UNINSTALL_STATUS -> {
                 val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
                 val packageName = intent.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME) ?: "unknown"

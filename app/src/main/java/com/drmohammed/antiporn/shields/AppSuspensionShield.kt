@@ -6,17 +6,22 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 
 /**
  * Pluggable security shield targeting unauthorized and unrestricted applications:
- * Suspends, hides, and silently uninstalls Telegram clients and proxy/unrestricted browsers.
+ * Suspends, hides, and silently uninstalls Telegram clients, open social networks,
+ * proxy/bypass browsers, and random/anonymous chat applications.
  */
 object AppSuspensionShield : ProtectionShield {
 
@@ -26,17 +31,150 @@ object AppSuspensionShield : ProtectionShield {
     override val id: String = "app_suspension"
     override val titleResId: Int = R.string.card_app_suspension_title
 
-    val BLACKLISTED_PACKAGES: Set<String> = setOf(
-        // Telegram & clients
-        "org.telegram.messenger", "org.telegram.messenger.web", "org.telegram.plus",
-        "nekox.messenger", "org.thunderdog.challegram",
-        // Unrestricted / Proxy browsers
-        "org.mozilla.firefox", "org.mozilla.firefox_beta", "org.mozilla.fenix",
-        "org.torproject.torbrowser", "com.duckduckgo.mobile.android",
-        "com.cloudmosa.puffinFree", "com.kiwibrowser.browser", "com.opera.touch"
+    /**
+     * Packages that must NEVER be suspended or uninstalled under any circumstances.
+     * Contains the AntiPorn app itself and the user's custom messenger (org.puregram.messenger).
+     */
+    val IMMUNE_PACKAGES: Set<String> = setOf(
+        "org.puregram.messenger",
+        "com.drmohammed.antiporn"
     )
 
-    fun isBlacklisted(packageName: String): Boolean = BLACKLISTED_PACKAGES.contains(packageName)
+    /**
+     * Telegram & official / unofficial clients / forks.
+     */
+    val TELEGRAM_PACKAGES: Set<String> = setOf(
+        "org.telegram.messenger",       // Official Play Store
+        "org.telegram.messenger.web",   // Official Website APK
+        "org.telegram.messenger.beta",  // Telegram Beta
+        "org.telegram.plus",            // Plus Messenger
+        "nekox.messenger",              // NekoX
+        "org.thunderdog.challegram",    // Telegram X
+        "com.iMe.android",              // iMe Messenger
+        "org.aka.messenger",            // Turrit / Aka
+        "com.turrit.telegram",          // Turrit
+        "org.vidogram.messenger",       // Vidogram
+        "org.telegram.BNavigation"      // Telegram BNavigation
+    )
+
+    /**
+     * Open Social Networks (Reddit clients, X/Twitter, Tumblr, VK).
+     */
+    val OPEN_SOCIAL_NETWORKS: Set<String> = setOf(
+        // Reddit & top clients
+        "com.reddit.frontpage",                  // Reddit Official
+        "com.rubenmayayo.reddit",                // Boost for Reddit
+        "com.laurencedawson.reddit_sync",        // Sync for Reddit
+        "ml.docilealligator.infinityforreddit",  // Infinity for Reddit
+        "free.reddit.news",                      // Relay for Reddit
+        "com.andrewshu.android.reddit",          // RIF (reddit is fun)
+
+        // X / Twitter
+        "com.twitter.android",                   // X / Twitter
+        "com.twitter.android.lite",              // X Lite / Twitter Lite
+
+        // Tumblr
+        "com.tumblr",                            // Tumblr
+
+        // VK
+        "com.vkontakte.android",                 // VK Official
+        "com.vk.im"                              // VK Me / Messenger
+    )
+
+    /**
+     * Proxy / Bypass Browsers (Tor, Firefox variants, DuckDuckGo, Aloha, Opera, UC, Puffin, Kiwi).
+     */
+    val PROXY_BROWSERS: Set<String> = setOf(
+        // Firefox variants
+        "org.mozilla.firefox",
+        "org.mozilla.firefox_beta",
+        "org.mozilla.fenix",
+
+        // Tor Browser
+        "org.torproject.torbrowser",
+
+        // DuckDuckGo
+        "com.duckduckgo.mobile.android",
+
+        // Puffin
+        "com.cloudmosa.puffinFree",
+        "com.cloudmosa.puffin",
+
+        // Kiwi Browser
+        "com.kiwibrowser.browser",
+
+        // Opera variants
+        "com.opera.touch",
+        "com.opera.browser",
+
+        // Aloha Browser
+        "com.alohamobile.browser",
+        "com.alohamobile.browser.lite",
+
+        // UC Browser
+        "com.UCMobile.intl",
+        "com.uc.browser.en"
+    )
+
+    /**
+     * Random / Anonymous Chat Apps (OmeTV, Monkey, Chatous, Kik, Camfrog, Connected2.me, Azar, LivU).
+     */
+    val RANDOM_CHAT_APPS: Set<String> = setOf(
+        "chat.ometv",                    // OmeTV
+        "com.monkey.cool",               // Monkey
+        "com.chatous.chatous",           // Chatous
+        "com.kik.android",               // Kik
+        "com.camfrog.android.phone",     // Camfrog
+        "com.connected2.me",             // Connected2.me
+        "com.azar.live",                 // Azar
+        "com.livu.live"                  // LivU
+    )
+
+    /**
+     * TikTok variants & clients (TikTok Global, TikTok Lite, Douyin, regional variants).
+     */
+    val TIKTOK_PACKAGES: Set<String> = setOf(
+        "com.zhiliaoapp.musically",       // TikTok Global / Main
+        "com.zhiliaoapp.musically.go",    // TikTok Lite
+        "com.ss.android.ugc.trill",       // TikTok Asia / Southeast Asia
+        "com.ss.android.ugc.aweme",       // Douyin (TikTok China)
+        "com.ss.android.ugc.aweme.lite",  // Douyin Lite
+        "com.ss.android.ugc.aweme.mobile",// Douyin Mobile
+        "com.zhiliao.musically"           // Legacy / Alternative Musical.ly
+    )
+
+    /**
+     * Aggregated set of all blacklisted packages, strictly guaranteed to exclude immune packages.
+     */
+    val BLACKLISTED_PACKAGES: Set<String> = (
+        TELEGRAM_PACKAGES +
+        OPEN_SOCIAL_NETWORKS +
+        PROXY_BROWSERS +
+        RANDOM_CHAT_APPS +
+        TIKTOK_PACKAGES
+    ) - IMMUNE_PACKAGES
+
+    private val fastExecutor = Executors.newSingleThreadExecutor()
+    private val processingPackages = ConcurrentHashMap.newKeySet<String>()
+
+    fun isImmune(packageName: String): Boolean = IMMUNE_PACKAGES.contains(packageName)
+
+    fun isBlacklisted(packageName: String): Boolean {
+        if (isImmune(packageName)) return false
+        return BLACKLISTED_PACKAGES.contains(packageName)
+    }
+
+    fun getCategoryForPackage(packageName: String): String? {
+        if (isImmune(packageName)) return null
+        return when {
+            TELEGRAM_PACKAGES.contains(packageName) -> "Telegram"
+            OPEN_SOCIAL_NETWORKS.contains(packageName) -> "Open Social Network"
+            PROXY_BROWSERS.contains(packageName) -> "Proxy Browser"
+            RANDOM_CHAT_APPS.contains(packageName) -> "Random Chat App"
+            TIKTOK_PACKAGES.contains(packageName) -> "TikTok"
+            else -> null
+        }
+    }
 
     fun isPackageInstalled(pm: PackageManager, packageName: String): Boolean {
         return try {
@@ -59,13 +197,17 @@ object AppSuspensionShield : ProtectionShield {
                 Log.e(TAG, "PackageInstaller not available for $packageName")
                 return
             }
-            val intent = Intent(ACTION_UNINSTALL_STATUS).apply { setPackage(context.packageName) }
+            val intent = Intent(ACTION_UNINSTALL_STATUS).apply {
+                setPackage(context.packageName)
+                putExtra(PackageInstaller.EXTRA_PACKAGE_NAME, packageName)
+            }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             } else {
                 PendingIntent.FLAG_UPDATE_CURRENT
             }
-            val pendingIntent = PendingIntent.getBroadcast(context, packageName.hashCode(), intent, flags)
+            val requestCode = Math.abs(packageName.hashCode())
+            val pendingIntent = PendingIntent.getBroadcast(context, requestCode, intent, flags)
             packageInstaller.uninstall(packageName, pendingIntent.intentSender)
             Log.i(TAG, "Requested silent uninstallation for $packageName")
         } catch (e: Exception) {
@@ -74,63 +216,115 @@ object AppSuspensionShield : ProtectionShield {
     }
 
     fun freezeAndUninstall(context: Context, dpm: DevicePolicyManager, admin: ComponentName, packageName: String) {
-        if (packageName == context.packageName) {
-            Log.w(TAG, "Self-protection guard: Cannot freeze or uninstall self ($packageName)")
+        if (packageName == context.packageName || isImmune(packageName)) {
+            Log.w(TAG, "Immunity guard: Cannot freeze or uninstall immune or self package ($packageName)")
             return
         }
         if (!isPackageInstalled(context.packageManager, packageName)) {
             Log.d(TAG, "Package $packageName is not installed; skipping freeze/uninstall")
             return
         }
-
-        try {
-            if (dpm.isUninstallBlocked(admin, packageName)) {
-                dpm.setUninstallBlocked(admin, packageName, false)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not unblock uninstall for $packageName", e)
+        if (!processingPackages.add(packageName)) {
+            Log.d(TAG, "Package $packageName is already being processed; skipping concurrent freeze/uninstall")
+            return
         }
 
         try {
-            val failedPackages = dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
-            if (failedPackages.contains(packageName)) {
-                Log.w(TAG, "Failed to suspend package: $packageName")
-            } else {
-                Log.i(TAG, "Suspended package: $packageName")
+            // Check-Before-Write: unblock uninstall only if currently blocked
+            try {
+                if (dpm.isUninstallBlocked(admin, packageName)) {
+                    dpm.setUninstallBlocked(admin, packageName, false)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not unblock uninstall for $packageName", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to suspend package: $packageName", e)
-        }
 
-        try {
-            val hidden = dpm.setApplicationHidden(admin, packageName, true)
-            if (hidden) {
-                Log.i(TAG, "Hidden package: $packageName")
-            } else {
-                Log.w(TAG, "Failed to hide package: $packageName")
+            // Check-Before-Write: suspend only if not already suspended
+            try {
+                val isSuspended = try { dpm.isPackageSuspended(admin, packageName) } catch (e: Exception) { false }
+                if (!isSuspended) {
+                    val failedPackages = dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
+                    if (failedPackages?.contains(packageName) == true) {
+                        Log.w(TAG, "Failed to suspend package: $packageName")
+                    } else {
+                        Log.i(TAG, "Suspended package: $packageName")
+                    }
+                } else {
+                    Log.d(TAG, "Package $packageName is already suspended; skipping setPackagesSuspended")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to suspend package: $packageName", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to hide package: $packageName", e)
-        }
 
-        uninstallSilently(context, packageName)
+            // Check-Before-Write: hide application only if not already hidden
+            try {
+                val isHidden = try { dpm.isApplicationHidden(admin, packageName) } catch (e: Exception) { false }
+                if (!isHidden) {
+                    val hidden = dpm.setApplicationHidden(admin, packageName, true)
+                    if (hidden) {
+                        Log.i(TAG, "Hidden package: $packageName")
+                    } else {
+                        Log.w(TAG, "Failed to hide package: $packageName")
+                    }
+                } else {
+                    Log.d(TAG, "Package $packageName is already hidden; skipping setApplicationHidden")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to hide package: $packageName", e)
+            }
+
+            uninstallSilently(context, packageName)
+        } finally {
+            processingPackages.remove(packageName)
+        }
     }
 
     fun handlePackageAdded(context: Context, packageName: String) {
-        if (!isBlacklisted(packageName)) return
+        if (isImmune(packageName) || !isBlacklisted(packageName)) return
         val appContext = context.applicationContext
         val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
         if (dpm == null) {
             Log.e(TAG, "DevicePolicyManager unavailable in handlePackageAdded")
             return
         }
-        val admin = ComponentName(appContext, com.drmohammed.antiporn.AdminReceiver::class.java)
+        val admin = ComponentName(appContext, AdminReceiver::class.java)
         if (!dpm.isDeviceOwnerApp(appContext.packageName)) {
             Log.w(TAG, "Cannot freeze $packageName: App is not Device Owner")
             return
         }
         Log.i(TAG, "Freezing and uninstalling blacklisted app on install: $packageName")
         freezeAndUninstall(appContext, dpm, admin, packageName)
+    }
+
+    /**
+     * High-speed helper to scan and enforce blacklist on all installed packages immediately.
+     * Can be called synchronously or asynchronously without excessive overhead.
+     */
+    fun enforceBlacklistFast(context: Context) {
+        val appContext = context.applicationContext
+        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
+        val admin = ComponentName(appContext, AdminReceiver::class.java)
+        if (!dpm.isDeviceOwnerApp(appContext.packageName)) {
+            Log.w(TAG, "enforceBlacklistFast skipped: not Device Owner")
+            return
+        }
+
+        val pm = appContext.packageManager
+        for (pkg in BLACKLISTED_PACKAGES) {
+            if (!isImmune(pkg) && isPackageInstalled(pm, pkg)) {
+                freezeAndUninstall(appContext, dpm, admin, pkg)
+            }
+        }
+    }
+
+    fun enforceBlacklistFastAsync(context: Context) {
+        fastExecutor.execute {
+            try {
+                enforceBlacklistFast(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in enforceBlacklistFastAsync", e)
+            }
+        }
     }
 
     override fun apply(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldResult {
@@ -140,7 +334,7 @@ object AppSuspensionShield : ProtectionShield {
 
         return try {
             val pm = context.packageManager
-            val installedTargets = BLACKLISTED_PACKAGES.filter { isPackageInstalled(pm, it) }
+            val installedTargets = BLACKLISTED_PACKAGES.filter { !isImmune(it) && isPackageInstalled(pm, it) }
             for (pkg in installedTargets) {
                 freezeAndUninstall(context, dpm, admin, pkg)
             }
@@ -163,7 +357,7 @@ object AppSuspensionShield : ProtectionShield {
 
         return try {
             val pm = context.packageManager
-            val installedTargets = BLACKLISTED_PACKAGES.filter { isPackageInstalled(pm, it) }
+            val installedTargets = BLACKLISTED_PACKAGES.filter { !isImmune(it) && isPackageInstalled(pm, it) }
             if (installedTargets.isEmpty()) {
                 return ShieldStatus.Active(context.getString(R.string.card_app_suspension_active))
             }

@@ -3,8 +3,10 @@ package com.drmohammed.antiporn
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.database.ContentObserver
 import android.net.Uri
@@ -18,7 +20,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.services.NetworkWatchdog
+import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
+import java.util.concurrent.Executors
 
 class DnsWatchdogService : Service() {
 
@@ -27,6 +31,8 @@ class DnsWatchdogService : Service() {
         const val CHANNEL_ID = "antiporn_watchdog"
         const val NOTIFICATION_ID = 1001
         private const val DEBOUNCE_DELAY_MS = 500L
+        private const val SCREEN_DEBOUNCE_DELAY_MS = 500L
+        private const val HEARTBEAT_INTERVAL_MS = 60_000L
 
         @Volatile
         var isRunning: Boolean = false
@@ -50,12 +56,69 @@ class DnsWatchdogService : Service() {
         }
     }
 
+    private val bgExecutor = Executors.newSingleThreadExecutor()
+
     private val debounceHandler = Handler(Looper.getMainLooper())
     private val checkRunnable = Runnable {
         checkAndEnforceProtection()
     }
+
+    private val screenDebounceRunnable = Runnable {
+        Log.i(TAG, "Layer 2 - Screen event debounced check: enforcing blacklist and verifying shields")
+        AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
+        checkAndEnforceProtection()
+    }
+
+    private val heartbeatHandler = Handler(Looper.getMainLooper())
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            Log.d(TAG, "Layer 3 - Periodic heartbeat (60s): cleaning stray apps & verifying shields")
+            AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
+            checkAndEnforceProtection()
+            heartbeatHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
+        }
+    }
+
     private var dnsObserver: ContentObserver? = null
     private val networkWatchdog = NetworkWatchdog()
+
+    private var isPackageReceiverRegistered = false
+    private val packageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent == null) return
+            val action = intent.action
+            if (action == Intent.ACTION_PACKAGE_ADDED) {
+                val packageName = intent.data?.schemeSpecificPart ?: return
+                if (AppSuspensionShield.isBlacklisted(packageName)) {
+                    Log.i(TAG, "Layer 1 - Dynamic package receiver detected blacklisted package: $packageName")
+                    try {
+                        bgExecutor.execute {
+                            try {
+                                AppSuspensionShield.handlePackageAdded(applicationContext, packageName)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error handling added package $packageName in watchdog", e)
+                            }
+                        }
+                    } catch (e: java.util.concurrent.RejectedExecutionException) {
+                        Log.w(TAG, "Watchdog bgExecutor rejected task during shutdown for $packageName", e)
+                    }
+                }
+            }
+        }
+    }
+
+    private var isScreenReceiverRegistered = false
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent == null) return
+            val action = intent.action
+            if (action == Intent.ACTION_USER_PRESENT || action == Intent.ACTION_SCREEN_ON) {
+                Log.d(TAG, "Layer 2 - Screen event observed ($action). Debouncing scan...")
+                debounceHandler.removeCallbacks(screenDebounceRunnable)
+                debounceHandler.postDelayed(screenDebounceRunnable, SCREEN_DEBOUNCE_DELAY_MS)
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -64,7 +127,11 @@ class DnsWatchdogService : Service() {
         startForegroundNotification()
         registerDnsObserver()
         registerNetworkWatchdog()
+        registerPackageReceiver()
+        registerScreenReceiver()
+        startHeartbeat()
         checkAndEnforceProtection()
+        AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -80,9 +147,18 @@ class DnsWatchdogService : Service() {
         super.onDestroy()
         isRunning = false
         Log.w(TAG, "DnsWatchdogService destroyed")
+        stopHeartbeat()
         debounceHandler.removeCallbacks(checkRunnable)
+        debounceHandler.removeCallbacks(screenDebounceRunnable)
         unregisterDnsObserver()
+        unregisterPackageReceiver()
+        unregisterScreenReceiver()
         networkWatchdog.unregister()
+        try {
+            bgExecutor.shutdown()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error shutting down bgExecutor", e)
+        }
     }
 
     private fun startForegroundNotification() {
@@ -166,6 +242,70 @@ class DnsWatchdogService : Service() {
             debounceHandler.removeCallbacks(checkRunnable)
             debounceHandler.postDelayed(checkRunnable, 1000L)
         }
+    }
+
+    private fun registerPackageReceiver() {
+        if (isPackageReceiverRegistered) return
+        try {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addDataScheme("package")
+            }
+            registerReceiver(packageReceiver, filter)
+            isPackageReceiverRegistered = true
+            Log.i(TAG, "Layer 1 - Dynamic package BroadcastReceiver registered successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register dynamic package receiver", e)
+        }
+    }
+
+    private fun unregisterPackageReceiver() {
+        if (!isPackageReceiverRegistered) return
+        try {
+            unregisterReceiver(packageReceiver)
+            isPackageReceiverRegistered = false
+            Log.i(TAG, "Layer 1 - Dynamic package BroadcastReceiver unregistered")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to unregister dynamic package receiver: ${e.message}")
+        }
+    }
+
+    private fun registerScreenReceiver() {
+        if (isScreenReceiverRegistered) return
+        try {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            }
+            registerReceiver(screenReceiver, filter)
+            isScreenReceiverRegistered = true
+            Log.i(TAG, "Layer 2 - Screen / User Present BroadcastReceiver registered successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register screen receiver", e)
+        }
+    }
+
+    private fun unregisterScreenReceiver() {
+        if (!isScreenReceiverRegistered) return
+        try {
+            unregisterReceiver(screenReceiver)
+            isScreenReceiverRegistered = false
+            Log.i(TAG, "Layer 2 - Screen / User Present BroadcastReceiver unregistered")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to unregister screen receiver: ${e.message}")
+        }
+    }
+
+    private fun startHeartbeat() {
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+        heartbeatHandler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS)
+        Log.i(TAG, "Layer 3 - Periodic heartbeat scheduled (every ${HEARTBEAT_INTERVAL_MS / 1000}s)")
+    }
+
+    private fun stopHeartbeat() {
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+        Log.i(TAG, "Layer 3 - Periodic heartbeat cancelled")
     }
 
     private fun checkAndEnforceProtection() {
