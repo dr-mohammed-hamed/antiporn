@@ -8,6 +8,7 @@ import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
+import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
 
@@ -55,7 +56,28 @@ object CurfewShield : ProtectionShield {
         return try {
             val isActive = CurfewEnforcer.isEffectiveCurfewActive(context)
             if (isActive) {
-                ShieldStatus.Active(context.getString(R.string.card_curfew_active_desc))
+                // Ground-truth verification: Ensure stores and search loophole apps are hidden
+                val packagesToHide = CurfewConfig.KNOWN_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
+                val allStoresHidden = packagesToHide.all { pkg ->
+                    try {
+                        val isInstalled = try {
+                            context.packageManager.getPackageInfo(pkg, 0)
+                            true
+                        } catch (e: Exception) {
+                            false
+                        }
+                        if (isInstalled) dpm.isApplicationHidden(admin, pkg) else true
+                    } catch (e: Exception) {
+                        true
+                    }
+                }
+
+                if (!allStoresHidden) {
+                    Log.w(TAG, "Curfew is active but store/search apps are NOT hidden!")
+                    ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_inactive_desc))
+                } else {
+                    ShieldStatus.Active(context.getString(R.string.card_curfew_active_desc))
+                }
             } else {
                 ShieldStatus.Active(context.getString(R.string.card_curfew_scheduled_desc))
             }

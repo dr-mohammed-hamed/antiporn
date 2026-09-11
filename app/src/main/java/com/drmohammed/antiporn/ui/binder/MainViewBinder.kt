@@ -46,6 +46,7 @@ class MainViewBinder(rootView: View) {
     private val tvAppSuspensionStatus: TextView = rootView.findViewById(R.id.tvAppSuspensionStatus)
     private val tvAppSuspensionSubtext: TextView = rootView.findViewById(R.id.tvAppSuspensionSubtext)
     private val tvCurfewStatus: TextView = rootView.findViewById(R.id.tvCurfewStatus)
+    private val tvCurfewSubtext: TextView = rootView.findViewById(R.id.tvCurfewSubtext)
     val btnCurfewTestToggle: MaterialButton = rootView.findViewById(R.id.btnCurfewTestToggle)
     private val cardAdbHelp: MaterialCardView = rootView.findViewById(R.id.cardAdbHelp)
     val btnEnforceNow: MaterialButton = rootView.findViewById(R.id.btnEnforceNow)
@@ -156,23 +157,34 @@ class MainViewBinder(rootView: View) {
             tvAppSuspensionSubtext.text = context.getString(R.string.card_app_suspension_subtext)
 
             // Bind Curfew Shield
+            val isScheduledCurfew = CurfewEnforcer.isCurfewActive()
             val isTestActive = CurfewEnforcer.isManualTestActive(context)
-            val isCurfewRunning = CurfewEnforcer.isEffectiveCurfewActive(context)
             btnCurfewTestToggle.visibility = View.VISIBLE
-            btnCurfewTestToggle.setText(if (isTestActive) R.string.btn_test_curfew_off else R.string.btn_test_curfew_on)
 
-            if (isTestActive) {
-                tvCurfewStatus.text = context.getString(R.string.card_curfew_active_desc) + " (تجريبي)"
-                tvCurfewStatus.setTextColor(greenColor)
-            } else if (isCurfewRunning) {
+            if (isScheduledCurfew) {
+                // Scheduled night curfew is actively running (9:30 PM - 7:00 AM)
+                // Lock the button in disabled state to prevent accidental or intentional bypass
+                btnCurfewTestToggle.isEnabled = false
+                btnCurfewTestToggle.setText(R.string.btn_curfew_night_locked)
                 tvCurfewStatus.text = context.getString(R.string.card_curfew_active_desc)
                 tvCurfewStatus.setTextColor(greenColor)
-            } else if (curfewActive) {
-                tvCurfewStatus.text = context.getString(R.string.card_curfew_scheduled_desc)
-                tvCurfewStatus.setTextColor(greenColor)
+                tvCurfewSubtext.text = context.getString(R.string.card_curfew_night_locked_hint)
             } else {
-                tvCurfewStatus.text = context.getString(R.string.card_curfew_inactive_desc)
-                tvCurfewStatus.setTextColor(orangeColor)
+                // Daytime hours: button enabled for manual testing
+                btnCurfewTestToggle.isEnabled = true
+                btnCurfewTestToggle.setText(if (isTestActive) R.string.btn_test_curfew_off else R.string.btn_test_curfew_on)
+                tvCurfewSubtext.text = context.getString(R.string.card_curfew_subtext)
+
+                if (isTestActive) {
+                    tvCurfewStatus.text = context.getString(R.string.card_curfew_active_desc) + " (تجريبي)"
+                    tvCurfewStatus.setTextColor(greenColor)
+                } else if (curfewActive) {
+                    tvCurfewStatus.text = context.getString(R.string.card_curfew_scheduled_desc)
+                    tvCurfewStatus.setTextColor(greenColor)
+                } else {
+                    tvCurfewStatus.text = context.getString(R.string.card_curfew_inactive_desc)
+                    tvCurfewStatus.setTextColor(orangeColor)
+                }
             }
 
         } else {
@@ -206,8 +218,10 @@ class MainViewBinder(rootView: View) {
             tvAppSuspensionSubtext.text = context.getString(R.string.card_app_suspension_subtext)
 
             btnCurfewTestToggle.visibility = View.GONE
+            btnCurfewTestToggle.isEnabled = false
             tvCurfewStatus.text = context.getString(R.string.card_curfew_inactive_desc)
             tvCurfewStatus.setTextColor(orangeColor)
+            tvCurfewSubtext.text = context.getString(R.string.card_curfew_subtext)
         }
     }
 }

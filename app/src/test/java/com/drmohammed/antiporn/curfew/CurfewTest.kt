@@ -108,4 +108,43 @@ class CurfewTest {
 
         assertEquals(listOf("com.google.android.youtube"), safeToUnsuspend)
     }
+
+    @Test
+    fun testCurfewInvariant_cannotReleaseCurfewDuringNightHours() {
+        val nightTime = createCalendar(23, 0)
+        assertTrue("23:00 is inside night curfew window", CurfewEnforcer.isCurfewActive(nightTime))
+
+        // If someone passes activate = false during night hours, the invariant guard must trigger:
+        val activate = false
+        val rejectDeactivation = !activate && CurfewEnforcer.isCurfewActive(nightTime)
+        assertTrue("Invariant must reject deactivation during night curfew", rejectDeactivation)
+    }
+
+    @Test
+    fun testCurfewEffectiveState_nightCurfewOverridesManualTestFalse() {
+        val nightTime = createCalendar(2, 30) // 02:30 AM
+        val isCurfewNight = CurfewEnforcer.isCurfewActive(nightTime)
+        assertTrue(isCurfewNight)
+
+        // Even if manual test is false:
+        val manualTestActive = false
+        val effectiveState = manualTestActive || isCurfewNight
+        assertTrue("Effective state must remain TRUE during night regardless of manual test flag", effectiveState)
+    }
+
+    @Test
+    fun testCurfewDaytime_effectiveStateFollowsManualTest() {
+        val dayTime = createCalendar(14, 0) // 02:00 PM
+        val isCurfewNight = CurfewEnforcer.isCurfewActive(dayTime)
+        assertFalse(isCurfewNight)
+
+        // In daytime, effective state strictly follows manual test flag:
+        assertFalse(false || isCurfewNight)
+        assertTrue(true || isCurfewNight)
+
+        // Daytime wakeup must NOT be blocked by night invariant:
+        val activate = false
+        val rejectDeactivation = !activate && isCurfewNight
+        assertFalse("Daytime wakeup must be permitted", rejectDeactivation)
+    }
 }

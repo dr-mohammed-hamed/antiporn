@@ -97,6 +97,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         viewBinder.btnCurfewTestToggle.setOnClickListener {
+            if (CurfewEnforcer.isCurfewActive()) {
+                Toast.makeText(this, R.string.card_curfew_night_locked_hint, Toast.LENGTH_SHORT).show()
+                refreshUi(isEnforcing = false)
+                return@setOnClickListener
+            }
+
             val isCurrentlyActive = CurfewEnforcer.isManualTestActive(this)
             val newActive = !isCurrentlyActive
             viewBinder.btnCurfewTestToggle.isEnabled = false

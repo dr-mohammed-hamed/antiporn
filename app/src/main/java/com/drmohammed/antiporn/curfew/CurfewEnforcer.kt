@@ -66,7 +66,8 @@ object CurfewEnforcer {
         bgExecutor.execute {
             var success = false
             try {
-                success = enforce(appContext, active)
+                val shouldBeActive = isEffectiveCurfewActive(appContext)
+                success = enforce(appContext, shouldBeActive)
             } catch (e: Exception) {
                 Log.e(TAG, "Error executing setManualTestActiveAsync", e)
             } finally {
@@ -86,15 +87,22 @@ object CurfewEnforcer {
 
     /**
      * Synchronously applies or releases curfew suspensions and store lockdowns.
+     * Guaranteed invariant: Cannot release curfew if current time is inside night curfew window.
      */
     @Synchronized
-    fun enforce(context: Context, activate: Boolean): Boolean {
+    fun enforce(context: Context, activate: Boolean, calendar: Calendar = Calendar.getInstance()): Boolean {
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return false
         val admin = ComponentName(context, AdminReceiver::class.java)
 
         if (!dpm.isDeviceOwnerApp(context.packageName)) {
             Log.w(TAG, "Cannot enforce curfew: Not Device Owner")
             return false
+        }
+
+        // Ironclad Security Invariant: NEVER release curfew (morning wakeup) if current time is within scheduled night window
+        if (!activate && isCurfewActive(calendar)) {
+            Log.w(TAG, "Security Alert: Curfew release rejected - current time is within scheduled night curfew window (21:30 - 07:00)!")
+            return true
         }
 
         val prefs = context.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)

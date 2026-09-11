@@ -19,6 +19,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
+import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.services.NetworkWatchdog
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
@@ -328,6 +329,15 @@ class DnsWatchdogService : Service() {
             }
         } catch (e: Exception) {
             Log.d(TAG, "Could not read Settings.Global directly", e)
+        }
+
+        // Live self-healing curfew synchronization during night hours or test mode
+        if (CurfewEnforcer.isEffectiveCurfewActive(this)) {
+            try {
+                CurfewEnforcer.syncCurfewState(this)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error synchronizing curfew in watchdog", e)
+            }
         }
 
         if (needsEnforce) {

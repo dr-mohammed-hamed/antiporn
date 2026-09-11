@@ -74,4 +74,6 @@
     <string name="btn_test_curfew_off">إنهاء اختبار القفل ☀️</string>
     <string name="toast_curfew_test_on">تم تفعيل قفل النوم تجريبياً (تطبيقات التشتيت معلقة الآن)</string>
     <string name="toast_curfew_test_off">تم إنهاء الاختبار وفك التعليق عن تطبيقات النهار بنجاح</string>
+    <string name="btn_curfew_night_locked">الحظر الليلي نشط تلقائياً 🌙</string>
+    <string name="card_curfew_night_locked_hint">الحظر الليلي قيد التشغيل المجدول (9:30 م - 7:00 ص) ولا يمكن إيقافه أثناء ساعات النوم</string>
 </resources>
