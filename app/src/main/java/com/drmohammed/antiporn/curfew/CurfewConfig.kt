@@ -76,7 +76,10 @@ object CurfewConfig {
         "com.google.android.apps.kids.familylink",       // Family Link Parent
 
         // Device Management Self-Protection
-        "com.drmohammed.antiporn"              // AntiPorn Guard
+        "com.drmohammed.antiporn",             // AntiPorn Guard
+
+        // Exempted Games
+        "com.axlebolt.standoff2"               // Standoff 2 (Shooting Game)
     )
 
     /**

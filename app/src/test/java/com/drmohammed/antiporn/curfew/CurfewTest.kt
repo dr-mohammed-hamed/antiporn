@@ -61,6 +61,9 @@ class CurfewTest {
         // Audiobooks & Podcasts
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("de.ph1b.audiobook"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("de.danoeh.antennapod"))
+
+        // Exempted Games
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.axlebolt.standoff2"))
     }
 
     @Test
