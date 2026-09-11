@@ -156,6 +156,7 @@ class AppSuspensionShieldTest {
             "com.google.android.youtube",
             "org.fdroid.fdroid",
             "com.termux",
+            "com.google.android.googlequicksearchbox",
             "",
             "random.unknown.package"
         )

@@ -8,6 +8,8 @@ import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.BrowserShield
+import com.drmohammed.antiporn.curfew.CurfewEnforcer
+import com.drmohammed.antiporn.shields.CurfewShield
 import com.drmohammed.antiporn.shields.DnsShield
 import com.drmohammed.antiporn.shields.SystemTamperShield
 import com.drmohammed.antiporn.shields.VpnShield
@@ -43,6 +45,8 @@ class MainViewBinder(rootView: View) {
     private val tvSystemTamperSubtext: TextView = rootView.findViewById(R.id.tvSystemTamperSubtext)
     private val tvAppSuspensionStatus: TextView = rootView.findViewById(R.id.tvAppSuspensionStatus)
     private val tvAppSuspensionSubtext: TextView = rootView.findViewById(R.id.tvAppSuspensionSubtext)
+    private val tvCurfewStatus: TextView = rootView.findViewById(R.id.tvCurfewStatus)
+    val btnCurfewTestToggle: MaterialButton = rootView.findViewById(R.id.btnCurfewTestToggle)
     private val cardAdbHelp: MaterialCardView = rootView.findViewById(R.id.cardAdbHelp)
     val btnEnforceNow: MaterialButton = rootView.findViewById(R.id.btnEnforceNow)
 
@@ -79,8 +83,9 @@ class MainViewBinder(rootView: View) {
             val browserActive = state.shields[BrowserShield.id] is ShieldStatus.Active
             val tamperActive = state.shields[SystemTamperShield.id] is ShieldStatus.Active
             val appSuspensionActive = state.shields[AppSuspensionShield.id] is ShieldStatus.Active
+            val curfewActive = state.shields[CurfewShield.id] is ShieldStatus.Active
 
-            val allActive = dnsActive && vpnActive && browserActive && tamperActive && appSuspensionActive
+            val allActive = dnsActive && vpnActive && browserActive && tamperActive && appSuspensionActive && curfewActive
 
             if (allActive) {
                 tvOverallStatusBadge.text = context.getString(R.string.status_active_title)
@@ -150,6 +155,26 @@ class MainViewBinder(rootView: View) {
             }
             tvAppSuspensionSubtext.text = context.getString(R.string.card_app_suspension_subtext)
 
+            // Bind Curfew Shield
+            val isTestActive = CurfewEnforcer.isManualTestActive(context)
+            val isCurfewRunning = CurfewEnforcer.isEffectiveCurfewActive(context)
+            btnCurfewTestToggle.visibility = View.VISIBLE
+            btnCurfewTestToggle.setText(if (isTestActive) R.string.btn_test_curfew_off else R.string.btn_test_curfew_on)
+
+            if (isTestActive) {
+                tvCurfewStatus.text = context.getString(R.string.card_curfew_active_desc) + " (تجريبي)"
+                tvCurfewStatus.setTextColor(greenColor)
+            } else if (isCurfewRunning) {
+                tvCurfewStatus.text = context.getString(R.string.card_curfew_active_desc)
+                tvCurfewStatus.setTextColor(greenColor)
+            } else if (curfewActive) {
+                tvCurfewStatus.text = context.getString(R.string.card_curfew_scheduled_desc)
+                tvCurfewStatus.setTextColor(greenColor)
+            } else {
+                tvCurfewStatus.text = context.getString(R.string.card_curfew_inactive_desc)
+                tvCurfewStatus.setTextColor(orangeColor)
+            }
+
         } else {
             // Not Device Owner
             cardAdbHelp.visibility = View.VISIBLE
@@ -179,6 +204,10 @@ class MainViewBinder(rootView: View) {
             tvAppSuspensionStatus.text = context.getString(R.string.card_app_suspension_inactive)
             tvAppSuspensionStatus.setTextColor(orangeColor)
             tvAppSuspensionSubtext.text = context.getString(R.string.card_app_suspension_subtext)
+
+            btnCurfewTestToggle.visibility = View.GONE
+            tvCurfewStatus.text = context.getString(R.string.card_curfew_inactive_desc)
+            tvCurfewStatus.setTextColor(orangeColor)
         }
     }
 }

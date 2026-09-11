@@ -29,17 +29,18 @@ class PackageChangeReceiver : BroadcastReceiver() {
                 val data = intent.data ?: return
                 val packageName = data.schemeSpecificPart ?: return
 
-                if (!AppSuspensionShield.isBlacklisted(packageName)) {
-                    return
-                }
-
-                Log.i(TAG, "Blacklisted package install detected: $packageName. Enforcing freeze...")
                 val pendingResult = goAsync()
                 val appContext = context.applicationContext
                 try {
                     bgExecutor.execute {
                         try {
-                            AppSuspensionShield.handlePackageAdded(appContext, packageName)
+                            if (AppSuspensionShield.isBlacklisted(packageName)) {
+                                Log.i(TAG, "Blacklisted package install detected: $packageName. Enforcing freeze...")
+                                AppSuspensionShield.handlePackageAdded(appContext, packageName)
+                            } else {
+                                Log.i(TAG, "New package install detected: $packageName. Evaluating curfew status...")
+                                com.drmohammed.antiporn.curfew.CurfewEnforcer.handlePackageAdded(appContext, packageName)
+                            }
                         } catch (e: Exception) {
                             Log.e(TAG, "Error handling added package $packageName", e)
                         } finally {

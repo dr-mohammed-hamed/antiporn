@@ -14,6 +14,7 @@ import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.BrowserShield
+import com.drmohammed.antiporn.shields.CurfewShield
 import com.drmohammed.antiporn.shields.DnsShield
 import com.drmohammed.antiporn.shields.SystemTamperShield
 import com.drmohammed.antiporn.shields.VpnShield
@@ -34,7 +35,8 @@ object ProtectionEngine {
         VpnShield,
         BrowserShield,
         SystemTamperShield,
-        AppSuspensionShield
+        AppSuspensionShield,
+        CurfewShield
     )
 
     private val bgExecutor = Executors.newSingleThreadExecutor()

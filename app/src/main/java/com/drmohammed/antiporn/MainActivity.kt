@@ -11,6 +11,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
+import com.drmohammed.antiporn.curfew.CurfewEnforcer
+import com.drmohammed.antiporn.curfew.CurfewScheduler
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
 import com.drmohammed.antiporn.ui.ProtectionUiState
@@ -62,6 +64,12 @@ class MainActivity : AppCompatActivity() {
         val isDeviceOwner = ProtectionEngine.isDeviceOwner(this)
         if (isDeviceOwner) {
             DnsWatchdogService.startService(this)
+            CurfewScheduler.scheduleNextAlarms(this)
+            CurfewEnforcer.syncCurfewStateAsync(this) {
+                if (!isFinishing && !isDestroyed) {
+                    refreshUi(isEnforcing = false)
+                }
+            }
             if (!ProtectionEngine.isSystemFullyProtected(this)) {
                 triggerEnforcement(showToast = false)
             }
@@ -86,6 +94,24 @@ class MainActivity : AppCompatActivity() {
     private fun setupListeners() {
         viewBinder.btnEnforceNow.setOnClickListener {
             triggerEnforcement(showToast = true)
+        }
+
+        viewBinder.btnCurfewTestToggle.setOnClickListener {
+            val isCurrentlyActive = CurfewEnforcer.isManualTestActive(this)
+            val newActive = !isCurrentlyActive
+            viewBinder.btnCurfewTestToggle.isEnabled = false
+            CurfewEnforcer.setManualTestActiveAsync(this, newActive) {
+                if (!isFinishing && !isDestroyed) {
+                    viewBinder.btnCurfewTestToggle.isEnabled = true
+                    val toastMessage = if (newActive) {
+                        getString(R.string.toast_curfew_test_on)
+                    } else {
+                        getString(R.string.toast_curfew_test_off)
+                    }
+                    Toast.makeText(this, toastMessage, Toast.LENGTH_SHORT).show()
+                    refreshUi(isEnforcing = false)
+                }
+            }
         }
     }
 

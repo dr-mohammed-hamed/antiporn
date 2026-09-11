@@ -61,4 +61,17 @@
     <string name="card_app_suspension_subtext">تجميد وحذف فوري لتطبيقات تليجرام ومتصفحات البروكسي (Firefox, Tor, DuckDuckGo)</string>
     <string name="shield_app_suspension_none_found">تم الفحص: لا توجد أي تطبيقات محظورة مثبتة على الجهاز</string>
     <string name="shield_app_suspension_blocked_count">تم تجميد وإلغاء تثبيت %1$d من التطبيقات المحظورة بنجاح</string>
+
+    <!-- Night Curfew Strings -->
+    <string name="card_curfew_title">🌙 حظر النوم الآلي المجدول (Night Curfew)</string>
+    <string name="card_curfew_active_desc">حظر النوم نشط حالياً (9:30 م - 7:00 ص) - تطبيقات التشتيت معلقة</string>
+    <string name="card_curfew_scheduled_desc">مجدول يومياً (9:30 م - 7:00 ص) - جميع التطبيقات المسموحة نشطة</string>
+    <string name="card_curfew_inactive_desc">غير مفعل (يتطلب صلاحية Device Owner)</string>
+    <string name="card_curfew_subtext">تعليق تلقائي لتطبيقات التشتيت (يوتيوب، المتجر، الألعاب) واستثناء تطبيقات العمل والقرآن والأدوات الأساسية</string>
+    <string name="shield_curfew_active_applied">تم تفعيل حظر النوم الليلي وتعليق التطبيقات الترفيهية</string>
+    <string name="shield_curfew_scheduled_applied">تمت جدولة حظر النوم بنجاح (9:30 م - 7:00 ص)</string>
+    <string name="btn_test_curfew_on">اختبار قفل النوم الآن 🌙</string>
+    <string name="btn_test_curfew_off">إنهاء اختبار القفل ☀️</string>
+    <string name="toast_curfew_test_on">تم تفعيل قفل النوم تجريبياً (تطبيقات التشتيت معلقة الآن)</string>
+    <string name="toast_curfew_test_off">تم إنهاء الاختبار وفك التعليق عن تطبيقات النهار بنجاح</string>
 </resources>
