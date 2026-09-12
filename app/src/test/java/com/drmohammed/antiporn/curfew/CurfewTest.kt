@@ -23,11 +23,13 @@ class CurfewTest {
     fun testCurfewActiveWindow_crossMidnight() {
         // Daytime: should be false
         assertFalse("12:00 PM should NOT be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(12, 0)))
-        assertFalse("21:29 should NOT be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(21, 29)))
+        assertFalse("20:29 should NOT be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(20, 29)))
         assertFalse("07:00 AM should NOT be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(7, 0)))
         assertFalse("08:30 AM should NOT be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(8, 30)))
 
         // Nighttime Curfew: should be true
+        assertTrue("20:30 should be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(20, 30)))
+        assertTrue("21:00 should be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(21, 0)))
         assertTrue("21:30 should be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(21, 30)))
         assertTrue("22:00 should be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(22, 0)))
         assertTrue("23:59 should be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(23, 59)))
@@ -64,6 +66,12 @@ class CurfewTest {
 
         // Exempted Games
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.axlebolt.standoff2"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.AlfaBravo.CombatMaster"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.nekki.shadowfightarena"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("yio.tro.antiyoy.android"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("air.com.RustyLake.CubeEscapeCollection"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("org.ppsspp.ppsspp"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.coloros.gamespaceui"))
     }
 
     @Test

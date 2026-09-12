@@ -25,11 +25,11 @@ object CurfewEnforcer {
     private val bgExecutor = Executors.newSingleThreadExecutor()
 
     /**
-     * Determines whether the current device time falls within the 21:30 - 07:00 curfew window.
+     * Determines whether the current device time falls within the 20:30 - 07:00 curfew window.
      */
     fun isCurfewActive(calendar: Calendar = Calendar.getInstance()): Boolean {
         val minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
-        val startMinute = CurfewConfig.START_HOUR * 60 + CurfewConfig.START_MINUTE // 21:30 = 1290
+        val startMinute = CurfewConfig.START_HOUR * 60 + CurfewConfig.START_MINUTE // 20:30 = 1230
         val endMinute = CurfewConfig.END_HOUR * 60 + CurfewConfig.END_MINUTE     // 07:00 = 420
 
         // Overnight interval across midnight
@@ -101,7 +101,7 @@ object CurfewEnforcer {
 
         // Ironclad Security Invariant: NEVER release curfew (morning wakeup) if current time is within scheduled night window
         if (!activate && isCurfewActive(calendar)) {
-            Log.w(TAG, "Security Alert: Curfew release rejected - current time is within scheduled night curfew window (21:30 - 07:00)!")
+            Log.w(TAG, "Security Alert: Curfew release rejected - current time is within scheduled night curfew window (20:30 - 07:00)!")
             return true
         }
 

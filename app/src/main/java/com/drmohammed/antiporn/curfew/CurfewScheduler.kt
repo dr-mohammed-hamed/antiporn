@@ -36,7 +36,7 @@ object CurfewScheduler {
     }
 
     /**
-     * Schedules the next exact alarms for 21:30 (Curfew Start) and 07:00 (Curfew End).
+     * Schedules the next exact alarms for 20:30 (Curfew Start) and 07:00 (Curfew End).
      */
     fun scheduleNextAlarms(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: run {

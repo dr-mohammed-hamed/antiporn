@@ -2,11 +2,11 @@ package com.drmohammed.antiporn.curfew
 
 /**
  * Configuration and immutable constants for the Scheduled Night Curfew system.
- * Curfew window: 21:30 (9:30 PM) to 07:00 (7:00 AM) every day.
+ * Curfew window: 20:30 (8:30 PM) to 07:00 (7:00 AM) every day.
  */
 object CurfewConfig {
 
-    const val START_HOUR = 21
+    const val START_HOUR = 20
     const val START_MINUTE = 30
 
     const val END_HOUR = 7
@@ -79,7 +79,13 @@ object CurfewConfig {
         "com.drmohammed.antiporn",             // AntiPorn Guard
 
         // Exempted Games
-        "com.axlebolt.standoff2"               // Standoff 2 (Shooting Game)
+        "com.axlebolt.standoff2",              // Standoff 2 (Shooting Game)
+        "com.AlfaBravo.CombatMaster",          // Combat Master (FPS Shooting Game)
+        "com.nekki.shadowfightarena",          // Shadow Fight 4: Arena (Fighting Game)
+        "yio.tro.antiyoy.android",             // Antiyoy (Turn-based Strategy Game)
+        "air.com.RustyLake.CubeEscapeCollection", // Cube Escape Collection (Puzzle Game)
+        "org.ppsspp.ppsspp",                   // PPSSPP (PSP Games Emulator)
+        "com.coloros.gamespaceui"              // Game Space UI (Realme/OPPO Game Assistant)
     )
 
     /**
