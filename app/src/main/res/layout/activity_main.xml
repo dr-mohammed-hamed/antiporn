@@ -407,6 +407,17 @@
                     android:text="@string/btn_test_curfew_on"
                     android:textSize="13sp"
                     app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnGrantUsageAccess"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/btn_grant_usage_access"
+                    android:textColor="@color/status_orange"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

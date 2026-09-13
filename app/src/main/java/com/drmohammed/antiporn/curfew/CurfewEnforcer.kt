@@ -111,15 +111,35 @@ object CurfewEnforcer {
             val targets = CurfewAppResolver.getCurfewTargetPackages(context)
             Log.i(TAG, "Enforcing Curfew ON for ${targets.size} targeted packages")
 
-            // 1. Lockdown App Stores & Search loophole apps completely (Hide from launcher and apps list)
-            val packagesToHide = CurfewConfig.KNOWN_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
+            // 1. Lockdown OEM App Stores & Search loophole apps completely (Hide from launcher and apps list)
+            val packagesToHide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
             for (pkg in packagesToHide) {
                 try {
-                    dpm.setApplicationHidden(admin, pkg, true)
-                    Log.i(TAG, "Hidden store/search package: $pkg")
+                    if (!dpm.isApplicationHidden(admin, pkg)) {
+                        dpm.setApplicationHidden(admin, pkg, true)
+                        Log.i(TAG, "Hidden store/search package: $pkg")
+                    }
                 } catch (e: Exception) {
                     Log.w(TAG, "Could not hide package $pkg", e)
                 }
+            }
+
+            // Ensure Google Play Store and Google Search are NOT hidden and NOT suspended so games and Gemini can use background IPC
+            try {
+                if (dpm.isApplicationHidden(admin, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE)) {
+                    dpm.setApplicationHidden(admin, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, false)
+                }
+                if (dpm.isPackageSuspended(admin, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE)) {
+                    dpm.setPackagesSuspended(admin, arrayOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE), false)
+                }
+                if (dpm.isApplicationHidden(admin, CurfewConfig.GOOGLE_SEARCH_PACKAGE)) {
+                    dpm.setApplicationHidden(admin, CurfewConfig.GOOGLE_SEARCH_PACKAGE, false)
+                }
+                if (dpm.isPackageSuspended(admin, CurfewConfig.GOOGLE_SEARCH_PACKAGE)) {
+                    dpm.setPackagesSuspended(admin, arrayOf(CurfewConfig.GOOGLE_SEARCH_PACKAGE), false)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not ensure Play Store / Google Search unhidden/unsuspended", e)
             }
 
             // 2. Suspend target applications (excluding already suspended)
@@ -140,6 +160,17 @@ object CurfewEnforcer {
                 }
             }
 
+            // 3. Forbid installing apps on device during curfew
+            try {
+                dpm.addUserRestriction(admin, UserManager.DISALLOW_INSTALL_APPS)
+                Log.i(TAG, "Curfew restriction enforced: DISALLOW_INSTALL_APPS")
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not add DISALLOW_INSTALL_APPS restriction", e)
+            }
+
+            // 4. Start foreground watcher for instant auto-kickout if Play Store UI is launched
+            CurfewForegroundWatcher.start(context)
+
             // Save set of curfew-suspended packages
             val savedSet = prefs.getStringSet(CurfewConfig.KEY_CURFEW_SUSPENDED_PACKAGES, emptySet())?.toMutableSet()
                 ?: mutableSetOf()
@@ -150,18 +181,31 @@ object CurfewEnforcer {
             // Wakeup: Restore daytime apps and stores
             Log.i(TAG, "Enforcing Curfew OFF: Releasing daytime apps and stores")
 
-            // 1. Restore App Stores & Search apps (Unhide)
-            val packagesToUnhide = CurfewConfig.KNOWN_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
+            // 1. Restore OEM App Stores & Search apps (Unhide)
+            val packagesToUnhide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
             for (pkg in packagesToUnhide) {
                 try {
-                    dpm.setApplicationHidden(admin, pkg, false)
-                    Log.i(TAG, "Unhid store/search package: $pkg")
+                    if (dpm.isApplicationHidden(admin, pkg)) {
+                        dpm.setApplicationHidden(admin, pkg, false)
+                        Log.i(TAG, "Unhid store/search package: $pkg")
+                    }
                 } catch (e: Exception) {
                     Log.w(TAG, "Could not unhide package $pkg", e)
                 }
             }
 
-            // 2. Unsuspend curfew targets
+            // 2. Clear app installation restriction
+            try {
+                dpm.clearUserRestriction(admin, UserManager.DISALLOW_INSTALL_APPS)
+                Log.i(TAG, "Curfew restriction cleared: DISALLOW_INSTALL_APPS")
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not clear DISALLOW_INSTALL_APPS restriction", e)
+            }
+
+            // 3. Stop foreground watcher
+            CurfewForegroundWatcher.stop()
+
+            // 4. Unsuspend curfew targets
             val recordedCurfewPackages = prefs.getStringSet(CurfewConfig.KEY_CURFEW_SUSPENDED_PACKAGES, emptySet()) ?: emptySet()
             val allInstalledTargets = CurfewAppResolver.getCurfewTargetPackages(context)
             val candidates = (recordedCurfewPackages + allInstalledTargets).toSet()
@@ -235,8 +279,8 @@ object CurfewEnforcer {
         }
 
         val immune = CurfewAppResolver.resolveImmunePackages(appContext)
-        if (immune.contains(packageName)) {
-            Log.i(TAG, "Newly installed package $packageName is immune/whitelisted; skipping suspension")
+        if (immune.contains(packageName) || packageName == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE || packageName == CurfewConfig.GOOGLE_SEARCH_PACKAGE) {
+            Log.i(TAG, "Newly installed package $packageName is immune, Play Store, or Google Search IPC; skipping suspension")
             return
         }
 
@@ -246,7 +290,7 @@ object CurfewEnforcer {
 
         try {
             dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
-            if (CurfewConfig.KNOWN_APP_STORES.contains(packageName) || CurfewConfig.CURFEW_SEARCH_APPS.contains(packageName)) {
+            if (CurfewConfig.OEM_APP_STORES.contains(packageName) || CurfewConfig.CURFEW_SEARCH_APPS.contains(packageName)) {
                 dpm.setApplicationHidden(admin, packageName, true)
             }
             // Add to recorded curfew packages

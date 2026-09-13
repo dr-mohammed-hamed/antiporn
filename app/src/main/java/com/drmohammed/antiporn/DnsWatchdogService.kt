@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
+import com.drmohammed.antiporn.curfew.CurfewForegroundWatcher
 import com.drmohammed.antiporn.services.NetworkWatchdog
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
@@ -156,6 +157,7 @@ class DnsWatchdogService : Service() {
         unregisterDnsObserver()
         unregisterPackageReceiver()
         unregisterScreenReceiver()
+        CurfewForegroundWatcher.stop()
         networkWatchdog.unregister()
         try {
             bgExecutor.shutdown()
@@ -356,9 +358,12 @@ class DnsWatchdogService : Service() {
         if (CurfewEnforcer.isEffectiveCurfewActive(this)) {
             try {
                 CurfewEnforcer.syncCurfewState(this)
+                CurfewForegroundWatcher.start(this)
             } catch (e: Exception) {
                 Log.e(TAG, "Error synchronizing curfew in watchdog", e)
             }
+        } else {
+            CurfewForegroundWatcher.stop()
         }
 
         if (needsEnforce) {

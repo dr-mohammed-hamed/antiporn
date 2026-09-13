@@ -77,4 +77,9 @@
     <string name="toast_curfew_test_off">تم إنهاء الاختبار وفك التعليق عن تطبيقات النهار بنجاح</string>
     <string name="btn_curfew_night_locked">الحظر الليلي نشط تلقائياً 🌙</string>
     <string name="card_curfew_night_locked_hint">الحظر الليلي قيد التشغيل المجدول (8:30 م - 7:00 ص) ولا يمكن إيقافه أثناء ساعات النوم</string>
+    <string name="curfew_play_store_blocked">🚫 متجر Google Play مغلق أثناء حظر التجول الليلي لحماية وقتك!</string>
+    <string name="btn_grant_usage_access">منح إذن الوصول لبيانات الاستخدام</string>
+    <string name="card_curfew_usage_missing_subtext">⚠️ إذن الوصول لبيانات الاستخدام مطلوب لتأمين إغلاق متجر Google Play أثناء الحظر.</string>
+    <string name="toast_open_settings_failed">تعذر فتح شاشة الإعدادات</string>
+    <string name="curfew_google_search_blocked">🚫 بحث Google وتغذية الأخبار مغلقة أثناء حظر التجول الليلي! (تطبيق Gemini متاح)</string>
 </resources>

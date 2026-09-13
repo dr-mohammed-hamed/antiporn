@@ -91,12 +91,60 @@ class CurfewTest {
 
     @Test
     fun testCurfewSearchApps_areExplicitlyTargetedForCurfew() {
-        assertTrue(CurfewConfig.CURFEW_SEARCH_APPS.contains("com.google.android.googlequicksearchbox"))
+        // Searchlite (Google Go) is hidden, but Google Search is kept unhidden for Gemini IPC
         assertTrue(CurfewConfig.CURFEW_SEARCH_APPS.contains("com.google.android.apps.searchlite"))
+        assertFalse(
+            "Google Search must NOT be in CURFEW_SEARCH_APPS so it remains unhidden for Gemini AI",
+            CurfewConfig.CURFEW_SEARCH_APPS.contains(CurfewConfig.GOOGLE_SEARCH_PACKAGE)
+        )
 
-        // Ensure search apps are NOT in whitelist
-        assertFalse(CurfewConfig.STATIC_WHITELIST.contains("com.google.android.googlequicksearchbox"))
+        // Ensure Gemini is in whitelist and searchlite is NOT in whitelist
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.google.android.apps.bard"))
         assertFalse(CurfewConfig.STATIC_WHITELIST.contains("com.google.android.apps.searchlite"))
+        assertFalse(CurfewConfig.STATIC_WHITELIST.contains(CurfewConfig.GOOGLE_SEARCH_PACKAGE))
+    }
+
+    @Test
+    fun testCurfewForegroundWatcher_isGeminiActivity() {
+        // Gemini surfaces
+        assertTrue(
+            CurfewForegroundWatcher.isGeminiActivity(
+                "com.google.android.apps.search.assistant.surfaces.voice.robin.main.MainActivity"
+            )
+        )
+        assertTrue(
+            CurfewForegroundWatcher.isGeminiActivity(
+                "com.google.android.apps.search.assistant.surfaces.voice.robin.launcher.RobinEntryPointActivity"
+            )
+        )
+        assertTrue(
+            CurfewForegroundWatcher.isGeminiActivity(
+                "com.google.android.apps.gsa.assistant.settings.AssistantSettingsActivity"
+            )
+        )
+
+        // Google Search & Discover surfaces to block
+        assertFalse(
+            CurfewForegroundWatcher.isGeminiActivity(
+                "com.google.android.googlequicksearchbox.SearchActivity"
+            )
+        )
+        assertFalse(
+            CurfewForegroundWatcher.isGeminiActivity(
+                "com.google.android.apps.search.googleapp.activity.GoogleAppActivity"
+            )
+        )
+        assertFalse(
+            CurfewForegroundWatcher.isGeminiActivity(
+                "com.google.android.apps.search.googleapp.launcher.minusone.activity.MinusOneActivity"
+            )
+        )
+        assertFalse(CurfewForegroundWatcher.isGeminiActivity(null))
+        assertFalse(CurfewForegroundWatcher.isGeminiActivity(""))
+        assertFalse(CurfewForegroundWatcher.isGeminiActivity("   "))
+        assertTrue(CurfewForegroundWatcher.isGeminiActivity("com.google.android.apps.ROBIN.activity"))
+        assertTrue(CurfewForegroundWatcher.isGeminiActivity("com.google.android.apps.ASSISTANT.MainActivity"))
+        assertFalse("CurfewForegroundWatcher should not be running in tests by default", CurfewForegroundWatcher.isRunning)
     }
 
     @Test
@@ -180,5 +228,38 @@ class CurfewTest {
         assertEquals(20, nextOccurrence.get(Calendar.HOUR_OF_DAY))
         assertEquals(30, nextOccurrence.get(Calendar.MINUTE))
         assertTrue(nextOccurrence.timeInMillis > baseTime.timeInMillis)
+    }
+
+    @Test
+    fun testGooglePlayStore_isConfiguredForIPC() {
+        assertEquals("com.android.vending", CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE)
+        assertTrue(CurfewConfig.KNOWN_APP_STORES.contains(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE))
+        assertFalse(
+            "Google Play Store must NOT be in OEM_APP_STORES so it remains unhidden for background IPC",
+            CurfewConfig.OEM_APP_STORES.contains(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE)
+        )
+    }
+
+    @Test
+    fun testOemAppStores_remainHiddenAndTargeted() {
+        assertTrue(CurfewConfig.OEM_APP_STORES.contains("com.heytap.market"))
+        assertTrue(CurfewConfig.OEM_APP_STORES.contains("com.oppo.market"))
+        assertTrue(CurfewConfig.OEM_APP_STORES.contains("com.sec.android.app.samsungapps"))
+        assertTrue(CurfewConfig.OEM_APP_STORES.contains("com.xiaomi.mipicks"))
+        assertTrue(CurfewConfig.OEM_APP_STORES.contains("com.huawei.appmarket"))
+    }
+
+    @Test
+    fun testPhobiesGame_isInStaticWhitelist() {
+        assertTrue("Phobies game must be whitelisted", CurfewConfig.STATIC_WHITELIST.contains("com.smokingguninc.phobies"))
+    }
+
+    @Test
+    fun testCurfewShieldPackagesToHide_excludesGooglePlayStore() {
+        val packagesToHide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
+        assertFalse(
+            "CurfewShield hidden packages verification must NEVER include Play Store to prevent infinite desync loops",
+            packagesToHide.contains(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE)
+        )
     }
 }

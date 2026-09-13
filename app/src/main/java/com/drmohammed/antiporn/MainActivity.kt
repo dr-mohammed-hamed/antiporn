@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -119,6 +120,18 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        viewBinder.btnGrantUsageAccess.setOnClickListener {
+            try {
+                val intent = Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to open usage access settings", e)
+                Toast.makeText(this, R.string.toast_open_settings_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun triggerEnforcement(showToast: Boolean) {
@@ -158,5 +171,9 @@ class MainActivity : AppCompatActivity() {
             isEnforcing = isEnforcing
         )
         viewBinder.bind(state)
+    }
+
+    companion object {
+        private const val TAG = "AntiPorn_MainActivity"
     }
 }

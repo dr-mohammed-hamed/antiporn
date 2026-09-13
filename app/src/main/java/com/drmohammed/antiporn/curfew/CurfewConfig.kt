@@ -82,6 +82,7 @@ object CurfewConfig {
         "com.google.android.keep",             // Google Keep Notes
         "com.google.android.apps.kids.familylinkhelper", // Family Link
         "com.google.android.apps.kids.familylink",       // Family Link Parent
+        "com.google.android.apps.bard",        // Google Gemini (AI Assistant)
 
         // Device Management Self-Protection
         "com.drmohammed.antiporn",             // AntiPorn Guard
@@ -159,11 +160,16 @@ object CurfewConfig {
         "com.android.packageinstaller"
     )
 
+    const val GOOGLE_PLAY_STORE_PACKAGE = "com.android.vending"
+    const val GOOGLE_SEARCH_PACKAGE = "com.google.android.googlequicksearchbox"
+
     /**
-     * App Stores that must be suspended AND hidden during curfew.
+     * Third-party OEM App Stores that must be suspended AND hidden during curfew.
+     * Note: Google Play Store is kept unhidden and unsuspended so games can access its
+     * background licensing, Play Games, and In-App Billing IPC services.
+     * Play Store UI is locked via CurfewForegroundWatcher (auto-kickout) and DISALLOW_INSTALL_APPS.
      */
-    val KNOWN_APP_STORES: Set<String> = setOf(
-        "com.android.vending",               // Google Play Store
+    val OEM_APP_STORES: Set<String> = setOf(
         "com.heytap.market",                 // Realme / Oppo App Market
         "com.oppo.market",
         "com.sec.android.app.samsungapps",   // Samsung Galaxy Store
@@ -172,11 +178,18 @@ object CurfewConfig {
     )
 
     /**
-     * Search loophole apps (Google App / Google Go) that must be hidden and suspended
-     * during curfew only, exactly like Play Store, and restored in the morning.
+     * All known app stores (OEM stores + Google Play Store).
+     */
+    val KNOWN_APP_STORES: Set<String> = OEM_APP_STORES + GOOGLE_PLAY_STORE_PACKAGE
+
+    /**
+     * Search loophole apps (Google Go) that must be hidden and suspended
+     * during curfew only, and restored in the morning.
+     * Note: Google Search (com.google.android.googlequicksearchbox) is kept unhidden and unsuspended
+     * so that the Gemini AI Assistant (com.google.android.apps.bard) can run its underlying assistant backend.
+     * Search UI and Discover feed are locked via CurfewForegroundWatcher activity-level inspection.
      */
     val CURFEW_SEARCH_APPS: Set<String> = setOf(
-        "com.google.android.googlequicksearchbox", // Google App (تطبيق بحث جوجل)
         "com.google.android.apps.searchlite"        // Google Go
     )
 }

@@ -295,12 +295,18 @@ object CurfewAppResolver {
             Log.e(TAG, "Error querying installed applications", e)
         }
 
-        // 3. Known App Stores (Google Play Store, Realme Market, etc.) & Search Loophole Apps
-        targets.addAll(CurfewConfig.KNOWN_APP_STORES)
+        // 3. OEM App Stores (Realme Market, Xiaomi, etc.) & Search Loophole Apps
+        targets.addAll(CurfewConfig.OEM_APP_STORES)
         targets.addAll(CurfewConfig.CURFEW_SEARCH_APPS)
 
-        // Filter out immune packages and self
-        val finalTargets = targets.filterNot { immunePackages.contains(it) }.toSet()
+        // Filter out immune packages, self, Google Play Store, and Google Search.
+        // Google Play Store and Google Search are kept unsuspended so games and Gemini AI can access background IPC services,
+        // while their UI is protected via CurfewForegroundWatcher.
+        val finalTargets = targets
+            .filterNot { immunePackages.contains(it) }
+            .filterNot { it == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE }
+            .filterNot { it == CurfewConfig.GOOGLE_SEARCH_PACKAGE }
+            .toSet()
         Log.i(TAG, "Curfew target resolution: ${finalTargets.size} packages targeted for curfew")
         return finalTargets
     }

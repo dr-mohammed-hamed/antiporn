@@ -56,8 +56,8 @@ object CurfewShield : ProtectionShield {
         return try {
             val isActive = CurfewEnforcer.isEffectiveCurfewActive(context)
             if (isActive) {
-                // Ground-truth verification: Ensure stores and search loophole apps are hidden
-                val packagesToHide = CurfewConfig.KNOWN_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
+                // Ground-truth verification: Ensure OEM stores and search loophole apps are hidden
+                val packagesToHide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
                 val allStoresHidden = packagesToHide.all { pkg ->
                     try {
                         val isInstalled = try {

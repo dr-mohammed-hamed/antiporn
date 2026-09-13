@@ -9,6 +9,7 @@ import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.BrowserShield
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
+import com.drmohammed.antiporn.curfew.CurfewForegroundWatcher
 import com.drmohammed.antiporn.shields.CurfewShield
 import com.drmohammed.antiporn.shields.DnsShield
 import com.drmohammed.antiporn.shields.SystemTamperShield
@@ -29,6 +30,7 @@ class MainViewBinder(rootView: View) {
     private val greenBgColor = ContextCompat.getColor(context, R.color.status_green_bg)
     private val orangeColor = ContextCompat.getColor(context, R.color.status_orange)
     private val orangeBgColor = ContextCompat.getColor(context, R.color.status_orange_bg)
+    private val secondaryTextColor = ContextCompat.getColor(context, R.color.text_secondary)
 
     private val tvOverallStatusBadge: TextView = rootView.findViewById(R.id.tvOverallStatusBadge)
     private val tvOverallStatusDesc: TextView = rootView.findViewById(R.id.tvOverallStatusDesc)
@@ -48,6 +50,7 @@ class MainViewBinder(rootView: View) {
     private val tvCurfewStatus: TextView = rootView.findViewById(R.id.tvCurfewStatus)
     private val tvCurfewSubtext: TextView = rootView.findViewById(R.id.tvCurfewSubtext)
     val btnCurfewTestToggle: MaterialButton = rootView.findViewById(R.id.btnCurfewTestToggle)
+    val btnGrantUsageAccess: MaterialButton = rootView.findViewById(R.id.btnGrantUsageAccess)
     private val cardAdbHelp: MaterialCardView = rootView.findViewById(R.id.cardAdbHelp)
     val btnEnforceNow: MaterialButton = rootView.findViewById(R.id.btnEnforceNow)
 
@@ -187,6 +190,16 @@ class MainViewBinder(rootView: View) {
                 }
             }
 
+            val hasUsageAccess = CurfewForegroundWatcher.hasUsageStatsPermission(context)
+            if (!hasUsageAccess) {
+                btnGrantUsageAccess.visibility = View.VISIBLE
+                tvCurfewSubtext.text = context.getString(R.string.card_curfew_usage_missing_subtext)
+                tvCurfewSubtext.setTextColor(orangeColor)
+            } else {
+                btnGrantUsageAccess.visibility = View.GONE
+                tvCurfewSubtext.setTextColor(secondaryTextColor)
+            }
+
         } else {
             // Not Device Owner
             cardAdbHelp.visibility = View.VISIBLE
@@ -219,6 +232,7 @@ class MainViewBinder(rootView: View) {
 
             btnCurfewTestToggle.visibility = View.GONE
             btnCurfewTestToggle.isEnabled = false
+            btnGrantUsageAccess.visibility = View.GONE
             tvCurfewStatus.text = context.getString(R.string.card_curfew_inactive_desc)
             tvCurfewStatus.setTextColor(orangeColor)
             tvCurfewSubtext.text = context.getString(R.string.card_curfew_subtext)
