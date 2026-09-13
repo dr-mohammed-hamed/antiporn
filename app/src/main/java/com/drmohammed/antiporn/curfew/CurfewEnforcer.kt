@@ -160,12 +160,13 @@ object CurfewEnforcer {
                 }
             }
 
-            // 3. Forbid installing apps on device during curfew
+            // Ensure DISALLOW_INSTALL_APPS is NOT active, preserving ADB developer workflow (Constitution Article 1).
+            // App installation prevention is handled safely via CurfewForegroundWatcher (Play Store kickout),
+            // OEM store hiding/suspension, and handlePackageAdded instant freezing.
             try {
-                dpm.addUserRestriction(admin, UserManager.DISALLOW_INSTALL_APPS)
-                Log.i(TAG, "Curfew restriction enforced: DISALLOW_INSTALL_APPS")
+                dpm.clearUserRestriction(admin, UserManager.DISALLOW_INSTALL_APPS)
             } catch (e: Exception) {
-                Log.w(TAG, "Could not add DISALLOW_INSTALL_APPS restriction", e)
+                Log.w(TAG, "Could not clear DISALLOW_INSTALL_APPS restriction", e)
             }
 
             // 4. Start foreground watcher for instant auto-kickout if Play Store UI is launched

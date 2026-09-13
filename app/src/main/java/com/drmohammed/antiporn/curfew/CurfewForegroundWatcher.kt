@@ -62,6 +62,7 @@ object CurfewForegroundWatcher {
     /**
      * Verifies if the special PACKAGE_USAGE_STATS AppOp permission is granted to this app.
      */
+    @Suppress("DEPRECATION")
     fun hasUsageStatsPermission(context: Context): Boolean {
         return try {
             val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager ?: return false
