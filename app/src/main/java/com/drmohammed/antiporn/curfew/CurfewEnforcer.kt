@@ -160,6 +160,20 @@ object CurfewEnforcer {
                 }
             }
 
+            // Ensure any whitelisted or immune package that might have been previously suspended is immediately unsuspended
+            val immunePackages = CurfewAppResolver.resolveImmunePackages(context)
+            val immuneToUnsuspend = immunePackages.filter { pkg ->
+                !AppSuspensionShield.isBlacklisted(pkg) && try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+            }
+            if (immuneToUnsuspend.isNotEmpty()) {
+                try {
+                    dpm.setPackagesSuspended(admin, immuneToUnsuspend.toTypedArray(), false)
+                    Log.i(TAG, "Unsuspended whitelisted/immune packages during curfew: $immuneToUnsuspend")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error unsuspending immune packages during curfew", e)
+                }
+            }
+
             // Ensure DISALLOW_INSTALL_APPS is NOT active, preserving ADB developer workflow (Constitution Article 1).
             // App installation prevention is handled safely via CurfewForegroundWatcher (Play Store kickout),
             // OEM store hiding/suspension, and handlePackageAdded instant freezing.

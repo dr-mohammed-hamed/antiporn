@@ -33,6 +33,10 @@ object CurfewConfig {
         // User Custom Business Apps
         "com.dr.tech.daftar_albahr",           // دفتر البحر
         "com.dr.tech.hafeez_pos_micro_erp",    // حفيظ
+        "com.dr.tech.puretube",                // PureTube (Alternative YouTube Player)
+        "org.schabi.newpipe",                  // NewPipe (Official)
+        "org.schabi.newpipe.debug",            // NewPipe (Modified / Debug variant)
+        "org.polymorphicshade.tubular",        // Tubular (NewPipe Fork)
 
         // Quran & Islamic Apps
         "com.islamicapp.moshafy",              // مصحفي
@@ -87,7 +91,7 @@ object CurfewConfig {
         // Device Management Self-Protection
         "com.drmohammed.antiporn",             // AntiPorn Guard
 
-        // Exempted Games
+        // Exempted Games & Emulators
         "com.axlebolt.standoff2",              // Standoff 2 (Shooting Game)
         "com.AlfaBravo.CombatMaster",          // Combat Master (FPS Shooting Game)
         "com.nekki.shadowfightarena",          // Shadow Fight 4: Arena (Fighting Game)
@@ -96,6 +100,9 @@ object CurfewConfig {
         "yio.tro.antiyoy.android",             // Antiyoy (Turn-based Strategy Game)
         "air.com.RustyLake.CubeEscapeCollection", // Cube Escape Collection (Puzzle Game)
         "org.ppsspp.ppsspp",                   // PPSSPP (PSP Games Emulator)
+        "xyz.aethersx2.android",               // AetherSX2 (PS2 Games Emulator)
+        "com.frogmind.badland",                // BADLAND (Physics Adventure Game)
+        "com.nvsgames.snap",                   // MARVEL SNAP (Card Strategy Game)
         "com.coloros.gamespaceui"              // Game Space UI (Realme/OPPO Game Assistant)
     )
 

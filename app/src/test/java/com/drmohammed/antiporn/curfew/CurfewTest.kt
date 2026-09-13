@@ -45,6 +45,10 @@ class CurfewTest {
         // Business & productivity apps
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.dr.tech.daftar_albahr"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.dr.tech.hafeez_pos_micro_erp"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.dr.tech.puretube"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("org.schabi.newpipe"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("org.schabi.newpipe.debug"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("org.polymorphicshade.tubular"))
         assertFalse("Puregram should NOT be exempt during curfew", CurfewConfig.STATIC_WHITELIST.contains("org.puregram.messenger"))
 
         // Islamic apps & Athan
@@ -66,7 +70,7 @@ class CurfewTest {
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("de.ph1b.audiobook"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("de.danoeh.antennapod"))
 
-        // Exempted Games
+        // Exempted Games & Emulators
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.axlebolt.standoff2"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.AlfaBravo.CombatMaster"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.nekki.shadowfightarena"))
@@ -75,6 +79,9 @@ class CurfewTest {
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("yio.tro.antiyoy.android"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("air.com.RustyLake.CubeEscapeCollection"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("org.ppsspp.ppsspp"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("xyz.aethersx2.android"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.frogmind.badland"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.nvsgames.snap"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.coloros.gamespaceui"))
     }
 
@@ -261,5 +268,17 @@ class CurfewTest {
             "CurfewShield hidden packages verification must NEVER include Play Store to prevent infinite desync loops",
             packagesToHide.contains(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE)
         )
+    }
+
+    @Test
+    fun testNewPipe_isWhitelistedAndExemptFromCurfew() {
+        val newpipePackages = listOf(
+            "org.schabi.newpipe",
+            "org.schabi.newpipe.debug",
+            "org.polymorphicshade.tubular"
+        )
+        for (pkg in newpipePackages) {
+            assertTrue("Package $pkg must be in STATIC_WHITELIST", CurfewConfig.STATIC_WHITELIST.contains(pkg))
+        }
     }
 }

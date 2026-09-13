@@ -100,6 +100,20 @@ object CurfewAppResolver {
     }
 
     /**
+     * Dynamically identifies if an application is an alternative YouTube player, NewPipe client/fork, or local media player.
+     */
+    fun isMediaOrAlternativePlayerApp(pm: PackageManager, appInfo: ApplicationInfo): Boolean {
+        val pkg = appInfo.packageName.lowercase()
+        val keywords = listOf("newpipe", "puretube", "tubular", "musicolet")
+        if (keywords.any { pkg.contains(it) }) return true
+
+        val label = try { pm.getApplicationLabel(appInfo).toString().lowercase() } catch (e: Exception) { "" }
+        val labelTokens = label.split(Regex("[\\s_\\-.,;:!?/\\\\\\[\\]()]+")).filter { it.isNotBlank() }
+        val playerTokens = setOf("newpipe", "puretube", "tubular")
+        return labelTokens.any { playerTokens.contains(it) }
+    }
+
+    /**
      * Dynamically identifies if an application is classified as a game by the Android system.
      */
     fun isGameApp(appInfo: ApplicationInfo): Boolean {
@@ -131,7 +145,7 @@ object CurfewAppResolver {
                 pm.getInstalledApplications(0)
             }
             for (app in installedApps) {
-                if (isIslamicOrQuranApp(pm, app) || isAudiobookOrPodcastApp(pm, app) || isMedicalOrStudyApp(pm, app) || isGameApp(app)) {
+                if (isIslamicOrQuranApp(pm, app) || isAudiobookOrPodcastApp(pm, app) || isMedicalOrStudyApp(pm, app) || isMediaOrAlternativePlayerApp(pm, app) || isGameApp(app)) {
                     immune.add(app.packageName)
                     Log.i(TAG, "Exempted Whitelist app dynamically: ${app.packageName}")
                 }
