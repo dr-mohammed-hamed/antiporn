@@ -1,10 +1,18 @@
 package com.drmohammed.antiporn.curfew
 
+import java.util.Calendar
+import java.util.TimeZone
+
 /**
  * Configuration and immutable constants for the Scheduled Night Curfew system.
  * Curfew window: 20:30 (8:30 PM) to 07:00 (7:00 AM) every day.
+ * Timezone: Asia/Riyadh (Makkah Al-Mukarramah, UTC+3).
  */
 object CurfewConfig {
+
+    const val MAKKAH_TIMEZONE_ID = "Asia/Riyadh"
+
+    fun getCurfewCalendar(): Calendar = Calendar.getInstance(TimeZone.getTimeZone(MAKKAH_TIMEZONE_ID))
 
     const val START_HOUR = 20
     const val START_MINUTE = 30
@@ -82,6 +90,8 @@ object CurfewConfig {
         "com.axlebolt.standoff2",              // Standoff 2 (Shooting Game)
         "com.AlfaBravo.CombatMaster",          // Combat Master (FPS Shooting Game)
         "com.nekki.shadowfightarena",          // Shadow Fight 4: Arena (Fighting Game)
+        "com.zeptolab.bulletecho.google",      // Bullet Echo (Tactical PvP Shooter Game)
+        "com.smokingguninc.phobies",           // Phobies (Turn-based Strategy Game)
         "yio.tro.antiyoy.android",             // Antiyoy (Turn-based Strategy Game)
         "air.com.RustyLake.CubeEscapeCollection", // Cube Escape Collection (Puzzle Game)
         "org.ppsspp.ppsspp",                   // PPSSPP (PSP Games Emulator)

@@ -19,10 +19,12 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
+import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.services.NetworkWatchdog
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
+import java.util.TimeZone
 import java.util.concurrent.Executors
 
 class DnsWatchdogService : Service() {
@@ -329,6 +331,25 @@ class DnsWatchdogService : Service() {
             }
         } catch (e: Exception) {
             Log.d(TAG, "Could not read Settings.Global directly", e)
+        }
+
+        // Verify Makkah Timezone (Asia/Riyadh, GMT+3) and Network Auto Time directly
+        try {
+            val currentTz = TimeZone.getDefault()
+            val isMakkahTz = currentTz.id == CurfewConfig.MAKKAH_TIMEZONE_ID || currentTz.rawOffset == 3 * 3600 * 1000
+            if (!isMakkahTz) {
+                Log.w(TAG, "Timezone mismatch detected in watchdog: current=${currentTz.id}, expected=${CurfewConfig.MAKKAH_TIMEZONE_ID}")
+                needsEnforce = true
+            }
+
+            val autoTime = Settings.Global.getInt(contentResolver, Settings.Global.AUTO_TIME, 1)
+            val autoTimeZone = Settings.Global.getInt(contentResolver, Settings.Global.AUTO_TIME_ZONE, 0)
+            if (autoTime != 1 || autoTimeZone != 0) {
+                Log.w(TAG, "Auto time settings mismatch in watchdog: autoTime=$autoTime, autoTimeZone=$autoTimeZone")
+                needsEnforce = true
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not verify Timezone or Auto Time directly in watchdog", e)
         }
 
         // Live self-healing curfew synchronization during night hours or test mode

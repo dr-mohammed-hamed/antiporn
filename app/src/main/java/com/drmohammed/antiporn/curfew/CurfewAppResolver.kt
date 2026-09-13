@@ -100,7 +100,18 @@ object CurfewAppResolver {
     }
 
     /**
-     * Resolves all system immune packages dynamically (keyboards, launcher, dialer, camera, SMS, contacts, Quran, Audiobooks, Medical apps).
+     * Dynamically identifies if an application is classified as a game by the Android system.
+     */
+    fun isGameApp(appInfo: ApplicationInfo): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (appInfo.category == ApplicationInfo.CATEGORY_GAME) return true
+        }
+        @Suppress("DEPRECATION")
+        return (appInfo.flags and ApplicationInfo.FLAG_IS_GAME) != 0
+    }
+
+    /**
+     * Resolves all system immune packages dynamically (keyboards, launcher, dialer, camera, SMS, contacts, Quran, Audiobooks, Medical apps, and Games).
      */
     fun resolveImmunePackages(context: Context): Set<String> {
         val immune = mutableSetOf<String>()
@@ -111,7 +122,7 @@ object CurfewAppResolver {
         immune.addAll(CurfewConfig.STATIC_WHITELIST)
         immune.add(context.packageName)
 
-        // 2. Dynamic Discovery of ALL Quran, Islamic, Audiobook, Podcast, and Medical apps installed on the phone
+        // 2. Dynamic Discovery of ALL Quran, Islamic, Audiobook, Podcast, Medical, and Game apps installed on the phone
         try {
             val installedApps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
@@ -120,13 +131,13 @@ object CurfewAppResolver {
                 pm.getInstalledApplications(0)
             }
             for (app in installedApps) {
-                if (isIslamicOrQuranApp(pm, app) || isAudiobookOrPodcastApp(pm, app) || isMedicalOrStudyApp(pm, app)) {
+                if (isIslamicOrQuranApp(pm, app) || isAudiobookOrPodcastApp(pm, app) || isMedicalOrStudyApp(pm, app) || isGameApp(app)) {
                     immune.add(app.packageName)
                     Log.i(TAG, "Exempted Whitelist app dynamically: ${app.packageName}")
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error scanning installed apps for Quran packages", e)
+            Log.w(TAG, "Error scanning installed apps for whitelisted packages", e)
         }
 
         // 3. Default Home Launcher
@@ -232,8 +243,9 @@ object CurfewAppResolver {
             Log.w(TAG, "Error resolving utility packages", e)
         }
 
-        // Strictly ensure no blacklisted or curfew search loophole package ever gains immunity
+        // Strictly ensure no blacklisted, app store, or curfew search loophole package ever gains immunity
         immune.removeAll { AppSuspensionShield.isBlacklisted(it) }
+        immune.removeAll(CurfewConfig.KNOWN_APP_STORES)
         immune.removeAll(CurfewConfig.CURFEW_SEARCH_APPS)
 
         return immune

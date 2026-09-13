@@ -8,10 +8,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
 
+import java.util.TimeZone
+
 class CurfewTest {
 
     private fun createCalendar(hourOfDay: Int, minute: Int): Calendar {
-        return Calendar.getInstance().apply {
+        return Calendar.getInstance(TimeZone.getTimeZone(CurfewConfig.MAKKAH_TIMEZONE_ID)).apply {
             set(Calendar.HOUR_OF_DAY, hourOfDay)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
@@ -68,6 +70,8 @@ class CurfewTest {
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.axlebolt.standoff2"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.AlfaBravo.CombatMaster"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.nekki.shadowfightarena"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.zeptolab.bulletecho.google"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.smokingguninc.phobies"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("yio.tro.antiyoy.android"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("air.com.RustyLake.CubeEscapeCollection"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("org.ppsspp.ppsspp"))
@@ -157,5 +161,24 @@ class CurfewTest {
         val activate = false
         val rejectDeactivation = !activate && isCurfewNight
         assertFalse("Daytime wakeup must be permitted", rejectDeactivation)
+    }
+
+    @Test
+    fun testMakkahTimezone_isConfiguredCorrectly() {
+        assertEquals("Asia/Riyadh", CurfewConfig.MAKKAH_TIMEZONE_ID)
+        val makkahCal = CurfewConfig.getCurfewCalendar()
+        assertEquals(3 * 3600 * 1000, makkahCal.timeZone.rawOffset)
+    }
+
+    @Test
+    fun testCurfewScheduler_nextOccurrence_usesMakkahTimezone() {
+        val baseTime = createCalendar(12, 0) // 12:00 PM Makkah time
+        val nextOccurrence = CurfewScheduler.getNextOccurrence(20, 30, baseTime)
+
+        assertEquals("Next occurrence should preserve Makkah timezone",
+            baseTime.timeZone.rawOffset, nextOccurrence.timeZone.rawOffset)
+        assertEquals(20, nextOccurrence.get(Calendar.HOUR_OF_DAY))
+        assertEquals(30, nextOccurrence.get(Calendar.MINUTE))
+        assertTrue(nextOccurrence.timeInMillis > baseTime.timeInMillis)
     }
 }

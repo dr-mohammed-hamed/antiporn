@@ -21,9 +21,8 @@ object CurfewScheduler {
      * Calculates next calendar occurrence for a given hour and minute.
      * If the time today has already passed, schedules for tomorrow.
      */
-    fun getNextOccurrence(hour: Int, minute: Int, now: Calendar = Calendar.getInstance()): Calendar {
-        val target = Calendar.getInstance().apply {
-            timeInMillis = now.timeInMillis
+    fun getNextOccurrence(hour: Int, minute: Int, now: Calendar = CurfewConfig.getCurfewCalendar()): Calendar {
+        val target = (now.clone() as Calendar).apply {
             set(Calendar.HOUR_OF_DAY, hour)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
@@ -44,13 +43,9 @@ object CurfewScheduler {
             return
         }
 
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
-        val now = Calendar.getInstance()
+        val now = CurfewConfig.getCurfewCalendar()
         val nextStart = getNextOccurrence(CurfewConfig.START_HOUR, CurfewConfig.START_MINUTE, now)
         val nextEnd = getNextOccurrence(CurfewConfig.END_HOUR, CurfewConfig.END_MINUTE, now)
 
@@ -89,7 +84,7 @@ object CurfewScheduler {
                         endPendingIntent
                     )
                 }
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            } else {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     nextStart.timeInMillis,
@@ -100,9 +95,6 @@ object CurfewScheduler {
                     nextEnd.timeInMillis,
                     endPendingIntent
                 )
-            } else {
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, nextStart.timeInMillis, startPendingIntent)
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, nextEnd.timeInMillis, endPendingIntent)
             }
             Log.i(TAG, "Scheduled exact curfew alarms: Start at ${nextStart.time}, End at ${nextEnd.time}")
         } catch (e: Exception) {

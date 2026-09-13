@@ -68,7 +68,8 @@
 
         <receiver
             android:name=".curfew.CurfewAlarmReceiver"
-            android:exported="true">
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
             <intent-filter>
                 <action android:name="com.drmohammed.antiporn.ACTION_CURFEW_START" />
                 <action android:name="com.drmohammed.antiporn.ACTION_CURFEW_END" />

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import java.util.concurrent.Executors
 
 /**
@@ -27,6 +28,11 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
                 // evaluate ground-truth state via syncCurfewState to prevent broadcast spoofing.
                 CurfewEnforcer.syncCurfewState(appContext)
                 CurfewScheduler.scheduleNextAlarms(appContext)
+
+                if (action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_TIMEZONE_CHANGED) {
+                    Log.i(TAG, "Time/Timezone change detected; re-enforcing system policies immediately")
+                    ProtectionEngine.applyAllAsync(appContext)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing curfew alarm action: $action", e)
             } finally {

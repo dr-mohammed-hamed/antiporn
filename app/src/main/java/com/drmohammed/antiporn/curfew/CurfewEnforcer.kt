@@ -25,9 +25,9 @@ object CurfewEnforcer {
     private val bgExecutor = Executors.newSingleThreadExecutor()
 
     /**
-     * Determines whether the current device time falls within the 20:30 - 07:00 curfew window.
+     * Determines whether the current Makkah time falls within the 20:30 - 07:00 curfew window.
      */
-    fun isCurfewActive(calendar: Calendar = Calendar.getInstance()): Boolean {
+    fun isCurfewActive(calendar: Calendar = CurfewConfig.getCurfewCalendar()): Boolean {
         val minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
         val startMinute = CurfewConfig.START_HOUR * 60 + CurfewConfig.START_MINUTE // 20:30 = 1230
         val endMinute = CurfewConfig.END_HOUR * 60 + CurfewConfig.END_MINUTE     // 07:00 = 420
@@ -90,7 +90,7 @@ object CurfewEnforcer {
      * Guaranteed invariant: Cannot release curfew if current time is inside night curfew window.
      */
     @Synchronized
-    fun enforce(context: Context, activate: Boolean, calendar: Calendar = Calendar.getInstance()): Boolean {
+    fun enforce(context: Context, activate: Boolean, calendar: Calendar = CurfewConfig.getCurfewCalendar()): Boolean {
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return false
         val admin = ComponentName(context, AdminReceiver::class.java)
 
