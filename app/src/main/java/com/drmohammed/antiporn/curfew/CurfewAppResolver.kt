@@ -105,13 +105,16 @@ object CurfewAppResolver {
      */
     fun isMediaOrAlternativePlayerApp(pm: PackageManager, appInfo: ApplicationInfo): Boolean {
         val pkg = appInfo.packageName.lowercase()
-        val keywords = listOf("newpipe", "puretube", "tubular", "musicolet")
+        val keywords = listOf("newpipe", "puretube", "tubular", "musicolet", "mxtech", "mxplayer")
         if (keywords.any { pkg.contains(it) }) return true
 
         val label = try { pm.getApplicationLabel(appInfo).toString().lowercase() } catch (e: Exception) { "" }
         val labelTokens = label.split(Regex("[\\s_\\-.,;:!?/\\\\\\[\\]()]+")).filter { it.isNotBlank() }
-        val playerTokens = setOf("newpipe", "puretube", "tubular")
-        return labelTokens.any { playerTokens.contains(it) }
+        val playerTokens = setOf("newpipe", "puretube", "tubular", "mxplayer")
+        if (labelTokens.any { playerTokens.contains(it) }) return true
+
+        val mediaPhrases = listOf("mx player", "مشغل mx")
+        return mediaPhrases.any { label.contains(it) }
     }
 
     /**

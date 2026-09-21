@@ -60,6 +60,8 @@ class CurfewTest {
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.authy.authy"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.google.android.apps.authenticator2"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("in.krosbits.musicolet"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.mxtech.videoplayer.ad"))
+        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.mxtech.videoplayer.pro"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.xodo.pdf.reader"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.google.android.keep"))
 
@@ -294,5 +296,16 @@ class CurfewTest {
     @Test
     fun testCurfewVpnBypassConfigKey() {
         assertEquals("key_curfew_vpn_bypass_packages", CurfewConfig.KEY_CURFEW_VPN_BYPASS_PACKAGES)
+    }
+
+    @Test
+    fun testMxPlayer_isWhitelistedAndExemptFromCurfew() {
+        val mxPackages = listOf(
+            "com.mxtech.videoplayer.ad",
+            "com.mxtech.videoplayer.pro"
+        )
+        for (pkg in mxPackages) {
+            assertTrue("Package $pkg must be in STATIC_WHITELIST", CurfewConfig.STATIC_WHITELIST.contains(pkg))
+        }
     }
 }

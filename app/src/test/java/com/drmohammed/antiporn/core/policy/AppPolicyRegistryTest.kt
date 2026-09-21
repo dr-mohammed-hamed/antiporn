@@ -104,4 +104,28 @@ class AppPolicyRegistryTest {
         assertEquals(AppClassification.CURFEW_EXEMPT_PRODUCTIVITY, AppPolicyRegistry.classify(variant))
         assertTrue("TickTick variants must be exempt via wildcard", AppPolicyRegistry.isExemptFromCurfew(variant))
     }
+
+    @Test
+    fun testMxPlayer_isExemptFromNightCurfew() {
+        val free = "com.mxtech.videoplayer.ad"
+        val pro = "com.mxtech.videoplayer.pro"
+        val beta = "com.mxtech.videoplayer.beta"
+
+        // Free version
+        assertEquals(AppClassification.CURFEW_EXEMPT_MEDIA, AppPolicyRegistry.classify(free))
+        assertTrue("MX Player Free must be exempt from curfew", AppPolicyRegistry.isExemptFromCurfew(free))
+        assertTrue("MX Player Free must be in curfew static whitelist", AppPolicyRegistry.getCurfewStaticWhitelist().contains(free))
+        assertFalse("MX Player must NOT be permanently blacklisted", AppPolicyRegistry.isPermanentlyBlacklisted(free))
+
+        // Pro version
+        assertEquals(AppClassification.CURFEW_EXEMPT_MEDIA, AppPolicyRegistry.classify(pro))
+        assertTrue("MX Player Pro must be exempt from curfew", AppPolicyRegistry.isExemptFromCurfew(pro))
+        assertTrue("MX Player Pro must be in curfew static whitelist", AppPolicyRegistry.getCurfewStaticWhitelist().contains(pro))
+        assertFalse("MX Player Pro must NOT be permanently blacklisted", AppPolicyRegistry.isPermanentlyBlacklisted(pro))
+
+        // Beta / wildcard variant
+        assertEquals(AppClassification.CURFEW_EXEMPT_MEDIA, AppPolicyRegistry.classify(beta))
+        assertTrue("MX Player Beta must be exempt via wildcard", AppPolicyRegistry.isExemptFromCurfew(beta))
+        assertFalse("MX Player Beta must NOT be permanently blacklisted", AppPolicyRegistry.isPermanentlyBlacklisted(beta))
+    }
 }
