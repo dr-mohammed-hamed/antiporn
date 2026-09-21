@@ -174,15 +174,13 @@ object CurfewForegroundWatcher {
             lastForegroundClass = null
             kickoutToHome(context, now, R.string.curfew_play_store_blocked)
         } else if (lastForegroundPackage == CurfewConfig.GOOGLE_SEARCH_PACKAGE) {
-            if (!isGeminiActivity(lastForegroundClass)) {
-                Log.w(
-                    TAG,
-                    "Google Search / Discover UI detected in foreground ($lastForegroundClass) during curfew! Kicking out to Home..."
-                )
-                lastForegroundPackage = null
-                lastForegroundClass = null
-                kickoutToHome(context, now, R.string.curfew_google_search_blocked)
-            }
+            Log.w(
+                TAG,
+                "Google Search / Gemini UI detected in foreground ($lastForegroundClass) during curfew! Kicking out to Home..."
+            )
+            lastForegroundPackage = null
+            lastForegroundClass = null
+            kickoutToHome(context, now, R.string.curfew_google_search_blocked)
         }
     }
 

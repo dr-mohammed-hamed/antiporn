@@ -12,6 +12,7 @@ import android.provider.Telephony
 import android.telecom.TelecomManager
 import android.util.Log
 import android.view.inputmethod.InputMethodManager
+import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 
 /**
@@ -145,7 +146,7 @@ object CurfewAppResolver {
                 pm.getInstalledApplications(0)
             }
             for (app in installedApps) {
-                if (isIslamicOrQuranApp(pm, app) || isAudiobookOrPodcastApp(pm, app) || isMedicalOrStudyApp(pm, app) || isMediaOrAlternativePlayerApp(pm, app) || isGameApp(app)) {
+                if (AppPolicyRegistry.isExemptFromCurfew(app.packageName) || isIslamicOrQuranApp(pm, app) || isAudiobookOrPodcastApp(pm, app) || isMedicalOrStudyApp(pm, app) || isMediaOrAlternativePlayerApp(pm, app) || isGameApp(app)) {
                     immune.add(app.packageName)
                     Log.i(TAG, "Exempted Whitelist app dynamically: ${app.packageName}")
                 }
@@ -314,7 +315,7 @@ object CurfewAppResolver {
         targets.addAll(CurfewConfig.CURFEW_SEARCH_APPS)
 
         // Filter out immune packages, self, Google Play Store, and Google Search.
-        // Google Play Store and Google Search are kept unsuspended so games and Gemini AI can access background IPC services,
+        // Google Play Store and Google Search are kept unsuspended so games can access background IPC services,
         // while their UI is protected via CurfewForegroundWatcher.
         val finalTargets = targets
             .filterNot { immunePackages.contains(it) }

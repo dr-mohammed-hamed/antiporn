@@ -124,7 +124,7 @@ object CurfewEnforcer {
                 }
             }
 
-            // Ensure Google Play Store and Google Search are NOT hidden and NOT suspended so games and Gemini can use background IPC
+            // Ensure Google Play Store and Google Search are NOT hidden and NOT suspended so games can use background IPC
             try {
                 if (dpm.isApplicationHidden(admin, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE)) {
                     dpm.setApplicationHidden(admin, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, false)

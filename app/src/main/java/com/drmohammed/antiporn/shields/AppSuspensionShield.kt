@@ -15,6 +15,7 @@ import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
+import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
@@ -33,12 +34,9 @@ object AppSuspensionShield : ProtectionShield {
 
     /**
      * Packages that must NEVER be suspended or uninstalled under any circumstances.
-     * Contains the AntiPorn app itself and the user's custom messenger (org.puregram.messenger).
+     * Delegates to central [AppPolicyRegistry].
      */
-    val IMMUNE_PACKAGES: Set<String> = setOf(
-        "org.puregram.messenger",
-        "com.drmohammed.antiporn"
-    )
+    val IMMUNE_PACKAGES: Set<String> get() = AppPolicyRegistry.getImmunePackages()
 
     /**
      * Telegram & official / unofficial clients / forks.
@@ -144,25 +142,16 @@ object AppSuspensionShield : ProtectionShield {
     )
 
     /**
-     * Aggregated set of all blacklisted packages, strictly guaranteed to exclude immune packages.
+     * Aggregated set of all blacklisted packages, sourced from central [AppPolicyRegistry].
      */
-    val BLACKLISTED_PACKAGES: Set<String> = (
-        TELEGRAM_PACKAGES +
-        OPEN_SOCIAL_NETWORKS +
-        PROXY_BROWSERS +
-        RANDOM_CHAT_APPS +
-        TIKTOK_PACKAGES
-    ) - IMMUNE_PACKAGES
+    val BLACKLISTED_PACKAGES: Set<String> get() = AppPolicyRegistry.getBlacklistedPackages()
 
     private val fastExecutor = Executors.newSingleThreadExecutor()
     private val processingPackages = ConcurrentHashMap.newKeySet<String>()
 
-    fun isImmune(packageName: String): Boolean = IMMUNE_PACKAGES.contains(packageName)
+    fun isImmune(packageName: String): Boolean = AppPolicyRegistry.isImmune(packageName)
 
-    fun isBlacklisted(packageName: String): Boolean {
-        if (isImmune(packageName)) return false
-        return BLACKLISTED_PACKAGES.contains(packageName)
-    }
+    fun isBlacklisted(packageName: String): Boolean = AppPolicyRegistry.isPermanentlyBlacklisted(packageName)
 
     fun getCategoryForPackage(packageName: String): String? {
         if (isImmune(packageName)) return null

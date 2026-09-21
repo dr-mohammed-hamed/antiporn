@@ -81,5 +81,5 @@
     <string name="btn_grant_usage_access">منح إذن الوصول لبيانات الاستخدام</string>
     <string name="card_curfew_usage_missing_subtext">⚠️ إذن الوصول لبيانات الاستخدام مطلوب لتأمين إغلاق متجر Google Play أثناء الحظر.</string>
     <string name="toast_open_settings_failed">تعذر فتح شاشة الإعدادات</string>
-    <string name="curfew_google_search_blocked">🚫 بحث Google وتغذية الأخبار مغلقة أثناء حظر التجول الليلي! (تطبيق Gemini متاح)</string>
+    <string name="curfew_google_search_blocked">🚫 بحث Google وتطبيق Gemini مغلقان أثناء حظر التجول الليلي!</string>
 </resources>

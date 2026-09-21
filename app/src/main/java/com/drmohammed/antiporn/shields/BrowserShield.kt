@@ -9,6 +9,7 @@ import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
+import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 
 /**
  * Isolated security shield that disables Incognito / Private browsing and enforces
@@ -21,21 +22,7 @@ object BrowserShield : ProtectionShield {
     override val id: String = "browser"
     override val titleResId: Int = R.string.card_browser_title
 
-    val TARGET_BROWSER_PACKAGES = listOf(
-        "com.android.chrome",
-        "com.chrome.beta",
-        "com.chrome.dev",
-        "com.chrome.canary",
-        "com.brave.browser",
-        "com.brave.browser_beta",
-        "com.brave.browser_nightly",
-        "com.microsoft.emmx",
-        "com.microsoft.emmx.canary",
-        "com.sec.android.app.sbrowser",
-        "com.opera.browser",
-        "com.opera.mini.native",
-        "com.vivaldi.browser"
-    )
+    val TARGET_BROWSER_PACKAGES: List<String> get() = AppPolicyRegistry.getTargetBrowserPackages()
 
     fun buildBrowserRestrictionsBundle(): Bundle {
         return Bundle().apply {

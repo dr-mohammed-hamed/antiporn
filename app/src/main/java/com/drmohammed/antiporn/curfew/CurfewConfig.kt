@@ -1,5 +1,6 @@
 package com.drmohammed.antiporn.curfew
 
+import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import java.util.Calendar
 import java.util.TimeZone
 
@@ -27,84 +28,9 @@ object CurfewConfig {
 
     /**
      * Explicit Whitelist of user productivity, financial, religious, and essential applications.
-     * These apps must NEVER be suspended during curfew.
+     * Sourced from central [AppPolicyRegistry].
      */
-    val STATIC_WHITELIST: Set<String> = setOf(
-        // User Custom Business Apps
-        "com.dr.tech.daftar_albahr",           // دفتر البحر
-        "com.dr.tech.hafeez_pos_micro_erp",    // حفيظ
-        "com.dr.tech.puretube",                // PureTube (Alternative YouTube Player)
-        "org.schabi.newpipe",                  // NewPipe (Official)
-        "org.schabi.newpipe.debug",            // NewPipe (Modified / Debug variant)
-        "org.polymorphicshade.tubular",        // Tubular (NewPipe Fork)
-
-        // Quran & Islamic Apps
-        "com.islamicapp.moshafy",              // مصحفي
-        "com.quran.labs.androidquran",         // Quran Android
-        "com.simppro.quran.tafseer.offline",   // المصحف والتفسير
-        "com.simppro.quran.offline",           // المصحف الشريف
-        "com.surahapp",                        // سورة
-        "com.simt.ayah",                       // آية Ayah
-        "com.madina.quran",                    // مصحف المدينة
-        "com.quran.karem",                     // القرآن الكريم
-        "com.surah.quran",                     // سور القرآن
-        "com.athanotify",                      // أذان نوتيفاي Athanotify
-
-        // Medical & Pediatric Apps (Work & Study)
-        "com.companyname.pedi_dose_app",       // Pedi Dose
-        "com.medscape.android",                // Medscape
-        "com.uptodate.android",                // UpToDate
-        "com.lexicomp.android",                // Lexicomp
-
-        // Audiobooks & Podcasts
-        "de.ph1b.audiobook",                   // Voice Audiobook Player
-        "de.danoeh.antennapod",                // AntennaPod Podcast Player
-        "ak.alizandro.smartaudiobookplayer",   // Smart AudioBook Player
-        "com.storytel.app",                    // Storytel
-        "com.wajeez",                          // Wajeez
-        "com.akhdar",                          // Akhdar
-        "com.abjjad",                          // Abjjad
-        "com.rufoof.app",                      // Rufoof
-        "com.dhad",                            // Dhad
-
-        // Camera Apps (Device Specific GCams)
-        "com.googleCamera.Wichaya8",           // GCam Wichaya
-        "com.android.MGC",                     // GCam MGC
-        "org.codeaurora.snapcam",              // Snap Camera
-
-        // Two-Factor Authentication (2FA) & Security
-        "com.authy.authy",                     // Twilio Authy
-        "com.google.android.apps.authenticator2", // Google Authenticator
-        "com.azure.authenticator",             // Microsoft Authenticator
-        "org.fedorahosted.freeotp",            // FreeOTP
-        "com.duosecurity.duomobile",           // Duo Mobile
-
-        // Essential Financial & Daily Tools
-        "com.egyptianbanks.instapay",          // InstaPay Egypt
-        "in.krosbits.musicolet",               // Musicolet Audio Player
-        "com.xodo.pdf.reader",                 // Xodo PDF Reader & Editor
-        "com.google.android.keep",             // Google Keep Notes
-        "com.google.android.apps.kids.familylinkhelper", // Family Link
-        "com.google.android.apps.kids.familylink",       // Family Link Parent
-        "com.google.android.apps.bard",        // Google Gemini (AI Assistant)
-
-        // Device Management Self-Protection
-        "com.drmohammed.antiporn",             // AntiPorn Guard
-
-        // Exempted Games & Emulators
-        "com.axlebolt.standoff2",              // Standoff 2 (Shooting Game)
-        "com.AlfaBravo.CombatMaster",          // Combat Master (FPS Shooting Game)
-        "com.nekki.shadowfightarena",          // Shadow Fight 4: Arena (Fighting Game)
-        "com.zeptolab.bulletecho.google",      // Bullet Echo (Tactical PvP Shooter Game)
-        "com.smokingguninc.phobies",           // Phobies (Turn-based Strategy Game)
-        "yio.tro.antiyoy.android",             // Antiyoy (Turn-based Strategy Game)
-        "air.com.RustyLake.CubeEscapeCollection", // Cube Escape Collection (Puzzle Game)
-        "org.ppsspp.ppsspp",                   // PPSSPP (PSP Games Emulator)
-        "xyz.aethersx2.android",               // AetherSX2 (PS2 Games Emulator)
-        "com.frogmind.badland",                // BADLAND (Physics Adventure Game)
-        "com.nvsgames.snap",                   // MARVEL SNAP (Card Strategy Game)
-        "com.coloros.gamespaceui"              // Game Space UI (Realme/OPPO Game Assistant)
-    )
+    val STATIC_WHITELIST: Set<String> get() = AppPolicyRegistry.getCurfewStaticWhitelist()
 
     /**
      * Known vendor calculator packages.
@@ -157,15 +83,7 @@ object CurfewConfig {
     /**
      * Critical system framework packages that must NEVER be suspended.
      */
-    val SYSTEM_CRITICAL_PACKAGES: Set<String> = setOf(
-        "android",
-        "com.android.systemui",
-        "com.google.android.gms",
-        "com.google.android.gsf",
-        "com.android.settings",
-        "com.google.android.packageinstaller",
-        "com.android.packageinstaller"
-    )
+    val SYSTEM_CRITICAL_PACKAGES: Set<String> get() = AppPolicyRegistry.getSystemCriticalPackages()
 
     const val GOOGLE_PLAY_STORE_PACKAGE = "com.android.vending"
     const val GOOGLE_SEARCH_PACKAGE = "com.google.android.googlequicksearchbox"
@@ -176,13 +94,7 @@ object CurfewConfig {
      * background licensing, Play Games, and In-App Billing IPC services.
      * Play Store UI is locked via CurfewForegroundWatcher (auto-kickout) and DISALLOW_INSTALL_APPS.
      */
-    val OEM_APP_STORES: Set<String> = setOf(
-        "com.heytap.market",                 // Realme / Oppo App Market
-        "com.oppo.market",
-        "com.sec.android.app.samsungapps",   // Samsung Galaxy Store
-        "com.xiaomi.mipicks",                // Xiaomi GetApps
-        "com.huawei.appmarket"               // Huawei AppGallery
-    )
+    val OEM_APP_STORES: Set<String> get() = AppPolicyRegistry.getOemAppStores()
 
     /**
      * All known app stores (OEM stores + Google Play Store).
@@ -193,8 +105,7 @@ object CurfewConfig {
      * Search loophole apps (Google Go) that must be hidden and suspended
      * during curfew only, and restored in the morning.
      * Note: Google Search (com.google.android.googlequicksearchbox) is kept unhidden and unsuspended
-     * so that the Gemini AI Assistant (com.google.android.apps.bard) can run its underlying assistant backend.
-     * Search UI and Discover feed are locked via CurfewForegroundWatcher activity-level inspection.
+     * for system IPC background services, while its UI and Gemini Assistant are locked via CurfewForegroundWatcher.
      */
     val CURFEW_SEARCH_APPS: Set<String> = setOf(
         "com.google.android.apps.searchlite"        // Google Go

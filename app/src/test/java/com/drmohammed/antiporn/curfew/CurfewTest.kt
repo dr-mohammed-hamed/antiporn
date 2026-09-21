@@ -98,15 +98,15 @@ class CurfewTest {
 
     @Test
     fun testCurfewSearchApps_areExplicitlyTargetedForCurfew() {
-        // Searchlite (Google Go) is hidden, but Google Search is kept unhidden for Gemini IPC
+        // Searchlite (Google Go) is hidden, but Google Search is kept unhidden for system IPC
         assertTrue(CurfewConfig.CURFEW_SEARCH_APPS.contains("com.google.android.apps.searchlite"))
         assertFalse(
-            "Google Search must NOT be in CURFEW_SEARCH_APPS so it remains unhidden for Gemini AI",
+            "Google Search must NOT be in CURFEW_SEARCH_APPS so it remains unhidden for IPC",
             CurfewConfig.CURFEW_SEARCH_APPS.contains(CurfewConfig.GOOGLE_SEARCH_PACKAGE)
         )
 
-        // Ensure Gemini is in whitelist and searchlite is NOT in whitelist
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.google.android.apps.bard"))
+        // Ensure Gemini, searchlite, and Google Search are NOT in whitelist
+        assertFalse(CurfewConfig.STATIC_WHITELIST.contains("com.google.android.apps.bard"))
         assertFalse(CurfewConfig.STATIC_WHITELIST.contains("com.google.android.apps.searchlite"))
         assertFalse(CurfewConfig.STATIC_WHITELIST.contains(CurfewConfig.GOOGLE_SEARCH_PACKAGE))
     }
