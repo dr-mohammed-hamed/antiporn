@@ -82,4 +82,11 @@
     <string name="card_curfew_usage_missing_subtext">⚠️ إذن الوصول لبيانات الاستخدام مطلوب لتأمين إغلاق متجر Google Play أثناء الحظر.</string>
     <string name="toast_open_settings_failed">تعذر فتح شاشة الإعدادات</string>
     <string name="curfew_google_search_blocked">🚫 بحث Google وتطبيق Gemini مغلقان أثناء حظر التجول الليلي!</string>
+
+    <!-- Curfew Blackhole VPN Strings -->
+    <string name="curfew_vpn_channel_name">عزل شبكة الحظر الليلي 🌙</string>
+    <string name="curfew_vpn_channel_desc">قناة إشعارات حظر الإنترنت التام أثناء فترة النوم</string>
+    <string name="curfew_vpn_notification_title">الحظر الليلي نشط: تم عزل الإنترنت 🌙</string>
+    <string name="curfew_vpn_notification_desc">تم قطع اتصال الإنترنت بالكامل حتى 07:00 ص. المكالمات ورسائل SMS تعمل بشكل طبيعي.</string>
+    <string name="curfew_vpn_session_name">AntiPorn Curfew Blackhole</string>
 </resources>

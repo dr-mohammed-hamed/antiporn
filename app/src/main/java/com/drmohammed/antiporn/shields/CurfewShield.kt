@@ -72,14 +72,33 @@ object CurfewShield : ProtectionShield {
                     }
                 }
 
-                if (!allStoresHidden) {
-                    Log.w(TAG, "Curfew is active but store/search apps are NOT hidden!")
+                val isVpnEnforced = try {
+                    dpm.getAlwaysOnVpnPackage(admin) == context.packageName
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to query always-on VPN package during curfew check", e)
+                    false
+                }
+
+                if (!allStoresHidden || !isVpnEnforced) {
+                    Log.w(TAG, "Curfew is active but store hiding ($allStoresHidden) or Blackhole VPN ($isVpnEnforced) is not fully enforced!")
                     ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_inactive_desc))
                 } else {
                     ShieldStatus.Active(context.getString(R.string.card_curfew_active_desc))
                 }
             } else {
-                ShieldStatus.Active(context.getString(R.string.card_curfew_scheduled_desc))
+                val isVpnLingering = try {
+                    dpm.getAlwaysOnVpnPackage(admin) == context.packageName
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to query always-on VPN package during release check", e)
+                    false
+                }
+
+                if (isVpnLingering) {
+                    Log.w(TAG, "Curfew is inactive but Blackhole VPN is still configured!")
+                    ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_inactive_desc))
+                } else {
+                    ShieldStatus.Active(context.getString(R.string.card_curfew_scheduled_desc))
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking CurfewShield status", e)

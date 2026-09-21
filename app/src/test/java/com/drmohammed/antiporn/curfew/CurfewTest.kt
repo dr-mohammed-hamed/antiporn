@@ -281,4 +281,18 @@ class CurfewTest {
             assertTrue("Package $pkg must be in STATIC_WHITELIST", CurfewConfig.STATIC_WHITELIST.contains(pkg))
         }
     }
+
+    @Test
+    fun testCurfewBlackholeVpnConstants() {
+        assertEquals("antiporn_curfew_vpn", CurfewBlackholeVpnService.CHANNEL_ID)
+        assertEquals(2001, CurfewBlackholeVpnService.NOTIFICATION_ID)
+        assertEquals("com.drmohammed.antiporn.curfew.ACTION_START_VPN", CurfewBlackholeVpnService.ACTION_START)
+        assertEquals("com.drmohammed.antiporn.curfew.ACTION_STOP_VPN", CurfewBlackholeVpnService.ACTION_STOP)
+        assertFalse(CurfewBlackholeVpnService.isRunning)
+    }
+
+    @Test
+    fun testCurfewVpnBypassConfigKey() {
+        assertEquals("key_curfew_vpn_bypass_packages", CurfewConfig.KEY_CURFEW_VPN_BYPASS_PACKAGES)
+    }
 }

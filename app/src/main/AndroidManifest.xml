@@ -89,6 +89,18 @@
                 android:value="Enforce enterprise DNS security and prevent private DNS tampering on Device Owner managed hardware" />
         </service>
 
+        <service
+            android:name=".curfew.CurfewBlackholeVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Enforce complete network isolation and prevent internet access during curfew on Device Owner managed hardware" />
+        </service>
     </application>
 
 </manifest>

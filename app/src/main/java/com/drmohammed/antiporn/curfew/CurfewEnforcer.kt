@@ -111,6 +111,23 @@ object CurfewEnforcer {
             val targets = CurfewAppResolver.getCurfewTargetPackages(context)
             Log.i(TAG, "Enforcing Curfew ON for ${targets.size} targeted packages")
 
+            // 0. Enforce 100% network blackout via Always-On Blackhole VPN + OS Lockdown
+            try {
+                val currentVpn = dpm.getAlwaysOnVpnPackage(admin)
+                val bypassedPackages = CurfewConfig.getVpnBypassedPackages(context)
+                if (currentVpn != context.packageName) {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        dpm.setAlwaysOnVpnPackage(admin, context.packageName, true, bypassedPackages)
+                    } else {
+                        dpm.setAlwaysOnVpnPackage(admin, context.packageName, true)
+                    }
+                    Log.i(TAG, "Always-on Blackhole VPN configured to ${context.packageName} with lockdown=true")
+                }
+                CurfewBlackholeVpnService.start(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error configuring Always-On Blackhole VPN during curfew", e)
+            }
+
             // 1. Lockdown OEM App Stores & Search loophole apps completely (Hide from launcher and apps list)
             val packagesToHide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
             for (pkg in packagesToHide) {
@@ -195,6 +212,17 @@ object CurfewEnforcer {
         } else {
             // Wakeup: Restore daytime apps and stores
             Log.i(TAG, "Enforcing Curfew OFF: Releasing daytime apps and stores")
+
+            // 0. Release Always-On Blackhole VPN and clear OS Lockdown
+            try {
+                CurfewBlackholeVpnService.stop(context)
+                if (dpm.getAlwaysOnVpnPackage(admin) == context.packageName) {
+                    dpm.setAlwaysOnVpnPackage(admin, null, false)
+                    Log.i(TAG, "Always-on Blackhole VPN released on curfew wakeup")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error releasing Always-On Blackhole VPN during wakeup", e)
+            }
 
             // 1. Restore OEM App Stores & Search apps (Unhide)
             val packagesToUnhide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS

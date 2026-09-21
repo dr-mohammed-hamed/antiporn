@@ -1,5 +1,6 @@
 package com.drmohammed.antiporn.curfew
 
+import android.content.Context
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import java.util.Calendar
 import java.util.TimeZone
@@ -25,6 +26,34 @@ object CurfewConfig {
     const val KEY_CURFEW_ENABLED = "key_curfew_enabled"
     const val KEY_CURFEW_SUSPENDED_PACKAGES = "key_curfew_suspended_packages"
     const val KEY_MANUAL_TEST_ACTIVE = "key_manual_test_active"
+    const val KEY_CURFEW_VPN_BYPASS_PACKAGES = "key_curfew_vpn_bypass_packages"
+
+    /**
+     * Packages explicitly permitted to bypass the curfew blackhole VPN.
+     * Returns an empty set by default to enforce 100% complete blackout,
+     * while being fully architected to support dynamic user/admin exemptions.
+     */
+    fun getVpnBypassedPackages(context: Context): Set<String> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, emptySet())?.toSet() ?: emptySet()
+    }
+
+    fun setVpnBypassedPackages(context: Context, packages: Set<String>) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, packages).apply()
+    }
+
+    fun addVpnBypassedPackage(context: Context, packageName: String) {
+        val current = getVpnBypassedPackages(context).toMutableSet()
+        current.add(packageName)
+        setVpnBypassedPackages(context, current)
+    }
+
+    fun removeVpnBypassedPackage(context: Context, packageName: String) {
+        val current = getVpnBypassedPackages(context).toMutableSet()
+        current.remove(packageName)
+        setVpnBypassedPackages(context, current)
+    }
 
     /**
      * Explicit Whitelist of user productivity, financial, religious, and essential applications.
