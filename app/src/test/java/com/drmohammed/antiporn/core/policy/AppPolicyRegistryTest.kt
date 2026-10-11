@@ -27,6 +27,8 @@ class AppPolicyRegistryTest {
         // Telegram
         assertTrue(AppPolicyRegistry.isPermanentlyBlacklisted("org.telegram.messenger"))
         assertFalse(AppPolicyRegistry.isExemptFromCurfew("org.telegram.messenger"))
+        assertTrue(AppPolicyRegistry.isPermanentlyBlacklisted("org.telegram.messenger.web"))
+        assertFalse(AppPolicyRegistry.isExemptFromCurfew("org.telegram.messenger.web"))
 
         // TikTok
         assertTrue(AppPolicyRegistry.isPermanentlyBlacklisted("com.zhiliaoapp.musically"))

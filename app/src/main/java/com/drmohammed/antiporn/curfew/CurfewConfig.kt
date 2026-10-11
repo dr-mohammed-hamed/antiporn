@@ -29,6 +29,13 @@ object CurfewConfig {
     const val KEY_CURFEW_VPN_BYPASS_PACKAGES = "key_curfew_vpn_bypass_packages"
 
     /**
+     * Emergency temporary work extension timestamp in epoch milliseconds.
+     * Tonight only: allows full work and communication apps until 22:45 (10:45 PM).
+     * After this timestamp expires, normal curfew resumes automatically.
+     */
+    const val EMERGENCY_WORK_EXTENSION_UNTIL_MS: Long = 1790711100000L // 2026-09-29 22:45:00 Asia/Riyadh (UTC+3)
+
+    /**
      * Packages explicitly permitted to bypass the curfew blackhole VPN.
      * Returns an empty set by default to enforce 100% complete blackout,
      * while being fully architected to support dynamic user/admin exemptions.

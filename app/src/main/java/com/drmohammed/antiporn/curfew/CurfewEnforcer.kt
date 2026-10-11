@@ -82,12 +82,16 @@ object CurfewEnforcer {
 
     fun isEffectiveCurfewActive(context: Context): Boolean {
         if (!isCurfewFeatureEnabled(context)) return false
+        if (System.currentTimeMillis() < CurfewConfig.EMERGENCY_WORK_EXTENSION_UNTIL_MS) {
+            return false
+        }
         return isManualTestActive(context) || isCurfewActive()
     }
 
     /**
      * Synchronously applies or releases curfew suspensions and store lockdowns.
-     * Guaranteed invariant: Cannot release curfew if current time is inside night curfew window.
+     * Guaranteed invariant: Cannot release curfew if current time is inside night curfew window,
+     * unless an emergency work extension is explicitly active.
      */
     @Synchronized
     fun enforce(context: Context, activate: Boolean, calendar: Calendar = CurfewConfig.getCurfewCalendar()): Boolean {
@@ -99,8 +103,10 @@ object CurfewEnforcer {
             return false
         }
 
-        // Ironclad Security Invariant: NEVER release curfew (morning wakeup) if current time is within scheduled night window
-        if (!activate && isCurfewActive(calendar)) {
+        // Ironclad Security Invariant: NEVER release curfew (morning wakeup) if current time is within scheduled night window,
+        // unless an emergency work extension is actively running.
+        val isEmergencyWorkExtension = System.currentTimeMillis() < CurfewConfig.EMERGENCY_WORK_EXTENSION_UNTIL_MS
+        if (!activate && isCurfewActive(calendar) && !isEmergencyWorkExtension) {
             Log.w(TAG, "Security Alert: Curfew release rejected - current time is within scheduled night curfew window (20:30 - 07:00)!")
             return true
         }

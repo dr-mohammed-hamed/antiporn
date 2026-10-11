@@ -46,7 +46,13 @@ object CurfewScheduler {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
         val now = CurfewConfig.getCurfewCalendar()
-        val nextStart = getNextOccurrence(CurfewConfig.START_HOUR, CurfewConfig.START_MINUTE, now)
+        val nextStart = if (System.currentTimeMillis() < CurfewConfig.EMERGENCY_WORK_EXTENSION_UNTIL_MS) {
+            Calendar.getInstance(now.timeZone).apply {
+                timeInMillis = CurfewConfig.EMERGENCY_WORK_EXTENSION_UNTIL_MS
+            }
+        } else {
+            getNextOccurrence(CurfewConfig.START_HOUR, CurfewConfig.START_MINUTE, now)
+        }
         val nextEnd = getNextOccurrence(CurfewConfig.END_HOUR, CurfewConfig.END_MINUTE, now)
 
         val startIntent = Intent(context, CurfewAlarmReceiver::class.java).apply {
