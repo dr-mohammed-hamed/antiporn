@@ -11,6 +11,13 @@ import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.activity.result.contract.ActivityResultContracts
+import android.media.projection.MediaProjectionManager
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import com.drmohammed.antiporn.ai.service.ScreenAiProjectionService
+import com.drmohammed.antiporn.ai.ui.AiControlCardViewBinder
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
@@ -26,6 +33,43 @@ import com.drmohammed.antiporn.ui.binder.MainViewBinder
 class MainActivity : AppCompatActivity() {
 
     private lateinit var viewBinder: MainViewBinder
+    private lateinit var aiCardBinder: AiControlCardViewBinder
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private var lastAiToggleMs = 0L
+
+    private val aiRefreshRunnable = Runnable {
+        if (!isFinishing && !isDestroyed) {
+            aiCardBinder.updateUi()
+        }
+    }
+
+    private val projectionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (isFinishing || isDestroyed) return@registerForActivityResult
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            val serviceIntent = Intent(this, ScreenAiProjectionService::class.java).apply {
+                action = ScreenAiProjectionService.ACTION_START
+                putExtra(ScreenAiProjectionService.EXTRA_RESULT_CODE, result.resultCode)
+                putExtra(ScreenAiProjectionService.EXTRA_DATA, result.data)
+            }
+            ContextCompat.startForegroundService(this, serviceIntent)
+            uiHandler.postDelayed(aiRefreshRunnable, 300)
+        } else {
+            Toast.makeText(this, R.string.ai_permission_denied, Toast.LENGTH_SHORT).show()
+            aiCardBinder.updateUi()
+        }
+    }
+
+    private val uiTickerRunnable = object : Runnable {
+        override fun run() {
+            // MINOR(m1): never touch dead Activity views after onDestroy.
+            if (!isFinishing && !isDestroyed) {
+                try { aiCardBinder.updateUi() } catch (_: Exception) { }
+            }
+            if (!isFinishing && !isDestroyed) uiHandler.postDelayed(this, 1000L)
+        }
+    }
 
     private val packageChangeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -44,6 +88,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         viewBinder = MainViewBinder(findViewById(android.R.id.content))
+        aiCardBinder = AiControlCardViewBinder(this) {
+            handleAiShieldToggle()
+        }
         setupListeners()
     }
 
@@ -54,7 +101,11 @@ class MainActivity : AppCompatActivity() {
             addAction(Intent.ACTION_PACKAGE_REMOVED)
             addDataScheme("package")
         }
-        registerReceiver(packageChangeReceiver, pkgFilter)
+        // CRITICAL(C1): targetSdk=36 requires explicit exported flag on API 33+.
+        // System PACKAGE_* broadcasts are still delivered to NOT_EXPORTED receivers.
+        ContextCompat.registerReceiver(
+            this, packageChangeReceiver, pkgFilter, ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
         val statusFilter = IntentFilter(AppSuspensionShield.ACTION_UNINSTALL_STATUS)
         ContextCompat.registerReceiver(this, uninstallStatusReceiver, statusFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -76,6 +127,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
         refreshUi(isEnforcing = false)
+        aiCardBinder.updateUi()
+        uiHandler.post(uiTickerRunnable)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        uiHandler.removeCallbacks(uiTickerRunnable)
+        uiHandler.removeCallbacks(aiRefreshRunnable)
+    }
+
+    override fun onDestroy() {
+        uiHandler.removeCallbacks(uiTickerRunnable)
+        uiHandler.removeCallbacks(aiRefreshRunnable)
+        super.onDestroy()
     }
 
     override fun onStop() {
@@ -89,6 +154,27 @@ class MainActivity : AppCompatActivity() {
             unregisterReceiver(uninstallStatusReceiver)
         } catch (e: Exception) {
             // Receiver was not registered or already unregistered
+        }
+    }
+
+    private fun handleAiShieldToggle() {
+        // منع النقر المزدوج: تجاهل التبديلات المتقاربة (<1s) لمنع نوافذ موافقة مكررة.
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastAiToggleMs < 1000L) return
+        lastAiToggleMs = now
+        if (ScreenAiProjectionService.isRunning) {
+            // MINOR: stopService() avoids spawning the service (TFLite mmap + NNAPI init in
+            // onCreate) just to stop it. Notification STOP action still uses ACTION_STOP intent.
+            val stopIntent = Intent(this, ScreenAiProjectionService::class.java)
+            stopService(stopIntent)
+            uiHandler.postDelayed(aiRefreshRunnable, 300)
+        } else {
+            val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+            if (mpManager != null) {
+                projectionLauncher.launch(mpManager.createScreenCaptureIntent())
+            } else {
+                Toast.makeText(this, R.string.ai_permission_denied, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

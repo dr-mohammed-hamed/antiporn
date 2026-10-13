@@ -8,3 +8,8 @@
 -keep class com.drmohammed.antiporn.core.policy.** { *; }
 -keep class com.drmohammed.antiporn.core.model.** { *; }
 -keep class com.drmohammed.antiporn.core.contract.** { *; }
+
+# CodeRabbit MINOR-7: AI shield + TFLite — verify minified release loads both models.
+-keep class com.drmohammed.antiporn.ai.core.** { *; }
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn org.tensorflow.lite.**

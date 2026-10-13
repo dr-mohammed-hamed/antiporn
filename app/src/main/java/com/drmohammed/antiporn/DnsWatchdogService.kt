@@ -257,7 +257,8 @@ class DnsWatchdogService : Service() {
                 addAction(Intent.ACTION_PACKAGE_REMOVED)
                 addDataScheme("package")
             }
-            registerReceiver(packageReceiver, filter)
+            // CRITICAL(C1): explicit NOT_EXPORTED required for targetSdk=36 / API 33+.
+            ContextCompat.registerReceiver(this, packageReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
             isPackageReceiverRegistered = true
             Log.i(TAG, "Layer 1 - Dynamic package BroadcastReceiver registered successfully")
         } catch (e: Exception) {
@@ -283,7 +284,8 @@ class DnsWatchdogService : Service() {
                 addAction(Intent.ACTION_SCREEN_ON)
                 addAction(Intent.ACTION_USER_PRESENT)
             }
-            registerReceiver(screenReceiver, filter)
+            // CRITICAL(C1): explicit NOT_EXPORTED required for targetSdk=36 / API 33+.
+            ContextCompat.registerReceiver(this, screenReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
             isScreenReceiverRegistered = true
             Log.i(TAG, "Layer 2 - Screen / User Present BroadcastReceiver registered successfully")
         } catch (e: Exception) {
