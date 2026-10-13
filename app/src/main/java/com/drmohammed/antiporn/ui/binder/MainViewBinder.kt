@@ -10,6 +10,7 @@ import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.BrowserShield
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewForegroundWatcher
+import com.drmohammed.antiporn.curfew.NapController
 import com.drmohammed.antiporn.shields.CurfewShield
 import com.drmohammed.antiporn.shields.DnsShield
 import com.drmohammed.antiporn.shields.SystemTamperShield
@@ -51,6 +52,9 @@ class MainViewBinder(rootView: View) {
     private val tvCurfewSubtext: TextView = rootView.findViewById(R.id.tvCurfewSubtext)
     val btnCurfewTestToggle: MaterialButton = rootView.findViewById(R.id.btnCurfewTestToggle)
     val btnGrantUsageAccess: MaterialButton = rootView.findViewById(R.id.btnGrantUsageAccess)
+    private val tvNapCountdown: TextView = rootView.findViewById(R.id.tvNapCountdown)
+    val btnNapStart: MaterialButton = rootView.findViewById(R.id.btnNapStart)
+    val btnNapExtend: MaterialButton = rootView.findViewById(R.id.btnNapExtend)
     private val cardAdbHelp: MaterialCardView = rootView.findViewById(R.id.cardAdbHelp)
     val btnEnforceNow: MaterialButton = rootView.findViewById(R.id.btnEnforceNow)
 
@@ -71,6 +75,22 @@ class MainViewBinder(rootView: View) {
                 renderSuccess(state)
             }
         }
+    }
+
+    /**
+     * Updates the nap countdown text (mm:ss). Hides the counter when expired.
+     */
+    fun updateNapCountdown(remainingMs: Long) {
+        if (remainingMs <= 0L) {
+            tvNapCountdown.visibility = View.GONE
+            return
+        }
+        val totalSec = (remainingMs / 1000L).toInt()
+        val mm = totalSec / 60
+        val ss = totalSec % 60
+        tvNapCountdown.text = context.getString(R.string.nap_countdown_format, mm, ss)
+        tvNapCountdown.setTextColor(greenColor)
+        tvNapCountdown.visibility = View.VISIBLE
     }
 
     private fun renderSuccess(state: ProtectionUiState.Success) {
@@ -200,6 +220,37 @@ class MainViewBinder(rootView: View) {
                 tvCurfewSubtext.setTextColor(secondaryTextColor)
             }
 
+            // Bind Nap Mode (AFTER Curfew block — Curfew lines above unchanged)
+            val isNight = CurfewEnforcer.isCurfewActive()
+            val isNap = NapController.isNapActive(context)
+            btnNapStart.visibility = View.VISIBLE
+            if (isNight) {
+                btnNapStart.isEnabled = false
+                btnNapStart.setText(R.string.btn_nap_night_locked)
+                btnNapExtend.visibility = View.GONE
+                btnNapExtend.isEnabled = false
+                if (isNap) {
+                    tvNapCountdown.setTextColor(greenColor)
+                    tvNapCountdown.visibility = View.VISIBLE
+                } else {
+                    tvNapCountdown.visibility = View.GONE
+                }
+            } else if (isNap) {
+                btnNapStart.isEnabled = false
+                btnNapStart.setText(R.string.btn_nap_active)
+                btnNapExtend.visibility = View.VISIBLE
+                btnNapExtend.isEnabled = true
+                btnNapExtend.setText(R.string.btn_nap_extend)
+                tvNapCountdown.setTextColor(greenColor)
+                tvNapCountdown.visibility = View.VISIBLE
+            } else {
+                btnNapStart.isEnabled = true
+                btnNapStart.setText(R.string.btn_nap_start)
+                btnNapExtend.visibility = View.GONE
+                btnNapExtend.isEnabled = false
+                tvNapCountdown.visibility = View.GONE
+            }
+
         } else {
             // Not Device Owner
             cardAdbHelp.visibility = View.VISIBLE
@@ -233,6 +284,11 @@ class MainViewBinder(rootView: View) {
             btnCurfewTestToggle.visibility = View.GONE
             btnCurfewTestToggle.isEnabled = false
             btnGrantUsageAccess.visibility = View.GONE
+            btnNapStart.visibility = View.GONE
+            btnNapStart.isEnabled = false
+            btnNapExtend.visibility = View.GONE
+            btnNapExtend.isEnabled = false
+            tvNapCountdown.visibility = View.GONE
             tvCurfewStatus.text = context.getString(R.string.card_curfew_inactive_desc)
             tvCurfewStatus.setTextColor(orangeColor)
             tvCurfewSubtext.text = context.getString(R.string.card_curfew_subtext)

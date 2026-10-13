@@ -408,6 +408,38 @@
                     android:textSize="13sp"
                     app:cornerRadius="8dp" />
 
+                <TextView
+                    android:id="@+id/tvNapCountdown"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/status_green"
+                    android:visibility="gone"
+                    tools:text="متبقٍ 59:59" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnNapStart"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/btn_nap_start"
+                    android:textSize="13sp"
+                    app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnNapExtend"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/btn_nap_extend"
+                    android:textSize="13sp"
+                    android:visibility="gone"
+                    app:cornerRadius="8dp" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnGrantUsageAccess"
                     style="@style/Widget.MaterialComponents.Button.TextButton"

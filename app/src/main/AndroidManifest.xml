@@ -75,6 +75,7 @@
             <intent-filter>
                 <action android:name="com.drmohammed.antiporn.ACTION_CURFEW_START" />
                 <action android:name="com.drmohammed.antiporn.ACTION_CURFEW_END" />
+                <action android:name="com.drmohammed.antiporn.ACTION_NAP_END" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.TIME_SET" />

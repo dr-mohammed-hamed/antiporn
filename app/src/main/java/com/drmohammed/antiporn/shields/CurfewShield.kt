@@ -34,8 +34,8 @@ object CurfewShield : ProtectionShield {
 
         return try {
             CurfewScheduler.scheduleNextAlarms(context)
-            CurfewEnforcer.syncCurfewState(context)
-            val isActive = CurfewEnforcer.isEffectiveCurfewActive(context)
+            CurfewEnforcer.syncBlockState(context)
+            val isActive = CurfewEnforcer.isEffectiveBlockActive(context)
             val msg = if (isActive) {
                 context.getString(R.string.shield_curfew_active_applied)
             } else {
@@ -54,7 +54,7 @@ object CurfewShield : ProtectionShield {
         }
 
         return try {
-            val isActive = CurfewEnforcer.isEffectiveCurfewActive(context)
+            val isActive = CurfewEnforcer.isEffectiveBlockActive(context)
             if (isActive) {
                 // Ground-truth verification: Ensure OEM stores and search loophole apps are hidden
                 val packagesToHide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS

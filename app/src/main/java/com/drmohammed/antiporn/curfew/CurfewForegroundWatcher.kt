@@ -125,7 +125,7 @@ object CurfewForegroundWatcher {
     }
 
     private fun checkAndKickout(context: Context) {
-        if (!CurfewEnforcer.isEffectiveCurfewActive(context)) {
+        if (!CurfewEnforcer.isEffectiveBlockActive(context)) {
             stop()
             return
         }

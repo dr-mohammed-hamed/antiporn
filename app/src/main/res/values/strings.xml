@@ -83,6 +83,17 @@
     <string name="toast_open_settings_failed">تعذر فتح شاشة الإعدادات</string>
     <string name="curfew_google_search_blocked">🚫 بحث Google وتطبيق Gemini مغلقان أثناء حظر التجول الليلي!</string>
 
+    <!-- Nap Mode Strings -->
+    <string name="btn_nap_start">وضع القيلولة — ساعة كاملة</string>
+    <string name="btn_nap_active">القيلولة مفعّلة</string>
+    <string name="btn_nap_extend">+ ساعة</string>
+    <string name="btn_nap_night_locked">الحظر الليلي مفعّل</string>
+    <string name="dialog_nap_confirm_title">تأكيد وضع القيلولة</string>
+    <string name="dialog_nap_confirm_msg">سيُحظر الهاتف تماماً لمدة ساعة كاملة بدون نت، ولا يمكن الفك أو التقليل من داخل التطبيق. متأكد؟</string>
+    <string name="toast_nap_started">بدأت القيلولة — ساعة كاملة</string>
+    <string name="toast_nap_extended">تمت إضافة ساعة</string>
+    <string name="nap_countdown_format">متبقٍ %1$02d:%2$02d</string>
+
     <!-- Curfew Blackhole VPN Strings -->
     <string name="curfew_vpn_channel_name">عزل شبكة الحظر الليلي 🌙</string>
     <string name="curfew_vpn_channel_desc">قناة إشعارات حظر الإنترنت التام أثناء فترة النوم</string>

@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import android.media.projection.MediaProjectionManager
@@ -21,6 +22,7 @@ import com.drmohammed.antiporn.ai.ui.AiControlCardViewBinder
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
+import com.drmohammed.antiporn.curfew.NapController
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
 import com.drmohammed.antiporn.ui.ProtectionUiState
@@ -36,6 +38,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var aiCardBinder: AiControlCardViewBinder
     private val uiHandler = Handler(Looper.getMainLooper())
     private var lastAiToggleMs = 0L
+    private var lastNapTapMs = 0L
 
     private val aiRefreshRunnable = Runnable {
         if (!isFinishing && !isDestroyed) {
@@ -66,6 +69,7 @@ class MainActivity : AppCompatActivity() {
             // MINOR(m1): never touch dead Activity views after onDestroy.
             if (!isFinishing && !isDestroyed) {
                 try { aiCardBinder.updateUi() } catch (_: Exception) { }
+                try { viewBinder.updateNapCountdown(NapController.remainingMs(this@MainActivity)) } catch (_: Exception) { }
             }
             if (!isFinishing && !isDestroyed) uiHandler.postDelayed(this, 1000L)
         }
@@ -128,6 +132,7 @@ class MainActivity : AppCompatActivity() {
         }
         refreshUi(isEnforcing = false)
         aiCardBinder.updateUi()
+        try { viewBinder.updateNapCountdown(NapController.remainingMs(this)) } catch (_: Exception) { }
         uiHandler.post(uiTickerRunnable)
     }
 
@@ -202,6 +207,59 @@ class MainActivity : AppCompatActivity() {
                         getString(R.string.toast_curfew_test_off)
                     }
                     Toast.makeText(this, toastMessage, Toast.LENGTH_SHORT).show()
+                    refreshUi(isEnforcing = false)
+                }
+            }
+        }
+
+        viewBinder.btnNapStart.setOnClickListener {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastNapTapMs < 1000L) return@setOnClickListener
+            lastNapTapMs = now
+            if (CurfewEnforcer.isCurfewActive()) {
+                Toast.makeText(this, R.string.card_curfew_night_locked_hint, Toast.LENGTH_SHORT).show()
+                refreshUi(isEnforcing = false)
+                return@setOnClickListener
+            }
+            AlertDialog.Builder(this)
+                .setTitle(R.string.dialog_nap_confirm_title)
+                .setMessage(R.string.dialog_nap_confirm_msg)
+                .setPositiveButton(android.R.string.ok) { dialog, _ ->
+                    dialog.dismiss()
+                    viewBinder.btnNapStart.isEnabled = false
+                    viewBinder.btnNapExtend.isEnabled = false
+                    NapController.startNap(this)
+                    CurfewScheduler.scheduleNapEndAlarm(this, NapController.getEndWall(this))
+                    CurfewEnforcer.syncBlockStateAsync(this) {
+                        if (!isFinishing && !isDestroyed) {
+                            viewBinder.btnNapStart.isEnabled = true
+                            viewBinder.btnNapExtend.isEnabled = true
+                            Toast.makeText(this, R.string.toast_nap_started, Toast.LENGTH_SHORT).show()
+                            refreshUi(isEnforcing = false)
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel) { dialog, _ ->
+                    dialog.dismiss()
+                }
+                .show()
+        }
+
+        viewBinder.btnNapExtend.setOnClickListener {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastNapTapMs < 1000L) return@setOnClickListener
+            lastNapTapMs = now
+            if (!NapController.isNapActive(this)) {
+                refreshUi(isEnforcing = false)
+                return@setOnClickListener
+            }
+            viewBinder.btnNapExtend.isEnabled = false
+            NapController.extendNap(this)
+            CurfewScheduler.scheduleNapEndAlarm(this, NapController.getEndWall(this))
+            CurfewEnforcer.syncBlockStateAsync(this) {
+                if (!isFinishing && !isDestroyed) {
+                    viewBinder.btnNapExtend.isEnabled = true
+                    Toast.makeText(this, R.string.toast_nap_extended, Toast.LENGTH_SHORT).show()
                     refreshUi(isEnforcing = false)
                 }
             }

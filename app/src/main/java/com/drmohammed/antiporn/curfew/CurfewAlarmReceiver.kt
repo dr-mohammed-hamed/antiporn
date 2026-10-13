@@ -24,10 +24,22 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
 
         bgExecutor.execute {
             try {
-                // Regardless of whether START, END, BOOT, or TIME_SET was received,
-                // evaluate ground-truth state via syncCurfewState to prevent broadcast spoofing.
-                CurfewEnforcer.syncCurfewState(appContext)
+                if (action == NapConfig.ACTION_NAP_END) {
+                    // Nap end: merge block state (curfew OR nap), keep night alarms scheduled,
+                    // then reschedule nap alarm if still active (extended), else cancel.
+                    CurfewEnforcer.syncBlockState(appContext)
+                    CurfewScheduler.scheduleNextAlarms(appContext)
+                    rescheduleNapIfNeeded(appContext)
+                    return@execute
+                }
+                // General path (START/END/BOOT/TIME_SET/...): merged block state is safe
+                // because syncBlockState = curfew OR nap.
+                CurfewEnforcer.syncBlockState(appContext)
                 CurfewScheduler.scheduleNextAlarms(appContext)
+
+                if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+                    rescheduleNapIfNeeded(appContext)
+                }
 
                 if (action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_TIMEZONE_CHANGED) {
                     Log.i(TAG, "Time/Timezone change detected; re-enforcing system policies immediately")
@@ -47,5 +59,22 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
 
         const val ACTION_CURFEW_START = "com.drmohammed.antiporn.ACTION_CURFEW_START"
         const val ACTION_CURFEW_END = "com.drmohammed.antiporn.ACTION_CURFEW_END"
+
+        private fun rescheduleNapIfNeeded(appContext: Context) {
+            try {
+                if (NapController.isNapActive(appContext)) {
+                    val napEndWall = NapController.getEndWall(appContext)
+                    if (napEndWall > System.currentTimeMillis()) {
+                        CurfewScheduler.scheduleNapEndAlarm(appContext, napEndWall)
+                    } else {
+                        CurfewScheduler.cancelNapEndAlarm(appContext)
+                    }
+                } else {
+                    CurfewScheduler.cancelNapEndAlarm(appContext)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error rescheduling nap alarm", e)
+            }
+        }
     }
 }

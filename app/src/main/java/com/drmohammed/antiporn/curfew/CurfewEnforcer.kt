@@ -89,6 +89,12 @@ object CurfewEnforcer {
     }
 
     /**
+     * Effective block = night curfew OR active nap. Nap merges into the same engine.
+     */
+    fun isEffectiveBlockActive(context: Context): Boolean =
+        isEffectiveCurfewActive(context) || NapController.isNapActive(context)
+
+    /**
      * Synchronously applies or releases curfew suspensions and store lockdowns.
      * Guaranteed invariant: Cannot release curfew if current time is inside night curfew window,
      * unless an emergency work extension is explicitly active.
@@ -103,11 +109,11 @@ object CurfewEnforcer {
             return false
         }
 
-        // Ironclad Security Invariant: NEVER release curfew (morning wakeup) if current time is within scheduled night window,
-        // unless an emergency work extension is actively running.
+        // Ironclad Security Invariant: NEVER release block (morning wakeup / nap end) if current time is within
+        // scheduled night window OR a nap is still active, unless an emergency work extension is actively running.
         val isEmergencyWorkExtension = System.currentTimeMillis() < CurfewConfig.EMERGENCY_WORK_EXTENSION_UNTIL_MS
-        if (!activate && isCurfewActive(calendar) && !isEmergencyWorkExtension) {
-            Log.w(TAG, "Security Alert: Curfew release rejected - current time is within scheduled night curfew window (20:30 - 07:00)!")
+        if (!activate && (isCurfewActive(calendar) || NapController.isNapActive(context)) && !isEmergencyWorkExtension) {
+            Log.w(TAG, "Security Alert: Block release rejected - night curfew window (20:30 - 07:00) or active nap still holds!")
             return true
         }
 
@@ -316,11 +322,42 @@ object CurfewEnforcer {
     }
 
     /**
+     * Synchronously applies merged block state (night curfew OR nap).
+     */
+    fun syncBlockState(context: Context) {
+        val shouldBeActive = isEffectiveBlockActive(context)
+        Log.d(TAG, "Syncing block state: shouldBeActive = $shouldBeActive")
+        enforce(context, shouldBeActive)
+    }
+
+    /**
+     * Asynchronously synchronizes merged block state on background executor.
+     */
+    fun syncBlockStateAsync(context: Context, onComplete: ((Boolean) -> Unit)? = null) {
+        val appContext = context.applicationContext
+        bgExecutor.execute {
+            var success = false
+            try {
+                val shouldBeActive = isEffectiveBlockActive(appContext)
+                success = enforce(appContext, shouldBeActive)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in syncBlockStateAsync", e)
+            } finally {
+                if (onComplete != null) {
+                    Handler(Looper.getMainLooper()).post {
+                        onComplete.invoke(success)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Handles newly installed package. If curfew is currently active, freezes and hides it immediately.
      */
     fun handlePackageAdded(context: Context, packageName: String) {
         val appContext = context.applicationContext
-        val isCurfewRunning = isEffectiveCurfewActive(appContext)
+        val isCurfewRunning = isEffectiveBlockActive(appContext)
 
         if (!isCurfewRunning) {
             Log.d(TAG, "Package $packageName installed while curfew is inactive; will be evaluated at next curfew cycle")
