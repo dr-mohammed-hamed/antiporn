@@ -109,6 +109,27 @@
             android:name=".ai.service.ScreenAiProjectionService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
+
+        <service
+            android:name=".cloud.fcm.AntiPornFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <activity
+            android:name=".ui.accountability.AccountabilityHubActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:label="@string/title_accountability_hub" />
+
+        <activity
+            android:name=".ui.accountability.GuardianControlActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:label="@string/title_guardian_control" />
     </application>
 
 </manifest>
+

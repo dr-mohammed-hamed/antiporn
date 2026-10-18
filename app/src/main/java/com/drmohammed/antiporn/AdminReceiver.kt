@@ -48,14 +48,28 @@ class AdminReceiver : DeviceAdminReceiver() {
     }
 
     private fun enforcePoliciesAsync(context: Context) {
-        DnsWatchdogService.startService(context)
+        val appContext = context.applicationContext
+        DnsWatchdogService.startService(appContext)
+        try {
+            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(appContext).startFirestoreSync()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initiating PolicyRepository sync in AdminReceiver", e)
+        }
         val pendingResult = goAsync()
-        bgExecutor.execute {
-            try {
-                com.drmohammed.antiporn.core.engine.ProtectionEngine.applyAllSync(context.applicationContext)
-            } finally {
-                pendingResult.finish()
+        try {
+            bgExecutor.execute {
+                try {
+                    com.drmohammed.antiporn.core.engine.ProtectionEngine.applyAllSync(appContext)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error applying policies in AdminReceiver", e)
+                } finally {
+                    pendingResult.finish()
+                }
             }
+        } catch (e: java.util.concurrent.RejectedExecutionException) {
+            Log.e(TAG, "Executor rejected task in AdminReceiver", e)
+            pendingResult.finish()
         }
     }
+
 }

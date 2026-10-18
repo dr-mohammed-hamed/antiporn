@@ -328,8 +328,9 @@ class DnsWatchdogService : Service() {
             val mode = Settings.Global.getString(contentResolver, "private_dns_mode")
             val specifier = Settings.Global.getString(contentResolver, "private_dns_specifier")
             if (mode != null && specifier != null) {
-                if (mode != "hostname" || specifier != DnsShield.NEXTDNS_HOST) {
-                    Log.w(TAG, "Settings.Global reports DNS mismatch: mode=$mode, specifier=$specifier")
+                val expectedHost = DnsShield.getEffectiveDnsHost(this)
+                if (mode != "hostname" || specifier != expectedHost) {
+                    Log.w(TAG, "Settings.Global reports DNS mismatch: mode=$mode, specifier=$specifier, expected=$expectedHost")
                     needsEnforce = true
                 }
             }
@@ -356,13 +357,13 @@ class DnsWatchdogService : Service() {
             Log.w(TAG, "Could not verify Timezone or Auto Time directly in watchdog", e)
         }
 
-        // Live self-healing curfew synchronization during night hours or test mode
-        if (CurfewEnforcer.isEffectiveCurfewActive(this)) {
+        // Live self-healing curfew/nap block synchronization during active periods
+        if (CurfewEnforcer.isEffectiveBlockActive(this)) {
             try {
-                CurfewEnforcer.syncCurfewState(this)
+                CurfewEnforcer.syncBlockStateAsync(this)
                 CurfewForegroundWatcher.start(this)
             } catch (e: Exception) {
-                Log.e(TAG, "Error synchronizing curfew in watchdog", e)
+                Log.e(TAG, "Error synchronizing block state in watchdog", e)
             }
         } else {
             CurfewForegroundWatcher.stop()

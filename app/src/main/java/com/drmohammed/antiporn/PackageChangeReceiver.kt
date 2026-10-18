@@ -28,6 +28,7 @@ class PackageChangeReceiver : BroadcastReceiver() {
             Intent.ACTION_PACKAGE_ADDED -> {
                 val data = intent.data ?: return
                 val packageName = data.schemeSpecificPart ?: return
+                val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
 
                 val pendingResult = goAsync()
                 val appContext = context.applicationContext
@@ -38,9 +39,27 @@ class PackageChangeReceiver : BroadcastReceiver() {
                                 Log.i(TAG, "Blacklisted package install detected: $packageName. Enforcing freeze...")
                                 AppSuspensionShield.handlePackageAdded(appContext, packageName)
                             } else {
-                                Log.i(TAG, "New package install detected: $packageName. Evaluating curfew status...")
-                                com.drmohammed.antiporn.curfew.CurfewEnforcer.handlePackageAdded(appContext, packageName)
+                                val approvalRepo = com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(appContext)
+                                val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any { it.packageName == packageName && it.isApproved }
+
+                                val policy = com.drmohammed.antiporn.data.repository.PolicyRepository
+                                    .getInstance(appContext).getCurrentPolicy()
+                                if (policy.lockNewInstallsUntilApproved && !isReplacing && !isAlreadyApproved) {
+                                    if (packageName == appContext.packageName ||
+                                        com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isImmune(packageName) ||
+                                        com.drmohammed.antiporn.curfew.CurfewAppResolver.resolveImmunePackages(appContext).contains(packageName)
+                                    ) {
+                                        Log.i(TAG, "New install $packageName is immune or self. Skipping freeze.")
+                                    } else {
+                                        Log.i(TAG, "Strict Zero-Trust active: Freezing new install $packageName in 0ms and submitting approval ticket")
+                                        approvalRepo.freezeAndSubmitApproval(packageName)
+                                    }
+                                } else {
+                                    Log.i(TAG, "Package $packageName added/updated (replacing=$isReplacing, alreadyApproved=$isAlreadyApproved). Evaluating curfew status...")
+                                    com.drmohammed.antiporn.curfew.CurfewEnforcer.handlePackageAdded(appContext, packageName)
+                                }
                             }
+
                         } catch (e: Exception) {
                             Log.e(TAG, "Error handling added package $packageName", e)
                         } finally {

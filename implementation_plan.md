@@ -1,74 +1,189 @@
-# Master Implementation Plan — Single-MobileNetV4 Experiment + Standard Exemption Architecture
+# Master Implementation Plan — Accountability Partner Cloud Infrastructure & Standard Dynamic Architecture
+## خطة التحول المعماري الشامل: نظام التحكم السحابي التبادلي وشريك المساءلة (AntiPorn)
 
-> **الحالة: خطة فقط — ZERO CODE. بانتظار موافقتك الصريحة (ابدأ / نفذ / Approved) + مسار ملف MobileNetV4.**
-> **الفلسفة:** لا سطر كود واحد قبل الاعتماد. التنفيذ لاحقاً عبر وكلاء فرعيين بمراجعة قائد.
+> **الحالة: خطة معمارية فقط — ZERO CODE. بانتظار موافقتك الصريحة (ابدأ / نفذ / Approved) لبدء إطلاق الوكلاء.**
+> **الفلسفة:** لا سطر كود واحد في ملفات المصدر قبل الاعتماد. التنفيذ يتم لاحقاً عبر وكلاء فرعيين متخصصين تحت إشراف ومراجعة القائد.
 
-## 1. Executive Summary & Business Value
-- **الهدف:** استبدال كاشف YOLO11n متعدد الصناديق (10.6MB، CPU فقط، Toast فقط) بنموذج **واحد MobileNetV4 تصنيفي** (صورة كاملة → درجة فاضح/نظيف) يهز ويعرض Toast للتجربة فقط، مع **نظام استثناءات معماري قياسي** يعفي تطبيقات نظام Realme 6 Pro المؤكدة النظافة (لانشر/إعدادات/هاتف...) ويبقي الدرع قابلاً للتشغيل/الإيقاف اليدوي.
-- **القيمة:** تجربة أخف وأسرع (224 مقابل 320، مصنف واحد مقابل NMS)، ضجيج أقل في التطبيقات الآمنة، وقابلية عكس كاملة إلى YOLO بسطر واحد عبر `IModestyDetector` — مثالي لمرحلة المعايرة الميدانية قبل أي إنفاذ.
-- **النطاق المحظور في هذه المرحلة:** لا `setPackagesSuspended`، لا `lockNow`، لا بلور، لا تشغيل تلقائي بعد الإقلاع. فقط اهتزاز + Toast.
+---
 
-## 2. Ground Truth (نتائج الفحص الجراحي — Read-Only)
-- **لا يوجد MobileNetV4 في المجلد الآخر:** `D:\b\antiporn_ai_dream\models` يحتوي فقط `custom_modesty_yolo11n_320.tflite (10,612,703B)` + `.onnx/.pt` — **بانتظار مسارك.**
-- **العقد الحالي:** `IModestyDetector.detect(ByteBuffer): ModestyInferenceResult` — `TfLiteModestyDetector` يقرأ `inputShape/outputShape` runtime ويخصص `outputArray` مسبقاً، `RowStrideExtractor` يحول RGBA→Float32 NHWC/NCHW، `FrameDifferencer (8x4, 3%)` بوابة L0، `ContextualGatingWatcher (UsageStats, 1s)` بوابة سياق، `ScreenAiProjectionService (320x320 VirtualDisplay, HandlerThread, START_NOT_STICKY)` + `triggerAlertThrottled (5s, vibrate 150ms + Toast)`.
-- **الاستثناءات اليوم مشتتة:** `AppPolicyRegistry.isExemptFromCurfew` (للحظر الليلي، ليس للـ AI) + `SOCIAL_FEED_PACKAGES` داخل `ContextualGatingWatcher` — لا يوجد `AiExemption` مستقل. القرار: بناء طبقة AI خاصة لا تكسر `AppPolicyRegistry` (SSOT للحظر).
-- **الإجماع الخارجي (DuckDuckGo):** مصنفات MobileNet القياسية دخل `[1,224,224,3]`؛ مخرج sigmoid واحد أو softmax ثنائي؛ تطبيع `[0,1]` أو `[-1,1]` حسب التدريب — لذلك **الاكتشاف التلقائي runtime إلزامي** وليس افتراضاً.
-- **Realme 6 Pro (RMX2061, SD720G):** حزم ColorOS/Oppo الآمنة موثقة (`com.coloros.*`, `com.oppo.*`, `com.realme.*`, `com.android.*`) — القرار المعتمد: **قائمة مغلقة صارمة** + المتجر/المتصفح هدف دائم.
+## 1. الملخص التنفيذي وقيمة الأعمال (Executive Summary & Business Value)
+- **الهدف الاستراتيجي:** تحويل تطبيق **AntiPorn** من تطبيق حماية محلي ذي إعدادات ثابتة في الكود إلى **منصة شبكية قياسية قائمة على شريك المساءلة (Accountability Partner & Guardian Model)**.
+- **القيمة الوظيفية للمستخدم:**
+  1. **التحكم بيد الصديق أو الولي، لا بيد المستخدم نفسه:** إزالة مفتاح الإلغاء الذاتي؛ حماية كل هاتف تدار حصرياً من هاتف الصديق المختار.
+  2. **تحكم متعدد وشامل (1:N و N:M):** إمكانية تحكم الأب في عدة أبناء، وإمكانية تبادل التحكم بين صديقين (أ يتحكم في ب، وب يتحكم في أ في آن واحد).
+  3. **تحكم دقيق وفوري في الصلاحيات:**
+     - مواقيت الحظر الليلي (البدء والانتهاء).
+     - قوة المنع (قطع الإنترنت بالكامل عبر VPN Blackhole أم تجميد تطبيقات محددة فقط).
+     - قائمة التطبيقات المحظورة كلياً 24/7.
+     - فرض غلق التصفح الخفي ومحركات البحث الآمنة في متصفحات كروم.
+     - **قفل أي تطبيق جديد يُثبّت فوراً (Freeze at 0ms)** حتى يضغط الصديق على زر الموافقة في هاتفه.
+  4. **بنية قياسية سهلة التوسع مستقبلاً:** نموذج بيانات مرن يسمح بإضافة أي صلاحية جديدة مستقبلاً بسطر واحد دون المساس بجهاز التوأمة أو شبكة المزامنة.
 
-## 3. Current vs Proposed (Mermaid)
+---
+
+## 2. نتائج الفحص الجراحي وقرارات المستخدم (Ground Truth & Alignment)
+1. **تم إنجاز الجانب السحابي وتجهيزه ذاتياً بالكامل:**
+   - تم إنشاء مشروع Firebase: `antiporn-guard` تحت الخطة المجانية الدائمة (`freeTier: true`).
+   - تم تسجيل تطبيق أندرويد `com.drmohammed.antiporn` وتوليد وتثبيت ملف `app/google-services.json`.
+   - تم تفعيل خدمة `Cloud Firestore` وإنشاء قاعدة البيانات في منطقة `europe-west3` (فرانكفورت).
+2. **قرارات المقابلة المعمارية المعتمدة مع المستخدم (`/grill-me`):**
+   - **المصادقة:** دخول مجهول وصامت كلياً (`Firebase Anonymous Auth`) مع توليد رمز اقتران فريد لكل مستخدم (مثل `ALH-7421`) دون الحاجة لإدخال بريد إلكتروني أو كلمة سر (خصوصية تامة وسهولة تشغيل).
+   - **الواجهة:** شاشة كاملة مستقلة **"مركز المساءلة" (Accountability Hub)** تتضمن: رمزي الخاص للمشاركة، قائمة بمن أحميهم (Wards)، وقائمة بمن يحمونني (Guardians).
+   - **سياسة التطبيقات الجديدة:** تطبيق مبدأ **الحظر الصارم 100% (Strict Zero-Trust)**؛ أي تطبيق جديد يُجمّد فور تثبيته عبر `Device Owner` ولا يُفتح حتى يوافق الصديق من هاتفه.
+
+---
+
+## 3. المعمارية المستهدفة ودورة تدفق البيانات (Architecture & Flow)
 
 ```mermaid
 flowchart TD
-    subgraph CUR [الحالي: YOLO]
-        V[VirtualDisplay 320x320] --> G[ContextualGating + FrameDiff]
-        G --> E320[RowStride 320 Float 0-1]
-        E320 --> Y[YOLO 7x2100 + NMS IoU0.45 + Anchor 0.35/0.70]
-        Y --> T[Toast+Vibrate]
+    subgraph UI_Layer ["طبقة العرض والواجهة"]
+        HubActivity["AccountabilityHubActivity\n (رمزي الخاص + الأصدقاء + المكفولين)"]
+        GuardianSheet["GuardianControlSheet\n (سلايدر الحظر + أزرار القوة + الموافقة)"]
+        MainActivity["MainActivity Dashboard\n (العرض المباشر لحالة الحماية)"]
     end
-    subgraph PROP [المقترح: MobileNetV4 واحد]
-        V2[VirtualDisplay 224x224] --> EX[AiExemptionRegistry<br/>STRICT_EXEMPT vs TARGET]
-        EX -- معفي --> DROP[إسقاط فوري + reset FrameDiff]
-        EX -- هدف --> G2[FrameDiff 3%]
-        G2 --> E224[RowStride 224 + InputConfig auto]
-        E224 --> M[MobileNetV4BinaryClassifier<br/>sigmoid/softmax auto + threshold]
-        M --> T2[Toast+Vibrate throttle 5s]
+
+    subgraph Domain_Repo ["طبقة المنطق والمستودع الموحد"]
+        PolicyRepo["PolicyRepository (SSOT)\n (المصدر الموحد للسياسات محلياً وسحابياً)"]
+        PairingManager["PairingManager\n (إدارة رموز الاقتران والتوأمة)"]
+        ApprovalManager["ApprovalManager\n (إدارة طوابير استئذان التطبيقات)"]
     end
+
+    subgraph Local_Storage ["التخزين المحلي المستقل (Room SQLite)"]
+        RoomDB["AntiPornDatabase (Room)"]
+        DevicePolicyEntity["DevicePolicyEntity (أحدث سياسة مفعلة)"]
+        PartnerEntity["PartnerEntity (سجل الأصدقاء والمكفولين)"]
+        AppApprovalEntity["AppApprovalEntity (التطبيقات المعلقة)"]
+    end
+
+    subgraph Cloud_Sync ["المزامنة السحابية والإشعارات الصامتة"]
+        Firestore["Cloud Firestore (antiporn-guard)"]
+        FCM["Firebase Cloud Messaging (High-Priority Silent Push)"]
+        FCMService["AntiPornMessagingService"]
+    end
+
+    subgraph OS_Enforcement ["أذرع التنفيذ في نظام أندرويد (Device Owner)"]
+        CurfewEnforcer["CurfewEnforcer (تجميد التطبيقات + VPN Blackhole)"]
+        CurfewScheduler["CurfewScheduler (منبهات AlarmManager الدقيقة)"]
+        BrowserShield["BrowserShield (حظر Incognito و SafeSearch)"]
+        PackageReceiver["PackageChangeReceiver (تجميد التطبيقات الجديدة فوراً)"]
+    end
+
+    HubActivity --> PairingManager
+    GuardianSheet --> PolicyRepo
+    PolicyRepo --> RoomDB
+    PolicyRepo --> Firestore
+    Firestore -.-> FCM
+    FCM --> FCMService
+    FCMService --> PolicyRepo
+    PolicyRepo --> CurfewEnforcer
+    PolicyRepo --> CurfewScheduler
+    PolicyRepo --> BrowserShield
+    PackageReceiver --> ApprovalManager
+    ApprovalManager --> Firestore
 ```
 
-## 4. 3 Red-Teamed Failure Modes & Mitigations
-1. **Input mismatch (224 vs 320, [0,1] vs [-1,1]):** درجات عشوائية صامتة. **المنع:** `AiInputConfigResolver` يقرأ `inputTensor.shape()+type` عند `initialize`، يضبط `VirtualDisplay+Extractor` تلقائياً، ويفشل بصوت عالٍ (حالة حمراء في البطاقة) إذا الشكل غير `[1,H,W,3]`. سجل `inShape/outShape` في Logcat.
-2. **Output misinterpretation (sigmoid vs softmax vs embedding):** إيجابيات 100% أو صمت 100%. **المنع:** `MobileNetOutputDecoder` يدعم `[1,1] sigmoid` و `[1,2] softmax` فقط ويرفض غيرهما، عتبة افتراضية `0.65` قابلة للضبط من `AiCalibration` (لاحقاً)، ووضع `DebugLogits` يعرض الدرجة الخام في Toast التجريبي لمعايرة سريعة على `data/test_samples/safe|suggestive`.
-3. **Exemption over-broadening + UsageStats lag:** إعفاء تطبيق فيه WebView (بحث الإعدادات، متجر Realme) يخفي ثغرة؛ وفحص كل 1s يفوت تبديلاً سريعاً. **المنع:** طبقتان `ALWAYS_EXEMPT_SYSTEM (بلا WebView إطلاقاً: لانشر/ساعة/آلة حاسبة)` مقابل `DEFAULT_TARGET (المتصفح/المتجر/السوشيال دائماً هدف)`، شرط `isExempt = inExempt && !inTarget` (الهدف يغلب)، `reset()` للـ FrameDiff عند تغير الواجهة لمنع تلوث العينات، وتنبيه عند سحب إذن UsageStats (fail-closed مع رسالة، لا تجميد صامت).
+---
 
-## 5. Surgical File Diff Blueprint
-- **[NEW] `ai/core/policy/AiExemptionRegistry.kt`:** `object` مستقل: `STRICT_SYSTEM_EXEMPT: Set<String>` (لانشر Realme `com.oppo.launcher`/`com.coloros.launcher`, إعدادات `com.android.settings`, واجهة `com.android.systemui`, هاتف `com.android.dialer/com.android.contacts`, رسائل `com.android.mms`, ساعة/آلة حاسبة/مسجل ColorOS, كاميرا/معرض النظام) + `ALWAYS_TARGET: Set<String>` (كل `RESTRICTED_BROWSER` من `AppPolicyRegistry` + `SOCIAL_FEED_PACKAGES` + `BLACKLIST` + `com.android.vending/com.heytap.market`) + `isExempt(pkg) = exempt && !target` + `clearCache()`. لا يعدل `AppPolicyRegistry`.
-- **[NEW] `ai/core/inference/MobileNetV4ModestyDetector.kt`:** يطبق `IModestyDetector`: `initialize()` يقرأ الشكل/النوع ويبني `inputBuffer/outputArray` مسبقاً، `detect()` يشغل `Interpreter(numThreads=4, NNAPI)` ويمرر `MobileNetOutputDecoder` → `ModestyInferenceResult` (نعيد استخدام `EXPOSED_SKIN` كانتهاك واحد بثقة الدرجة، بلا صناديق). يحتفظ بتوقيع `detect(ByteBuffer)` لعزل الخدمة عن نوع الموديل.
-- **[NEW] `ai/core/inference/MobileNetOutputDecoder.kt` + `AiInputConfig.kt`:** فك `[1,1]/[1,2]` + عتبة قابلة للحقن + رفض صريح للأشكال الغريبة.
-- **[MODIFY] `ai/service/ScreenAiProjectionService.kt`:** حقن `detector: IModestyDetector` (افتراضي MobileNet، تبديل سطر إلى YOLO للرجوع)، تغيير `VirtualDisplay` إلى حجم الموديل المكتشف (224)، استدعاء `AiExemptionRegistry.isExempt` قبل `FrameDifferencer`، إظهار خطأ التهيئة في البطاقة بدل الصمت. **لا تغيير في `onDestroy` الترتيبي (listener→join→close).**
-- **[MODIFY] `ai/core/pipeline/RowStrideExtractor.kt`:** تعميم `width/height` (224) + دعم تطبيع `[-1,1]` عبر flag من `AiInputConfig` — بلا كسر `isChannelsLast`.
-- **[MODIFY] `ai/core/pipeline/ContextualGatingWatcher.kt`:** تفويض القرار إلى `AiExemptionRegistry` (حذف `SOCIAL_FEED_PACKAGES` المكررة)، الاحتفاظ بدورة `1s` للتجربة مع `onStateChanged → frameDifferencer.reset()`.
-- **[MODIFY] `ai/ui/AiControlCardViewBinder.kt` + `res/values/strings.xml`:** سطر يعرض اسم الموديل النشط (`MobileNetV4-experiment`) + حالة `Model load failed` الحمراء + زر تشغيل/إيقاف كما هو (التجربة اليدوية).
-- **[KEEP — لا حذف] `TfLiteModestyDetector.kt`, `ModestyPostProcessor.kt`, `custom_modesty_yolo11n_320.tflite`:** تبقى احتياطاً للرجوع الفوري. حذفها لاحقاً فقط بعد نجاح المعايرة.
-- **[DELETE — لا شيء في هذه المرحلة].**
+## 4. سيناريوهات الفشل الثلاثة الحرجة وسبل الوقاية (3 Failure Modes & Mitigations)
 
-## 6. Subagent Task Breakdown (بعد الاعتماد فقط)
-| Role | Domain | Gate |
-|---|---|---|
-| **model-ingest** | استلام مسارك، نسخ `.tflite` إلى `assets/`, قراءة `in/out shape` عبر سكربت فحص (read-only أولاً) وتثبيت `AiInputConfig` | يعرض الأشكال والعتبة المقترحة قبل أي كود |
-| **logic-specialist** | `MobileNetV4Detector + Decoder + AiExemptionRegistry` + حقن `IModestyDetector` | مراجعة `synchronized`، لا GC pauses، فشل صاخب |
-| **service-specialist** | `ScreenAiProjectionService + RowStrideExtractor(224) + Watcher delegation` | مراجعة خيط واحد، `image.close()`، `START_NOT_STICKY` محفوظ |
-| **ui-verify** | بطاقة AI + strings + اختبار يدوي على Realme 6 Pro (تبديل safe/suggestive + تطبيقات معفاة) | `assembleDebug` + Toast/Vibrate موثقة بالفيديو |
-| **auditor (coderabbit-guard)** | تدقيق Kotlin: NPE، تسرب `Interpreter`، أذونات `USAGE_STATS/FOREGROUND_SERVICE_MEDIA_PROJECTION` | `0 errors` قبل التسليم |
+1. **الفشل الأول: حلقة العزل التام وانقطاع النت (The Offline Blackhole Trap):**
+   * *السيناريو:* الصديق فعّل "قطع النت بالكامل" عبر VPN Blackhole، أو نفدت باقة الإنترنت، وأراد الصديق فك القفل أو الموافقة على تطبيق، فتعذر وصول الإشعار السحابي للهاتف.
+   * *الحل المعماري الوقائي:*
+     1. استثناء نطاقات FCM وخوادم Google Play Services في الـ VPN Blackhole لضمان استقبال أوامر التحكم دائماً.
+     2. إضافة خوارزمية **رمز الطوارئ بدون إنترنت (Offline TOTP Emergency Code)**؛ يفتح الصديق شاشته ويظهر رمزاً مؤقتاً مدته دقيقتان يُدخله المستخدم في هاتفه لفك القفل محلياً.
 
-## 7. Verification & Testing Plan
-- **ستاتيكي:** `assembleDebug`, فحص `inShape=[1,224,224,3]? outShape=[1,1]/[1,2]?`, لا تحذيرات `NNAPI deprecated` تُخفي فشلاً.
-- **ميداني (Realme 6 Pro):** (1) افتح إعدادات/لانشر → لا FPS ولا Toast (معفي). (2) افتح Chrome/YouTube صورة `suggestive_01` → اهتزاز+Toast خلال ~2s. (3) صورة `safe_05` → صمت. (4) أوقف من البطاقة → يتوقف فوراً؛ أعد التشغيل → يطلب إذن التقاط. (5) اسحب إذن UsageStats → رسالة تحذير لا تجميد صامت.
-- **معايرة:** جرّب عتبات `0.5/0.65/0.8` على `antiporn_ai_dream/data/test_samples` وسجل FP/FN في `reports/` قبل تثبيت العتبة.
-- **رجوع:** تبديل سطر `MobileNetV4ModestyDetector` → `TfLiteModestyDetector` يعيد YOLO دون حذف.
+2. **الفشل الثاني: مأزق الشلل التبادلي (Mutual Lockout Deadlock):**
+   * *السيناريو:* المستخدم (أ) يتحكم في (ب)، و(ب) يتحكم في (أ). قيام أحدهما بحظر تطبيقات الآخر بما فيها وسائل الاتصال والتطبيق نفسه.
+   * *الحل المعماري الوقائي:*
+     1. الحصانة الصلبة غير القابلة للإلغاء لحزمة `com.drmohammed.antiporn` (`ALWAYS_IMMUNE`)؛ لا يمكن لأي مستخدم أو سياسة تجميد تطبيق الحماية.
+     2. الفصل المعماري التام: شاشة التحكم في الصديق منفصلة تماماً عن السياسة المطبقة على هاتفي.
 
-## 8. ما أحتاجه منك الآن (بوابة الاعتماد)
-1. **أرسل المسار الكامل لملف MobileNetV4 (`.tflite`)** — سأقرأ أبعاده أولاً وأؤكد العقد قبل أي تنفيذ.
-2. **رد بكلمة واحدة:** `ابدأ` / `Approved` للتنفيذ بالوكلاء، أو عدّل القائمة المغلقة/العتبة أعلاه.
-3. **تأكيد:** هل أبقي `VirtualDisplay` على `224` تلقائياً من شكل الموديل (موصى به) أم تفضل `320` مع resize؟
+3. **الفشل الثالث: اغتيال أنظمة توفير الطاقة لعمليات المزامنة (OEM Battery Murder):**
+   * *السيناريو:* واجهات شاومي وريلمي وأوبو تقتل قنوات الاتصال بالخلفية فور إطفاء الشاشة.
+   * *الحل المعماري الوقائي:*
+     1. عدم الاعتماد إطلاقاً على اتصالات مفتوحة (WebSockets/Polling).
+     2. استخدام رسائل `FCM High-Priority Data Messages` ذات إذن الاستيقاظ الاستثنائي لصلاحية `Device Owner`.
+     3. **الاستقلالية المحلية:** مواعيد الحظر تجدول محلياً في `AlarmManager` وتعمل بدقة الثانية حتى لو كان الهاتف مفصولاً كلياً عن الشبكة.
 
-> **لن يُكتب أو يُعدل أي كود مصدري حتى ترد بالاعتماد + المسار.**
+---
+
+## 5. المخطط الجراحي لتعديل وإنشاء الملفات (Surgical File Diff Blueprint)
+
+### أ. ملفات التبعات والبناء (Gradle & Dependencies):
+- **`[MODIFY]` `gradle/libs.versions.toml`:**
+  - إضافة `firebase-bom = "33.10.0"`.
+  - إضافة `firebase-firestore`, `firebase-messaging`, `firebase-auth`.
+  - إضافة `room = "2.7.0-alpha12"` أو أحدث إصدار متوافق، مع `ksp`.
+  - إضافة `google-services = "4.4.2"`.
+- **`[MODIFY]` `build.gradle.kts`:**
+  - تسجيل إضافة `com.google.gms.google-services` apply false.
+- **`[MODIFY]` `app/build.gradle.kts`:**
+  - تطبيق إضافة `plugins { id("com.google.gms.google-services") }`.
+  - ربط مكتبات Firebase عبر BoM، ومكتبات Room، والـ Coroutines.
+
+### ب. طبقة البيانات والنماذج المحلية (Data & Models):
+- **`[NEW]` `core/model/DevicePolicyBundle.kt`:** كائن البيانات الموحد لجميع إعدادات الحماية:
+  - `curfewStartHour`, `curfewStartMinute`, `curfewEndHour`, `curfewEndMinute`.
+  - `isVpnBlackholeEnabled: Boolean`.
+  - `isIncognitoBlocked: Boolean`.
+  - `lockNewInstallsUntilApproved: Boolean`.
+  - `customBlacklistPackages: Set<String>`.
+  - `customCurfewWhitelistPackages: Set<String>`.
+  - `version: Long`, `updatedAt: Long`.
+- **`[NEW]` `data/local/db/AntiPornDatabase.kt`:** قاعدة بيانات Room المحلية.
+- **`[NEW]` `data/local/db/entity/DevicePolicyEntity.kt`:** كيان تخزين السياسة المحلية.
+- **`[NEW]` `data/local/db/entity/PartnerEntity.kt`:** كيان تخزين الأصدقاء والمكفولين.
+- **`[NEW]` `data/local/db/entity/PendingApprovalEntity.kt`:** كيان طابور التطبيقات المعلقة.
+
+### ج. طبقة المستودع والمزامنة السحابية (Repository & Cloud Sync):
+- **`[NEW]` `data/repository/PolicyRepository.kt`:** المستودع الموحد (SSOT) الذي يدمج القراءة من Room مع مزامنة Firestore.
+- **`[NEW]` `data/repository/AccountabilityRepository.kt`:** إدارة علاقات التوأمة برموز الاقتران.
+- **`[NEW]` `cloud/fcm/AntiPornFirebaseMessagingService.kt`:** استقبال الإشعارات الصامتة عالية الأولوية وتطبيق التغييرات فوراً في الخلفية.
+
+### د. تحرير وتحديث محركات الإنفاذ (Engine Dynamicization):
+- **`[MODIFY]` `curfew/CurfewConfig.kt`:** تحويل الثوابت الجامدة لميثودات تقرأ ديناميكياً من `PolicyRepository`.
+- **`[MODIFY]` `curfew/CurfewScheduler.kt`:** جدولة المنبهات بالاعتماد على الأوقات المستلمة من الصديق.
+- **`[MODIFY]` `curfew/CurfewEnforcer.kt`:** التحقق من خيار `isVpnBlackholeEnabled`؛ تشغيل VPN فقط إذا كان الخيار معتمداً من الصديق.
+- **`[MODIFY]` `shields/BrowserShield.kt`:** تطبيق وضع منع التصفح الخفي ديناميكياً حسب رغبة الصديق.
+- **`[MODIFY]` `PackageChangeReceiver.kt`:** عند تثبيت أي تطبيق جديد أثناء تفعيل خيار الصديق `lockNewInstallsUntilApproved`، يتم تجميده فورياً عبر `DevicePolicyManager` ورفع طلب استئذان للسحابة.
+
+### هـ. طبقة الواجهة وتجربة المستخدم (UI & Accountability Hub):
+- **`[NEW]` `ui/accountability/AccountabilityHubActivity.kt`:** الشاشة المخصصة لشركاء المساءلة.
+- **`[NEW]` `ui/accountability/GuardianControlActivity.kt`:** لوحة تحكم الصديق في مكفوله (تعديل الأوقات، التبديل بين قوة المنع، الموافقة على التطبيقات).
+- **`[NEW]` `res/layout/activity_accountability_hub.xml`:** واجهة أنيقة بالـ Material 3.
+- **`[MODIFY]` `ui/binder/MainViewBinder.kt` & `activity_main.xml`:** إضافة زر رئيسي جذاب لفتح "مركز المساءلة".
+
+---
+
+## 6. خطة توزيع المهام على الوكلاء الفرعيين (Subagents Decomposition)
+
+| الوكيل المتخصص | نطاق العمل والمسؤولية | بوابة المراجعة الصارمة (Supervision Gate) |
+| :--- | :--- | :--- |
+| **الوكيل 1: مهندس البيانات والمزامنة السحابية**<br>`(subagent-data-cloud)` | • ربط تبعات Firebase و Room في Gradle.<br>• إنشاء كيانات قاعدة البيانات وجداول السياسات.<br>• بناء `PolicyRepository` و `FirestoreSyncEngine`. | التحقق من صحة بناء المشروع وعدم وجود أخطاء في الـ Schema. |
+| **الوكيل 2: مهندس تحرير محركات النظام**<br>`(subagent-engine-dynamic)` | • فك الارتباط الثابت في `CurfewConfig` و `CurfewScheduler`.<br>• تعديل `CurfewEnforcer` لدعم أنماط المنع المختلفة.<br>• ربط `BrowserShield` و `PackageChangeReceiver` بالسياسة الديناميكية. | فحص مسارات التنفيذ وتوافقها 100% مع صلاحيات `Device Owner`. |
+| **الوكيل 3: مهندس الإشعارات الفورية والتجميد الصارم**<br>`(subagent-fcm-approval)` | • كتابة `AntiPornFirebaseMessagingService`.<br>• معالجة الإشعارات الصامتة وإيقاظ النظام.<br>• تفعيل دورة استئذان التطبيقات الجديدة وتجميدها الفوري. | التأكد من استيقاظ التطبيق وسرعة التجميد في 0ms دون تجميد واجهة النظام. |
+| **الوكيل 4: مهندس الواجهات وتجربة المستخدم**<br>`(subagent-ui-hub)` | • بناء شاشة `AccountabilityHubActivity` و `GuardianControlActivity`.<br>• تصميم حوار مشاركة وإدخال رمز الاقتران (6 أرقام).<br>• ربط التفاعل مع الشاشة الرئيسية `MainActivity`. | مراجعة التصميم، دعم اللغة العربية والإنجليزية وتناسق الخطوط والمظهر الليلي. |
+| **الوكيل 5: المدقق الحيادي الصارم**<br>`(subagent-auditor-verifier)` | • تدقيق شامل للكود ومسارات الأمان ومقاومة العبث.<br>• تشغيل `./gradlew assembleDebug` و `./gradlew test`.<br>• التأكد من تصفير كافة التحذيرات والأخطاء. | تحقيق نسبة نجاح 100% في الاختبارات وبناء APK قابل للتشغيل الفوري. |
+
+---
+
+## 7. خطة التحقق والاختبار (Verification & Acceptance Testing)
+
+1. **اختبار البناء البرمجي (Compilation & Build Gate):**
+   - تنفيذ `./gradlew assembleDebug` والتحقق من اكتمال الدمج وخلوه من أي تعارضات في المكتبات.
+2. **اختبار التوأمة السحابية (Pairing Verification):**
+   - توليد رمز اقتران للمستخدم الأول، وإدخاله في محاكاة المستخدم الثاني، والتحقق من إنشاء وثيقة الاقتران في Firestore لحظياً.
+3. **اختبار تغيير مواقيت الحظر عن بعد (Remote Curfew Sync):**
+   - تعديل موعد الحظر من لوحة تحكم الصديق، والتحقق من استقبال الإشعار الصامت وتحديث منبهات `AlarmManager` على الهاتف المكفول في أقل من 3 ثوانٍ.
+4. **اختبار قفل التطبيق الجديد الصارم (Instant Freeze Test):**
+   - تثبيت حزمة جديدة، والتحقق من تجميدها الفوري عبر `dpm.setPackagesSuspended` وظهور طلب الاستئذان على هاتف الصديق.
+5. **اختبار الأمان والحصانة:**
+   - التأكد من استحالة تجميد تطبيق AntiPorn نفسه، واستمرار عمل الحماية حتى في حال إعادة تشغيل الجهاز.
+
+---
+
+> [!IMPORTANT]
+> **بوابة الاعتماد الصريح (Approval Gate):**
+> لقد تم وضع الخطة التفصيلية الكاملة أعلاه طبقاً لمواصفاتك وأجوبتك الدقيقة.
+> **لن يتم تعديل أي ملف في كود المشروع، ولن يتم إطلاق الوكلاء الفرعيين، حتى تعطي إشارتك بالموافقة الصريحة (مثل: "ابدأ"، "نفذ"، "Approved").**

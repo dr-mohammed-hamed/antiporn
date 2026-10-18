@@ -24,10 +24,10 @@ object BrowserShield : ProtectionShield {
 
     val TARGET_BROWSER_PACKAGES: List<String> get() = AppPolicyRegistry.getTargetBrowserPackages()
 
-    fun buildBrowserRestrictionsBundle(): Bundle {
+    fun buildBrowserRestrictionsBundle(isIncognitoBlocked: Boolean = true): Bundle {
         return Bundle().apply {
-            putInt("IncognitoModeAvailability", 1)
-            putInt("InPrivateModeAvailability", 1)
+            putInt("IncognitoModeAvailability", if (isIncognitoBlocked) 1 else 0)
+            putInt("InPrivateModeAvailability", if (isIncognitoBlocked) 1 else 0)
             putBoolean("ForceGoogleSafeSearch", true)
             putBoolean("ForceYouTubeSafetyMode", true)
             putInt("ForceYouTubeRestrict", 2)
@@ -36,14 +36,18 @@ object BrowserShield : ProtectionShield {
         }
     }
 
-    fun applyBrowserRestrictions(dpm: DevicePolicyManager, admin: ComponentName): Boolean {
-        val bundle = buildBrowserRestrictionsBundle()
+    fun applyBrowserRestrictions(
+        dpm: DevicePolicyManager,
+        admin: ComponentName,
+        isIncognitoBlocked: Boolean = true
+    ): Boolean {
+        val bundle = buildBrowserRestrictionsBundle(isIncognitoBlocked)
         var appliedCount = 0
         for (pkg in TARGET_BROWSER_PACKAGES) {
             try {
                 dpm.setApplicationRestrictions(admin, pkg, bundle)
                 appliedCount++
-                Log.d(TAG, "Applied browser restrictions to $pkg")
+                Log.d(TAG, "Applied browser restrictions to $pkg (incognitoBlocked=$isIncognitoBlocked)")
             } catch (e: Exception) {
                 Log.d(TAG, "Could not apply browser restrictions to $pkg: ${e.message}")
             }
@@ -52,7 +56,17 @@ object BrowserShield : ProtectionShield {
         return appliedCount > 0
     }
 
+
     fun checkBrowserRestrictions(context: Context, dpm: DevicePolicyManager, admin: ComponentName): Boolean {
+        val isIncognitoBlocked = try {
+            com.drmohammed.antiporn.data.repository.PolicyRepository
+                .getInstance(context).getCurrentPolicy().isIncognitoBlocked
+        } catch (e: Exception) {
+            true
+        }
+
+        val expectedMode = if (isIncognitoBlocked) 1 else 0
+
         val pm = context.packageManager
         val installedBrowsers = TARGET_BROWSER_PACKAGES.filter { pkg ->
             try {
@@ -71,8 +85,9 @@ object BrowserShield : ProtectionShield {
                     } catch (e: Exception) {
                         null
                     }
-                    if (restrictions?.getInt("IncognitoModeAvailability", 0) != 1) {
-                        Log.w(TAG, "Installed browser $pkg is missing Incognito restriction!")
+                    val currentMode = restrictions?.getInt("IncognitoModeAvailability", 0) ?: 0
+                    if (currentMode != expectedMode) {
+                        Log.w(TAG, "Installed browser $pkg Incognito mode ($currentMode) does not match expected ($expectedMode)!")
                         return false
                     }
                 } catch (e: Exception) {
@@ -84,10 +99,13 @@ object BrowserShield : ProtectionShield {
         }
 
         // Fallback when no target browser is installed yet: check if DPM has restrictions recorded
-        return checkBrowserRestrictions(dpm, admin)
+        return checkBrowserRestrictions(dpm, admin, isIncognitoBlocked)
     }
 
-    fun checkBrowserRestrictions(dpm: DevicePolicyManager, admin: ComponentName): Boolean {
+    fun checkBrowserRestrictions(dpm: DevicePolicyManager, admin: ComponentName, isIncognitoBlocked: Boolean = true): Boolean {
+        if (!isIncognitoBlocked) {
+            return true
+        }
         for (pkg in TARGET_BROWSER_PACKAGES) {
             try {
                 val restrictions: Bundle? = try {
@@ -115,7 +133,9 @@ object BrowserShield : ProtectionShield {
         }
 
         return try {
-            val applied = applyBrowserRestrictions(dpm, admin)
+            val isIncognitoBlocked = com.drmohammed.antiporn.data.repository.PolicyRepository
+                .getInstance(context).getCurrentPolicy().isIncognitoBlocked
+            val applied = applyBrowserRestrictions(dpm, admin, isIncognitoBlocked)
             ShieldResult(
                 shieldId = id,
                 success = applied,
@@ -125,6 +145,7 @@ object BrowserShield : ProtectionShield {
                     context.getString(R.string.card_browser_unblocked)
                 }
             )
+
         } catch (e: Exception) {
             Log.e(TAG, "Error applying browser restrictions", e)
             ShieldResult(

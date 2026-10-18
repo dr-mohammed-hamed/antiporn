@@ -44,7 +44,7 @@ object CurfewShield : ProtectionShield {
             ShieldResult(shieldId = id, success = true, message = msg)
         } catch (e: Exception) {
             Log.e(TAG, "Error applying CurfewShield", e)
-            ShieldResult(shieldId = id, success = false, message = e.localizedMessage ?: "Unknown error")
+            ShieldResult(shieldId = id, success = false, message = e.localizedMessage ?: context.getString(R.string.error_unknown))
         }
     }
 
@@ -68,15 +68,21 @@ object CurfewShield : ProtectionShield {
                         }
                         if (isInstalled) dpm.isApplicationHidden(admin, pkg) else true
                     } catch (e: Exception) {
-                        true
+                        Log.w(TAG, "Error checking application hidden state for $pkg", e)
+                        false
                     }
                 }
 
-                val isVpnEnforced = try {
-                    dpm.getAlwaysOnVpnPackage(admin) == context.packageName
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to query always-on VPN package during curfew check", e)
-                    false
+                val isVpnBlackholeConfigured = CurfewConfig.isVpnBlackholeEnabled(context)
+                val isVpnEnforced = if (isVpnBlackholeConfigured) {
+                    try {
+                        dpm.getAlwaysOnVpnPackage(admin) == context.packageName
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to query always-on VPN package during curfew check", e)
+                        false
+                    }
+                } else {
+                    true
                 }
 
                 if (!allStoresHidden || !isVpnEnforced) {

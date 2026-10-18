@@ -47,14 +47,14 @@ object CurfewScheduler {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
         val now = CurfewConfig.getCurfewCalendar()
-        val nextStart = if (System.currentTimeMillis() < CurfewConfig.EMERGENCY_WORK_EXTENSION_UNTIL_MS) {
-            Calendar.getInstance(now.timeZone).apply {
-                timeInMillis = CurfewConfig.EMERGENCY_WORK_EXTENSION_UNTIL_MS
-            }
-        } else {
-            getNextOccurrence(CurfewConfig.START_HOUR, CurfewConfig.START_MINUTE, now)
-        }
-        val nextEnd = getNextOccurrence(CurfewConfig.END_HOUR, CurfewConfig.END_MINUTE, now)
+        val startH = CurfewConfig.getCurfewStartHour(context)
+        val startM = CurfewConfig.getCurfewStartMinute(context)
+        val endH = CurfewConfig.getCurfewEndHour(context)
+        val endM = CurfewConfig.getCurfewEndMinute(context)
+
+        val nextStart = getNextOccurrence(startH, startM, now)
+        val nextEnd = getNextOccurrence(endH, endM, now)
+
 
         val startIntent = Intent(context, CurfewAlarmReceiver::class.java).apply {
             action = CurfewAlarmReceiver.ACTION_CURFEW_START
@@ -67,42 +67,8 @@ object CurfewScheduler {
         val endPendingIntent = PendingIntent.getBroadcast(context, REQUEST_CODE_END, endIntent, flags)
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        nextStart.timeInMillis,
-                        startPendingIntent
-                    )
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        nextEnd.timeInMillis,
-                        endPendingIntent
-                    )
-                } else {
-                    alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        nextStart.timeInMillis,
-                        startPendingIntent
-                    )
-                    alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        nextEnd.timeInMillis,
-                        endPendingIntent
-                    )
-                }
-            } else {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    nextStart.timeInMillis,
-                    startPendingIntent
-                )
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    nextEnd.timeInMillis,
-                    endPendingIntent
-                )
-            }
+            setExactCompat(alarmManager, AlarmManager.RTC_WAKEUP, nextStart.timeInMillis, startPendingIntent)
+            setExactCompat(alarmManager, AlarmManager.RTC_WAKEUP, nextEnd.timeInMillis, endPendingIntent)
             Log.i(TAG, "Scheduled exact curfew alarms: Start at ${nextStart.time}, End at ${nextEnd.time}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact alarms via AlarmManager", e)

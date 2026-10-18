@@ -68,8 +68,8 @@ class MainActivity : AppCompatActivity() {
         override fun run() {
             // MINOR(m1): never touch dead Activity views after onDestroy.
             if (!isFinishing && !isDestroyed) {
-                try { aiCardBinder.updateUi() } catch (_: Exception) { }
-                try { viewBinder.updateNapCountdown(NapController.remainingMs(this@MainActivity)) } catch (_: Exception) { }
+                try { aiCardBinder.updateUi() } catch (e: Exception) { Log.w(TAG, "Error updating AI card UI: ${e.message}") }
+                try { viewBinder.updateNapCountdown(NapController.remainingMs(this@MainActivity)) } catch (e: Exception) { Log.w(TAG, "Error updating nap countdown: ${e.message}") }
             }
             if (!isFinishing && !isDestroyed) uiHandler.postDelayed(this, 1000L)
         }
@@ -121,7 +121,7 @@ class MainActivity : AppCompatActivity() {
         if (isDeviceOwner) {
             DnsWatchdogService.startService(this)
             CurfewScheduler.scheduleNextAlarms(this)
-            CurfewEnforcer.syncCurfewStateAsync(this) {
+            CurfewEnforcer.syncBlockStateAsync(this) {
                 if (!isFinishing && !isDestroyed) {
                     refreshUi(isEnforcing = false)
                 }
@@ -132,7 +132,7 @@ class MainActivity : AppCompatActivity() {
         }
         refreshUi(isEnforcing = false)
         aiCardBinder.updateUi()
-        try { viewBinder.updateNapCountdown(NapController.remainingMs(this)) } catch (_: Exception) { }
+        try { viewBinder.updateNapCountdown(NapController.remainingMs(this)) } catch (e: Exception) { Log.w(TAG, "Error updating nap countdown on resume: ${e.message}") }
         uiHandler.post(uiTickerRunnable)
     }
 
@@ -153,12 +153,12 @@ class MainActivity : AppCompatActivity() {
         try {
             unregisterReceiver(packageChangeReceiver)
         } catch (e: Exception) {
-            // Receiver was not registered or already unregistered
+            Log.d(TAG, "Package receiver not registered or already unregistered: ${e.message}")
         }
         try {
             unregisterReceiver(uninstallStatusReceiver)
         } catch (e: Exception) {
-            // Receiver was not registered or already unregistered
+            Log.d(TAG, "Uninstall status receiver not registered or already unregistered: ${e.message}")
         }
     }
 
@@ -184,12 +184,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        viewBinder.btnOpenAccountabilityHub.setOnClickListener {
+            startActivity(Intent(this, com.drmohammed.antiporn.ui.accountability.AccountabilityHubActivity::class.java))
+        }
+
         viewBinder.btnEnforceNow.setOnClickListener {
             triggerEnforcement(showToast = true)
         }
 
+
         viewBinder.btnCurfewTestToggle.setOnClickListener {
-            if (CurfewEnforcer.isCurfewActive()) {
+            if (CurfewEnforcer.isCurfewActive(this)) {
                 Toast.makeText(this, R.string.card_curfew_night_locked_hint, Toast.LENGTH_SHORT).show()
                 refreshUi(isEnforcing = false)
                 return@setOnClickListener
@@ -216,7 +221,7 @@ class MainActivity : AppCompatActivity() {
             val now = SystemClock.elapsedRealtime()
             if (now - lastNapTapMs < 1000L) return@setOnClickListener
             lastNapTapMs = now
-            if (CurfewEnforcer.isCurfewActive()) {
+            if (CurfewEnforcer.isCurfewActive(this)) {
                 Toast.makeText(this, R.string.card_curfew_night_locked_hint, Toast.LENGTH_SHORT).show()
                 refreshUi(isEnforcing = false)
                 return@setOnClickListener
@@ -284,7 +289,7 @@ class MainActivity : AppCompatActivity() {
             if (!isFinishing && !isDestroyed) {
                 val allSuccess = results.all { it.success }
                 val message = if (allSuccess) {
-                    getString(R.string.toast_enforce_success, DnsShield.NEXTDNS_HOST)
+                    getString(R.string.toast_enforce_success, DnsShield.getEffectiveDnsHost(this@MainActivity))
                 } else {
                     results.firstOrNull { !it.success }?.message
                         ?: getString(R.string.status_need_enforce_desc)

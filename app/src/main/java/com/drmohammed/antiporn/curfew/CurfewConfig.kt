@@ -1,6 +1,7 @@
 package com.drmohammed.antiporn.curfew
 
 import android.content.Context
+import android.util.Log
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import java.util.Calendar
 import java.util.TimeZone
@@ -22,18 +23,47 @@ object CurfewConfig {
     const val END_HOUR = 7
     const val END_MINUTE = 0
 
+    fun getCurfewStartHour(context: Context): Int = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().curfewStartHour
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        START_HOUR
+    }
+
+    fun getCurfewStartMinute(context: Context): Int = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().curfewStartMinute
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        START_MINUTE
+    }
+
+    fun getCurfewEndHour(context: Context): Int = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().curfewEndHour
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        END_HOUR
+    }
+
+    fun getCurfewEndMinute(context: Context): Int = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().curfewEndMinute
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        END_MINUTE
+    }
+
+    fun isVpnBlackholeEnabled(context: Context): Boolean = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isVpnBlackholeEnabled
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        false
+    }
+
+
     const val PREFS_NAME = "antiporn_curfew_prefs"
     const val KEY_CURFEW_ENABLED = "key_curfew_enabled"
     const val KEY_CURFEW_SUSPENDED_PACKAGES = "key_curfew_suspended_packages"
     const val KEY_MANUAL_TEST_ACTIVE = "key_manual_test_active"
     const val KEY_CURFEW_VPN_BYPASS_PACKAGES = "key_curfew_vpn_bypass_packages"
-
-    /**
-     * Emergency temporary work extension timestamp in epoch milliseconds.
-     * Tonight only: allows full work and communication apps until 22:45 (10:45 PM).
-     * After this timestamp expires, normal curfew resumes automatically.
-     */
-    const val EMERGENCY_WORK_EXTENSION_UNTIL_MS: Long = 1790711100000L // 2026-09-29 22:45:00 Asia/Riyadh (UTC+3)
 
     /**
      * Packages explicitly permitted to bypass the curfew blackhole VPN.

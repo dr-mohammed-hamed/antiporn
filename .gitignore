@@ -15,3 +15,5 @@
 local.properties
 .kotlin/
 repomix-output*
+app/google-services.json
+google-services.json

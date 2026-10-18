@@ -32,20 +32,20 @@ class CurfewBlackholeVpnService : VpnService() {
 
         val action = intent?.action
         if (action == ACTION_STOP) {
-            if (CurfewEnforcer.isEffectiveCurfewActive(this)) {
-                Log.w(TAG, "Security Alert: Rejected ACTION_STOP because Curfew is still actively enforced!")
+            if (CurfewEnforcer.isEffectiveBlockActive(this)) {
+                Log.w(TAG, "Security Alert: Rejected ACTION_STOP because Curfew or Nap block is still actively enforced!")
                 establishTunnel()
                 return START_STICKY
             }
-            Log.i(TAG, "Received ACTION_STOP and curfew is inactive. Tearing down Blackhole VPN.")
+            Log.i(TAG, "Received ACTION_STOP and block is inactive. Tearing down Blackhole VPN.")
             stopVpn()
             stopSelf()
             return START_NOT_STICKY
         }
 
-        // Verify that curfew should effectively be running
-        if (!CurfewEnforcer.isEffectiveCurfewActive(this)) {
-            Log.w(TAG, "Blackhole VPN started but curfew is inactive; stopping service")
+        // Verify that curfew or nap block should effectively be running
+        if (!CurfewEnforcer.isEffectiveBlockActive(this)) {
+            Log.w(TAG, "Blackhole VPN started but block is inactive; stopping service")
             stopVpn()
             stopSelf()
             return START_NOT_STICKY

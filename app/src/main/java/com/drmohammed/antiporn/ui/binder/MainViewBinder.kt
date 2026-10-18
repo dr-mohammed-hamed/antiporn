@@ -56,7 +56,9 @@ class MainViewBinder(rootView: View) {
     val btnNapStart: MaterialButton = rootView.findViewById(R.id.btnNapStart)
     val btnNapExtend: MaterialButton = rootView.findViewById(R.id.btnNapExtend)
     private val cardAdbHelp: MaterialCardView = rootView.findViewById(R.id.cardAdbHelp)
+    val btnOpenAccountabilityHub: MaterialButton = rootView.findViewById(R.id.btnOpenAccountabilityHub)
     val btnEnforceNow: MaterialButton = rootView.findViewById(R.id.btnEnforceNow)
+
 
     /**
      * Binds the UI state to the views deterministically.
@@ -126,13 +128,14 @@ class MainViewBinder(rootView: View) {
             }
 
             // Bind DNS Shield
+            val targetHost = DnsShield.getEffectiveDnsHost(context)
             if (dnsActive) {
-                tvDnsHostStatus.text = context.getString(R.string.card_nextdns_active, DnsShield.NEXTDNS_HOST)
+                tvDnsHostStatus.text = context.getString(R.string.card_nextdns_active, targetHost)
                 tvDnsHostStatus.setTextColor(greenColor)
                 tvDnsLockSubtext.text = context.getString(R.string.card_nextdns_locked)
             } else {
                 val hostDisplay = state.currentDnsHost ?: context.getString(R.string.default_dns_text)
-                tvDnsHostStatus.text = context.getString(R.string.card_nextdns_pending, hostDisplay, DnsShield.NEXTDNS_HOST)
+                tvDnsHostStatus.text = context.getString(R.string.card_nextdns_pending, hostDisplay, targetHost)
                 tvDnsHostStatus.setTextColor(orangeColor)
                 tvDnsLockSubtext.text = context.getString(R.string.card_nextdns_unlocked)
             }
@@ -180,7 +183,7 @@ class MainViewBinder(rootView: View) {
             tvAppSuspensionSubtext.text = context.getString(R.string.card_app_suspension_subtext)
 
             // Bind Curfew Shield
-            val isScheduledCurfew = CurfewEnforcer.isCurfewActive()
+            val isScheduledCurfew = CurfewEnforcer.isCurfewActive(context)
             val isTestActive = CurfewEnforcer.isManualTestActive(context)
             btnCurfewTestToggle.visibility = View.VISIBLE
 
@@ -221,7 +224,7 @@ class MainViewBinder(rootView: View) {
             }
 
             // Bind Nap Mode (AFTER Curfew block — Curfew lines above unchanged)
-            val isNight = CurfewEnforcer.isCurfewActive()
+            val isNight = CurfewEnforcer.isCurfewActive(context)
             val isNap = NapController.isNapActive(context)
             btnNapStart.visibility = View.VISIBLE
             if (isNight) {

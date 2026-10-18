@@ -31,7 +31,7 @@ object VpnShield : ProtectionShield {
 
         return try {
             val restrictions = dpm.getUserRestrictions(admin)
-            val alreadyBlocked = restrictions.getBoolean(UserManager.DISALLOW_CONFIG_VPN, false)
+            val alreadyBlocked = restrictions?.getBoolean(UserManager.DISALLOW_CONFIG_VPN, false) ?: false
             if (!alreadyBlocked) {
                 dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_VPN)
                 Log.i(TAG, "Added restriction: DISALLOW_CONFIG_VPN")
@@ -61,7 +61,7 @@ object VpnShield : ProtectionShield {
 
         return try {
             val restrictions = dpm.getUserRestrictions(admin)
-            val isVpnBlocked = restrictions.getBoolean(UserManager.DISALLOW_CONFIG_VPN, false)
+            val isVpnBlocked = restrictions?.getBoolean(UserManager.DISALLOW_CONFIG_VPN, false) ?: false
             if (isVpnBlocked) {
                 ShieldStatus.Active(context.getString(R.string.card_vpn_blocked))
             } else {

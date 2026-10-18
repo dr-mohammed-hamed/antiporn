@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isGuardianOf(wardUid) {
+      return request.auth != null && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)/partners/$(wardUid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)/partners/$(wardUid)).data.role == 'WARD') ||
+        (exists(/databases/$(database)/documents/users/$(wardUid)/partners/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(wardUid)/partners/$(request.auth.uid)).data.role == 'GUARDIAN')
+      );
+    }
+
+    // 1. Pairings: Exchange and resolve 6-character alphanumeric pairing codes
+    match /pairings/{code} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // 2. Policies: Unified protection policies per device/ward
+    match /policies/{wardUid} {
+      allow read: if request.auth != null && (request.auth.uid == wardUid || isGuardianOf(wardUid));
+      allow create: if request.auth != null && (request.auth.uid == wardUid || isGuardianOf(wardUid));
+      allow update: if request.auth != null && isGuardianOf(wardUid) && request.auth.uid != wardUid;
+      allow delete: if false;
+    }
+
+    // 3. Approvals: Zero-trust app installation requests and guardian approvals
+    match /approvals/{ticketId} {
+      allow read: if request.auth != null && (resource.data.wardUid == request.auth.uid || isGuardianOf(resource.data.wardUid));
+      allow create: if request.auth != null && request.resource.data.wardUid == request.auth.uid && request.resource.data.status == 'PENDING';
+      allow update: if request.auth != null && request.auth.uid != resource.data.wardUid && isGuardianOf(resource.data.wardUid);
+      allow delete: if request.auth != null && (request.auth.uid == resource.data.wardUid || isGuardianOf(resource.data.wardUid));
+    }
+
+    // 4. Users: Tokens and partner relationships
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}
