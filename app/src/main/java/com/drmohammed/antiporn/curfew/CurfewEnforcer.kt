@@ -98,8 +98,36 @@ object CurfewEnforcer {
         }
     }
 
+    fun isSnoozeActive(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        val snoozeEnd = prefs.getLong(CurfewConfig.KEY_CURFEW_SNOOZE_END_WALL, 0L)
+        return System.currentTimeMillis() < snoozeEnd
+    }
+
+    fun getSnoozeEndWall(context: Context): Long {
+        val prefs = context.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getLong(CurfewConfig.KEY_CURFEW_SNOOZE_END_WALL, 0L)
+    }
+
+    fun clearSnooze(context: Context) {
+        val prefs = context.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove(CurfewConfig.KEY_CURFEW_SNOOZE_END_WALL).apply()
+        Log.i(TAG, "Curfew snooze cleared")
+    }
+
+    fun snoozeCurfew(context: Context, minutes: Int = 15) {
+        val safeMinutes = minutes.coerceIn(1, 60)
+        val prefs = context.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        val snoozeEnd = System.currentTimeMillis() + (safeMinutes * 60 * 1000L)
+        prefs.edit().putLong(CurfewConfig.KEY_CURFEW_SNOOZE_END_WALL, snoozeEnd).apply()
+        CurfewScheduler.scheduleCurfewSnoozeAlarm(context, snoozeEnd)
+        enforce(context, false)
+        Log.i(TAG, "Curfew snoozed for $safeMinutes minutes until $snoozeEnd")
+    }
+
     fun isEffectiveCurfewActive(context: Context): Boolean {
         if (!isCurfewFeatureEnabled(context)) return false
+        if (isSnoozeActive(context)) return false
         return isManualTestActive(context) || isCurfewActive(context)
     }
 
@@ -124,8 +152,8 @@ object CurfewEnforcer {
         }
 
         // Ironclad Security Invariant: NEVER release block (morning wakeup / nap end) if current time is within
-        // scheduled night window OR a nap is still active.
-        if (!activate && (isCurfewActive(context, calendar) || NapController.isNapActive(context))) {
+        // scheduled night window OR a nap is still active (unless an explicit snooze is active).
+        if (!activate && !isSnoozeActive(context) && (isCurfewActive(context, calendar) || NapController.isNapActive(context))) {
             Log.w(TAG, "Security Alert: Block release rejected - night curfew window or active nap still holds!")
             return true
         }

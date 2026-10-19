@@ -15,14 +15,19 @@ import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
-import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+
+// ARCHITECTURAL NOTE: Currently using SwitchMaterial (M2 MDC) for 100% compatibility
+// with Theme.MaterialComponents. When the whole app is migrated to Material 3 (Theme.Material3),
+// these can be safely upgraded to MaterialSwitch.
 
 /**
  * Control panel enabling a Guardian to configure protection timings, VPN blackhole,
@@ -32,15 +37,19 @@ class GuardianControlActivity : AppCompatActivity() {
 
     private lateinit var wardId: String
     private lateinit var wardName: String
+    private var isSavingPolicy = false
 
     private lateinit var tvWardName: TextView
+    private lateinit var cardOfflineBanner: MaterialCardView
+    private lateinit var tvOfflineStatus: TextView
+    private lateinit var btnRetryLoadPolicy: MaterialButton
     private lateinit var tvCurfewStartTime: TextView
     private lateinit var tvCurfewEndTime: TextView
     private lateinit var btnChangeStartTime: MaterialButton
     private lateinit var btnChangeEndTime: MaterialButton
-    private lateinit var switchVpnBlackhole: MaterialSwitch
-    private lateinit var switchIncognitoBlocked: MaterialSwitch
-    private lateinit var switchLockNewInstalls: MaterialSwitch
+    private lateinit var switchVpnBlackhole: SwitchMaterial
+    private lateinit var switchIncognitoBlocked: SwitchMaterial
+    private lateinit var switchLockNewInstalls: SwitchMaterial
     private lateinit var tilDnsHost: TextInputLayout
     private lateinit var etDnsHost: TextInputEditText
     private lateinit var btnPresetCloudflare: MaterialButton
@@ -87,6 +96,10 @@ class GuardianControlActivity : AppCompatActivity() {
         tvWardName = findViewById(R.id.tvWardName)
         tvWardName.text = getString(R.string.guardian_control_ward_name, wardName)
 
+        cardOfflineBanner = findViewById(R.id.cardOfflineBanner)
+        tvOfflineStatus = findViewById(R.id.tvOfflineStatus)
+        btnRetryLoadPolicy = findViewById(R.id.btnRetryLoadPolicy)
+
         tvCurfewStartTime = findViewById(R.id.tvCurfewStartTime)
         tvCurfewEndTime = findViewById(R.id.tvCurfewEndTime)
         btnChangeStartTime = findViewById(R.id.btnChangeStartTime)
@@ -118,6 +131,7 @@ class GuardianControlActivity : AppCompatActivity() {
         btnPresetCloudflare.isEnabled = enabled
         btnPresetNextDns.isEnabled = enabled
         btnSavePolicyChanges.isEnabled = enabled
+        btnRetryLoadPolicy.isEnabled = enabled
     }
 
     private fun setupListeners() {
@@ -162,6 +176,12 @@ class GuardianControlActivity : AppCompatActivity() {
         btnSavePolicyChanges.setOnClickListener {
             saveAndPushPolicy()
         }
+
+        btnRetryLoadPolicy.setOnClickListener {
+            btnRetryLoadPolicy.isEnabled = false
+            loadWardPolicy()
+            loadPendingApprovals()
+        }
     }
 
     private fun updateTimingLabels() {
@@ -173,10 +193,24 @@ class GuardianControlActivity : AppCompatActivity() {
         setInputsEnabled(false)
         lifecycleScope.launch(Dispatchers.IO) {
             if (isFinishing || isDestroyed) return@launch
+            var isOffline = false
+            var snapshot: com.google.firebase.firestore.DocumentSnapshot? = null
             try {
                 val firestore = FirebaseFirestore.getInstance()
-                val snapshot = firestore.collection("policies").document(wardId).get().await()
-                if (snapshot.exists() && snapshot.data != null) {
+                try {
+                    snapshot = firestore.collection("policies").document(wardId).get().await()
+                } catch (netEx: Exception) {
+                    if (netEx is kotlinx.coroutines.CancellationException) throw netEx
+                    Log.w(TAG, "Network fetch failed for ward policy $wardId, attempting offline cache", netEx)
+                    isOffline = true
+                    try {
+                        snapshot = firestore.collection("policies").document(wardId).get(Source.CACHE).await()
+                    } catch (cacheEx: Exception) {
+                        Log.w(TAG, "Cache fetch also failed or empty for ward $wardId", cacheEx)
+                    }
+                }
+
+                if (snapshot != null && snapshot.exists() && snapshot.data != null) {
                     currentPolicy = DevicePolicyBundle.fromMap(snapshot.data!!)
                 } else {
                     currentPolicy = DevicePolicyBundle.defaultPolicy()
@@ -195,6 +229,8 @@ class GuardianControlActivity : AppCompatActivity() {
                     switchLockNewInstalls.isChecked = currentPolicy.lockNewInstallsUntilApproved
                     etDnsHost.setText(currentPolicy.dnsHost)
                     tilDnsHost.error = null
+                    cardOfflineBanner.visibility = if (isOffline) View.VISIBLE else View.GONE
+                    btnRetryLoadPolicy.isEnabled = true
                     setInputsEnabled(true)
                 }
             } catch (e: Exception) {
@@ -203,7 +239,16 @@ class GuardianControlActivity : AppCompatActivity() {
                 Log.e(TAG, "Error loading ward policy for $wardId", e)
                 withContext(Dispatchers.Main) {
                     if (isFinishing || isDestroyed) return@withContext
-                    setInputsEnabled(false)
+                    // Resilience fallback: allow viewing and editing default policy even if offline
+                    updateTimingLabels()
+                    switchVpnBlackhole.isChecked = currentPolicy.isVpnBlackholeEnabled
+                    switchIncognitoBlocked.isChecked = currentPolicy.isIncognitoBlocked
+                    switchLockNewInstalls.isChecked = currentPolicy.lockNewInstallsUntilApproved
+                    etDnsHost.setText(currentPolicy.dnsHost)
+                    tilDnsHost.error = null
+                    cardOfflineBanner.visibility = View.VISIBLE
+                    btnRetryLoadPolicy.isEnabled = true
+                    setInputsEnabled(true)
                     Toast.makeText(this@GuardianControlActivity, R.string.toast_load_policy_failed, Toast.LENGTH_LONG).show()
                 }
             }
@@ -402,7 +447,9 @@ class GuardianControlActivity : AppCompatActivity() {
         }
         tilDnsHost.error = null
 
-        btnSavePolicyChanges.isEnabled = false
+        if (isSavingPolicy) return
+        isSavingPolicy = true
+        setInputsEnabled(false)
         val updatedPolicy = currentPolicy.copy(
             curfewStartHour = selectedStartHour,
             curfewStartMinute = selectedStartMinute,
@@ -417,7 +464,10 @@ class GuardianControlActivity : AppCompatActivity() {
         )
 
         lifecycleScope.launch {
-            if (isFinishing || isDestroyed) return@launch
+            if (isFinishing || isDestroyed) {
+                isSavingPolicy = false
+                return@launch
+            }
             try {
                 val policyRepo = PolicyRepository.getInstance(applicationContext)
                 val success = policyRepo.pushPolicyToWard(wardId, updatedPolicy)
@@ -434,8 +484,9 @@ class GuardianControlActivity : AppCompatActivity() {
                 Log.e(TAG, "Error pushing policy to ward", e)
                 Toast.makeText(this@GuardianControlActivity, getString(R.string.toast_policy_push_failed), Toast.LENGTH_LONG).show()
             } finally {
+                isSavingPolicy = false
                 if (!isFinishing && !isDestroyed) {
-                    btnSavePolicyChanges.isEnabled = true
+                    setInputsEnabled(true)
                 }
             }
         }

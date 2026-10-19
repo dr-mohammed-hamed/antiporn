@@ -72,11 +72,24 @@ class CurfewBlackholeVpnService : VpnService() {
                 .setMtu(1500)
                 .setBlocking(true)
 
+            // Absolute self-exemption: AntiPorn must NEVER be trapped inside its own blackhole TUN,
+            // guaranteeing that Firebase Firestore policy sync, Auth, and FCM push notifications always work.
+            var bypassedCount = 0
+            try {
+                builder.addDisallowedApplication(packageName)
+                bypassedCount++
+                Log.i(TAG, "Unconditionally exempted AntiPorn self package from Curfew VPN: $packageName")
+            } catch (e: Exception) {
+                Log.e(TAG, "CRITICAL: Cannot exempt self package from Curfew VPN blackhole. Aborting tunnel to prevent permanent isolation.", e)
+                isRunning = false
+                return
+            }
+
             // Extensible Bypass Architecture:
             // Query configured bypassed packages and allow them to route outside the blackhole TUN
             val bypassedPackages = CurfewConfig.getVpnBypassedPackages(this)
-            var bypassedCount = 0
             for (pkg in bypassedPackages) {
+                if (pkg == packageName) continue
                 try {
                     builder.addDisallowedApplication(pkg)
                     bypassedCount++
@@ -103,7 +116,7 @@ class CurfewBlackholeVpnService : VpnService() {
     }
 
     private fun startForegroundNotification() {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
         val channelTitle = getString(R.string.curfew_vpn_channel_name)
         val channelDesc = getString(R.string.curfew_vpn_channel_desc)

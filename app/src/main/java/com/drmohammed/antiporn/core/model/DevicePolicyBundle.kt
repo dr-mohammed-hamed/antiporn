@@ -8,11 +8,11 @@ import org.json.JSONObject
  * configured by the user's accountability partner/guardian.
  */
 data class DevicePolicyBundle(
-    val curfewStartHour: Int = 20,
-    val curfewStartMinute: Int = 30,
-    val curfewEndHour: Int = 7,
-    val curfewEndMinute: Int = 0,
-    val isVpnBlackholeEnabled: Boolean = false,
+    val curfewStartHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR,
+    val curfewStartMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE,
+    val curfewEndHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR,
+    val curfewEndMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE,
+    val isVpnBlackholeEnabled: Boolean = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED,
     val isIncognitoBlocked: Boolean = true,
     val lockNewInstallsUntilApproved: Boolean = true,
     val customBlacklistPackages: Set<String> = emptySet(),
@@ -71,11 +71,11 @@ data class DevicePolicyBundle(
 
         @Suppress("UNCHECKED_CAST")
         fun fromMap(map: Map<String, Any?>): DevicePolicyBundle {
-            val startHour = ((map["curfewStartHour"] as? Number)?.toInt() ?: 20).coerceIn(0, 23)
-            val startMin = ((map["curfewStartMinute"] as? Number)?.toInt() ?: 30).coerceIn(0, 59)
-            val endHour = ((map["curfewEndHour"] as? Number)?.toInt() ?: 7).coerceIn(0, 23)
-            val endMin = ((map["curfewEndMinute"] as? Number)?.toInt() ?: 0).coerceIn(0, 59)
-            val vpn = (map["isVpnBlackholeEnabled"] as? Boolean) ?: false
+            val startHour = ((map["curfewStartHour"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR).coerceIn(0, 23)
+            val startMin = ((map["curfewStartMinute"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE).coerceIn(0, 59)
+            val endHour = ((map["curfewEndHour"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR).coerceIn(0, 23)
+            val endMin = ((map["curfewEndMinute"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE).coerceIn(0, 59)
+            val vpn = (map["isVpnBlackholeEnabled"] as? Boolean) ?: com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED
             val incognito = (map["isIncognitoBlocked"] as? Boolean) ?: true
             val lockNew = (map["lockNewInstallsUntilApproved"] as? Boolean) ?: true
 
@@ -125,11 +125,11 @@ data class DevicePolicyBundle(
                 val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: LEGACY_DEFAULT_NEXTDNS_HOST
 
                 DevicePolicyBundle(
-                    curfewStartHour = json.optInt("curfewStartHour", 20),
-                    curfewStartMinute = json.optInt("curfewStartMinute", 30),
-                    curfewEndHour = json.optInt("curfewEndHour", 7),
-                    curfewEndMinute = json.optInt("curfewEndMinute", 0),
-                    isVpnBlackholeEnabled = json.optBoolean("isVpnBlackholeEnabled", false),
+                    curfewStartHour = json.optInt("curfewStartHour", com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR),
+                    curfewStartMinute = json.optInt("curfewStartMinute", com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE),
+                    curfewEndHour = json.optInt("curfewEndHour", com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR),
+                    curfewEndMinute = json.optInt("curfewEndMinute", com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE),
+                    isVpnBlackholeEnabled = json.optBoolean("isVpnBlackholeEnabled", com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED),
                     isIncognitoBlocked = json.optBoolean("isIncognitoBlocked", true),
                     lockNewInstallsUntilApproved = json.optBoolean("lockNewInstallsUntilApproved", true),
                     customBlacklistPackages = blacklist,

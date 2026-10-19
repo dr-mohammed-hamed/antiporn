@@ -188,7 +188,7 @@ class MainViewBinder(rootView: View) {
             btnCurfewTestToggle.visibility = View.VISIBLE
 
             if (isScheduledCurfew) {
-                // Scheduled night curfew is actively running (8:30 PM - 7:00 AM)
+                // Scheduled night curfew is actively running (8:00 PM - 7:00 AM)
                 // Lock the button in disabled state to prevent accidental or intentional bypass
                 btnCurfewTestToggle.isEnabled = false
                 btnCurfewTestToggle.setText(R.string.btn_curfew_night_locked)

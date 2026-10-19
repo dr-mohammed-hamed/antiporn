@@ -8,7 +8,7 @@ import java.util.TimeZone
 
 /**
  * Configuration and immutable constants for the Scheduled Night Curfew system.
- * Curfew window: 20:30 (8:30 PM) to 07:00 (7:00 AM) every day.
+ * Curfew window: 20:00 (8:00 PM) to 07:00 (7:00 AM) every day.
  * Timezone: Asia/Riyadh (Makkah Al-Mukarramah, UTC+3).
  */
 object CurfewConfig {
@@ -18,7 +18,7 @@ object CurfewConfig {
     fun getCurfewCalendar(): Calendar = Calendar.getInstance(TimeZone.getTimeZone(MAKKAH_TIMEZONE_ID))
 
     const val START_HOUR = 20
-    const val START_MINUTE = 30
+    const val START_MINUTE = 0
 
     const val END_HOUR = 7
     const val END_MINUTE = 0
@@ -51,11 +51,18 @@ object CurfewConfig {
         END_MINUTE
     }
 
+    /**
+     * Central Single Source of Truth Feature Flag for Night Curfew Internet Blackout.
+     * Set to true to enforce 100% complete data blackout by default in standalone versions.
+     * Set to false to cleanly disable the blackhole feature across the entire codebase.
+     */
+    const val DEFAULT_VPN_BLACKHOLE_ENABLED = true
+
     fun isVpnBlackholeEnabled(context: Context): Boolean = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isVpnBlackholeEnabled
     } catch (e: Exception) {
         Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
-        false
+        DEFAULT_VPN_BLACKHOLE_ENABLED
     }
 
 
@@ -64,32 +71,41 @@ object CurfewConfig {
     const val KEY_CURFEW_SUSPENDED_PACKAGES = "key_curfew_suspended_packages"
     const val KEY_MANUAL_TEST_ACTIVE = "key_manual_test_active"
     const val KEY_CURFEW_VPN_BYPASS_PACKAGES = "key_curfew_vpn_bypass_packages"
+    const val KEY_CURFEW_SNOOZE_END_WALL = "key_curfew_snooze_end_wall"
+    const val ACTION_CURFEW_SNOOZE = "com.drmohammed.antiporn.ACTION_CURFEW_SNOOZE"
+    const val ACTION_CURFEW_SNOOZE_END = "com.drmohammed.antiporn.ACTION_CURFEW_SNOOZE_END"
 
     /**
      * Packages explicitly permitted to bypass the curfew blackhole VPN.
-     * Returns an empty set by default to enforce 100% complete blackout,
-     * while being fully architected to support dynamic user/admin exemptions.
+     * Guaranteed to always include AntiPorn self-package so background IPC,
+     * Firebase FCM push notifications, and Firestore policy synchronization remain active.
      */
     fun getVpnBypassedPackages(context: Context): Set<String> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, emptySet())?.toSet() ?: emptySet()
+        val custom = prefs.getStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, emptySet())?.toSet() ?: emptySet()
+        return custom + context.packageName
     }
 
     fun setVpnBypassedPackages(context: Context, packages: Set<String>) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, packages).apply()
+        val toSave = packages - context.packageName
+        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, toSave).apply()
     }
 
     fun addVpnBypassedPackage(context: Context, packageName: String) {
-        val current = getVpnBypassedPackages(context).toMutableSet()
+        if (packageName == context.packageName) return
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val current = prefs.getStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, emptySet())?.toMutableSet() ?: mutableSetOf()
         current.add(packageName)
-        setVpnBypassedPackages(context, current)
+        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, current).apply()
     }
 
     fun removeVpnBypassedPackage(context: Context, packageName: String) {
-        val current = getVpnBypassedPackages(context).toMutableSet()
+        if (packageName == context.packageName) return
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val current = prefs.getStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, emptySet())?.toMutableSet() ?: mutableSetOf()
         current.remove(packageName)
-        setVpnBypassedPackages(context, current)
+        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, current).apply()
     }
 
     /**

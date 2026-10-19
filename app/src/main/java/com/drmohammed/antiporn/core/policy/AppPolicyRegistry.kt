@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap
  * 2. PERMANENT_BLACKLIST (Telegram, TikTok, Proxy Browsers) -> Frozen and silently uninstalled 24/7. Never exemptible.
  * 3. RESTRICTED_BROWSER (Chromium Browsers) -> Managed policies (SafeSearch, no incognito).
  * 4. CURFEW_EXEMPT (Business, Quran, Media, Medical, Games) -> Allowed during night curfew.
- * 5. DEFAULT_CURFEW_TARGET -> All other apps suspended at night (20:30 - 07:00).
+ * 5. DEFAULT_CURFEW_TARGET -> All other apps suspended at night (20:00 - 07:00).
  */
 object AppPolicyRegistry {
 
@@ -34,6 +34,11 @@ object AppPolicyRegistry {
         AppRule("com.android.settings", AppClassification.SYSTEM_CRITICAL, "System Settings"),
         AppRule("com.google.android.packageinstaller", AppClassification.SYSTEM_CRITICAL, "Google Package Installer"),
         AppRule("com.android.packageinstaller", AppClassification.SYSTEM_CRITICAL, "AOSP Package Installer"),
+        AppRule("com.coloros.packageinstaller", AppClassification.SYSTEM_CRITICAL, "ColorOS / Realme Package Installer"),
+        AppRule("com.oplus.packageinstaller", AppClassification.SYSTEM_CRITICAL, "OPlus Package Installer"),
+        AppRule("com.coloros.safecenter", AppClassification.SYSTEM_CRITICAL, "ColorOS Security Center"),
+        AppRule("com.samsung.android.packageinstaller", AppClassification.SYSTEM_CRITICAL, "Samsung Package Installer"),
+        AppRule("com.miui.packageinstaller", AppClassification.SYSTEM_CRITICAL, "MIUI Package Installer"),
 
         // =========================================================================
         // 3. GOOGLE IPC SERVICES (Kept unsuspended for background licensing & AI)
@@ -215,6 +220,11 @@ object AppPolicyRegistry {
         AppRule("com.googleCamera.Wichaya8", AppClassification.CURFEW_EXEMPT_PRODUCTIVITY, "GCam Wichaya"),
         AppRule("com.android.MGC", AppClassification.CURFEW_EXEMPT_PRODUCTIVITY, "GCam MGC"),
         AppRule("org.codeaurora.snapcam", AppClassification.CURFEW_EXEMPT_PRODUCTIVITY, "Snap Camera"),
+
+        // =========================================================================
+        // CURFEW EXEMPT: ESSENTIAL COMMUNICATION (Calls & Family Messages)
+        // =========================================================================
+        AppRule("com.whatsapp", AppClassification.CURFEW_EXEMPT_COMMUNICATION, "WhatsApp Messenger"),
 
         // =========================================================================
         // 17. CURFEW EXEMPT: PERMITTED GAMES & EMULATORS

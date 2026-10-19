@@ -25,11 +25,12 @@ class CurfewTest {
     fun testCurfewActiveWindow_crossMidnight() {
         // Daytime: should be false
         assertFalse("12:00 PM should NOT be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(12, 0)))
-        assertFalse("20:29 should NOT be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(20, 29)))
+        assertFalse("19:59 should NOT be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(19, 59)))
         assertFalse("07:00 AM should NOT be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(7, 0)))
         assertFalse("08:30 AM should NOT be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(8, 30)))
 
         // Nighttime Curfew: should be true
+        assertTrue("20:00 should be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(20, 0)))
         assertTrue("20:30 should be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(20, 30)))
         assertTrue("21:00 should be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(21, 0)))
         assertTrue("21:30 should be in curfew", CurfewEnforcer.isCurfewActive(createCalendar(21, 30)))
@@ -307,5 +308,20 @@ class CurfewTest {
         for (pkg in mxPackages) {
             assertTrue("Package $pkg must be in STATIC_WHITELIST", CurfewConfig.STATIC_WHITELIST.contains(pkg))
         }
+    }
+
+    @Test
+    fun testCurfewSnoozeConfigConstants() {
+        assertEquals("key_curfew_snooze_end_wall", CurfewConfig.KEY_CURFEW_SNOOZE_END_WALL)
+        assertEquals("com.drmohammed.antiporn.ACTION_CURFEW_SNOOZE", CurfewConfig.ACTION_CURFEW_SNOOZE)
+        assertEquals("com.drmohammed.antiporn.ACTION_CURFEW_SNOOZE_END", CurfewConfig.ACTION_CURFEW_SNOOZE_END)
+    }
+
+    @Test
+    fun testCurfewDefaultWindow_matchesConfig() {
+        assertEquals(20, CurfewConfig.START_HOUR)
+        assertEquals(0, CurfewConfig.START_MINUTE)
+        assertEquals(7, CurfewConfig.END_HOUR)
+        assertEquals(0, CurfewConfig.END_MINUTE)
     }
 }

@@ -15,10 +15,10 @@ class DevicePolicyBundleTest {
     fun testDefaultPolicyBundle_hasExpectedDefaults() {
         val policy = DevicePolicyBundle.defaultPolicy()
         assertEquals(20, policy.curfewStartHour)
-        assertEquals(30, policy.curfewStartMinute)
+        assertEquals(0, policy.curfewStartMinute)
         assertEquals(7, policy.curfewEndHour)
-        assertEquals(0, policy.curfewEndMinute)
-        assertFalse(policy.isVpnBlackholeEnabled)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED, policy.isVpnBlackholeEnabled)
+        assertTrue(policy.isVpnBlackholeEnabled)
         assertTrue(policy.isIncognitoBlocked)
         assertTrue(policy.lockNewInstallsUntilApproved)
         assertTrue(policy.customBlacklistPackages.isEmpty())
@@ -125,7 +125,7 @@ class DevicePolicyBundleTest {
         val restored = DevicePolicyBundle.fromJson("invalid json string {[{")
         assertNotNull(restored)
         assertEquals(20, restored.curfewStartHour)
-        assertEquals(30, restored.curfewStartMinute)
+        assertEquals(0, restored.curfewStartMinute)
     }
 
     @Test

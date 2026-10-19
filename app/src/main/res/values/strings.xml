@@ -64,19 +64,19 @@
 
     <!-- Night Curfew Strings -->
     <string name="card_curfew_title">🌙 حظر النوم الآلي المجدول (Night Curfew)</string>
-    <string name="card_curfew_active_desc">حظر النوم نشط حالياً (8:30 م - 7:00 ص) - تطبيقات التشتيت معلقة</string>
-    <string name="card_curfew_active_desc_test">حظر النوم نشط حالياً (8:30 م - 7:00 ص) - تطبيقات التشتيت معلقة (تجريبي)</string>
-    <string name="card_curfew_scheduled_desc">مجدول يومياً (8:30 م - 7:00 ص) - جميع التطبيقات المسموحة نشطة</string>
+    <string name="card_curfew_active_desc">حظر النوم نشط حالياً (8:00 م - 7:00 ص) - تطبيقات التشتيت معلقة</string>
+    <string name="card_curfew_active_desc_test">حظر النوم نشط حالياً (8:00 م - 7:00 ص) - تطبيقات التشتيت معلقة (تجريبي)</string>
+    <string name="card_curfew_scheduled_desc">مجدول يومياً (8:00 م - 7:00 ص) - جميع التطبيقات المسموحة نشطة</string>
     <string name="card_curfew_inactive_desc">غير مفعل (يتطلب صلاحية Device Owner)</string>
     <string name="card_curfew_subtext">تعليق تلقائي لتطبيقات التشتيت (يوتيوب، المتجر، الألعاب) واستثناء تطبيقات العمل والقرآن والأدوات الأساسية</string>
     <string name="shield_curfew_active_applied">تم تفعيل حظر النوم الليلي وتعليق التطبيقات الترفيهية</string>
-    <string name="shield_curfew_scheduled_applied">تمت جدولة حظر النوم بنجاح (8:30 م - 7:00 ص)</string>
+    <string name="shield_curfew_scheduled_applied">تمت جدولة حظر النوم بنجاح (8:00 م - 7:00 ص)</string>
     <string name="btn_test_curfew_on">اختبار قفل النوم الآن 🌙</string>
     <string name="btn_test_curfew_off">إنهاء اختبار القفل ☀️</string>
     <string name="toast_curfew_test_on">تم تفعيل قفل النوم تجريبياً (تطبيقات التشتيت معلقة الآن)</string>
     <string name="toast_curfew_test_off">تم إنهاء الاختبار وفك التعليق عن تطبيقات النهار بنجاح</string>
     <string name="btn_curfew_night_locked">الحظر الليلي نشط تلقائياً 🌙</string>
-    <string name="card_curfew_night_locked_hint">الحظر الليلي قيد التشغيل المجدول (8:30 م - 7:00 ص) ولا يمكن إيقافه أثناء ساعات النوم</string>
+    <string name="card_curfew_night_locked_hint">الحظر الليلي قيد التشغيل المجدول (8:00 م - 7:00 ص) ولا يمكن إيقافه أثناء ساعات النوم</string>
     <string name="curfew_play_store_blocked">🚫 متجر Google Play مغلق أثناء حظر التجول الليلي لحماية وقتك!</string>
     <string name="btn_grant_usage_access">منح إذن الوصول لبيانات الاستخدام</string>
     <string name="card_curfew_usage_missing_subtext">⚠️ إذن الوصول لبيانات الاستخدام مطلوب لتأمين إغلاق متجر Google Play أثناء الحظر.</string>
@@ -192,4 +192,7 @@
     <string name="toast_partner_delete_failed">فشل حذف الشريك: %1$s</string>
     <string name="toast_load_policy_failed">فشل تحميل سياسة الحماية الحالية. يرجى التحقق من الاتصال بالإنترنت.</string>
     <string name="error_loading_pending_apps">تعذر تحميل طلبات الموافقة المعلقة. تحقق من الاتصال بالإنترنت.</string>
+    <string name="btn_retry">إعادة المحاولة</string>
+    <string name="guardian_offline_banner_desc">تعذر الاتصال بالخادم. يتم عرض السياسة المحلية/المؤقتة.</string>
+    <string name="toast_offline_policy_edit_note">تعذر الوصول إلى الخادم؛ يرجى التحقق من الاتصال بالإنترنت ثم إعادة المحاولة.</string>
 </resources>

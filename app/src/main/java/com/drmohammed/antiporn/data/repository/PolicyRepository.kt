@@ -46,7 +46,39 @@ class PolicyRepository private constructor(context: Context) {
 
     private fun loadInitialPolicy(): DevicePolicyBundle {
         return try {
-            database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
+            val loaded = database.getDevicePolicy()?.toBundle()
+            if (loaded != null) {
+                // Reconcile standalone devices (no guardians attached) on initial policy v1
+                val hasGuardians = try {
+                    database.getPartnersByRole(com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN).isNotEmpty()
+                } catch (e: Exception) {
+                    false
+                }
+                if (!hasGuardians && loaded.version == 1L && loaded.isVpnBlackholeEnabled != com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED) {
+                    val reconciled = loaded.copy(
+                        isVpnBlackholeEnabled = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    repositoryScope.launch {
+                        try {
+                            val current = _currentPolicyFlow.value
+                            if (current.version == 1L && current.isVpnBlackholeEnabled == reconciled.isVpnBlackholeEnabled) {
+                                database.saveDevicePolicy(com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity.fromBundle(reconciled))
+                                Log.i(TAG, "Reconciled standalone device policy asynchronously with DEFAULT_VPN_BLACKHOLE_ENABLED=${com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED}")
+                            } else {
+                                Log.i(TAG, "Skipping async reconcile save: policy already superseded by v${current.version}")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed saving reconciled standalone policy", e)
+                        }
+                    }
+                    reconciled
+                } else {
+                    loaded
+                }
+            } else {
+                DevicePolicyBundle.defaultPolicy()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error loading initial policy from SQLite", e)
             DevicePolicyBundle.defaultPolicy()

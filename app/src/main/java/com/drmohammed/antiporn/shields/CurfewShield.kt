@@ -13,7 +13,7 @@ import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
 
 /**
- * Isolated protection shield managing scheduled night curfew (8:30 PM - 7:00 AM)
+ * Isolated protection shield managing scheduled night curfew (8:00 PM - 7:00 AM)
  * suspending non-whitelisted entertainment apps and isolating network usage during sleep hours.
  */
 object CurfewShield : ProtectionShield {

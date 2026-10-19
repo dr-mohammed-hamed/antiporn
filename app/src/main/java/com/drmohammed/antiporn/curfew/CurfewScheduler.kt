@@ -36,7 +36,7 @@ object CurfewScheduler {
     }
 
     /**
-     * Schedules the next exact alarms for 20:30 (Curfew Start) and 07:00 (Curfew End).
+     * Schedules the next exact alarms for 20:00 (Curfew Start) and 07:00 (Curfew End).
      */
     fun scheduleNextAlarms(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: run {
@@ -138,6 +138,34 @@ object CurfewScheduler {
             Log.i(TAG, "Cancelled dual nap end alarms")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to cancel nap end alarms", e)
+        }
+    }
+
+    private const val REQUEST_CODE_SNOOZE = 3003
+
+    fun scheduleCurfewSnoozeAlarm(context: Context, triggerWallMs: Long) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        val intent = Intent(context, CurfewAlarmReceiver::class.java).apply {
+            action = CurfewConfig.ACTION_CURFEW_SNOOZE_END
+        }
+        val pi = PendingIntent.getBroadcast(context, REQUEST_CODE_SNOOZE, intent, flags)
+        setExactCompat(alarmManager, AlarmManager.RTC_WAKEUP, triggerWallMs, pi)
+        Log.i(TAG, "Scheduled snooze expiration alarm at $triggerWallMs")
+    }
+
+    fun cancelCurfewSnoozeAlarm(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            val intent = Intent(context, CurfewAlarmReceiver::class.java).apply {
+                action = CurfewConfig.ACTION_CURFEW_SNOOZE_END
+            }
+            val pi = PendingIntent.getBroadcast(context, REQUEST_CODE_SNOOZE, intent, flags)
+            alarmManager.cancel(pi)
+            Log.i(TAG, "Cancelled curfew snooze alarm")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to cancel curfew snooze alarm", e)
         }
     }
 }

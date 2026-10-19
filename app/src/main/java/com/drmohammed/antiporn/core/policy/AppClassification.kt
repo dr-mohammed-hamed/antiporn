@@ -77,7 +77,7 @@ enum class AppClassification {
 
     /**
      * Default classification for arbitrary third-party user applications,
-     * suspended during night curfew (20:30 - 07:00).
+     * suspended during night curfew (20:00 - 07:00).
      */
     DEFAULT_CURFEW_TARGET
 }
