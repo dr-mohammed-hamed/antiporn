@@ -148,8 +148,9 @@
     <string name="card_accountability_subtext">شارك رمزك مع صديق موثوق للتحكم بحمايتك عن بعد ومنع الإلغاء الذاتي</string>
     <string name="guardian_control_ward_name">التحكم في حماية: %1$s</string>
     <string name="guardian_curfew_timings_title">🌙 مواقيت الحظر الليلي</string>
-    <string name="guardian_curfew_start_label">بداية الحظر: %1$02d:%2$02d</string>
-    <string name="guardian_curfew_end_label">نهاية الحظر: %1$02d:%2$02d</string>
+    <string name="guardian_curfew_start_label">وقت بداية الحظر</string>
+    <string name="guardian_curfew_end_label">وقت نهاية الحظر</string>
+    <string name="guardian_curfew_time_format">%1$02d:%2$02d</string>
     <string name="guardian_enforcement_strength_title">⚡ قوة المنع أثناء الحظر</string>
     <string name="guardian_mode_vpn_blackhole">قطع الإنترنت بالكامل (VPN Blackhole) 🌐❌</string>
     <string name="guardian_mode_app_freeze_only">تجميد التطبيقات المحددة فقط مع إبقاء الإنترنت 📱</string>

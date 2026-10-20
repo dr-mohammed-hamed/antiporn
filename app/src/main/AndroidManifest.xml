@@ -20,6 +20,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
+        android:name=".AntiPornApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -122,12 +123,14 @@
             android:name=".ui.accountability.AccountabilityHubActivity"
             android:exported="false"
             android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
             android:label="@string/title_accountability_hub" />
 
         <activity
             android:name=".ui.accountability.GuardianControlActivity"
             android:exported="false"
             android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
             android:label="@string/title_guardian_control" />
     </application>
 

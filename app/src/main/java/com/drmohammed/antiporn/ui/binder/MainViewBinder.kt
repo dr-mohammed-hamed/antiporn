@@ -115,16 +115,20 @@ class MainViewBinder(rootView: View) {
 
             if (allActive) {
                 tvOverallStatusBadge.text = context.getString(R.string.status_active_title)
-                tvOverallStatusBadge.setTextColor(greenColor)
+                tvOverallStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.shield_emerald_radiant))
+                tvOverallStatusBadge.setBackgroundResource(R.drawable.bg_shield_status_badge)
                 tvOverallStatusDesc.text = context.getString(R.string.status_active_desc)
-                layoutMainStatus.setBackgroundColor(greenBgColor)
-                cardMainStatus.strokeColor = greenColor
+                layoutMainStatus.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                cardMainStatus.setCardBackgroundColor(ContextCompat.getColor(context, R.color.shield_hero_bg))
+                cardMainStatus.strokeColor = ContextCompat.getColor(context, R.color.shield_hero_stroke)
             } else {
                 tvOverallStatusBadge.text = context.getString(R.string.status_need_enforce_title)
-                tvOverallStatusBadge.setTextColor(orangeColor)
+                tvOverallStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.shield_amber_calm))
+                tvOverallStatusBadge.setBackgroundResource(R.drawable.bg_shield_status_badge_amber)
                 tvOverallStatusDesc.text = context.getString(R.string.status_need_enforce_desc)
-                layoutMainStatus.setBackgroundColor(orangeBgColor)
-                cardMainStatus.strokeColor = orangeColor
+                layoutMainStatus.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                cardMainStatus.setCardBackgroundColor(ContextCompat.getColor(context, R.color.shield_hero_bg))
+                cardMainStatus.strokeColor = ContextCompat.getColor(context, R.color.shield_amber_calm)
             }
 
             // Bind DNS Shield
@@ -258,10 +262,12 @@ class MainViewBinder(rootView: View) {
             // Not Device Owner
             cardAdbHelp.visibility = View.VISIBLE
             tvOverallStatusBadge.text = context.getString(R.string.status_no_device_owner_title)
-            tvOverallStatusBadge.setTextColor(orangeColor)
+            tvOverallStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.shield_amber_calm))
+            tvOverallStatusBadge.setBackgroundResource(R.drawable.bg_shield_status_badge_amber)
             tvOverallStatusDesc.text = context.getString(R.string.status_no_device_owner_desc)
-            layoutMainStatus.setBackgroundColor(orangeBgColor)
-            cardMainStatus.strokeColor = orangeColor
+            layoutMainStatus.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            cardMainStatus.setCardBackgroundColor(ContextCompat.getColor(context, R.color.shield_hero_bg))
+            cardMainStatus.strokeColor = ContextCompat.getColor(context, R.color.shield_amber_calm)
 
             tvDeviceOwnerStatus.text = context.getString(R.string.card_device_owner_inactive)
             tvDeviceOwnerStatus.setTextColor(orangeColor)

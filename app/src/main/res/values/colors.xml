@@ -1,18 +1,66 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF1A73E8</color>
-    <color name="purple_700">#FF1557B0</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-    <color name="status_green">#FF2E7D32</color>
-    <color name="status_green_bg">#FFE8F5E9</color>
-    <color name="status_orange">#FFE65100</color>
-    <color name="status_orange_bg">#FFFFF3E0</color>
+    <!-- Brand Identity & Recovery Hero Shield Semantic Tokens (Immutable - immune to dynamic color overwrite) -->
+    <color name="shield_hero_bg">#FF11161F</color>
+    <color name="shield_hero_stroke">#3326E07F</color>
+    <color name="shield_emerald_radiant">#FF26E07F</color>
+    <color name="shield_emerald_soft_bg">#1F26E07F</color>
+    <color name="shield_amber_calm">#FFF59E0B</color>
+    <color name="shield_amber_soft_bg">#1FF59E0B</color>
+    <color name="shield_hero_desc">#FF94A3B8</color>
+
+    <!-- Material 3 Sleek Modern Slate Light Theme Tokens -->
+    <color name="md_theme_light_primary">#FF0D9488</color>
+    <color name="md_theme_light_onPrimary">#FFFFFFFF</color>
+    <color name="md_theme_light_primaryContainer">#FFCCFBF1</color>
+    <color name="md_theme_light_onPrimaryContainer">#FF115E59</color>
+    <color name="md_theme_light_secondary">#FF0284C7</color>
+    <color name="md_theme_light_onSecondary">#FFFFFFFF</color>
+    <color name="md_theme_light_secondaryContainer">#FFE0F2FE</color>
+    <color name="md_theme_light_onSecondaryContainer">#FF0369A1</color>
+    <color name="md_theme_light_surface">#FFF8FAFC</color>
+    <color name="md_theme_light_onSurface">#FF0F172A</color>
+    <color name="md_theme_light_surfaceVariant">#FFE2E8F0</color>
+    <color name="md_theme_light_onSurfaceVariant">#FF475569</color>
+    <color name="md_theme_light_surfaceContainer">#FFF1F5F9</color>
+    <color name="md_theme_light_surfaceContainerHigh">#FFE2E8F0</color>
+    <color name="md_theme_light_outline">#FF94A3B8</color>
+    <color name="md_theme_light_outlineVariant">#FFE2E8F0</color>
+
+    <!-- Material 3 Sleek Modern Slate Dark Theme Tokens -->
+    <color name="md_theme_dark_primary">#FF2DD4BF</color>
+    <color name="md_theme_dark_onPrimary">#FF042F2E</color>
+    <color name="md_theme_dark_primaryContainer">#FF134E4A</color>
+    <color name="md_theme_dark_onPrimaryContainer">#FF99F6E4</color>
+    <color name="md_theme_dark_secondary">#FF38BDF8</color>
+    <color name="md_theme_dark_onSecondary">#FF082F49</color>
+    <color name="md_theme_dark_secondaryContainer">#FF075985</color>
+    <color name="md_theme_dark_onSecondaryContainer">#FFBAE6FD</color>
+    <color name="md_theme_dark_surface">#FF0B0F15</color>
+    <color name="md_theme_dark_onSurface">#FFF1F5F9</color>
+    <color name="md_theme_dark_surfaceVariant">#FF1E2632</color>
+    <color name="md_theme_dark_onSurfaceVariant">#FF94A3B8</color>
+    <color name="md_theme_dark_surfaceContainer">#FF141A23</color>
+    <color name="md_theme_dark_surfaceContainerHigh">#FF1E2632</color>
+    <color name="md_theme_dark_outline">#FF475569</color>
+    <color name="md_theme_dark_outlineVariant">#FF334155</color>
+
+    <!-- Status and Legacy Compatibility Mappings (Tuned to Modern Slate Palette) -->
+    <color name="status_green">#FF10B981</color>
+    <color name="status_green_bg">#FFE8FBF3</color>
+    <color name="status_orange">#FFF59E0B</color>
+    <color name="status_orange_bg">#FFFEF3C7</color>
     <color name="card_bg">#FFFFFFFF</color>
-    <color name="bg_light">#FFF5F7FB</color>
-    <color name="text_primary">#FF1A1C1E</color>
-    <color name="text_secondary">#FF74777F</color>
+    <color name="bg_light">#FFF8FAFC</color>
+    <color name="text_primary">#FF0F172A</color>
+    <color name="text_secondary">#FF64748B</color>
+
+    <!-- Classic Standard Tokens -->
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="purple_500">#FF0D9488</color>
+    <color name="purple_700">#FF0F766E</color>
+    <color name="purple_200">#FF2DD4BF</color>
+    <color name="teal_200">#FF38BDF8</color>
+    <color name="teal_700">#FF0284C7</color>
 </resources>

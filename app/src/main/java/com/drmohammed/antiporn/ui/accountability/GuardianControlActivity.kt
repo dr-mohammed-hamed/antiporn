@@ -1,13 +1,18 @@
 package com.drmohammed.antiporn.ui.accountability
 
-import android.app.TimePickerDialog
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.timepicker.MaterialTimePicker
+import com.google.android.material.timepicker.TimeFormat
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
@@ -15,7 +20,7 @@ import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
-import com.google.android.material.switchmaterial.SwitchMaterial
+import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.firestore.FirebaseFirestore
@@ -25,9 +30,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
-// ARCHITECTURAL NOTE: Currently using SwitchMaterial (M2 MDC) for 100% compatibility
-// with Theme.MaterialComponents. When the whole app is migrated to Material 3 (Theme.Material3),
-// these can be safely upgraded to MaterialSwitch.
+// ARCHITECTURAL NOTE: Successfully upgraded to Material 3 (MaterialSwitch)
+// in full alignment with Theme.Material3.
 
 /**
  * Control panel enabling a Guardian to configure protection timings, VPN blackhole,
@@ -47,9 +51,9 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var tvCurfewEndTime: TextView
     private lateinit var btnChangeStartTime: MaterialButton
     private lateinit var btnChangeEndTime: MaterialButton
-    private lateinit var switchVpnBlackhole: SwitchMaterial
-    private lateinit var switchIncognitoBlocked: SwitchMaterial
-    private lateinit var switchLockNewInstalls: SwitchMaterial
+    private lateinit var switchVpnBlackhole: MaterialSwitch
+    private lateinit var switchIncognitoBlocked: MaterialSwitch
+    private lateinit var switchLockNewInstalls: MaterialSwitch
     private lateinit var tilDnsHost: TextInputLayout
     private lateinit var etDnsHost: TextInputEditText
     private lateinit var btnPresetCloudflare: MaterialButton
@@ -67,8 +71,24 @@ class GuardianControlActivity : AppCompatActivity() {
     private var hasLoadedInitialPolicy = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_guardian_control)
+
+        findViewById<View>(R.id.scrollGuardianControl)?.let { scrollView ->
+            ViewCompat.setOnApplyWindowInsetsListener(scrollView) { view, windowInsets ->
+                val insets = windowInsets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime()
+                )
+                view.setPadding(
+                    insets.left,
+                    insets.top,
+                    insets.right,
+                    insets.bottom
+                )
+                windowInsets
+            }
+        }
 
         wardId = intent.getStringExtra(EXTRA_WARD_ID) ?: ""
         wardName = intent.getStringExtra(EXTRA_WARD_NAME) ?: getString(R.string.status_ward_badge)
@@ -136,31 +156,39 @@ class GuardianControlActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         btnChangeStartTime.setOnClickListener {
-            TimePickerDialog(
-                this,
-                { _, hourOfDay, minute ->
-                    selectedStartHour = hourOfDay
-                    selectedStartMinute = minute
-                    updateTimingLabels()
-                },
-                selectedStartHour,
-                selectedStartMinute,
-                true
-            ).show()
+            if (isFinishing || isDestroyed) return@setOnClickListener
+            if (supportFragmentManager.findFragmentByTag("start_time_picker") != null) return@setOnClickListener
+            val picker = MaterialTimePicker.Builder()
+                .setTimeFormat(TimeFormat.CLOCK_24H)
+                .setHour(selectedStartHour)
+                .setMinute(selectedStartMinute)
+                .setTitleText(R.string.guardian_curfew_start_label)
+                .build()
+
+            picker.addOnPositiveButtonClickListener {
+                selectedStartHour = picker.hour
+                selectedStartMinute = picker.minute
+                updateTimingLabels()
+            }
+            picker.show(supportFragmentManager, "start_time_picker")
         }
 
         btnChangeEndTime.setOnClickListener {
-            TimePickerDialog(
-                this,
-                { _, hourOfDay, minute ->
-                    selectedEndHour = hourOfDay
-                    selectedEndMinute = minute
-                    updateTimingLabels()
-                },
-                selectedEndHour,
-                selectedEndMinute,
-                true
-            ).show()
+            if (isFinishing || isDestroyed) return@setOnClickListener
+            if (supportFragmentManager.findFragmentByTag("end_time_picker") != null) return@setOnClickListener
+            val picker = MaterialTimePicker.Builder()
+                .setTimeFormat(TimeFormat.CLOCK_24H)
+                .setHour(selectedEndHour)
+                .setMinute(selectedEndMinute)
+                .setTitleText(R.string.guardian_curfew_end_label)
+                .build()
+
+            picker.addOnPositiveButtonClickListener {
+                selectedEndHour = picker.hour
+                selectedEndMinute = picker.minute
+                updateTimingLabels()
+            }
+            picker.show(supportFragmentManager, "end_time_picker")
         }
 
         btnPresetCloudflare.setOnClickListener {
@@ -185,8 +213,8 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun updateTimingLabels() {
-        tvCurfewStartTime.text = getString(R.string.guardian_curfew_start_label, selectedStartHour, selectedStartMinute)
-        tvCurfewEndTime.text = getString(R.string.guardian_curfew_end_label, selectedEndHour, selectedEndMinute)
+        tvCurfewStartTime.text = getString(R.string.guardian_curfew_time_format, selectedStartHour, selectedStartMinute)
+        tvCurfewEndTime.text = getString(R.string.guardian_curfew_time_format, selectedEndHour, selectedEndMinute)
     }
 
     private fun loadWardPolicy() {
@@ -311,7 +339,9 @@ class GuardianControlActivity : AppCompatActivity() {
             val card = MaterialCardView(this).apply {
                 radius = resources.displayMetrics.density * 8
                 cardElevation = resources.displayMetrics.density * 1
-                setCardBackgroundColor(getColor(R.color.bg_light))
+                setCardBackgroundColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorSurfaceContainer))
+                strokeWidth = (1 * resources.displayMetrics.density).toInt()
+                strokeColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutlineVariant)
                 val lp = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -330,7 +360,7 @@ class GuardianControlActivity : AppCompatActivity() {
             val titleView = TextView(this).apply {
                 text = name
                 textSize = 14f
-                setTextColor(getColor(R.color.text_primary))
+                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurface))
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             }
             container.addView(titleView)
@@ -338,7 +368,7 @@ class GuardianControlActivity : AppCompatActivity() {
             val pkgView = TextView(this).apply {
                 text = pkg
                 textSize = 11f
-                setTextColor(getColor(R.color.text_secondary))
+                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutline))
             }
             container.addView(pkgView)
 

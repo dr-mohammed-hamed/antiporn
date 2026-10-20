@@ -13,14 +13,20 @@ import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,8 +51,24 @@ class AccountabilityHubActivity : AppCompatActivity() {
     private var lastManageClickTime = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_accountability_hub)
+
+        findViewById<View>(R.id.scrollAccountabilityHub)?.let { scrollView ->
+            ViewCompat.setOnApplyWindowInsetsListener(scrollView) { view, windowInsets ->
+                val insets = windowInsets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+                )
+                view.setPadding(
+                    insets.left,
+                    insets.top,
+                    insets.right,
+                    insets.bottom
+                )
+                windowInsets
+            }
+        }
 
         accountabilityRepo = AccountabilityRepository.getInstance(applicationContext)
 
@@ -152,9 +174,21 @@ class AccountabilityHubActivity : AppCompatActivity() {
 
     private fun createPartnerCard(partner: PartnerEntity, isWard: Boolean): View {
         val card = MaterialCardView(this).apply {
-            radius = resources.displayMetrics.density * 12
-            cardElevation = resources.displayMetrics.density * 1
-            setCardBackgroundColor(getColor(R.color.card_bg))
+            radius = resources.displayMetrics.density * 18
+            cardElevation = 0f
+            strokeWidth = (1 * resources.displayMetrics.density).toInt()
+            strokeColor = MaterialColors.getColor(
+                this@AccountabilityHubActivity,
+                com.google.android.material.R.attr.colorOutlineVariant,
+                android.graphics.Color.GRAY
+            )
+            setCardBackgroundColor(
+                MaterialColors.getColor(
+                    this@AccountabilityHubActivity,
+                    com.google.android.material.R.attr.colorSurfaceContainer,
+                    android.graphics.Color.WHITE
+                )
+            )
             val layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -173,7 +207,13 @@ class AccountabilityHubActivity : AppCompatActivity() {
         val nameView = TextView(this).apply {
             text = partner.displayName
             textSize = 15f
-            setTextColor(getColor(R.color.text_primary))
+            setTextColor(
+                MaterialColors.getColor(
+                    this@AccountabilityHubActivity,
+                    com.google.android.material.R.attr.colorOnSurface,
+                    android.graphics.Color.BLACK
+                )
+            )
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
         container.addView(nameView)
@@ -181,7 +221,13 @@ class AccountabilityHubActivity : AppCompatActivity() {
         val codeView = TextView(this).apply {
             text = getString(R.string.partner_pairing_code_label, partner.pairingCode)
             textSize = 12f
-            setTextColor(getColor(R.color.text_secondary))
+            setTextColor(
+                MaterialColors.getColor(
+                    this@AccountabilityHubActivity,
+                    com.google.android.material.R.attr.colorOutline,
+                    android.graphics.Color.GRAY
+                )
+            )
             setPadding(0, (4 * resources.displayMetrics.density).toInt(), 0, 0)
         }
         container.addView(codeView)
@@ -210,15 +256,14 @@ class AccountabilityHubActivity : AppCompatActivity() {
             btnRow.addView(manageBtn)
         }
 
-        val deleteBtn = MaterialButton(this)
-        deleteBtn.text = getString(R.string.btn_delete_partner)
-        deleteBtn.textSize = 12f
-        deleteBtn.setTextColor(getColor(R.color.status_orange))
-        deleteBtn.strokeWidth = 0
-        deleteBtn.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        val deleteBtn = MaterialButton(this, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
+            text = getString(R.string.btn_delete_partner)
+            textSize = 12f
+            setTextColor(MaterialColors.getColor(this, androidx.appcompat.R.attr.colorError, getColor(R.color.status_orange)))
+        }
         deleteBtn.setOnClickListener {
             if (!isWard) {
-                AlertDialog.Builder(this@AccountabilityHubActivity)
+                MaterialAlertDialogBuilder(this@AccountabilityHubActivity)
                     .setTitle(R.string.dialog_cannot_delete_guardian_title)
                     .setMessage(R.string.dialog_cannot_delete_guardian_msg)
                     .setPositiveButton(android.R.string.ok, null)
@@ -226,7 +271,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            AlertDialog.Builder(this@AccountabilityHubActivity)
+            MaterialAlertDialogBuilder(this@AccountabilityHubActivity)
                 .setTitle(R.string.dialog_delete_partner_title)
                 .setMessage(getString(R.string.dialog_delete_partner_msg, partner.displayName))
                 .setPositiveButton(R.string.btn_delete_partner) { dialog, _ ->
@@ -279,10 +324,11 @@ class AccountabilityHubActivity : AppCompatActivity() {
 
     private fun showAddPartnerDialog() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_partner, null)
+        val tilCode = dialogView.findViewById<TextInputLayout>(R.id.tilPartnerCode)
         val etCode = dialogView.findViewById<EditText>(R.id.etPartnerCode)
         val rbWard = dialogView.findViewById<RadioButton>(R.id.rbAddAsWard)
 
-        val dialog = AlertDialog.Builder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_add_partner_title)
             .setView(dialogView)
             .setPositiveButton(R.string.dialog_btn_connect, null)
@@ -295,11 +341,10 @@ class AccountabilityHubActivity : AppCompatActivity() {
             val code = etCode.text?.toString()?.trim() ?: ""
             val regex = Regex("^[A-Za-z0-9]{6}$")
             if (!regex.matches(code)) {
-                etCode.error = getString(R.string.dialog_add_partner_code_hint)
-                Toast.makeText(this, R.string.dialog_add_partner_code_hint, Toast.LENGTH_SHORT).show()
+                tilCode?.error = getString(R.string.dialog_add_partner_code_hint)
                 return@setOnClickListener
             }
-            etCode.error = null
+            tilCode?.error = null
             dialog.dismiss()
             val role = if (rbWard.isChecked) PartnerEntity.ROLE_WARD else PartnerEntity.ROLE_GUARDIAN
             performPairing(code, role)
