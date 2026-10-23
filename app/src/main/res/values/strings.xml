@@ -113,7 +113,8 @@
     <string name="ai_fps_format">معدل الفحص: %1$.1f FPS</string>
     <string name="ai_last_detection_format">آخر رصد: %1$s (الثقة: %2$d%%)</string>
     <string name="ai_no_detections_yet">لم يتم رصد أي مخالفات بعد</string>
-    <string name="ai_alert_toast_format">⚠️ رصد محتوى غير محتشم: %1$s (الثقة: %2$d%%)</string>
+    <string name="ai_alert_hard_porn">🚨 تحذير عاجل: تم رصد محتوى إباحي صريح! (الثقة: %1$d%%)</string>
+    <string name="ai_alert_soft_porn">⚠️ تنبيه: تم رصد محتوى فاضح / عري جزئي: %1$s (الثقة: %2$d%%)</string>
     <string name="ai_service_notification_title">فحص الذكاء الاصطناعي نشط 🤖</string>
     <string name="ai_service_notification_desc">مراقبة الشاشة وحفظ العورات تعمل محلياً على الهاتف</string>
     <string name="ai_service_channel_name">درع الذكاء الاصطناعي (AI Shield)</string>

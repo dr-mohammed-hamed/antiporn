@@ -69,6 +69,7 @@ android {
 
     androidResources {
         noCompress += "tflite"
+        noCompress += "onnx"
     }
 }
 
@@ -78,6 +79,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.tensorflow.lite)
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 
     // Firebase BoM & Cloud Infrastructure
     implementation(platform(libs.firebase.bom))

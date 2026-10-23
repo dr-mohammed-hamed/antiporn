@@ -31,13 +31,14 @@ import androidx.core.app.NotificationCompat
 import com.drmohammed.antiporn.MainActivity
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.ai.core.inference.HalalifyGenderDetector
-import com.drmohammed.antiporn.ai.core.inference.IModestyDetector
-import com.drmohammed.antiporn.ai.core.inference.TfLiteModestyDetector
+import com.drmohammed.antiporn.ai.core.inference.NudeNetDetector
+import com.drmohammed.antiporn.ai.core.model.NudeNetDetection
+import com.drmohammed.antiporn.ai.core.model.NudeNetResult
 import com.drmohammed.antiporn.ai.core.pipeline.ContextualGatingWatcher
 import com.drmohammed.antiporn.ai.core.pipeline.FrameDifferencer
-import com.drmohammed.antiporn.ai.core.pipeline.RowStrideExtractor
 import com.drmohammed.antiporn.ai.diagnostic.TelegramAlertDispatcher
 import com.drmohammed.antiporn.ai.overlay.ScreenBlurOverlayManager
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
 /**
@@ -55,12 +56,14 @@ class ScreenAiProjectionService : Service() {
     private var backgroundHandler: Handler? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    private lateinit var detector: IModestyDetector
     private lateinit var halalifyDetector: HalalifyGenderDetector
+    private lateinit var nudeNetDetector: NudeNetDetector
     private lateinit var blurOverlayManager: ScreenBlurOverlayManager
-    private lateinit var rowStrideExtractor: RowStrideExtractor
     private lateinit var frameDifferencer: FrameDifferencer
     private lateinit var contextualWatcher: ContextualGatingWatcher
+
+    // صمام إسقاط الإطارات لمنع تراكم الذاكرة وتأخر استجابة الهاتف (Drop Latest)
+    private val isProcessingFrame = AtomicBoolean(false)
 
     private var scratchBitmap: Bitmap? = null
     private var scratchPixels: IntArray? = null
@@ -115,7 +118,7 @@ class ScreenAiProjectionService : Service() {
 
         /** اسم الموديل النشط للعرض في بطاقة التجربة. */
         @Volatile
-        var modelName: String = TfLiteModestyDetector.MODEL_DISPLAY_NAME
+        var modelName: String = "Halalify v2 + NudeNet v3"
             private set
 
         /** رسالة فشل التهيئة (فارغة = نجاح) — تُعرض بالأحمر بدل الفشل الصامت. */
@@ -136,34 +139,20 @@ class ScreenAiProjectionService : Service() {
         backgroundThread = thread
         backgroundHandler = Handler(thread.looper)
 
-        // محرك الاستدلال الافتراضي: YOLO11n الموحد INT8 لحفظ العورات
-        // الأبعاد والتطبيع تُشتق تلقائياً من واجهة IModestyDetector
-        detector = TfLiteModestyDetector()
-        val initOk = detector.initialize(applicationContext)
-        if (!initOk) {
-            initError = applicationContext.getString(R.string.ai_init_failed_desc, detector.inputWidth)
-            Log.e(TAG, "AI detector init FAILED: $initError")
-        } else {
-            initError = ""
-            Log.i(TAG, "AI detector ready: $modelName ${detector.inputWidth}x${detector.inputHeight}")
+        halalifyDetector = HalalifyGenderDetector(applicationContext)
+        nudeNetDetector = NudeNetDetector()
+        backgroundHandler?.post {
+            val nudeOk = nudeNetDetector.initialize(applicationContext)
+            if (!nudeOk) {
+                initError = "NudeNet initialization failed"
+                Log.e(TAG, "NudeNetDetector initialization failed")
+            } else {
+                initError = ""
+                Log.i(TAG, "AI detectors ready: $modelName")
+            }
         }
 
-        halalifyDetector = HalalifyGenderDetector(applicationContext)
         blurOverlayManager = ScreenBlurOverlayManager(applicationContext)
-
-        rowStrideExtractor = RowStrideExtractor(
-            width = detector.inputWidth,
-            height = detector.inputHeight,
-            isChannelsLast = detector.isChannelsLast,
-            normalization = if (detector is TfLiteModestyDetector)
-                RowStrideExtractor.Normalization.UNIT_01
-            else
-                RowStrideExtractor.Normalization.IMAGENET_MEAN_STD,
-            dataType = if (detector.isFloat16)
-                RowStrideExtractor.DataType.FLOAT16
-            else
-                RowStrideExtractor.DataType.FLOAT32
-        )
         frameDifferencer = FrameDifferencer()
 
         contextualWatcher = ContextualGatingWatcher(
@@ -183,6 +172,7 @@ class ScreenAiProjectionService : Service() {
             // CRITICAL(C3): stop frame flow synchronously — onDestroy is async and a rapid
             // STOP→START would otherwise overwrite live handles (leak + double VirtualDisplay).
             isStopping = true
+            isProcessingFrame.set(false)
             try { imageReader?.setOnImageAvailableListener(null, null) } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
             try { virtualDisplay?.release() } catch (e: Exception) { Log.e(TAG, "Error releasing display on STOP", e) }
             if (::blurOverlayManager.isInitialized) {
@@ -209,10 +199,10 @@ class ScreenAiProjectionService : Service() {
                 Log.w(TAG, "Duplicate/reentrant ACTION_START ignored; running=$isRunning stopping=$isStopping")
                 return START_NOT_STICKY
             }
-            // CRITICAL(C4): fail-closed — never hold MediaProjection while detector is dead.
-            if (initError.isNotEmpty() || !::detector.isInitialized) {
-                Log.e(TAG, "Refusing START: detector not ready: $initError")
-                val msg = initError.ifEmpty { getString(R.string.ai_init_failed_desc, detector.inputWidth) }
+            // CRITICAL(C4): fail-closed — never hold MediaProjection while detectors are dead.
+            if (initError.isNotEmpty() || !::halalifyDetector.isInitialized || !::nudeNetDetector.isInitialized) {
+                Log.e(TAG, "Refusing START: detectors not ready: $initError")
+                val msg = initError.ifEmpty { getString(R.string.ai_init_failed_desc, NudeNetDetector.MODEL_INPUT_SIZE) }
                 mainHandler.post {
                     Toast.makeText(applicationContext, msg, Toast.LENGTH_LONG).show()
                 }
@@ -265,6 +255,7 @@ class ScreenAiProjectionService : Service() {
         currentFps = 0f
         frameCounter = 0
         fpsTimerStart = 0L
+        isProcessingFrame.set(false)
         val notification = buildServiceNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -335,12 +326,25 @@ class ScreenAiProjectionService : Service() {
                 try { imageReaderInstance.acquireLatestImage()?.close() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
                 return@setOnImageAvailableListener
             }
+
+            // الشرط الثاني الإلزامي: استخدام آلية إسقاط الإطارات (Drop Latest)
+            // إذا كان المعالج لا يزال يعالج إطاراً سابقاً، يتم إسقاط الإطار الجديد فوراً دون وضعه في طابور انتظار
+            if (!isProcessingFrame.compareAndSet(false, true)) {
+                try { imageReaderInstance.acquireLatestImage()?.close() } catch (e: Exception) { Log.d(TAG, "Dropped frame cleanup: ${e.message}") }
+                return@setOnImageAvailableListener
+            }
+
             val image = try {
                 imageReaderInstance.acquireLatestImage()
             } catch (e: Exception) {
                 Log.d(TAG, "acquireLatestImage failed (reader closing?)", e)
                 null
-            } ?: return@setOnImageAvailableListener
+            }
+
+            if (image == null) {
+                isProcessingFrame.set(false)
+                return@setOnImageAvailableListener
+            }
 
             try {
                 // حساب الـ FPS
@@ -397,6 +401,13 @@ class ScreenAiProjectionService : Service() {
                             sourceHeight = 1
                         )
                         Log.i(TAG, "👁️ [Halalify Shield] Active | Female Detections: ${femaleDetections.size} | Top Conf: ${"%.1f".format((femaleDetections.maxOfOrNull { it.confidence } ?: 0f) * 100)}% | Latency: ${halalifyLatency}ms | Boxes: ${femaleBoxes.joinToString { "[${"%.2f".format(it.left)}, ${"%.2f".format(it.top)}, ${"%.2f".format(it.right)}, ${"%.2f".format(it.bottom)}]" }}")
+
+                        // الشرط الأول الإلزامي: ربط الاستدعاء المشروط (Gated Execution)
+                        // لا يتم تمرير الإطار إلى NudeNetDetector إلا إذا اكتشف Halalify وجود شبهة جسد أو أنثى على الشاشة لتوفير طاقة المعالج ومنع السخونة
+                        if (::nudeNetDetector.isInitialized) {
+                            val nudeResult = nudeNetDetector.detect(rawBitmap)
+                            handleNudeNetResult(nudeResult)
+                        }
                     } else {
                         blurOverlayManager.updateRegions(emptyList())
                         val nowMs = SystemClock.elapsedRealtime()
@@ -407,42 +418,12 @@ class ScreenAiProjectionService : Service() {
                         }
                     }
                 }
-
-                // استخراج البكسلات سطراً بسطر متجاوزاً حشو الـ rowStride (تطبيع ImageNet داخل المستخرج)
-                val buffer = rowStrideExtractor.extract(image)
-
-                // المستوى الوحيد للتجربة: مصنف MobileNetV4 → درجة شبهة
-                val result = detector.detect(buffer)
-
-                if (result.hasViolation && result.topViolation != null) {
-                    val violation = result.topViolation
-                    // MAJOR(S3): atomic snapshot — UI reads label+confidence together, never torn.
-                    val snapshot = LastDetection(violation.classType.labelAr, violation.confidence)
-                    lastDetection = snapshot
-                    lastDetectedLabel = snapshot.label
-                    lastConfidence = snapshot.confidence
-
-                    Log.w(TAG, "Modesty Violation=${violation.classType.name} (${violation.classType.labelAr}) conf=${violation.confidence} latency=${result.latencyMs}ms")
-                    triggerAlertThrottled(violation.classType.labelAr, violation.confidence)
-
-                    if (TelegramAlertDispatcher.isEnabled && rawBitmap != null) {
-                        try {
-                            TelegramAlertDispatcher.dispatchAlert(
-                                rawBitmap = rawBitmap,
-                                detections = result.detections,
-                                topViolation = violation,
-                                latencyMs = result.latencyMs
-                            )
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Telegram alert dispatch error: ${e.message}")
-                        }
-                    }
-                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in frame processing loop", e)
             } finally {
-                // الإغلاق الإلزامي لتفادي تجويع الذاكرة
+                // الإغلاق الإلزامي لتفادي تجويع الذاكرة وإعادة ضبط صمام إسقاط الإطارات فوراً
                 image.close()
+                isProcessingFrame.set(false)
             }
         }, backgroundHandler)
 
@@ -527,7 +508,33 @@ class ScreenAiProjectionService : Service() {
         }
     }
 
-    private fun triggerAlertThrottled(label: String, confidence: Float) {
+    private fun handleNudeNetResult(result: NudeNetResult) {
+        if (result.hasHardPorn) {
+            val topHard = result.detections
+                .filter { it.isHardPorn }
+                .maxByOrNull { it.confidence }
+            if (topHard != null) {
+                val snapshot = LastDetection(topHard.classType.labelAr, topHard.confidence)
+                lastDetection = snapshot
+                lastDetectedLabel = snapshot.label
+                lastConfidence = snapshot.confidence
+                triggerHardPornAlertThrottled(topHard.confidence)
+            }
+        } else if (result.hasSoftPorn) {
+            val topSoft = result.detections
+                .filter { it.isSoftPorn }
+                .maxByOrNull { it.confidence }
+            if (topSoft != null) {
+                val snapshot = LastDetection(topSoft.classType.labelAr, topSoft.confidence)
+                lastDetection = snapshot
+                lastDetectedLabel = snapshot.label
+                lastConfidence = snapshot.confidence
+                triggerSoftPornAlertThrottled(topSoft.classType.labelAr, topSoft.confidence)
+            }
+        }
+    }
+
+    private fun triggerHardPornAlertThrottled(confidence: Float) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastAlertTimeMs < ALERT_DEBOUNCE_MS) {
             return
@@ -535,9 +542,30 @@ class ScreenAiProjectionService : Service() {
         lastAlertTimeMs = now
 
         val confidencePercent = (confidence * 100).toInt()
-        val message = getString(R.string.ai_alert_toast_format, label, confidencePercent)
+        val message = getString(R.string.ai_alert_hard_porn, confidencePercent)
 
-        // 1. نبضة اهتزاز لمسية فورية (150ms) لكسر كتم واجهة ريلمي
+        // 1. نبضة اهتزاز مزدوجة قوية
+        triggerDoubleHapticPulse()
+
+        // 2. إظهار رسالة Toast على الخيط الرئيسي
+        mainHandler.post {
+            Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+        }
+
+        Log.w(TAG, "🚨 HARD PORN ALERT TRIGGERED: $message")
+    }
+
+    private fun triggerSoftPornAlertThrottled(label: String, confidence: Float) {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastAlertTimeMs < ALERT_DEBOUNCE_MS) {
+            return
+        }
+        lastAlertTimeMs = now
+
+        val confidencePercent = (confidence * 100).toInt()
+        val message = getString(R.string.ai_alert_soft_porn, label, confidencePercent)
+
+        // 1. نبضة اهتزاز مفردة (150ms)
         triggerHapticPulse()
 
         // 2. إظهار رسالة Toast على الخيط الرئيسي
@@ -545,7 +573,39 @@ class ScreenAiProjectionService : Service() {
             Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
         }
 
-        Log.w(TAG, "ALERT TRIGGERED: $message")
+        Log.w(TAG, "⚠️ SOFT PORN ALERT TRIGGERED: $message")
+    }
+
+    private fun triggerDoubleHapticPulse() {
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+
+            if (vibrator == null || !vibrator.hasVibrator()) {
+                return
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // نبضتان قويتان: اهتزاز 200ms، توقف 100ms، اهتزاز 250ms
+                val timings = longArrayOf(0, 200, 100, 250)
+                if (vibrator.hasAmplitudeControl()) {
+                    val amplitudes = intArrayOf(0, 255, 0, 255)
+                    vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+                } else {
+                    vibrator.vibrate(VibrationEffect.createWaveform(timings, -1))
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(longArrayOf(0, 200, 100, 250), -1)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to trigger double haptic pulse", e)
+        }
     }
 
     private fun triggerHapticPulse() {
@@ -558,11 +618,15 @@ class ScreenAiProjectionService : Service() {
                 getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             }
 
+            if (vibrator == null || !vibrator.hasVibrator()) {
+                return
+            }
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator?.vibrate(VibrationEffect.createOneShot(150L, VibrationEffect.DEFAULT_AMPLITUDE))
+                vibrator.vibrate(VibrationEffect.createOneShot(150L, VibrationEffect.DEFAULT_AMPLITUDE))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator?.vibrate(150L)
+                vibrator.vibrate(150L)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to trigger haptic pulse", e)
@@ -654,14 +718,14 @@ class ScreenAiProjectionService : Service() {
         if (worker != null && worker.isAlive && workerHandler != null) {
             workerHandler.postAtFrontOfQueue {
                 try {
-                    if (::detector.isInitialized) detector.close()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error closing detector on worker", e)
-                }
-                try {
                     if (::halalifyDetector.isInitialized) halalifyDetector.close()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error closing halalifyDetector on worker", e)
+                }
+                try {
+                    if (::nudeNetDetector.isInitialized) nudeNetDetector.close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error closing nudeNetDetector on worker", e)
                 } finally {
                     try { worker.quitSafely() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
                 }
@@ -682,14 +746,14 @@ class ScreenAiProjectionService : Service() {
                 try { if (worker.isAlive) worker.quit() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
             }, 3000L)
         } else {
-            if (::detector.isInitialized) {
-                try { detector.close() } catch (e: Exception) {
-                    Log.e(TAG, "Error closing detector", e)
-                }
-            }
             if (::halalifyDetector.isInitialized) {
                 try { halalifyDetector.close() } catch (e: Exception) {
                     Log.e(TAG, "Error closing halalifyDetector", e)
+                }
+            }
+            if (::nudeNetDetector.isInitialized) {
+                try { nudeNetDetector.close() } catch (e: Exception) {
+                    Log.e(TAG, "Error closing nudeNetDetector", e)
                 }
             }
             try { imageReader?.close() } catch (e: Exception) {
