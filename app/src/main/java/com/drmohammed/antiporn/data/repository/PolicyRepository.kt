@@ -3,14 +3,18 @@ package com.drmohammed.antiporn.data.repository
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.os.UserManager
 import android.util.Log
 import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
+import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
+import com.drmohammed.antiporn.curfew.CurfewAppResolver
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
 import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
 import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
+import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.BrowserShield
 import com.drmohammed.antiporn.shields.DnsShield
 import com.google.firebase.auth.FirebaseAuth
@@ -207,13 +211,15 @@ class PolicyRepository private constructor(context: Context) {
         }
         _currentPolicyFlow.value = bundle
         database.saveDevicePolicy(DevicePolicyEntity.fromBundle(bundle))
-        applyPolicyToSystem(bundle)
+        applyPolicyToSystem(bundle, current)
     }
 
     /**
-     * Applies policy bundle parameters across system engines (Curfew, Browser, VPN).
+     * Applies policy bundle parameters across system engines (Curfew, Browser, VPN),
+     * reconciling differences with previous policy to unsuspend removed blacklist packages
+     * and clear uninstall blocking for removed protected packages.
      */
-    fun applyPolicyToSystem(bundle: DevicePolicyBundle) {
+    fun applyPolicyToSystem(bundle: DevicePolicyBundle, previousPolicy: DevicePolicyBundle = _currentPolicyFlow.value) {
         repositoryScope.launch {
             try {
                 // 1. Reschedule curfew alarms
@@ -222,13 +228,78 @@ class PolicyRepository private constructor(context: Context) {
                 // 2. Synchronize curfew enforcer with new timings and parameters
                 CurfewEnforcer.syncBlockState(appContext)
 
-                // 3. Apply browser & DNS restrictions
+                // 3. Apply browser & DNS restrictions, custom blacklist suspension, and protected apps
                 val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
                 if (dpm != null && dpm.isDeviceOwnerApp(appContext.packageName)) {
                     val admin = ComponentName(appContext, AdminReceiver::class.java)
                     BrowserShield.applyBrowserRestrictions(dpm, admin, bundle.isIncognitoBlocked)
                     DnsShield.apply(appContext, dpm, admin)
+
+                    // 24/7 Custom App Freezing (bundle.customBlacklistPackages)
+                    val currentBlacklist = bundle.customBlacklistPackages
+                    val packagesToSuspend = currentBlacklist.filter {
+                        it != appContext.packageName && !AppPolicyRegistry.isImmune(it)
+                    }.toTypedArray()
+                    if (packagesToSuspend.isNotEmpty()) {
+                        try {
+                            dpm.setPackagesSuspended(admin, packagesToSuspend, true)
+                            Log.i(TAG, "Enforced 24/7 custom blacklist suspension for ${packagesToSuspend.size} packages")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed suspending customBlacklistPackages", e)
+                        }
+                    }
+
+                    // Unsuspend packages that were removed from custom blacklist
+                    val removedFromBlacklist = (previousPolicy.customBlacklistPackages - currentBlacklist).filter {
+                        it != appContext.packageName && !AppPolicyRegistry.isImmune(it) && !AppSuspensionShield.isBlacklisted(it)
+                    }
+                    if (removedFromBlacklist.isNotEmpty()) {
+                        val isBlockActive = CurfewEnforcer.isEffectiveBlockActive(appContext)
+                        val immunePackages = CurfewAppResolver.resolveImmunePackages(appContext)
+                        val packagesToUnsuspend = removedFromBlacklist.filter { pkg ->
+                            !isBlockActive || immunePackages.contains(pkg)
+                        }.toTypedArray()
+                        if (packagesToUnsuspend.isNotEmpty()) {
+                            try {
+                                dpm.setPackagesSuspended(admin, packagesToUnsuspend, false)
+                                Log.i(TAG, "Unsuspended ${packagesToUnsuspend.size} packages removed from custom blacklist")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed unsuspending removed blacklist packages", e)
+                            }
+                        }
+                    }
+
+                    // App Protection (bundle.protectedAppPackages)
+                    for (pkg in bundle.protectedAppPackages) {
+                        try {
+                            dpm.setUninstallBlocked(admin, pkg, true)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed setting uninstall blocked for protected package: $pkg", e)
+                        }
+                    }
+
+                    // Clear uninstall blocked for packages removed from protection
+                    val unprotectPackages = previousPolicy.protectedAppPackages - bundle.protectedAppPackages
+                    for (pkg in unprotectPackages) {
+                        try {
+                            dpm.setUninstallBlocked(admin, pkg, false)
+                            Log.i(TAG, "Cleared uninstall blocked for unprotected package: $pkg")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed clearing uninstall blocked for package: $pkg", e)
+                        }
+                    }
+
+                    if (bundle.protectedAppPackages.isNotEmpty()) {
+                        dpm.addUserRestriction(admin, UserManager.DISALLOW_APPS_CONTROL)
+                        Log.i(TAG, "Added DISALLOW_APPS_CONTROL restriction for ${bundle.protectedAppPackages.size} protected packages")
+                    } else {
+                        dpm.clearUserRestriction(admin, UserManager.DISALLOW_APPS_CONTROL)
+                    }
                 }
+
+                // 4. Trigger inventory sync to cloud directly in coroutine
+                AppInventoryManager.getInstance(appContext).syncInventoryToCloud()
+
                 Log.i(TAG, "Successfully applied policy bundle v${bundle.version} to system engines")
             } catch (e: Exception) {
                 Log.e(TAG, "Error applying policy bundle to system engines", e)

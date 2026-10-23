@@ -4,8 +4,10 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import com.drmohammed.antiporn.AdminReceiver
+import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import com.drmohammed.antiporn.curfew.CurfewAppResolver
 import com.drmohammed.antiporn.curfew.CurfewConfig
@@ -39,10 +41,12 @@ class ApprovalRepository private constructor(context: Context) {
      * Freezes it in 0ms via DevicePolicyManager, records it locally, and submits a cloud approval ticket.
      */
     fun freezeAndSubmitApproval(packageName: String) {
-        if (packageName == appContext.packageName ||
-            AppPolicyRegistry.isImmune(packageName) ||
-            CurfewAppResolver.resolveImmunePackages(appContext).contains(packageName)
-        ) {
+        val isImmune = packageName == appContext.packageName ||
+            AppPolicyRegistry.getImmunePackages().contains(packageName) ||
+            AppPolicyRegistry.getSystemCriticalPackages().contains(packageName) ||
+            AppPolicyRegistry.isImmune(packageName)
+
+        if (isImmune) {
             Log.i(TAG, "Package $packageName is immune/self. Skipping freeze and approval submission.")
             return
         }
@@ -57,7 +61,12 @@ class ApprovalRepository private constructor(context: Context) {
 
         // 1. Instant 0ms suspension
         try {
-            dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
+            suspendWithGuardianMessage(
+                dpm = dpm,
+                admin = admin,
+                packageName = packageName,
+                message = appContext.getString(R.string.toast_app_suspended_by_guardian)
+            )
             Log.i(TAG, "Instant 0ms freeze applied to package: $packageName")
         } catch (e: Exception) {
             Log.e(TAG, "Failed instant freeze for $packageName", e)
@@ -182,8 +191,7 @@ class ApprovalRepository private constructor(context: Context) {
     }
 
     /**
-     * Starts listening to Firestore for real-time approvals for this ward device.
-     * When an approval snapshot arrives, unsuspends the app locally and marks it approved.
+     * Starts listening to Firestore for real-time approvals and rejections for this ward device.
      */
     fun startApprovalsSync(wardUid: String) {
         approvalsListener?.remove()
@@ -191,7 +199,6 @@ class ApprovalRepository private constructor(context: Context) {
             val firestore = FirebaseFirestore.getInstance()
             approvalsListener = firestore.collection("approvals")
                 .whereEqualTo("wardUid", wardUid)
-                .whereEqualTo("status", "APPROVED")
                 .addSnapshotListener { snapshots, error ->
                     if (error != null) {
                         Log.w(TAG, "Error listening for approval updates: ${error.message}")
@@ -202,12 +209,21 @@ class ApprovalRepository private constructor(context: Context) {
                             try {
                                 for (doc in snapshots.documents) {
                                     val packageName = doc.getString("packageName") ?: continue
+                                    val status = doc.getString("status") ?: continue
                                     val decidedBy = doc.getString("decidedBy")
                                     val pendingList = getLocalPendingApprovals()
                                     val local = pendingList.find { it.packageName == packageName }
-                                    if (local == null || local.isPending) {
-                                        Log.i(TAG, "Real-time approval received for $packageName from $decidedBy")
-                                        unsuspendAndApprove(packageName, decidedBy)
+
+                                    if (status == "APPROVED") {
+                                        if (local == null || local.isPending) {
+                                            Log.i(TAG, "Real-time approval received for $packageName from $decidedBy")
+                                            unsuspendAndApprove(packageName, decidedBy)
+                                        }
+                                    } else if (status == "REJECTED") {
+                                        if (local == null || local.isPending) {
+                                            Log.i(TAG, "Real-time rejection received for $packageName from $decidedBy")
+                                            recordRejection(packageName, decidedBy)
+                                        }
                                     }
                                 }
                             } catch (e: Exception) {
@@ -253,6 +269,40 @@ class ApprovalRepository private constructor(context: Context) {
     }
 
     fun getLocalPendingApprovals(): List<PendingApprovalEntity> = database.getPendingApprovals()
+
+    private fun suspendWithGuardianMessage(
+        dpm: DevicePolicyManager,
+        admin: ComponentName,
+        packageName: String,
+        message: String
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                val builderClass = Class.forName("android.content.pm.SuspendDialogInfo\$Builder")
+                val builder = builderClass.getDeclaredConstructor().newInstance()
+                val setMessageMethod = builderClass.getMethod("setMessage", String::class.java)
+                setMessageMethod.invoke(builder, message)
+                val buildMethod = builderClass.getMethod("build")
+                val dialogInfo = buildMethod.invoke(builder)
+
+                val suspendMethod = DevicePolicyManager::class.java.getMethod(
+                    "setPackagesSuspended",
+                    ComponentName::class.java,
+                    Array<String>::class.java,
+                    Boolean::class.javaPrimitiveType,
+                    android.os.PersistableBundle::class.java,
+                    android.os.PersistableBundle::class.java,
+                    Class.forName("android.content.pm.SuspendDialogInfo")
+                )
+                suspendMethod.invoke(dpm, admin, arrayOf(packageName), true, null, null, dialogInfo)
+                Log.i(TAG, "Applied Zero-Trust suspension with custom SuspendDialogInfo for $packageName")
+                return
+            } catch (e: Exception) {
+                Log.w(TAG, "Reflection for SuspendDialogInfo failed, falling back to standard suspension", e)
+            }
+        }
+        dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
+    }
 
     companion object {
         private const val TAG = "AntiPorn_ApprovalRepo"

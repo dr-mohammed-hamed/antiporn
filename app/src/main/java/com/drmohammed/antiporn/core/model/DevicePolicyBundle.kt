@@ -12,11 +12,19 @@ data class DevicePolicyBundle(
     val curfewStartMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE,
     val curfewEndHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR,
     val curfewEndMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE,
+    val isCurfewEnabled: Boolean = true,
+    val isInstantInternetKillEnabled: Boolean = false,
+    val isWeekendCurfewEnabled: Boolean = false,
+    val weekendCurfewStartHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR,
+    val weekendCurfewStartMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE,
+    val weekendCurfewEndHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR,
+    val weekendCurfewEndMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE,
     val isVpnBlackholeEnabled: Boolean = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED,
     val isIncognitoBlocked: Boolean = true,
     val lockNewInstallsUntilApproved: Boolean = true,
     val customBlacklistPackages: Set<String> = emptySet(),
     val customCurfewWhitelistPackages: Set<String> = emptySet(),
+    val protectedAppPackages: Set<String> = emptySet(),
     val dnsHost: String = ADGUARD_FAMILY_DNS_HOST,
     val guardianUid: String? = null,
     val guardianName: String? = null,
@@ -31,11 +39,19 @@ data class DevicePolicyBundle(
             "curfewStartMinute" to curfewStartMinute,
             "curfewEndHour" to curfewEndHour,
             "curfewEndMinute" to curfewEndMinute,
+            "isCurfewEnabled" to isCurfewEnabled,
+            "isInstantInternetKillEnabled" to isInstantInternetKillEnabled,
+            "isWeekendCurfewEnabled" to isWeekendCurfewEnabled,
+            "weekendCurfewStartHour" to weekendCurfewStartHour,
+            "weekendCurfewStartMinute" to weekendCurfewStartMinute,
+            "weekendCurfewEndHour" to weekendCurfewEndHour,
+            "weekendCurfewEndMinute" to weekendCurfewEndMinute,
             "isVpnBlackholeEnabled" to isVpnBlackholeEnabled,
             "isIncognitoBlocked" to isIncognitoBlocked,
             "lockNewInstallsUntilApproved" to lockNewInstallsUntilApproved,
             "customBlacklistPackages" to customBlacklistPackages.toList(),
             "customCurfewWhitelistPackages" to customCurfewWhitelistPackages.toList(),
+            "protectedAppPackages" to protectedAppPackages.toList(),
             "dnsHost" to dnsHost,
             "isSupervised" to isSupervised,
             "version" to version,
@@ -52,6 +68,13 @@ data class DevicePolicyBundle(
         json.put("curfewStartMinute", curfewStartMinute)
         json.put("curfewEndHour", curfewEndHour)
         json.put("curfewEndMinute", curfewEndMinute)
+        json.put("isCurfewEnabled", isCurfewEnabled)
+        json.put("isInstantInternetKillEnabled", isInstantInternetKillEnabled)
+        json.put("isWeekendCurfewEnabled", isWeekendCurfewEnabled)
+        json.put("weekendCurfewStartHour", weekendCurfewStartHour)
+        json.put("weekendCurfewStartMinute", weekendCurfewStartMinute)
+        json.put("weekendCurfewEndHour", weekendCurfewEndHour)
+        json.put("weekendCurfewEndMinute", weekendCurfewEndMinute)
         json.put("isVpnBlackholeEnabled", isVpnBlackholeEnabled)
         json.put("isIncognitoBlocked", isIncognitoBlocked)
         json.put("lockNewInstallsUntilApproved", lockNewInstallsUntilApproved)
@@ -63,6 +86,10 @@ data class DevicePolicyBundle(
         val whitelistArr = JSONArray()
         customCurfewWhitelistPackages.forEach { whitelistArr.put(it) }
         json.put("customCurfewWhitelistPackages", whitelistArr)
+
+        val protectedArr = JSONArray()
+        protectedAppPackages.forEach { protectedArr.put(it) }
+        json.put("protectedAppPackages", protectedArr)
 
         json.put("dnsHost", dnsHost)
         if (guardianUid != null) json.put("guardianUid", guardianUid)
@@ -91,12 +118,20 @@ data class DevicePolicyBundle(
             val startMin = ((map["curfewStartMinute"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE).coerceIn(0, 59)
             val endHour = ((map["curfewEndHour"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR).coerceIn(0, 23)
             val endMin = ((map["curfewEndMinute"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE).coerceIn(0, 59)
+            val isCurfew = (map["isCurfewEnabled"] as? Boolean) ?: true
+            val isInstantKill = (map["isInstantInternetKillEnabled"] as? Boolean) ?: false
+            val isWeekendCurfew = (map["isWeekendCurfewEnabled"] as? Boolean) ?: false
+            val wkStartHour = ((map["weekendCurfewStartHour"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR).coerceIn(0, 23)
+            val wkStartMin = ((map["weekendCurfewStartMinute"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE).coerceIn(0, 59)
+            val wkEndHour = ((map["weekendCurfewEndHour"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR).coerceIn(0, 23)
+            val wkEndMin = ((map["weekendCurfewEndMinute"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE).coerceIn(0, 59)
             val vpn = (map["isVpnBlackholeEnabled"] as? Boolean) ?: com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED
             val incognito = (map["isIncognitoBlocked"] as? Boolean) ?: true
             val lockNew = (map["lockNewInstallsUntilApproved"] as? Boolean) ?: true
 
             val blacklist = (map["customBlacklistPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
             val whitelist = (map["customCurfewWhitelistPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
+            val protectedApps = (map["protectedAppPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
 
             val dns = (map["dnsHost"] as? String)?.takeIf { it.isNotBlank() } ?: LEGACY_DEFAULT_NEXTDNS_HOST
 
@@ -112,11 +147,19 @@ data class DevicePolicyBundle(
                 curfewStartMinute = startMin,
                 curfewEndHour = endHour,
                 curfewEndMinute = endMin,
+                isCurfewEnabled = isCurfew,
+                isInstantInternetKillEnabled = isInstantKill,
+                isWeekendCurfewEnabled = isWeekendCurfew,
+                weekendCurfewStartHour = wkStartHour,
+                weekendCurfewStartMinute = wkStartMin,
+                weekendCurfewEndHour = wkEndHour,
+                weekendCurfewEndMinute = wkEndMin,
                 isVpnBlackholeEnabled = vpn,
                 isIncognitoBlocked = incognito,
                 lockNewInstallsUntilApproved = lockNew,
                 customBlacklistPackages = blacklist,
                 customCurfewWhitelistPackages = whitelist,
+                protectedAppPackages = protectedApps,
                 dnsHost = dns,
                 guardianUid = gUid,
                 guardianName = gName,
@@ -145,21 +188,37 @@ data class DevicePolicyBundle(
                     }
                 }
 
+                val protectedApps = mutableSetOf<String>()
+                val protectedArr = json.optJSONArray("protectedAppPackages")
+                if (protectedArr != null) {
+                    for (i in 0 until protectedArr.length()) {
+                        protectedApps.add(protectedArr.getString(i))
+                    }
+                }
+
                 val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: LEGACY_DEFAULT_NEXTDNS_HOST
                 val gUid = json.optString("guardianUid", "").takeIf { it.isNotBlank() }
                 val gName = json.optString("guardianName", "").takeIf { it.isNotBlank() }
                 val supervised = json.optBoolean("isSupervised", !gUid.isNullOrBlank())
 
                 DevicePolicyBundle(
-                    curfewStartHour = json.optInt("curfewStartHour", com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR),
-                    curfewStartMinute = json.optInt("curfewStartMinute", com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE),
-                    curfewEndHour = json.optInt("curfewEndHour", com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR),
-                    curfewEndMinute = json.optInt("curfewEndMinute", com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE),
+                    curfewStartHour = json.optInt("curfewStartHour", com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR).coerceIn(0, 23),
+                    curfewStartMinute = json.optInt("curfewStartMinute", com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE).coerceIn(0, 59),
+                    curfewEndHour = json.optInt("curfewEndHour", com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR).coerceIn(0, 23),
+                    curfewEndMinute = json.optInt("curfewEndMinute", com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE).coerceIn(0, 59),
+                    isCurfewEnabled = json.optBoolean("isCurfewEnabled", true),
+                    isInstantInternetKillEnabled = json.optBoolean("isInstantInternetKillEnabled", false),
+                    isWeekendCurfewEnabled = json.optBoolean("isWeekendCurfewEnabled", false),
+                    weekendCurfewStartHour = json.optInt("weekendCurfewStartHour", com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR).coerceIn(0, 23),
+                    weekendCurfewStartMinute = json.optInt("weekendCurfewStartMinute", com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE).coerceIn(0, 59),
+                    weekendCurfewEndHour = json.optInt("weekendCurfewEndHour", com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR).coerceIn(0, 23),
+                    weekendCurfewEndMinute = json.optInt("weekendCurfewEndMinute", com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE).coerceIn(0, 59),
                     isVpnBlackholeEnabled = json.optBoolean("isVpnBlackholeEnabled", com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED),
                     isIncognitoBlocked = json.optBoolean("isIncognitoBlocked", true),
                     lockNewInstallsUntilApproved = json.optBoolean("lockNewInstallsUntilApproved", true),
                     customBlacklistPackages = blacklist,
                     customCurfewWhitelistPackages = whitelist,
+                    protectedAppPackages = protectedApps,
                     dnsHost = dns,
                     guardianUid = gUid,
                     guardianName = gName,

@@ -10,13 +10,86 @@ import android.util.Log
 import java.util.Calendar
 
 /**
- * Schedules exact, Doze-exempt alarms via AlarmManager for curfew start and end times.
+ * Schedules exact, Doze-exempt alarms via AlarmManager for curfew start and end times,
+ * dynamically supporting distinct weekday and weekend schedules.
  */
 object CurfewScheduler {
 
     private const val TAG = "AntiPorn_CurfewScheduler"
     private const val REQUEST_CODE_START = 3001
     private const val REQUEST_CODE_END = 3002
+
+    /**
+     * Returns the curfew start hour and minute for a specific day of the week,
+     * accounting for weekend curfew schedules when enabled.
+     */
+    fun getCurfewStartTimeForDay(context: Context, dayOfWeek: Int): Pair<Int, Int> {
+        return if (CurfewConfig.isWeekendCurfewEnabled(context) &&
+            (dayOfWeek == Calendar.THURSDAY || dayOfWeek == Calendar.FRIDAY || dayOfWeek == Calendar.SATURDAY)
+        ) {
+            CurfewConfig.getWeekendCurfewStartHour(context) to CurfewConfig.getWeekendCurfewStartMinute(context)
+        } else {
+            CurfewConfig.getCurfewStartHour(context) to CurfewConfig.getCurfewStartMinute(context)
+        }
+    }
+
+    /**
+     * Returns the curfew end hour and minute for a specific day of the week,
+     * accounting for weekend curfew schedules when enabled.
+     */
+    fun getCurfewEndTimeForDay(context: Context, dayOfWeek: Int): Pair<Int, Int> {
+        return if (CurfewConfig.isWeekendCurfewEnabled(context) &&
+            (dayOfWeek == Calendar.FRIDAY || dayOfWeek == Calendar.SATURDAY)
+        ) {
+            CurfewConfig.getWeekendCurfewEndHour(context) to CurfewConfig.getWeekendCurfewEndMinute(context)
+        } else {
+            CurfewConfig.getCurfewEndHour(context) to CurfewConfig.getCurfewEndMinute(context)
+        }
+    }
+
+    /**
+     * Calculates the next calendar occurrence for curfew start, dynamically evaluating
+     * day-specific and weekend-specific schedules across upcoming days.
+     */
+    fun getNextCurfewStart(context: Context, now: Calendar = CurfewConfig.getCurfewCalendar()): Calendar {
+        for (dayOffset in 0..7) {
+            val candidate = (now.clone() as Calendar).apply {
+                add(Calendar.DAY_OF_YEAR, dayOffset)
+                val dayOfWeek = get(Calendar.DAY_OF_WEEK)
+                val (hour, minute) = getCurfewStartTimeForDay(context, dayOfWeek)
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            if (candidate.timeInMillis > now.timeInMillis) {
+                return candidate
+            }
+        }
+        return getNextOccurrence(CurfewConfig.getCurfewStartHour(context), CurfewConfig.getCurfewStartMinute(context), now)
+    }
+
+    /**
+     * Calculates the next calendar occurrence for curfew end, dynamically evaluating
+     * day-specific and weekend-specific schedules across upcoming days.
+     */
+    fun getNextCurfewEnd(context: Context, now: Calendar = CurfewConfig.getCurfewCalendar()): Calendar {
+        for (dayOffset in 0..7) {
+            val candidate = (now.clone() as Calendar).apply {
+                add(Calendar.DAY_OF_YEAR, dayOffset)
+                val dayOfWeek = get(Calendar.DAY_OF_WEEK)
+                val (hour, minute) = getCurfewEndTimeForDay(context, dayOfWeek)
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            if (candidate.timeInMillis > now.timeInMillis) {
+                return candidate
+            }
+        }
+        return getNextOccurrence(CurfewConfig.getCurfewEndHour(context), CurfewConfig.getCurfewEndMinute(context), now)
+    }
 
     /**
      * Calculates next calendar occurrence for a given hour and minute.
@@ -36,7 +109,8 @@ object CurfewScheduler {
     }
 
     /**
-     * Schedules the next exact alarms for 20:00 (Curfew Start) and 07:00 (Curfew End).
+     * Schedules the next exact alarms for Curfew Start and Curfew End,
+     * properly accounting for weekday vs weekend timings.
      */
     fun scheduleNextAlarms(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: run {
@@ -47,14 +121,8 @@ object CurfewScheduler {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
         val now = CurfewConfig.getCurfewCalendar()
-        val startH = CurfewConfig.getCurfewStartHour(context)
-        val startM = CurfewConfig.getCurfewStartMinute(context)
-        val endH = CurfewConfig.getCurfewEndHour(context)
-        val endM = CurfewConfig.getCurfewEndMinute(context)
-
-        val nextStart = getNextOccurrence(startH, startM, now)
-        val nextEnd = getNextOccurrence(endH, endM, now)
-
+        val nextStart = getNextCurfewStart(context, now)
+        val nextEnd = getNextCurfewEnd(context, now)
 
         val startIntent = Intent(context, CurfewAlarmReceiver::class.java).apply {
             action = CurfewAlarmReceiver.ACTION_CURFEW_START

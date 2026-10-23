@@ -5,7 +5,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.util.Log
+import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
+import com.drmohammed.antiporn.data.repository.AppInventoryManager
+import com.drmohammed.antiporn.data.repository.ApprovalRepository
+import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.shields.AppSuspensionShield
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 
@@ -39,17 +44,18 @@ class PackageChangeReceiver : BroadcastReceiver() {
                                 Log.i(TAG, "Blacklisted package install detected: $packageName. Enforcing freeze...")
                                 AppSuspensionShield.handlePackageAdded(appContext, packageName)
                             } else {
-                                val approvalRepo = com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(appContext)
+                                val approvalRepo = ApprovalRepository.getInstance(appContext)
                                 val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any { it.packageName == packageName && it.isApproved }
 
-                                val policy = com.drmohammed.antiporn.data.repository.PolicyRepository
-                                    .getInstance(appContext).getCurrentPolicy()
+                                val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
                                 if (policy.lockNewInstallsUntilApproved && !isReplacing && !isAlreadyApproved) {
-                                    if (packageName == appContext.packageName ||
-                                        com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isImmune(packageName) ||
-                                        com.drmohammed.antiporn.curfew.CurfewAppResolver.resolveImmunePackages(appContext).contains(packageName)
-                                    ) {
-                                        Log.i(TAG, "New install $packageName is immune or self. Skipping freeze.")
+                                    val isImmune = packageName == appContext.packageName ||
+                                        AppPolicyRegistry.getImmunePackages().contains(packageName) ||
+                                        AppPolicyRegistry.getSystemCriticalPackages().contains(packageName) ||
+                                        AppPolicyRegistry.isImmune(packageName)
+
+                                    if (isImmune) {
+                                        Log.i(TAG, "New install $packageName is immune or core system framework. Skipping freeze.")
                                     } else {
                                         Log.i(TAG, "Strict Zero-Trust active: Freezing new install $packageName in 0ms and submitting approval ticket")
                                         approvalRepo.freezeAndSubmitApproval(packageName)
@@ -58,6 +64,11 @@ class PackageChangeReceiver : BroadcastReceiver() {
                                     Log.i(TAG, "Package $packageName added/updated (replacing=$isReplacing, alreadyApproved=$isAlreadyApproved). Evaluating curfew status...")
                                     com.drmohammed.antiporn.curfew.CurfewEnforcer.handlePackageAdded(appContext, packageName)
                                 }
+                            }
+
+                            // Trigger blocking inventory sync to cloud to guarantee process is kept alive until completion
+                            runBlocking {
+                                AppInventoryManager.getInstance(appContext).syncInventoryToCloud()
                             }
 
                         } catch (e: Exception) {
@@ -76,6 +87,25 @@ class PackageChangeReceiver : BroadcastReceiver() {
                 val data = intent.data ?: return
                 val packageName = data.schemeSpecificPart ?: return
                 Log.d(TAG, "Package removed notification received: $packageName")
+
+                val pendingResult = goAsync()
+                val appContext = context.applicationContext
+                try {
+                    bgExecutor.execute {
+                        try {
+                            runBlocking {
+                                AppInventoryManager.getInstance(appContext).syncInventoryToCloud()
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error syncing inventory on package removed: $packageName", e)
+                        } finally {
+                            pendingResult.finish()
+                        }
+                    }
+                } catch (e: RejectedExecutionException) {
+                    Log.e(TAG, "Executor rejected task on package removed: $packageName", e)
+                    pendingResult.finish()
+                }
             }
 
             AppSuspensionShield.ACTION_UNINSTALL_STATUS -> {
