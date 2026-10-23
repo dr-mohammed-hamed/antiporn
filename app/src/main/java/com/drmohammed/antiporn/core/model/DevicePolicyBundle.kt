@@ -17,13 +17,16 @@ data class DevicePolicyBundle(
     val lockNewInstallsUntilApproved: Boolean = true,
     val customBlacklistPackages: Set<String> = emptySet(),
     val customCurfewWhitelistPackages: Set<String> = emptySet(),
-    val dnsHost: String = CLOUDFLARE_FAMILY_DNS_HOST,
+    val dnsHost: String = ADGUARD_FAMILY_DNS_HOST,
+    val guardianUid: String? = null,
+    val guardianName: String? = null,
+    val isSupervised: Boolean = false,
     val version: Long = 1L,
     val updatedAt: Long = System.currentTimeMillis()
 ) {
 
-    fun toMap(): Map<String, Any> {
-        return mapOf(
+    fun toMap(): Map<String, Any?> {
+        val map = mutableMapOf<String, Any?>(
             "curfewStartHour" to curfewStartHour,
             "curfewStartMinute" to curfewStartMinute,
             "curfewEndHour" to curfewEndHour,
@@ -34,9 +37,13 @@ data class DevicePolicyBundle(
             "customBlacklistPackages" to customBlacklistPackages.toList(),
             "customCurfewWhitelistPackages" to customCurfewWhitelistPackages.toList(),
             "dnsHost" to dnsHost,
+            "isSupervised" to isSupervised,
             "version" to version,
             "updatedAt" to updatedAt
         )
+        map["guardianUid"] = guardianUid
+        map["guardianName"] = guardianName
+        return map
     }
 
     fun toJson(): String {
@@ -58,16 +65,25 @@ data class DevicePolicyBundle(
         json.put("customCurfewWhitelistPackages", whitelistArr)
 
         json.put("dnsHost", dnsHost)
+        if (guardianUid != null) json.put("guardianUid", guardianUid)
+        if (guardianName != null) json.put("guardianName", guardianName)
+        json.put("isSupervised", isSupervised)
         json.put("version", version)
         json.put("updatedAt", updatedAt)
         return json.toString()
     }
 
     companion object {
+        const val ADGUARD_FAMILY_DNS_HOST = "family.adguard-dns.com"
         const val CLOUDFLARE_FAMILY_DNS_HOST = "family.cloudflare-dns.com"
         const val LEGACY_DEFAULT_NEXTDNS_HOST = "family.cloudflare-dns.com"
 
-        fun defaultPolicy(): DevicePolicyBundle = DevicePolicyBundle(dnsHost = CLOUDFLARE_FAMILY_DNS_HOST)
+        fun defaultPolicy(): DevicePolicyBundle = DevicePolicyBundle(
+            dnsHost = ADGUARD_FAMILY_DNS_HOST,
+            guardianUid = null,
+            guardianName = null,
+            isSupervised = false
+        )
 
         @Suppress("UNCHECKED_CAST")
         fun fromMap(map: Map<String, Any?>): DevicePolicyBundle {
@@ -84,6 +100,10 @@ data class DevicePolicyBundle(
 
             val dns = (map["dnsHost"] as? String)?.takeIf { it.isNotBlank() } ?: LEGACY_DEFAULT_NEXTDNS_HOST
 
+            val gUid = (map["guardianUid"] as? String)?.takeIf { it.isNotBlank() }
+            val gName = (map["guardianName"] as? String)?.takeIf { it.isNotBlank() }
+            val supervised = (map["isSupervised"] as? Boolean) ?: (!gUid.isNullOrBlank())
+
             val version = (map["version"] as? Number)?.toLong() ?: 1L
             val updatedAt = (map["updatedAt"] as? Number)?.toLong() ?: 0L
 
@@ -98,6 +118,9 @@ data class DevicePolicyBundle(
                 customBlacklistPackages = blacklist,
                 customCurfewWhitelistPackages = whitelist,
                 dnsHost = dns,
+                guardianUid = gUid,
+                guardianName = gName,
+                isSupervised = supervised,
                 version = version,
                 updatedAt = updatedAt
             )
@@ -123,6 +146,9 @@ data class DevicePolicyBundle(
                 }
 
                 val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: LEGACY_DEFAULT_NEXTDNS_HOST
+                val gUid = json.optString("guardianUid", "").takeIf { it.isNotBlank() }
+                val gName = json.optString("guardianName", "").takeIf { it.isNotBlank() }
+                val supervised = json.optBoolean("isSupervised", !gUid.isNullOrBlank())
 
                 DevicePolicyBundle(
                     curfewStartHour = json.optInt("curfewStartHour", com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR),
@@ -135,6 +161,9 @@ data class DevicePolicyBundle(
                     customBlacklistPackages = blacklist,
                     customCurfewWhitelistPackages = whitelist,
                     dnsHost = dns,
+                    guardianUid = gUid,
+                    guardianName = gName,
+                    isSupervised = supervised,
                     version = json.optLong("version", 1L),
                     updatedAt = json.optLong("updatedAt", System.currentTimeMillis())
                 )

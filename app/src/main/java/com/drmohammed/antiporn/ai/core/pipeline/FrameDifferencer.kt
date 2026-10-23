@@ -1,25 +1,36 @@
 package com.drmohammed.antiporn.ai.core.pipeline
 
+import android.os.SystemClock
 import java.nio.ByteBuffer
 import kotlin.math.abs
 
 /**
  * كاشف التغير اللحظي للإطارات (Level 0: Frame Differencing)
  * ينفذ فحصاً رياضياً سريعاً في الذاكرة في أقل من 0.2ms عبر عينات بكسلات متباعدة
- * إذا كانت الشاشة ثابتة، يتم إهمال الإطار فوراً لتوفير طاقة المعالج والبطارية بنسبة 100%
+ * يدعم الفحص الذكي للصور الساكنة (Smart Static Burst) مع نبضة فحص دورية (Heartbeat) كل ثانية واحدة
  */
 class FrameDifferencer(
     private val stepX: Int = 8, // قفزة أفقية كل 8 بكسلات
     private val stepY: Int = 4, // قفزة رأسية كل 4 أسطر
     private val pixelDiffThreshold: Int = 15, // حد الفارق في قيمة الإضاءة للبكسل الواحد
-    private val changeRatioThreshold: Float = 0.03f // إذا تغير أكثر من 3% من العينات تعتبر الشاشة متحركة
+    private val changeRatioThreshold: Float = 0.01f, // إذا تغير أكثر من 1% من العينات تعتبر الشاشة متحركة
+    private val heartbeatIntervalMs: Long = 1000L,
+    private val timeProvider: () -> Long = {
+        try {
+            SystemClock.elapsedRealtime()
+        } catch (_: RuntimeException) {
+            System.currentTimeMillis()
+        }
+    }
 ) {
     private var previousSamples: IntArray? = null
-    private var currentSamples: IntArray? = null
+    private var forcedBurstFrames: Int = BURST_FRAMES_ON_RESET
+    private var lastScanTimeMs: Long = 0L
 
     companion object {
         /** Upper bound shared with detectors — caps IntArray allocs against tampered dims. */
-        const val MAX_DIM = 640
+        const val MAX_DIM = 1920
+        const val BURST_FRAMES_ON_RESET = 10
     }
 
     /**
@@ -48,11 +59,16 @@ class FrameDifferencer(
 
         if (previousSamples == null || previousSamples?.size != totalSamples) {
             previousSamples = IntArray(totalSamples)
-            currentSamples = IntArray(totalSamples)
         }
 
         val prev = previousSamples ?: return true
-        val curr = currentSamples ?: return true
+
+        val now = timeProvider()
+        val isHeartbeat = (now - lastScanTimeMs >= heartbeatIntervalMs)
+        val isForced = (forcedBurstFrames > 0)
+        if (isForced) {
+            forcedBurstFrames--
+        }
 
         var changedCount = 0
         var sampleIdx = 0
@@ -69,7 +85,6 @@ class FrameDifferencer(
 
                     // حساب الإضاءة السريعة Y = 0.299R + 0.587G + 0.114B (تقريب عدد صحيح دقيق)
                     val luma = (r * 299 + g * 587 + b * 114) / 1000
-                    curr[sampleIdx] = luma
 
                     if (abs(luma - prev[sampleIdx]) > pixelDiffThreshold) {
                         changedCount++
@@ -82,12 +97,19 @@ class FrameDifferencer(
         }
 
         val changeRatio = if (totalSamples > 0) changedCount.toFloat() / totalSamples.toFloat() else 0f
-        return changeRatio >= changeRatioThreshold
+        val hasChanged = changeRatio >= changeRatioThreshold || isForced || isHeartbeat
+
+        if (hasChanged) {
+            lastScanTimeMs = now
+        }
+
+        return hasChanged
     }
 
     @Synchronized
     fun reset() {
         previousSamples = null
-        currentSamples = null
+        forcedBurstFrames = BURST_FRAMES_ON_RESET
+        lastScanTimeMs = 0L
     }
 }

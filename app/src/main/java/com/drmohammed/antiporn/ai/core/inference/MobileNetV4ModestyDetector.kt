@@ -59,7 +59,7 @@ class MobileNetV4ModestyDetector(
 
     override fun initialize(context: Context): Boolean {
         // إغلاق أي مفسر سابق قبل إعادة التهيئة لتفادي تسرب الذاكرة الأصلية.
-        try { interpreter?.close() } catch (_: Exception) { }
+        try { interpreter?.close() } catch (e: Exception) { Log.d(TAG, "Interpreter close notice: ${e.message}") }
         interpreter = null
         return try {
             val assetFd = context.assets.openFd(modelAssetPath)
@@ -72,7 +72,7 @@ class MobileNetV4ModestyDetector(
                     )
                 }
             } finally {
-                try { assetFd.close() } catch (_: Exception) { }
+                try { assetFd.close() } catch (e: Exception) { Log.w(TAG, "Error closing assetFd: ${e.message}") }
             }
 
             val options = Interpreter.Options().apply {
@@ -90,7 +90,7 @@ class MobileNetV4ModestyDetector(
             // --- تحليل شكل الدخل ---
             if (inShape.size != 4) {
                 Log.e(TAG, "Unsupported input rank: ${inShape.size}")
-                try { interp.close() } catch (_: Exception) { }
+                try { interp.close() } catch (e: Exception) { Log.d(TAG, "Interpreter close notice: ${e.message}") }
                 this.interpreter = null
                 return false
             }
@@ -102,7 +102,7 @@ class MobileNetV4ModestyDetector(
                 2 -> AiInputConfig.OutputKind.BINARY_SOFTMAX
                 else -> {
                     Log.e(TAG, "Unsupported output shape: ${outShape.contentToString()}")
-                    try { interp.close() } catch (_: Exception) { }
+                    try { interp.close() } catch (e: Exception) { Log.d(TAG, "Interpreter close notice: ${e.message}") }
                     this.interpreter = null
                     return false
                 }
@@ -118,14 +118,14 @@ class MobileNetV4ModestyDetector(
                 inputWidth = inShape[3]
             } else {
                 Log.e(TAG, "Cannot resolve channel axis in $inShape")
-                try { interp.close() } catch (_: Exception) { }
+                try { interp.close() } catch (e: Exception) { Log.d(TAG, "Interpreter close notice: ${e.message}") }
                 this.interpreter = null
                 return false
             }
             // MAJOR(M8): never trust model-reported dims verbatim (tampered model → 201MB alloc → OOM).
             if (inputWidth <= 0 || inputHeight <= 0 || inputWidth > MAX_INPUT_DIM || inputHeight > MAX_INPUT_DIM) {
                 Log.e(TAG, "Rejecting absurd input dims: ${inputWidth}x${inputHeight}")
-                try { interp.close() } catch (_: Exception) { }
+                try { interp.close() } catch (e: Exception) { Log.d(TAG, "Interpreter close notice: ${e.message}") }
                 this.interpreter = null
                 return false
             }
@@ -136,7 +136,7 @@ class MobileNetV4ModestyDetector(
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize MobileNetV4 detector ($modelAssetPath)", e)
-            try { interpreter?.close() } catch (_: Exception) { }
+            try { interpreter?.close() } catch (e: Exception) { Log.d(TAG, "Interpreter close notice: ${e.message}") }
             interpreter = null
             output2d = null
             inputConfig = null

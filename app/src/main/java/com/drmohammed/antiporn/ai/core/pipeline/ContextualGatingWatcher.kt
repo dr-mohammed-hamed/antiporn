@@ -108,8 +108,11 @@ class ContextualGatingWatcher(
             }
         }
 
-        // CRITICAL(C5): empty signal (denied/empty) must fail CLOSED, not freeze fail-open.
+        // إذا لم توجد أحداث تنقل جديدة ولكن لدينا تطبيق نشط مسجل مسبقاً، نحافظ على حالته لتفادي إغراق السجل
         if (latestEventPackage.isEmpty()) {
+            if (currentForegroundPackage.isNotEmpty()) {
+                return
+            }
             failClosed("empty foreground signal")
             return
         }
@@ -126,7 +129,7 @@ class ContextualGatingWatcher(
 
             if (isTarget != isTargetAppForeground) {
                 isTargetAppForeground = isTarget
-                Log.d(TAG, "Foreground changed -> Target: $isTarget")
+                Log.d(TAG, "Foreground changed -> Target: $isTarget (pkg: $latestEventPackage)")
                 onStateChanged?.invoke(isTarget, latestEventPackage)
             }
         }
@@ -146,11 +149,10 @@ class ContextualGatingWatcher(
         // إذا كان تطبيقنا نفسه فهو آمن (شاشة التجربة)
         if (pkg == context.packageName) return false
 
-        // التفويض الكامل إلى سجل الاستثناءات المعياري: الهدف يغلب الإعفاء
-        if (AiExemptionRegistry.isTarget(pkg)) return true
+        // تطبيقات النظام النظيفة المعفاة حصراً (لانشر، إعدادات، هاتف، ساعة، آلة حاسبة)
         if (AiExemptionRegistry.isExempt(pkg)) return false
 
-        // في الوضع الافتراضي، نعتبر التطبيقات الأخرى آمنة للحفاظ على البطارية
-        return false
+        // كافة التطبيقات الأخرى (المعرض، المتصفحات، السوشيال، وتطبيقات الطرف الثالث) هدف للفحص
+        return true
     }
 }

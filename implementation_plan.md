@@ -1,189 +1,121 @@
-# Master Implementation Plan — Accountability Partner Cloud Infrastructure & Standard Dynamic Architecture
-## خطة التحول المعماري الشامل: نظام التحكم السحابي التبادلي وشريك المساءلة (AntiPorn)
-
-> **الحالة: خطة معمارية فقط — ZERO CODE. بانتظار موافقتك الصريحة (ابدأ / نفذ / Approved) لبدء إطلاق الوكلاء.**
-> **الفلسفة:** لا سطر كود واحد في ملفات المصدر قبل الاعتماد. التنفيذ يتم لاحقاً عبر وكلاء فرعيين متخصصين تحت إشراف ومراجعة القائد.
+# خطة التنفيذ الشاملة: حل عوائق ظهور المشرف وتوحيد مصدر الحقيقة
+## Master Implementation Plan: Reliable Guardian Visibility & Single Source of Truth
 
 ---
 
-## 1. الملخص التنفيذي وقيمة الأعمال (Executive Summary & Business Value)
-- **الهدف الاستراتيجي:** تحويل تطبيق **AntiPorn** من تطبيق حماية محلي ذي إعدادات ثابتة في الكود إلى **منصة شبكية قياسية قائمة على شريك المساءلة (Accountability Partner & Guardian Model)**.
-- **القيمة الوظيفية للمستخدم:**
-  1. **التحكم بيد الصديق أو الولي، لا بيد المستخدم نفسه:** إزالة مفتاح الإلغاء الذاتي؛ حماية كل هاتف تدار حصرياً من هاتف الصديق المختار.
-  2. **تحكم متعدد وشامل (1:N و N:M):** إمكانية تحكم الأب في عدة أبناء، وإمكانية تبادل التحكم بين صديقين (أ يتحكم في ب، وب يتحكم في أ في آن واحد).
-  3. **تحكم دقيق وفوري في الصلاحيات:**
-     - مواقيت الحظر الليلي (البدء والانتهاء).
-     - قوة المنع (قطع الإنترنت بالكامل عبر VPN Blackhole أم تجميد تطبيقات محددة فقط).
-     - قائمة التطبيقات المحظورة كلياً 24/7.
-     - فرض غلق التصفح الخفي ومحركات البحث الآمنة في متصفحات كروم.
-     - **قفل أي تطبيق جديد يُثبّت فوراً (Freeze at 0ms)** حتى يضغط الصديق على زر الموافقة في هاتفه.
-  4. **بنية قياسية سهلة التوسع مستقبلاً:** نموذج بيانات مرن يسمح بإضافة أي صلاحية جديدة مستقبلاً بسطر واحد دون المساس بجهاز التوأمة أو شبكة المزامنة.
+### 1. ملخص تنفيذي وقيمة المشروع (Executive Summary & Value)
+تهدف هذه الخطة إلى حل مشكلة عدم ظهور المشرف في صفحة "مركز شريك المسائلة" لدى هاتف الشخص المحمي. بعد دراسة معمقة وتوافق مع متطلبات إدارة المشروع (PM Lead)، تقرر اعتماد نموذج الحماية القياسي الأحادي: **المشرف هو من يُدخل رمز المحمي لربطه**، بينما يعرض هاتف المحمي بطاقة موثقة وأنيقة للمشرف دون زر حذف زائف ودون نصوص مشوهة.
+
+يحل هذا التعديل 4 عوائق برمجية جذرية:
+1. **القضاء على سباق التزامن (Race Condition):** حفظ المشرف محلياً في قاعدة البيانات أولاً قبل إشعار الواجهة بالتحديث.
+2. **التعافي الذاتي وتوحيد الحقيقة (Self-Healing Fallback):** استدعاء بيانات المشرف مباشرة من وثيقة السياسة الفعالة إذا وُجد جدول الشركاء فارغاً.
+3. **تنقية تجربة المستخدم (UX Polish):** تحويل نافذة إضافة الشريك لتكون مخصصة حصراً لإضافة المشمولين بالرعاية (Wards)، وتحويل بطاقة المشرف لبطاقة أمان موثقة `🔒 مشرف حماية نشط وموثق`.
 
 ---
 
-## 2. نتائج الفحص الجراحي وقرارات المستخدم (Ground Truth & Alignment)
-1. **تم إنجاز الجانب السحابي وتجهيزه ذاتياً بالكامل:**
-   - تم إنشاء مشروع Firebase: `antiporn-guard` تحت الخطة المجانية الدائمة (`freeTier: true`).
-   - تم تسجيل تطبيق أندرويد `com.drmohammed.antiporn` وتوليد وتثبيت ملف `app/google-services.json`.
-   - تم تفعيل خدمة `Cloud Firestore` وإنشاء قاعدة البيانات في منطقة `europe-west3` (فرانكفورت).
-2. **قرارات المقابلة المعمارية المعتمدة مع المستخدم (`/grill-me`):**
-   - **المصادقة:** دخول مجهول وصامت كلياً (`Firebase Anonymous Auth`) مع توليد رمز اقتران فريد لكل مستخدم (مثل `ALH-7421`) دون الحاجة لإدخال بريد إلكتروني أو كلمة سر (خصوصية تامة وسهولة تشغيل).
-   - **الواجهة:** شاشة كاملة مستقلة **"مركز المساءلة" (Accountability Hub)** تتضمن: رمزي الخاص للمشاركة، قائمة بمن أحميهم (Wards)، وقائمة بمن يحمونني (Guardians).
-   - **سياسة التطبيقات الجديدة:** تطبيق مبدأ **الحظر الصارم 100% (Strict Zero-Trust)**؛ أي تطبيق جديد يُجمّد فور تثبيته عبر `Device Owner` ولا يُفتح حتى يوافق الصديق من هاتفه.
-
----
-
-## 3. المعمارية المستهدفة ودورة تدفق البيانات (Architecture & Flow)
+### 2. البنية المعمارية ومخطط التدفق (Architecture & Flow)
 
 ```mermaid
-flowchart TD
-    subgraph UI_Layer ["طبقة العرض والواجهة"]
-        HubActivity["AccountabilityHubActivity\n (رمزي الخاص + الأصدقاء + المكفولين)"]
-        GuardianSheet["GuardianControlSheet\n (سلايدر الحظر + أزرار القوة + الموافقة)"]
-        MainActivity["MainActivity Dashboard\n (العرض المباشر لحالة الحماية)"]
+sequenceDiagram
+    autonumber
+    actor Guardian as هاتف المشرف
+    participant Cloud as Cloud Firestore
+    participant PolicyRepo as هاتف المحمي: PolicyRepository
+    participant SQLite as هاتف المحمي: SQLite DB
+    participant HubUI as هاتف المحمي: AccountabilityHubActivity
+
+    Guardian->>Cloud: pairWithCode(wardCode, ROLE_WARD)<br/>تحديث policies/wardUid
+    Cloud-->>PolicyRepo: Snapshot Listener (سياسة جديدة v+1)
+    
+    rect rgb(230, 245, 230)
+        Note over PolicyRepo,SQLite: الخطوة 1: الحفظ المسبق (Pre-Persist) لمنع السباق
+        PolicyRepo->>SQLite: savePartner(Guardian) -> كتابة في TABLE_PARTNERS
+        PolicyRepo->>SQLite: saveDevicePolicy(Policy) -> كتابة في TABLE_DEVICE_POLICY
     end
 
-    subgraph Domain_Repo ["طبقة المنطق والمستودع الموحد"]
-        PolicyRepo["PolicyRepository (SSOT)\n (المصدر الموحد للسياسات محلياً وسحابياً)"]
-        PairingManager["PairingManager\n (إدارة رموز الاقتران والتوأمة)"]
-        ApprovalManager["ApprovalManager\n (إدارة طوابير استئذان التطبيقات)"]
+    rect rgb(230, 230, 250)
+        Note over PolicyRepo,HubUI: الخطوة 2: إشعار الواجهة بالتدفق
+        PolicyRepo->>HubUI: emit(_currentPolicyFlow.value)
+        HubUI->>PolicyRepo: loadPartners()
     end
 
-    subgraph Local_Storage ["التخزين المحلي المستقل (Room SQLite)"]
-        RoomDB["AntiPornDatabase (Room)"]
-        DevicePolicyEntity["DevicePolicyEntity (أحدث سياسة مفعلة)"]
-        PartnerEntity["PartnerEntity (سجل الأصدقاء والمكفولين)"]
-        AppApprovalEntity["AppApprovalEntity (التطبيقات المعلقة)"]
+    HubUI->>SQLite: getGuardians()
+    alt جدول الشركاء يحتوي المشرف
+        SQLite-->>HubUI: قائمة المشرف
+    else الجدول فارغ (حالة تشغيل بارد/خطأ استرجاع)
+        Note over HubUI,SQLite: التعافي الذاتي (Self-Healing)
+        HubUI->>PolicyRepo: قراءة المشرف مباشرة من DevicePolicyBundle
+        HubUI->>SQLite: إعادة ترميم المشرف تلقائياً
     end
 
-    subgraph Cloud_Sync ["المزامنة السحابية والإشعارات الصامتة"]
-        Firestore["Cloud Firestore (antiporn-guard)"]
-        FCM["Firebase Cloud Messaging (High-Priority Silent Push)"]
-        FCMService["AntiPornMessagingService"]
-    end
-
-    subgraph OS_Enforcement ["أذرع التنفيذ في نظام أندرويد (Device Owner)"]
-        CurfewEnforcer["CurfewEnforcer (تجميد التطبيقات + VPN Blackhole)"]
-        CurfewScheduler["CurfewScheduler (منبهات AlarmManager الدقيقة)"]
-        BrowserShield["BrowserShield (حظر Incognito و SafeSearch)"]
-        PackageReceiver["PackageChangeReceiver (تجميد التطبيقات الجديدة فوراً)"]
-    end
-
-    HubActivity --> PairingManager
-    GuardianSheet --> PolicyRepo
-    PolicyRepo --> RoomDB
-    PolicyRepo --> Firestore
-    Firestore -.-> FCM
-    FCM --> FCMService
-    FCMService --> PolicyRepo
-    PolicyRepo --> CurfewEnforcer
-    PolicyRepo --> CurfewScheduler
-    PolicyRepo --> BrowserShield
-    PackageReceiver --> ApprovalManager
-    ApprovalManager --> Firestore
+    HubUI->>HubUI: عرض بطاقة: 🔒 مشرف حماية نشط وموثق<br/>(بدون زر حذف وبدون نص LOCKED)
 ```
 
 ---
 
-## 4. سيناريوهات الفشل الثلاثة الحرجة وسبل الوقاية (3 Failure Modes & Mitigations)
+### 3. تدقيق أنماط الإخفاق وحلولها الوقائية (3 Red-Teamed Failure Modes)
 
-1. **الفشل الأول: حلقة العزل التام وانقطاع النت (The Offline Blackhole Trap):**
-   * *السيناريو:* الصديق فعّل "قطع النت بالكامل" عبر VPN Blackhole، أو نفدت باقة الإنترنت، وأراد الصديق فك القفل أو الموافقة على تطبيق، فتعذر وصول الإشعار السحابي للهاتف.
-   * *الحل المعماري الوقائي:*
-     1. استثناء نطاقات FCM وخوادم Google Play Services في الـ VPN Blackhole لضمان استقبال أوامر التحكم دائماً.
-     2. إضافة خوارزمية **رمز الطوارئ بدون إنترنت (Offline TOTP Emergency Code)**؛ يفتح الصديق شاشته ويظهر رمزاً مؤقتاً مدته دقيقتان يُدخله المستخدم في هاتفه لفك القفل محلياً.
-
-2. **الفشل الثاني: مأزق الشلل التبادلي (Mutual Lockout Deadlock):**
-   * *السيناريو:* المستخدم (أ) يتحكم في (ب)، و(ب) يتحكم في (أ). قيام أحدهما بحظر تطبيقات الآخر بما فيها وسائل الاتصال والتطبيق نفسه.
-   * *الحل المعماري الوقائي:*
-     1. الحصانة الصلبة غير القابلة للإلغاء لحزمة `com.drmohammed.antiporn` (`ALWAYS_IMMUNE`)؛ لا يمكن لأي مستخدم أو سياسة تجميد تطبيق الحماية.
-     2. الفصل المعماري التام: شاشة التحكم في الصديق منفصلة تماماً عن السياسة المطبقة على هاتفي.
-
-3. **الفشل الثالث: اغتيال أنظمة توفير الطاقة لعمليات المزامنة (OEM Battery Murder):**
-   * *السيناريو:* واجهات شاومي وريلمي وأوبو تقتل قنوات الاتصال بالخلفية فور إطفاء الشاشة.
-   * *الحل المعماري الوقائي:*
-     1. عدم الاعتماد إطلاقاً على اتصالات مفتوحة (WebSockets/Polling).
-     2. استخدام رسائل `FCM High-Priority Data Messages` ذات إذن الاستيقاظ الاستثنائي لصلاحية `Device Owner`.
-     3. **الاستقلالية المحلية:** مواعيد الحظر تجدول محلياً في `AlarmManager` وتعمل بدقة الثانية حتى لو كان الهاتف مفصولاً كلياً عن الشبكة.
+| الرقم | سيناريو الإخفاق | السبب الجذري | الحل الوقائي المنفذ في الخطة |
+| :--- | :--- | :--- | :--- |
+| **1** | **تحديث اسم المشرف لا ينعكس على المحمي** | تجاهل التحديثات اللاحقة بسبب شرط `!wasSupervised && isNowSupervised` | إلغاء الشرط، وتحديث سجل المشرف دائماً كلما وردت سياسة مقيدة تحتوي `guardianUid` و `guardianName`. |
+| **2** | **فتح التطبيق بدون إنترنت (Cold Boot Offline)** | قراءة جدول شركاء فارغ قبل وصول نبضة السحابة | تطبيق آلية التعافي الذاتي `Self-Healing`: عند استدعاء `getGuardians()`، إذا كان فارغاً والسياسة مقيدة، يتم توليد المشرف وحفظه فوراً في SQLite. |
+| **3** | **ارتباك المستخدم ومحاولة إضافة المشرف من هاتف المحمي** | بقاء خيار "إضافة كمشرف" المرفوض أمنياً من السحابة | تنقية نافذة "إضافة شريك" لتكون مخصصة حصراً لـ "إضافة شخص مشمول برعايتك"، مع توجيه المحمي لمشاركة رمزه الظاهر على الشاشة مع المشرف. |
 
 ---
 
-## 5. المخطط الجراحي لتعديل وإنشاء الملفات (Surgical File Diff Blueprint)
+### 4. التغييرات البرمجية الجراحية (Surgical File Blueprint)
 
-### أ. ملفات التبعات والبناء (Gradle & Dependencies):
-- **`[MODIFY]` `gradle/libs.versions.toml`:**
-  - إضافة `firebase-bom = "33.10.0"`.
-  - إضافة `firebase-firestore`, `firebase-messaging`, `firebase-auth`.
-  - إضافة `room = "2.7.0-alpha12"` أو أحدث إصدار متوافق، مع `ksp`.
-  - إضافة `google-services = "4.4.2"`.
-- **`[MODIFY]` `build.gradle.kts`:**
-  - تسجيل إضافة `com.google.gms.google-services` apply false.
-- **`[MODIFY]` `app/build.gradle.kts`:**
-  - تطبيق إضافة `plugins { id("com.google.gms.google-services") }`.
-  - ربط مكتبات Firebase عبر BoM، ومكتبات Room، والـ Coroutines.
+#### 1. [`PolicyRepository.kt`](file:///d:/b/antiporn/app/src/main/java/com/drmohammed/antiporn/data/repository/PolicyRepository.kt) — [MODIFY]
+* **الموقع:** دالة `attachPolicyListener` و `loadInitialPolicy`
+* **التعديل:**
+  1. تقديم كتابة المشرف `database.savePartner(partner)` لتكون **قبل** `updateLocalPolicyAndEnforce(cloudPolicy)`.
+  2. إزالة القيد القديم `!wasSupervised && isNowSupervised`، وتحديث المشرف كلما كان `cloudPolicy.isSupervised && !cloudPolicy.guardianUid.isNullOrBlank()`.
+  3. في `loadInitialPolicy()`: فحص السياسة المحلية، فإذا كانت مقيدة وجدول الشركاء لا يحوي المشرف، يتم إدراجه فوراً.
 
-### ب. طبقة البيانات والنماذج المحلية (Data & Models):
-- **`[NEW]` `core/model/DevicePolicyBundle.kt`:** كائن البيانات الموحد لجميع إعدادات الحماية:
-  - `curfewStartHour`, `curfewStartMinute`, `curfewEndHour`, `curfewEndMinute`.
-  - `isVpnBlackholeEnabled: Boolean`.
-  - `isIncognitoBlocked: Boolean`.
-  - `lockNewInstallsUntilApproved: Boolean`.
-  - `customBlacklistPackages: Set<String>`.
-  - `customCurfewWhitelistPackages: Set<String>`.
-  - `version: Long`, `updatedAt: Long`.
-- **`[NEW]` `data/local/db/AntiPornDatabase.kt`:** قاعدة بيانات Room المحلية.
-- **`[NEW]` `data/local/db/entity/DevicePolicyEntity.kt`:** كيان تخزين السياسة المحلية.
-- **`[NEW]` `data/local/db/entity/PartnerEntity.kt`:** كيان تخزين الأصدقاء والمكفولين.
-- **`[NEW]` `data/local/db/entity/PendingApprovalEntity.kt`:** كيان طابور التطبيقات المعلقة.
+#### 2. [`AccountabilityRepository.kt`](file:///d:/b/antiporn/app/src/main/java/com/drmohammed/antiporn/data/repository/AccountabilityRepository.kt) — [MODIFY]
+* **الموقع:** دالة `getGuardians()`
+* **التعديل:**
+  * إضافة فحص تعافي ذاتي: إذا كانت النتيجة من `TABLE_PARTNERS` فارغة، يتم الاستعلام من `database.getDevicePolicy()`. فإذا كان مقيداً، يُنشأ كائن `PartnerEntity` للمشرف ويُحفظ تلقائياً في SQLite ويُعاد للقائمة.
 
-### ج. طبقة المستودع والمزامنة السحابية (Repository & Cloud Sync):
-- **`[NEW]` `data/repository/PolicyRepository.kt`:** المستودع الموحد (SSOT) الذي يدمج القراءة من Room مع مزامنة Firestore.
-- **`[NEW]` `data/repository/AccountabilityRepository.kt`:** إدارة علاقات التوأمة برموز الاقتران.
-- **`[NEW]` `cloud/fcm/AntiPornFirebaseMessagingService.kt`:** استقبال الإشعارات الصامتة عالية الأولوية وتطبيق التغييرات فوراً في الخلفية.
+#### 3. [`AccountabilityHubActivity.kt`](file:///d:/b/antiporn/app/src/main/java/com/drmohammed/antiporn/ui/accountability/AccountabilityHubActivity.kt) — [MODIFY]
+* **الموقع:** `showAddPartnerDialog` و `createPartnerCard`
+* **التعديل:**
+  1. **تنقية بطاقة المشرف:** 
+     * عند `isWard == false`: إخفاء حقل "رمز الاقتران: LOCKED" واستبداله بنص شارة موثقة: `🔒 مشرف حماية نشط وموثق`.
+     * إخفاء زر "حذف الشريك" لبطاقة المشرف نهائياً (`if (isWard)` فقط).
+  2. **تنقية نافذة إضافة الشريك:**
+     * تخصيص النافذة لإضافة Wards فقط ("إضافة شخص تحت حمايتك").
+     * توضيح نصي أن الإشراف على هذا الهاتف يتم من خلال مشاركة الرمز الظاهر على الشاشة مع المشرف.
 
-### د. تحرير وتحديث محركات الإنفاذ (Engine Dynamicization):
-- **`[MODIFY]` `curfew/CurfewConfig.kt`:** تحويل الثوابت الجامدة لميثودات تقرأ ديناميكياً من `PolicyRepository`.
-- **`[MODIFY]` `curfew/CurfewScheduler.kt`:** جدولة المنبهات بالاعتماد على الأوقات المستلمة من الصديق.
-- **`[MODIFY]` `curfew/CurfewEnforcer.kt`:** التحقق من خيار `isVpnBlackholeEnabled`؛ تشغيل VPN فقط إذا كان الخيار معتمداً من الصديق.
-- **`[MODIFY]` `shields/BrowserShield.kt`:** تطبيق وضع منع التصفح الخفي ديناميكياً حسب رغبة الصديق.
-- **`[MODIFY]` `PackageChangeReceiver.kt`:** عند تثبيت أي تطبيق جديد أثناء تفعيل خيار الصديق `lockNewInstallsUntilApproved`، يتم تجميده فورياً عبر `DevicePolicyManager` ورفع طلب استئذان للسحابة.
-
-### هـ. طبقة الواجهة وتجربة المستخدم (UI & Accountability Hub):
-- **`[NEW]` `ui/accountability/AccountabilityHubActivity.kt`:** الشاشة المخصصة لشركاء المساءلة.
-- **`[NEW]` `ui/accountability/GuardianControlActivity.kt`:** لوحة تحكم الصديق في مكفوله (تعديل الأوقات، التبديل بين قوة المنع، الموافقة على التطبيقات).
-- **`[NEW]` `res/layout/activity_accountability_hub.xml`:** واجهة أنيقة بالـ Material 3.
-- **`[MODIFY]` `ui/binder/MainViewBinder.kt` & `activity_main.xml`:** إضافة زر رئيسي جذاب لفتح "مركز المساءلة".
+#### 4. [`strings.xml`](file:///d:/b/antiporn/app/src/main/res/values/strings.xml) — [MODIFY]
+* **التعديل:** إضافة نصوص واضحة باللغة العربية والإنجليزية لحالة المشرف النشط وتوجيهات الاقتران.
 
 ---
 
-## 6. خطة توزيع المهام على الوكلاء الفرعيين (Subagents Decomposition)
+### 5. خطة توزيع العمل على الوكلاء الفرعيين (Subagents Breakdown)
 
-| الوكيل المتخصص | نطاق العمل والمسؤولية | بوابة المراجعة الصارمة (Supervision Gate) |
-| :--- | :--- | :--- |
-| **الوكيل 1: مهندس البيانات والمزامنة السحابية**<br>`(subagent-data-cloud)` | • ربط تبعات Firebase و Room في Gradle.<br>• إنشاء كيانات قاعدة البيانات وجداول السياسات.<br>• بناء `PolicyRepository` و `FirestoreSyncEngine`. | التحقق من صحة بناء المشروع وعدم وجود أخطاء في الـ Schema. |
-| **الوكيل 2: مهندس تحرير محركات النظام**<br>`(subagent-engine-dynamic)` | • فك الارتباط الثابت في `CurfewConfig` و `CurfewScheduler`.<br>• تعديل `CurfewEnforcer` لدعم أنماط المنع المختلفة.<br>• ربط `BrowserShield` و `PackageChangeReceiver` بالسياسة الديناميكية. | فحص مسارات التنفيذ وتوافقها 100% مع صلاحيات `Device Owner`. |
-| **الوكيل 3: مهندس الإشعارات الفورية والتجميد الصارم**<br>`(subagent-fcm-approval)` | • كتابة `AntiPornFirebaseMessagingService`.<br>• معالجة الإشعارات الصامتة وإيقاظ النظام.<br>• تفعيل دورة استئذان التطبيقات الجديدة وتجميدها الفوري. | التأكد من استيقاظ التطبيق وسرعة التجميد في 0ms دون تجميد واجهة النظام. |
-| **الوكيل 4: مهندس الواجهات وتجربة المستخدم**<br>`(subagent-ui-hub)` | • بناء شاشة `AccountabilityHubActivity` و `GuardianControlActivity`.<br>• تصميم حوار مشاركة وإدخال رمز الاقتران (6 أرقام).<br>• ربط التفاعل مع الشاشة الرئيسية `MainActivity`. | مراجعة التصميم، دعم اللغة العربية والإنجليزية وتناسق الخطوط والمظهر الليلي. |
-| **الوكيل 5: المدقق الحيادي الصارم**<br>`(subagent-auditor-verifier)` | • تدقيق شامل للكود ومسارات الأمان ومقاومة العبث.<br>• تشغيل `./gradlew assembleDebug` و `./gradlew test`.<br>• التأكد من تصفير كافة التحذيرات والأخطاء. | تحقيق نسبة نجاح 100% في الاختبارات وبناء APK قابل للتشغيل الفوري. |
+| الوكيل | التخصص والاسم | المهام المسندة | معيار القبول والتحقق |
+| :--- | :--- | :--- | :--- |
+| **وكيل 1: البيانات والمزامنة** | `self` / `repo-sync-specialist` | تعديل `PolicyRepository.kt` و `AccountabilityRepository.kt` لتثبيت الحفظ المسبق والتعافي الذاتي | ضمان عدم قراءة قائمة فارغة أبداً عند وجود سياسة مقيدة |
+| **وكيل 2: واجهة المستخدم** | `self` / `ui-specialist` | تعديل `AccountabilityHubActivity.kt` و `strings.xml` | إخفاء زر الحذف عن المشرف، وتحديث نصوص الشارة والنافذة |
+| **وكيل 3: التدقيق والتجميع** | `self` / `qa-auditor` | تشغيل `./gradlew testDebugUnitTest` والتحقق من سلامة البناء وخلوه من التعارضات | اجتياز 100% من الاختبارات بنجاح |
 
 ---
 
-## 7. خطة التحقق والاختبار (Verification & Acceptance Testing)
+### 6. خطة التحقق والاختبار (Verification Plan)
 
-1. **اختبار البناء البرمجي (Compilation & Build Gate):**
-   - تنفيذ `./gradlew assembleDebug` والتحقق من اكتمال الدمج وخلوه من أي تعارضات في المكتبات.
-2. **اختبار التوأمة السحابية (Pairing Verification):**
-   - توليد رمز اقتران للمستخدم الأول، وإدخاله في محاكاة المستخدم الثاني، والتحقق من إنشاء وثيقة الاقتران في Firestore لحظياً.
-3. **اختبار تغيير مواقيت الحظر عن بعد (Remote Curfew Sync):**
-   - تعديل موعد الحظر من لوحة تحكم الصديق، والتحقق من استقبال الإشعار الصامت وتحديث منبهات `AlarmManager` على الهاتف المكفول في أقل من 3 ثوانٍ.
-4. **اختبار قفل التطبيق الجديد الصارم (Instant Freeze Test):**
-   - تثبيت حزمة جديدة، والتحقق من تجميدها الفوري عبر `dpm.setPackagesSuspended` وظهور طلب الاستئذان على هاتف الصديق.
-5. **اختبار الأمان والحصانة:**
-   - التأكد من استحالة تجميد تطبيق AntiPorn نفسه، واستمرار عمل الحماية حتى في حال إعادة تشغيل الجهاز.
+1. **فحص سلامة التجميع الآلي:** تشغيل `./gradlew compileDebugKotlin` للتأكد من عدم وجود أخطاء في الرموز والأنواع.
+2. **اختبارات الوحدة الآلية:** تشغيل `./gradlew testDebugUnitTest` للتأكد من سلامة منطق السياسات وقواعد البيانات.
+3. **خطوات التحقق الميداني لمدير المشروع (PM Verification Walkthrough):**
+   * **خطوة 1:** افتح مركز شريك المسائلة في هاتف غير مقيد -> لاحظ ظهور رمز الاقتران ووضوح الرسالة.
+   * **خطوة 2:** اضغط "إضافة شريك" -> لاحظ أن النافذة واضحة ومخصصة لإضافة الأشخاص المشمولين برعايتك فقط دون ارتباك خيار "كمشرف".
+   * **خطوة 3:** اربط الهاتف بمشرف من الهاتف الآخر -> راقب شاشة المحمي لحظياً: ستتحول بطاقة الرمز إلى شارة القفل فوراً، ويظهر كارت المشرف بالأسفل: **اسم المشرف + "🔒 مشرف حماية نشط وموثق"** دون أي نصوص LOCKED وبدون زر حذف مشوه!
+   * **خطوة 4:** أغلق التطبيق بالكامل وافتحه من جديد -> تحقق من بقاء بطاقة المشرف ظاهرة وثابتة دون اختفاء!
 
 ---
 
 > [!IMPORTANT]
-> **بوابة الاعتماد الصريح (Approval Gate):**
-> لقد تم وضع الخطة التفصيلية الكاملة أعلاه طبقاً لمواصفاتك وأجوبتك الدقيقة.
-> **لن يتم تعديل أي ملف في كود المشروع، ولن يتم إطلاق الوكلاء الفرعيين، حتى تعطي إشارتك بالموافقة الصريحة (مثل: "ابدأ"، "نفذ"، "Approved").**
+> **بوابة إذن المستخدم (User Approval Gate):**  
+> الخطة الآن مكتملة وجاهزة وفق بروتوكول `stop-think-search-and-plan`.  
+> لم يتم إجراء أي تعديل على كود المشروع بعد.  
+> يرجى مراجعة الخطة وإعطاء إشارة البدء (مثل: **"اعتمد ونفذ"** أو **"Proceed"**) لنباشر التنفيذ ومراقبة الوكلاء الفرعيين فوراً.

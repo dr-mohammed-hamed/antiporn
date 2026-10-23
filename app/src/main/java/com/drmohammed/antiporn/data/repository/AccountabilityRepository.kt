@@ -4,7 +4,9 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -17,6 +19,7 @@ import java.util.Locale
 /**
  * Repository responsible for Anonymous Authentication, Pairing Code generation,
  * and managing Guardian / Ward relationships both locally in SQLite and in Cloud Firestore.
+ * Implements strict single-guardian enforcement and automated revocation recovery.
  */
 class AccountabilityRepository private constructor(context: Context) {
 
@@ -71,8 +74,14 @@ class AccountabilityRepository private constructor(context: Context) {
 
     /**
      * Gets or generates the device's persistent 6-character pairing code.
+     * If the device is currently supervised, returns LOCKED and hides code from cloud discovery.
      */
     suspend fun getOrCreateMyPairingCode(): String = withContext(Dispatchers.IO) {
+        val currentPolicy = database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
+        if (currentPolicy.isSupervised) {
+            return@withContext CODE_LOCKED
+        }
+
         var code = prefs.getString(KEY_MY_PAIRING_CODE, null)
         if (code.isNullOrBlank()) {
             code = generateRandomCode()
@@ -103,6 +112,7 @@ class AccountabilityRepository private constructor(context: Context) {
 
     /**
      * Pairs with a partner by looking up their 6-digit pairing code in Firestore.
+     * Enforces strict single-guardian lock: prevents linking if target or local device is already supervised.
      * @param code The 6-digit pairing code entered by the user.
      * @param role The role to assign: "GUARDIAN" (they protect me) or "WARD" (I protect them).
      */
@@ -125,6 +135,72 @@ class AccountabilityRepository private constructor(context: Context) {
                 return@withContext Result.failure(IllegalArgumentException(appContext.getString(R.string.error_cannot_pair_self)))
             }
 
+            val myDeviceName = "${Build.MANUFACTURER} ${Build.MODEL}".replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString()
+            }
+
+            if (role == PartnerEntity.ROLE_WARD) {
+                // I am protecting targetUid (targetUid is my WARD, I am their GUARDIAN)
+                val policyDoc = firestore.collection("policies").document(targetUid).get().await()
+                val existingGuardianUid = policyDoc.getString("guardianUid")
+                val isAlreadySupervised = policyDoc.getBoolean("isSupervised") ?: (!existingGuardianUid.isNullOrBlank())
+
+                if (isAlreadySupervised && !existingGuardianUid.isNullOrBlank() && existingGuardianUid != myUid) {
+                    return@withContext Result.failure(IllegalStateException(appContext.getString(R.string.error_ward_already_has_guardian)))
+                }
+
+                val currentVersion = policyDoc.getLong("version") ?: 1L
+                val basePolicy = if (policyDoc.exists() && policyDoc.data != null) {
+                    DevicePolicyBundle.fromMap(policyDoc.data!!)
+                } else {
+                    DevicePolicyBundle.defaultPolicy()
+                }
+
+                val updatedPolicy = basePolicy.copy(
+                    guardianUid = myUid,
+                    guardianName = myDeviceName,
+                    isSupervised = true,
+                    version = currentVersion + 1,
+                    updatedAt = System.currentTimeMillis()
+                )
+                firestore.collection("policies").document(targetUid).set(updatedPolicy.toMap()).await()
+
+                try {
+                    firestore.collection("pairings").document(cleanCode).update(
+                        mapOf("status" to "LOCKED", "pairedGuardianUid" to myUid)
+                    ).await()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Pairing code lock status warning: ${e.message}")
+                }
+            } else if (role == PartnerEntity.ROLE_GUARDIAN) {
+                // Target is protecting ME (Target is my GUARDIAN, I am their WARD)
+                val myPolicyDoc = firestore.collection("policies").document(myUid).get().await()
+                val existingGuardian = myPolicyDoc.getString("guardianUid")
+                val isAlreadySupervised = myPolicyDoc.getBoolean("isSupervised") ?: (!existingGuardian.isNullOrBlank())
+
+                if (isAlreadySupervised && !existingGuardian.isNullOrBlank() && existingGuardian != targetUid) {
+                    return@withContext Result.failure(IllegalStateException(appContext.getString(R.string.error_already_supervised)))
+                }
+
+                val currentVersion = myPolicyDoc.getLong("version") ?: 1L
+                val basePolicy = if (myPolicyDoc.exists() && myPolicyDoc.data != null) {
+                    DevicePolicyBundle.fromMap(myPolicyDoc.data!!)
+                } else {
+                    DevicePolicyBundle.defaultPolicy()
+                }
+
+                val updatedMyPolicy = basePolicy.copy(
+                    guardianUid = targetUid,
+                    guardianName = targetName,
+                    isSupervised = true,
+                    version = currentVersion + 1,
+                    updatedAt = System.currentTimeMillis()
+                )
+                firestore.collection("policies").document(myUid).set(updatedMyPolicy.toMap()).await()
+                database.saveDevicePolicy(DevicePolicyEntity.fromBundle(updatedMyPolicy))
+                PolicyRepository.getInstance(appContext).updateLocalPolicyAndEnforce(updatedMyPolicy)
+            }
+
             val partner = PartnerEntity(
                 id = targetUid,
                 pairingCode = cleanCode,
@@ -135,7 +211,7 @@ class AccountabilityRepository private constructor(context: Context) {
                 lastSyncAt = System.currentTimeMillis()
             )
 
-            // Save relation in Firestore first
+            // Save relation in Firestore
             val relationData = mapOf(
                 "partnerUid" to targetUid,
                 "partnerName" to targetName,
@@ -148,14 +224,102 @@ class AccountabilityRepository private constructor(context: Context) {
                 .set(relationData)
                 .await()
 
-            // Save locally in SQLite only after cloud commit succeeds
+            // Save locally in SQLite
             database.savePartner(partner)
 
-            Log.i(TAG, "Successfully paired with $targetName ($targetUid) as $role")
+            Log.i(TAG, "Successfully paired with $targetName ($targetUid) as $role under strict single guardian lock")
             Result.success(partner)
         } catch (e: Exception) {
             Log.e(TAG, "Error during pairing with code $code", e)
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Revokes supervision over a ward device.
+     * Invoked when a Guardian deletes a ward from their Accountability list.
+     * Resets the ward's policy to safe default settings, sets guardianUid = null,
+     * and deletes the cloud/local partner relationship.
+     */
+    suspend fun revokeSupervision(wardUid: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val myUid = getOrCreateCurrentUid()
+
+            val policyDoc = firestore.collection("policies").document(wardUid).get().await()
+            val currentVersion = policyDoc.getLong("version") ?: 1L
+
+            // Reset ward policy to safe default bundle with guardianUid = null
+            val safeDefaultPolicy = DevicePolicyBundle.defaultPolicy().copy(
+                guardianUid = null,
+                guardianName = null,
+                isSupervised = false,
+                version = currentVersion + 1,
+                updatedAt = System.currentTimeMillis()
+            )
+            firestore.collection("policies").document(wardUid).set(safeDefaultPolicy.toMap()).await()
+
+            // Delete relation in cloud
+            firestore.collection("users").document(myUid)
+                .collection("partners").document(wardUid)
+                .delete()
+                .await()
+
+            // Delete locally from SQLite
+            database.deletePartner(wardUid)
+
+            Log.i(TAG, "Successfully revoked supervision for ward $wardUid")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error revoking supervision for ward $wardUid", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Handles local restoration when a ward device receives a policy update
+     * indicating that supervision has been revoked by the Guardian.
+     * Deletes local guardian records, burns the old pairing code,
+     * generates a fresh random pairing code, and registers it in Firestore.
+     */
+    suspend fun onSupervisionRevokedLocally() = withContext(Dispatchers.IO) {
+        try {
+            // 1. Delete all guardian records locally
+            val guardians = database.getPartnersByRole(PartnerEntity.ROLE_GUARDIAN)
+            for (guardian in guardians) {
+                database.deletePartner(guardian.id)
+            }
+
+            // 2. Delete old pairing code from cloud and prefs
+            val oldCode = prefs.getString(KEY_MY_PAIRING_CODE, null)
+            if (!oldCode.isNullOrBlank()) {
+                try {
+                    firestore.collection("pairings").document(oldCode).delete().await()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Old pairing code delete non-critical: ${e.message}")
+                }
+            }
+            prefs.edit().remove(KEY_MY_PAIRING_CODE).apply()
+
+            // 3. Generate a brand new cryptographically random 6-character code
+            val newCode = generateRandomCode()
+            prefs.edit().putString(KEY_MY_PAIRING_CODE, newCode).apply()
+
+            // 4. Publish new code to Firestore
+            val uid = getOrCreateCurrentUid()
+            val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString()
+            }
+            val pairingDoc = mapOf(
+                "pairingCode" to newCode,
+                "ownerUid" to uid,
+                "ownerName" to deviceName,
+                "status" to "ACTIVE",
+                "createdAt" to System.currentTimeMillis()
+            )
+            firestore.collection("pairings").document(newCode).set(pairingDoc).await()
+            Log.i(TAG, "Successfully processed local revocation: generated and registered new pairing code $newCode")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error executing local supervision revocation cleanup", e)
         }
     }
 
@@ -167,7 +331,30 @@ class AccountabilityRepository private constructor(context: Context) {
     }
 
     suspend fun getGuardians(): List<PartnerEntity> = withContext(Dispatchers.IO) {
-        database.getPartnersByRole(PartnerEntity.ROLE_GUARDIAN)
+        val list = database.getPartnersByRole(PartnerEntity.ROLE_GUARDIAN)
+        if (list.isNotEmpty()) return@withContext list
+
+        // Self-Healing Fallback: Check if device policy is supervised and has guardianUid
+        val policy = database.getDevicePolicy()?.toBundle()
+        if (policy != null && policy.isSupervised && !policy.guardianUid.isNullOrBlank()) {
+            val synthesizedGuardian = PartnerEntity(
+                id = policy.guardianUid,
+                pairingCode = CODE_LOCKED,
+                displayName = policy.guardianName ?: appContext.getString(R.string.guardian_default_name),
+                role = PartnerEntity.ROLE_GUARDIAN,
+                status = PartnerEntity.STATUS_ACTIVE,
+                createdAt = policy.updatedAt,
+                lastSyncAt = System.currentTimeMillis()
+            )
+            try {
+                database.savePartner(synthesizedGuardian)
+                Log.i(TAG, "Self-healed guardian record in SQLite: ${synthesizedGuardian.displayName}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to self-heal guardian in SQLite", e)
+            }
+            return@withContext listOf(synthesizedGuardian)
+        }
+        emptyList()
     }
 
     suspend fun getWards(): List<PartnerEntity> = withContext(Dispatchers.IO) {
@@ -205,6 +392,7 @@ class AccountabilityRepository private constructor(context: Context) {
         private const val PREFS_NAME = "antiporn_accountability_prefs"
         private const val KEY_MY_PAIRING_CODE = "key_my_pairing_code"
         private const val KEY_PERSISTED_UID = "key_persisted_uid"
+        const val CODE_LOCKED = "LOCKED"
 
         @Volatile
         private var instance: AccountabilityRepository? = null

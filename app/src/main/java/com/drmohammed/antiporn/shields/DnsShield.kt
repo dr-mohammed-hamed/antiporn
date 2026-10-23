@@ -26,10 +26,10 @@ object DnsShield : ProtectionShield {
     fun getEffectiveDnsHost(context: Context): String {
         return try {
             val policy = com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy()
-            policy.dnsHost.takeIf { it.isNotBlank() } ?: com.drmohammed.antiporn.core.model.DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST
+            policy.dnsHost.takeIf { it.isNotBlank() } ?: com.drmohammed.antiporn.core.model.DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST
         } catch (e: Exception) {
             Log.w(TAG, "Failed to read policy for DNS host, falling back to default", e)
-            com.drmohammed.antiporn.core.model.DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST
+            com.drmohammed.antiporn.core.model.DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST
         }
     }
 

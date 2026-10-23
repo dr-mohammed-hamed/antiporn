@@ -2,11 +2,14 @@ package com.drmohammed.antiporn
 
 import android.app.admin.DevicePolicyManager
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -181,6 +184,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun tryAutoGrantOverlayPermission() {
+        try {
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? android.app.admin.DevicePolicyManager ?: return
+            val admin = ComponentName(this, AdminReceiver::class.java)
+            if (dpm.isDeviceOwnerApp(packageName)) {
+                dpm.setPermissionGrantState(
+                    admin,
+                    packageName,
+                    android.Manifest.permission.SYSTEM_ALERT_WINDOW,
+                    android.app.admin.DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Device Owner overlay grant attempt: ${e.message}")
+        }
+    }
+
     private fun handleAiShieldToggle() {
         // منع النقر المزدوج: تجاهل التبديلات المتقاربة (<1s) لمنع نوافذ موافقة مكررة.
         val now = SystemClock.elapsedRealtime()
@@ -193,6 +213,19 @@ class MainActivity : AppCompatActivity() {
             stopService(stopIntent)
             uiHandler.postDelayed(aiRefreshRunnable, 300)
         } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                tryAutoGrantOverlayPermission()
+                if (!Settings.canDrawOverlays(this)) {
+                    val intent = Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:$packageName")
+                    )
+                    startActivity(intent)
+                    Toast.makeText(this, R.string.overlay_permission_prompt, Toast.LENGTH_LONG).show()
+                    return
+                }
+            }
+
             val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
             if (mpManager != null) {
                 projectionLauncher.launch(mpManager.createScreenCaptureIntent())

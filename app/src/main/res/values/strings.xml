@@ -102,10 +102,10 @@
     <string name="curfew_vpn_session_name">AntiPorn Curfew Blackhole</string>
 
     <!-- AI Shield Strings -->
-    <string name="card_ai_shield_title">🤖 فحص الذكاء الاصطناعي (MobileNetV4 تجريبي)</string>
+    <string name="card_ai_shield_title">🤖 فحص الذكاء الاصطناعي (YOLO11 تجريبي)</string>
     <string name="card_ai_shield_active_desc">الفحص اللحظي نشط: يراقب الريلز والشورتس والمتصفحات</string>
     <string name="card_ai_shield_idle_desc">الفحص متوقف حالياً. اضغط للتشغيل والتجربة الميدانية</string>
-    <string name="card_ai_shield_subtext">تجربة محلية 100% بموديل واحد MobileNetV4 (شبهة ImageNet ≥10%) مع اهتزاز وToast فقط</string>
+    <string name="card_ai_shield_subtext">فحص محلي 100% بنموذج YOLO11n لحفظ العورات مع اهتزاز وتنبيه فوري</string>
     <string name="ai_model_active_format">الموديل: %1$s</string>
     <string name="ai_init_failed_desc">تعذر تحميل موديل الذكاء الاصطناعي (دخل الموديل %1$d) — أعد التشغيل وتحقق من الأصول</string>
     <string name="btn_ai_shield_start">تشغيل فحص الذكاء الاصطناعي 🚀</string>
@@ -185,9 +185,10 @@
     <string name="guardian_dns_title">🔒 خادم حظر المواقع الإباحية (DNS)</string>
     <string name="guardian_dns_desc">يتحكم في تشفير وتصفية اتصالات الجهاز بالكامل لمنع المواقع الإباحية والإعلانات الخبيثة عبر Private DNS.</string>
     <string name="guardian_dns_hint">عنوان خادم DNS المشفر (DoT Hostname)</string>
+    <string name="btn_dns_preset_adguard">🛡️ AdGuard Family (إعلانات + بورن)</string>
     <string name="btn_dns_preset_cloudflare">🛡️ Cloudflare Family</string>
     <string name="btn_dns_preset_nextdns">⚡ NextDNS الخاص</string>
-    <string name="error_invalid_dns_host">يرجى إدخال عنوان خادم DNS صحيح (مثال: family.cloudflare-dns.com)</string>
+    <string name="error_invalid_dns_host">يرجى إدخال عنوان خادم DNS صحيح (مثال: family.adguard-dns.com)</string>
     <string name="error_unknown">خطأ غير معروف</string>
     <string name="toast_partner_deleted">تم حذف الشريك بنجاح 🗑️</string>
     <string name="toast_partner_delete_failed">فشل حذف الشريك: %1$s</string>
@@ -196,4 +197,16 @@
     <string name="btn_retry">إعادة المحاولة</string>
     <string name="guardian_offline_banner_desc">تعذر الاتصال بالخادم. يتم عرض السياسة المحلية/المؤقتة.</string>
     <string name="toast_offline_policy_edit_note">تعذر الوصول إلى الخادم؛ يرجى التحقق من الاتصال بالإنترنت ثم إعادة المحاولة.</string>
-</resources>
+    <string name="error_ward_already_has_guardian">هذا الجهاز مقيد بالفعل بمشرف آخر ولا يمكن ربطه!</string>
+    <string name="error_already_supervised">جهازك مقيد بالفعل بمشرف معتمد!</string>
+    <string name="pairing_code_locked_badge">🔒 الجهاز مقيد بمشرف</string>
+    <string name="status_supervised_banner_title">🔒 جهازك مقيد تحت إشراف معتمد</string>
+    <string name="status_supervised_banner_desc">تم حجب رمز الاقتران لمنع الالتفاف أو إضافة أي مشرفين آخرين. فك الإشراف مقتصر على المشرف فقط من تطبيقه.</string>
+    <string name="dialog_revoke_ward_title">إلغاء الإشراف وفك الحماية</string>
+    <string name="dialog_revoke_ward_msg">هل أنت متأكد من إلغاء الإشراف على %1$s؟ سيعود جهازه حراً بالكامل وستُعاد سياساته للإعدادات الافتراضية الآمنة مع توليد رمز اقتران جديد له.</string>
+    <string name="toast_supervision_revoked">تم إلغاء الإشراف بنجاح واستعادة حرية الجهاز 🕊️</string>
+    <string name="toast_supervision_revoked_ward">تم إلغاء الإشراف من قِبل المشرف — استعادة الوضع المستقل وتوليد رمز جديد</string>
+    <string name="overlay_permission_prompt">يرجى تفعيل خيار (الظهور فوق التطبيقات الأخرى) لتمكين درع التعتيم الموضعي</string>
+    <string name="guardian_status_active">🔒 مشرف حماية نشط وموثق</string>
+    <string name="dialog_add_ward_only_note">أدخل رمز اقتران الشخص الذي ترغب في حمايته والإشراف عليه. إذا كنت ترغب في أن يشرف شخص آخر عليك، فشارك معه رمزك الظاهر في الشاشة الرئيسية.</string>
+</resources>

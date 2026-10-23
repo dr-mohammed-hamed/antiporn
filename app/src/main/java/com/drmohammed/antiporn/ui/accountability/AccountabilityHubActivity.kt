@@ -18,7 +18,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
@@ -49,6 +51,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
 
     private var lastAddPartnerClickTime = 0L
     private var lastManageClickTime = 0L
+    private var isPairingInProgress = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -75,6 +78,26 @@ class AccountabilityHubActivity : AppCompatActivity() {
         initViews()
         setupListeners()
         loadPairingCode()
+        observePolicyChanges()
+    }
+
+    private fun observePolicyChanges() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(applicationContext)
+                    .currentPolicyFlow.collect { policy ->
+                        if (isFinishing || isDestroyed) return@collect
+                        if (policy.isSupervised) {
+                            tvMyPairingCode.text = getString(R.string.pairing_code_locked_badge)
+                            btnCopyCode.visibility = View.GONE
+                        } else {
+                            btnCopyCode.visibility = View.VISIBLE
+                            loadPairingCode()
+                        }
+                        loadPartners()
+                    }
+            }
+        }
     }
 
     override fun onResume() {
@@ -116,9 +139,21 @@ class AccountabilityHubActivity : AppCompatActivity() {
         lifecycleScope.launch {
             if (isFinishing || isDestroyed) return@launch
             try {
+                val currentPolicy = com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+                if (currentPolicy.isSupervised) {
+                    tvMyPairingCode.text = getString(R.string.pairing_code_locked_badge)
+                    btnCopyCode.visibility = View.GONE
+                    return@launch
+                }
                 val code = accountabilityRepo.getOrCreateMyPairingCode()
                 if (isFinishing || isDestroyed) return@launch
-                tvMyPairingCode.text = code
+                if (code == AccountabilityRepository.CODE_LOCKED) {
+                    tvMyPairingCode.text = getString(R.string.pairing_code_locked_badge)
+                    btnCopyCode.visibility = View.GONE
+                } else {
+                    tvMyPairingCode.text = code
+                    btnCopyCode.visibility = View.VISIBLE
+                }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 if (isFinishing || isDestroyed) return@launch
@@ -219,25 +254,37 @@ class AccountabilityHubActivity : AppCompatActivity() {
         container.addView(nameView)
 
         val codeView = TextView(this).apply {
-            text = getString(R.string.partner_pairing_code_label, partner.pairingCode)
+            text = if (isWard) {
+                getString(R.string.partner_pairing_code_label, partner.pairingCode)
+            } else {
+                getString(R.string.guardian_status_active)
+            }
             textSize = 12f
             setTextColor(
-                MaterialColors.getColor(
-                    this@AccountabilityHubActivity,
-                    com.google.android.material.R.attr.colorOutline,
-                    android.graphics.Color.GRAY
-                )
+                if (isWard) {
+                    MaterialColors.getColor(
+                        this@AccountabilityHubActivity,
+                        com.google.android.material.R.attr.colorOutline,
+                        android.graphics.Color.GRAY
+                    )
+                } else {
+                    MaterialColors.getColor(
+                        this@AccountabilityHubActivity,
+                        androidx.appcompat.R.attr.colorPrimary,
+                        android.graphics.Color.BLUE
+                    )
+                }
             )
             setPadding(0, (4 * resources.displayMetrics.density).toInt(), 0, 0)
         }
         container.addView(codeView)
 
-        val btnRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, (8 * resources.displayMetrics.density).toInt(), 0, 0)
-        }
-
         if (isWard) {
+            val btnRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, (8 * resources.displayMetrics.density).toInt(), 0, 0)
+            }
+
             val manageBtn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
                 text = getString(R.string.btn_manage_ward)
                 textSize = 12f
@@ -254,70 +301,60 @@ class AccountabilityHubActivity : AppCompatActivity() {
                 }
             }
             btnRow.addView(manageBtn)
-        }
 
-        val deleteBtn = MaterialButton(this, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
-            text = getString(R.string.btn_delete_partner)
-            textSize = 12f
-            setTextColor(MaterialColors.getColor(this, androidx.appcompat.R.attr.colorError, getColor(R.color.status_orange)))
-        }
-        deleteBtn.setOnClickListener {
-            if (!isWard) {
-                MaterialAlertDialogBuilder(this@AccountabilityHubActivity)
-                    .setTitle(R.string.dialog_cannot_delete_guardian_title)
-                    .setMessage(R.string.dialog_cannot_delete_guardian_msg)
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show()
-                return@setOnClickListener
+            val deleteBtn = MaterialButton(this, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
+                text = getString(R.string.btn_delete_partner)
+                textSize = 12f
+                setTextColor(MaterialColors.getColor(this, androidx.appcompat.R.attr.colorError, getColor(R.color.status_orange)))
             }
-
-            MaterialAlertDialogBuilder(this@AccountabilityHubActivity)
-                .setTitle(R.string.dialog_delete_partner_title)
-                .setMessage(getString(R.string.dialog_delete_partner_msg, partner.displayName))
-                .setPositiveButton(R.string.btn_delete_partner) { dialog, _ ->
-                    dialog.dismiss()
-                    deleteBtn.isEnabled = false
-                    lifecycleScope.launch {
-                        if (isFinishing || isDestroyed) return@launch
-                        try {
-                            val result = accountabilityRepo.deletePartner(partner.id)
+            deleteBtn.setOnClickListener {
+                MaterialAlertDialogBuilder(this@AccountabilityHubActivity)
+                    .setTitle(R.string.dialog_revoke_ward_title)
+                    .setMessage(getString(R.string.dialog_revoke_ward_msg, partner.displayName))
+                    .setPositiveButton(R.string.btn_delete_partner) { dialog, _ ->
+                        dialog.dismiss()
+                        deleteBtn.isEnabled = false
+                        lifecycleScope.launch {
                             if (isFinishing || isDestroyed) return@launch
-                            result.fold(
-                                onSuccess = {
-                                    Toast.makeText(this@AccountabilityHubActivity, R.string.toast_partner_deleted, Toast.LENGTH_SHORT).show()
-                                    loadPartners()
-                                },
-                                onFailure = { err ->
-                                    Toast.makeText(
-                                        this@AccountabilityHubActivity,
-                                        getString(R.string.toast_partner_delete_failed, err.localizedMessage ?: getString(R.string.error_unknown)),
-                                        Toast.LENGTH_LONG
-                                    ).show()
+                            try {
+                                val result = accountabilityRepo.revokeSupervision(partner.id)
+                                if (isFinishing || isDestroyed) return@launch
+                                result.fold(
+                                    onSuccess = {
+                                        Toast.makeText(this@AccountabilityHubActivity, R.string.toast_supervision_revoked, Toast.LENGTH_SHORT).show()
+                                        loadPartners()
+                                    },
+                                    onFailure = { err ->
+                                        Toast.makeText(
+                                            this@AccountabilityHubActivity,
+                                            getString(R.string.toast_partner_delete_failed, err.localizedMessage ?: getString(R.string.error_unknown)),
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                )
+                            } catch (e: Exception) {
+                                if (e is kotlinx.coroutines.CancellationException) throw e
+                                if (isFinishing || isDestroyed) return@launch
+                                Log.e(TAG, "Error revoking ward supervision ${partner.id}", e)
+                                Toast.makeText(
+                                    this@AccountabilityHubActivity,
+                                    getString(R.string.toast_partner_delete_failed, e.localizedMessage ?: getString(R.string.error_unknown)),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } finally {
+                                if (!isFinishing && !isDestroyed) {
+                                    deleteBtn.isEnabled = true
                                 }
-                            )
-                        } catch (e: Exception) {
-                            if (e is kotlinx.coroutines.CancellationException) throw e
-                            if (isFinishing || isDestroyed) return@launch
-                            Log.e(TAG, "Error deleting partner ${partner.id}", e)
-                            Toast.makeText(
-                                this@AccountabilityHubActivity,
-                                getString(R.string.toast_partner_delete_failed, e.localizedMessage ?: getString(R.string.error_unknown)),
-                                Toast.LENGTH_LONG
-                            ).show()
-                        } finally {
-                            if (!isFinishing && !isDestroyed) {
-                                deleteBtn.isEnabled = true
                             }
                         }
                     }
-                }
-                .setNegativeButton(R.string.dialog_btn_cancel, null)
-                .show()
+                    .setNegativeButton(R.string.dialog_btn_cancel, null)
+                    .show()
+            }
+            btnRow.addView(deleteBtn)
+            container.addView(btnRow)
         }
 
-        btnRow.addView(deleteBtn)
-
-        container.addView(btnRow)
         card.addView(container)
         return card
     }
@@ -327,6 +364,13 @@ class AccountabilityHubActivity : AppCompatActivity() {
         val tilCode = dialogView.findViewById<TextInputLayout>(R.id.tilPartnerCode)
         val etCode = dialogView.findViewById<EditText>(R.id.etPartnerCode)
         val rbWard = dialogView.findViewById<RadioButton>(R.id.rbAddAsWard)
+        val rbGuardian = dialogView.findViewById<RadioButton>(R.id.rbAddAsGuardian)
+
+        // Dialog is dedicated to adding Wards (people I protect)
+        rbGuardian?.visibility = View.GONE
+        rbWard.isChecked = true
+        rbWard.text = getString(R.string.dialog_add_as_ward)
+        tilCode?.helperText = getString(R.string.dialog_add_ward_only_note)
 
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_add_partner_title)
@@ -338,6 +382,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
         dialog.show()
 
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (isPairingInProgress) return@setOnClickListener
             val code = etCode.text?.toString()?.trim() ?: ""
             val regex = Regex("^[A-Za-z0-9]{6}$")
             if (!regex.matches(code)) {
@@ -345,13 +390,15 @@ class AccountabilityHubActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             tilCode?.error = null
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
             dialog.dismiss()
-            val role = if (rbWard.isChecked) PartnerEntity.ROLE_WARD else PartnerEntity.ROLE_GUARDIAN
-            performPairing(code, role)
+            performPairing(code, PartnerEntity.ROLE_WARD)
         }
     }
 
     private fun performPairing(code: String, role: String) {
+        if (isPairingInProgress) return
+        isPairingInProgress = true
         btnAddPartner.isEnabled = false
         lifecycleScope.launch {
             if (isFinishing || isDestroyed) return@launch
@@ -377,6 +424,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
                 Log.e(TAG, "Error performing pairing", e)
             } finally {
                 btnAddPartner.isEnabled = true
+                isPairingInProgress = false
             }
         }
     }

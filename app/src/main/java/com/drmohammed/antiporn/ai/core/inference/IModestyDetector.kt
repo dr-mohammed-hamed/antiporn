@@ -13,6 +13,8 @@ interface IModestyDetector : AutoCloseable {
     val inputWidth: Int
     val inputHeight: Int
     val isChannelsLast: Boolean
+    val isFloat16: Boolean
+        get() = false
 
     /**
      * تهيئة النموذج وتحميل الأوزان في الذاكرة

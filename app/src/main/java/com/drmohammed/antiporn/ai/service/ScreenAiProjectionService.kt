@@ -8,9 +8,11 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -28,12 +30,15 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.drmohammed.antiporn.MainActivity
 import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.ai.core.inference.HalalifyGenderDetector
 import com.drmohammed.antiporn.ai.core.inference.IModestyDetector
-import com.drmohammed.antiporn.ai.core.inference.MobileNetV4ModestyDetector
 import com.drmohammed.antiporn.ai.core.inference.TfLiteModestyDetector
 import com.drmohammed.antiporn.ai.core.pipeline.ContextualGatingWatcher
 import com.drmohammed.antiporn.ai.core.pipeline.FrameDifferencer
 import com.drmohammed.antiporn.ai.core.pipeline.RowStrideExtractor
+import com.drmohammed.antiporn.ai.diagnostic.TelegramAlertDispatcher
+import com.drmohammed.antiporn.ai.overlay.ScreenBlurOverlayManager
+import kotlin.math.roundToInt
 
 /**
  * خدمة التقاط الشاشة والاستدلال بالذكاء الاصطناعي في الخلفية
@@ -51,11 +56,19 @@ class ScreenAiProjectionService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private lateinit var detector: IModestyDetector
+    private lateinit var halalifyDetector: HalalifyGenderDetector
+    private lateinit var blurOverlayManager: ScreenBlurOverlayManager
     private lateinit var rowStrideExtractor: RowStrideExtractor
     private lateinit var frameDifferencer: FrameDifferencer
     private lateinit var contextualWatcher: ContextualGatingWatcher
 
+    private var scratchBitmap: Bitmap? = null
+    private var scratchPixels: IntArray? = null
+    private var scratchRowBytes: ByteArray? = null
+
     private var lastAlertTimeMs: Long = 0L
+    private var lastDiagnosticLogMs: Long = 0L
+    private var lastHalalifyIdleLogMs: Long = 0L
 
     companion object {
         private const val TAG = "ScreenAiProjectionSvc"
@@ -102,7 +115,7 @@ class ScreenAiProjectionService : Service() {
 
         /** اسم الموديل النشط للعرض في بطاقة التجربة. */
         @Volatile
-        var modelName: String = MobileNetV4ModestyDetector.MODEL_DISPLAY_NAME
+        var modelName: String = TfLiteModestyDetector.MODEL_DISPLAY_NAME
             private set
 
         /** رسالة فشل التهيئة (فارغة = نجاح) — تُعرض بالأحمر بدل الفشل الصامت. */
@@ -123,9 +136,9 @@ class ScreenAiProjectionService : Service() {
         backgroundThread = thread
         backgroundHandler = Handler(thread.looper)
 
-        // النموذج الوحيد للتجربة: MobileNetV4 (للتبديل إلى YOLO بدّل السطر التالي فقط —
-        // الأبعاد والتطبيع تُشتق من واجهة IModestyDetector، بلا downcast).
-        detector = MobileNetV4ModestyDetector()
+        // محرك الاستدلال الافتراضي: YOLO11n الموحد INT8 لحفظ العورات
+        // الأبعاد والتطبيع تُشتق تلقائياً من واجهة IModestyDetector
+        detector = TfLiteModestyDetector()
         val initOk = detector.initialize(applicationContext)
         if (!initOk) {
             initError = applicationContext.getString(R.string.ai_init_failed_desc, detector.inputWidth)
@@ -135,6 +148,9 @@ class ScreenAiProjectionService : Service() {
             Log.i(TAG, "AI detector ready: $modelName ${detector.inputWidth}x${detector.inputHeight}")
         }
 
+        halalifyDetector = HalalifyGenderDetector(applicationContext)
+        blurOverlayManager = ScreenBlurOverlayManager(applicationContext)
+
         rowStrideExtractor = RowStrideExtractor(
             width = detector.inputWidth,
             height = detector.inputHeight,
@@ -142,7 +158,11 @@ class ScreenAiProjectionService : Service() {
             normalization = if (detector is TfLiteModestyDetector)
                 RowStrideExtractor.Normalization.UNIT_01
             else
-                RowStrideExtractor.Normalization.IMAGENET_MEAN_STD
+                RowStrideExtractor.Normalization.IMAGENET_MEAN_STD,
+            dataType = if (detector.isFloat16)
+                RowStrideExtractor.DataType.FLOAT16
+            else
+                RowStrideExtractor.DataType.FLOAT32
         )
         frameDifferencer = FrameDifferencer()
 
@@ -163,8 +183,16 @@ class ScreenAiProjectionService : Service() {
             // CRITICAL(C3): stop frame flow synchronously — onDestroy is async and a rapid
             // STOP→START would otherwise overwrite live handles (leak + double VirtualDisplay).
             isStopping = true
-            try { imageReader?.setOnImageAvailableListener(null, null) } catch (_: Exception) { }
+            try { imageReader?.setOnImageAvailableListener(null, null) } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
             try { virtualDisplay?.release() } catch (e: Exception) { Log.e(TAG, "Error releasing display on STOP", e) }
+            if (::blurOverlayManager.isInitialized) {
+                try {
+                    blurOverlayManager.detachOverlay()
+                    blurOverlayManager.close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error closing blurOverlayManager on STOP", e)
+                }
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(Service.STOP_FOREGROUND_REMOVE)
             } else {
@@ -211,7 +239,9 @@ class ScreenAiProjectionService : Service() {
                 // or the system throws ForegroundServiceDidNotStartInTimeException.
                 try {
                     startForegroundWithNotification()
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to start foreground notification on error fallback", e)
+                }
                 isRunning = false
                 isStopping = false
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -286,10 +316,15 @@ class ScreenAiProjectionService : Service() {
     }
 
     private fun setupVirtualDisplay(mp: MediaProjection) {
-        // أبعاد الدخل تُحسم من واجهة IModestyDetector runtime — لا أرقام صلبة ولا downcast.
-        val width = detector.inputWidth
-        val height = detector.inputHeight
-        val density = resources.displayMetrics.densityDpi
+        val displayMetrics = resources.displayMetrics
+        val realWidth = displayMetrics.widthPixels.coerceAtLeast(1)
+        val realHeight = displayMetrics.heightPixels.coerceAtLeast(1)
+        // أبعاد العرض الافتراضي مطابقة تماماً لنسبة أبعاد الشاشة الحقيقية لتفادي أشرطة السواد والتشويه الهندسي
+        val width = 416.coerceAtMost(realWidth)
+        val height = ((realHeight.toFloat() * width) / realWidth).roundToInt().coerceAtLeast(1)
+        val density = displayMetrics.densityDpi
+
+        Log.i(TAG, "Creating VirtualDisplay: physical=${realWidth}x${realHeight}, virtual=${width}x${height}, density=$density")
 
         val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
         imageReader = reader
@@ -297,7 +332,7 @@ class ScreenAiProjectionService : Service() {
         reader.setOnImageAvailableListener({ imageReaderInstance ->
             // CRITICAL(C3): drop frames synchronously after STOP — onDestroy is async.
             if (!isRunning || isStopping) {
-                try { imageReaderInstance.acquireLatestImage()?.close() } catch (_: Exception) { }
+                try { imageReaderInstance.acquireLatestImage()?.close() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
                 return@setOnImageAvailableListener
             }
             val image = try {
@@ -308,13 +343,21 @@ class ScreenAiProjectionService : Service() {
             } ?: return@setOnImageAvailableListener
 
             try {
+                // حساب الـ FPS
+                trackFps()
+
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastDiagnosticLogMs >= 2000L) {
+                    lastDiagnosticLogMs = now
+                    val fgPkg = contextualWatcher.currentForegroundPackage
+                    val isTarget = contextualWatcher.isTargetAppForeground
+                    Log.i(TAG, "👁️ [ScreenAi Scan Active] Pkg: $fgPkg (Target: $isTarget) | FPS: ${"%.1f".format(currentFps)}")
+                }
+
                 // صمام الأمان: إهمال فوري للإطار إذا كان المستخدم في تطبيق آمن
                 if (!contextualWatcher.isTargetAppForeground) {
                     return@setOnImageAvailableListener
                 }
-
-                // حساب الـ FPS
-                trackFps()
 
                 // المستوى 0: التحقق مما إذا كانت الشاشة ثابتة عبر البايتات الخام RGBA مباشرة
                 val planes = image.planes
@@ -333,6 +376,38 @@ class ScreenAiProjectionService : Service() {
                     return@setOnImageAvailableListener
                 }
 
+                // درع Halalify: كشف وتعتيم الوجوه والأجسام النسائية فورياً (Pure Visual Shield)
+                val rawBitmap = createBitmapFromImage(image)
+                if (rawBitmap != null) {
+                    val startHalalify = SystemClock.elapsedRealtime()
+                    val detections = halalifyDetector.detect(rawBitmap)
+                    val halalifyLatency = SystemClock.elapsedRealtime() - startHalalify
+                    val femaleDetections = detections.filter { it.isFemale }
+                    val displayMetrics = resources.displayMetrics
+                    val screenWidth = displayMetrics.widthPixels
+                    val screenHeight = displayMetrics.heightPixels
+
+                    if (femaleDetections.isNotEmpty()) {
+                        val femaleBoxes = femaleDetections.map { it.boundingBox }
+                        blurOverlayManager.updateRegionsMapped(
+                            rawRegions = femaleBoxes,
+                            targetWidth = screenWidth,
+                            targetHeight = screenHeight,
+                            sourceWidth = 1,
+                            sourceHeight = 1
+                        )
+                        Log.i(TAG, "👁️ [Halalify Shield] Active | Female Detections: ${femaleDetections.size} | Top Conf: ${"%.1f".format((femaleDetections.maxOfOrNull { it.confidence } ?: 0f) * 100)}% | Latency: ${halalifyLatency}ms | Boxes: ${femaleBoxes.joinToString { "[${"%.2f".format(it.left)}, ${"%.2f".format(it.top)}, ${"%.2f".format(it.right)}, ${"%.2f".format(it.bottom)}]" }}")
+                    } else {
+                        blurOverlayManager.updateRegions(emptyList())
+                        val nowMs = SystemClock.elapsedRealtime()
+                        if (nowMs - lastHalalifyIdleLogMs >= 2000L) {
+                            lastHalalifyIdleLogMs = nowMs
+                            val rawConfPercent = (halalifyDetector.lastMaxRawFemaleConfidence * 100).toInt()
+                            Log.i(TAG, "👁️ [Halalify Shield] Idle | Female Detections: 0 | Max Raw Conf: $rawConfPercent% | Latency: ${halalifyLatency}ms")
+                        }
+                    }
+                }
+
                 // استخراج البكسلات سطراً بسطر متجاوزاً حشو الـ rowStride (تطبيع ImageNet داخل المستخرج)
                 val buffer = rowStrideExtractor.extract(image)
 
@@ -347,9 +422,21 @@ class ScreenAiProjectionService : Service() {
                     lastDetectedLabel = snapshot.label
                     lastConfidence = snapshot.confidence
 
-                    val dbgTop = (detector as? MobileNetV4ModestyDetector)?.lastTopClassId ?: -1
-                    Log.w(TAG, "Suspicion=${violation.confidence} topClass=$dbgTop latency=${result.latencyMs}ms")
+                    Log.w(TAG, "Modesty Violation=${violation.classType.name} (${violation.classType.labelAr}) conf=${violation.confidence} latency=${result.latencyMs}ms")
                     triggerAlertThrottled(violation.classType.labelAr, violation.confidence)
+
+                    if (TelegramAlertDispatcher.isEnabled && rawBitmap != null) {
+                        try {
+                            TelegramAlertDispatcher.dispatchAlert(
+                                rawBitmap = rawBitmap,
+                                detections = result.detections,
+                                topViolation = violation,
+                                latencyMs = result.latencyMs
+                            )
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Telegram alert dispatch error: ${e.message}")
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in frame processing loop", e)
@@ -371,6 +458,61 @@ class ScreenAiProjectionService : Service() {
         )
 
         Log.i(TAG, "VirtualDisplay created successfully at ${width}x${height}")
+    }
+
+    private fun createBitmapFromImage(image: Image): Bitmap? {
+        val plane = image.planes.firstOrNull() ?: return null
+        val buffer = plane.buffer
+        val width = image.width
+        val height = image.height
+        val pixelStride = plane.pixelStride
+        val rowStride = plane.rowStride
+
+        val requiredPixelCount = width * height
+        val requiredRowBytes = width * pixelStride
+
+        var pixels = scratchPixels
+        if (pixels == null || pixels.size != requiredPixelCount) {
+            pixels = IntArray(requiredPixelCount)
+            scratchPixels = pixels
+        }
+
+        var rowBytes = scratchRowBytes
+        if (rowBytes == null || rowBytes.size < requiredRowBytes) {
+            rowBytes = ByteArray(requiredRowBytes)
+            scratchRowBytes = rowBytes
+        }
+
+        var bitmap = scratchBitmap
+        if (bitmap == null || bitmap.isRecycled || bitmap.width != width || bitmap.height != height) {
+            try { bitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            scratchBitmap = bitmap
+        }
+
+        val savedPos = buffer.position()
+        try {
+            for (y in 0 until height) {
+                buffer.position(y * rowStride)
+                buffer.get(rowBytes, 0, requiredRowBytes)
+                val rowOffset = y * width
+                for (x in 0 until width) {
+                    val px = x * pixelStride
+                    val r = rowBytes[px].toInt() and 0xFF
+                    val g = rowBytes[px + 1].toInt() and 0xFF
+                    val b = rowBytes[px + 2].toInt() and 0xFF
+                    val a = if (pixelStride >= 4) (rowBytes[px + 3].toInt() and 0xFF) else 0xFF
+                    pixels[rowOffset + x] = (a shl 24) or (r shl 16) or (g shl 8) or b
+                }
+            }
+            bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+            return bitmap
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create bitmap from image", e)
+            return null
+        } finally {
+            try { buffer.position(savedPos) } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+        }
     }
 
     private fun trackFps() {
@@ -482,6 +624,15 @@ class ScreenAiProjectionService : Service() {
             contextualWatcher.stop()
         }
 
+        if (::blurOverlayManager.isInitialized) {
+            try {
+                blurOverlayManager.detachOverlay()
+                blurOverlayManager.close()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error closing blurOverlayManager in onDestroy", e)
+            }
+        }
+
         // 1. إيقاف تدفق الإطارات أولاً وهدم العرض الافتراضي (متزامن على main — سريع).
         try {
             imageReader?.setOnImageAvailableListener(null, null)
@@ -506,8 +657,13 @@ class ScreenAiProjectionService : Service() {
                     if (::detector.isInitialized) detector.close()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error closing detector on worker", e)
+                }
+                try {
+                    if (::halalifyDetector.isInitialized) halalifyDetector.close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error closing halalifyDetector on worker", e)
                 } finally {
-                    try { worker.quitSafely() } catch (_: Exception) { }
+                    try { worker.quitSafely() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
                 }
                 try {
                     imageReader?.close()
@@ -516,10 +672,14 @@ class ScreenAiProjectionService : Service() {
                 } finally {
                     imageReader = null
                 }
+                try { scratchBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+                scratchBitmap = null
+                scratchPixels = null
+                scratchRowBytes = null
             }
             // Best-effort fallback: force quit after 3s WITHOUT blocking main.
             mainHandler.postDelayed({
-                try { if (worker.isAlive) worker.quit() } catch (_: Exception) { }
+                try { if (worker.isAlive) worker.quit() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
             }, 3000L)
         } else {
             if (::detector.isInitialized) {
@@ -527,9 +687,18 @@ class ScreenAiProjectionService : Service() {
                     Log.e(TAG, "Error closing detector", e)
                 }
             }
+            if (::halalifyDetector.isInitialized) {
+                try { halalifyDetector.close() } catch (e: Exception) {
+                    Log.e(TAG, "Error closing halalifyDetector", e)
+                }
+            }
             try { imageReader?.close() } catch (e: Exception) {
                 Log.e(TAG, "Error closing image reader", e)
             } finally { imageReader = null }
+            try { scratchBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+            scratchBitmap = null
+            scratchPixels = null
+            scratchRowBytes = null
         }
 
         try {

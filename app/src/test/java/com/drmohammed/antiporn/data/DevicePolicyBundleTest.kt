@@ -23,7 +23,7 @@ class DevicePolicyBundleTest {
         assertTrue(policy.lockNewInstallsUntilApproved)
         assertTrue(policy.customBlacklistPackages.isEmpty())
         assertTrue(policy.customCurfewWhitelistPackages.isEmpty())
-        assertEquals(DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST, policy.dnsHost)
+        assertEquals(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST, policy.dnsHost)
         assertEquals(1L, policy.version)
     }
 
@@ -169,5 +169,52 @@ class DevicePolicyBundleTest {
         assertFalse(rejected.isPending)
         assertFalse(rejected.isApproved)
         assertTrue(rejected.isRejected)
+    }
+
+    @Test
+    fun testSupervisedPolicy_jsonAndMapSerialization() {
+        val policy = DevicePolicyBundle(
+            guardianUid = "guardian_abc123",
+            guardianName = "Father Phone",
+            isSupervised = true,
+            version = 10L
+        )
+        assertTrue(policy.isSupervised)
+        assertEquals("guardian_abc123", policy.guardianUid)
+        assertEquals("Father Phone", policy.guardianName)
+
+        val json = policy.toJson()
+        val fromJson = DevicePolicyBundle.fromJson(json)
+        assertTrue(fromJson.isSupervised)
+        assertEquals(policy.guardianUid, fromJson.guardianUid)
+        assertEquals(policy.guardianName, fromJson.guardianName)
+
+        val map = policy.toMap()
+        val fromMap = DevicePolicyBundle.fromMap(map)
+        assertTrue(fromMap.isSupervised)
+        assertEquals(policy.guardianUid, fromMap.guardianUid)
+        assertEquals(policy.guardianName, fromMap.guardianName)
+    }
+
+    @Test
+    fun testUnsupervisedPolicy_defaultsToFalseAndNull() {
+        val policy = DevicePolicyBundle.defaultPolicy()
+        assertFalse(policy.isSupervised)
+        org.junit.Assert.assertNull(policy.guardianUid)
+        org.junit.Assert.assertNull(policy.guardianName)
+    }
+
+    @Test
+    fun testGuardianPartner_representation() {
+        val guardian = PartnerEntity(
+            id = "guard_999",
+            pairingCode = "LOCKED",
+            displayName = "Supervising Guardian",
+            role = PartnerEntity.ROLE_GUARDIAN
+        )
+        assertTrue(guardian.isGuardian)
+        assertFalse(guardian.isWard)
+        assertEquals("LOCKED", guardian.pairingCode)
+        assertEquals("Supervising Guardian", guardian.displayName)
     }
 }

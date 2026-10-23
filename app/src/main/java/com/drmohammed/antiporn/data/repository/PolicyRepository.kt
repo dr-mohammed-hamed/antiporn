@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.util.Log
 import com.drmohammed.antiporn.AdminReceiver
+import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
@@ -52,9 +53,27 @@ class PolicyRepository private constructor(context: Context) {
                 val hasGuardians = try {
                     database.getPartnersByRole(com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN).isNotEmpty()
                 } catch (e: Exception) {
+                    Log.w(TAG, "Failed checking guardians in SQLite during cold boot reconcile", e)
                     false
                 }
-                if (!hasGuardians && loaded.version == 1L && loaded.isVpnBlackholeEnabled != com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED) {
+                if (loaded.isSupervised && !loaded.guardianUid.isNullOrBlank() && !hasGuardians) {
+                    try {
+                        val guardian = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity(
+                            id = loaded.guardianUid,
+                            pairingCode = AccountabilityRepository.CODE_LOCKED,
+                            displayName = loaded.guardianName ?: appContext.getString(R.string.guardian_default_name),
+                            role = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN,
+                            status = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.STATUS_ACTIVE,
+                            createdAt = loaded.updatedAt,
+                            lastSyncAt = loaded.updatedAt
+                        )
+                        database.savePartner(guardian)
+                        Log.i(TAG, "Reconciled missing guardian in SQLite on cold boot: ${loaded.guardianName}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed reconciling missing guardian in SQLite", e)
+                    }
+                    loaded
+                } else if (!hasGuardians && loaded.version == 1L && loaded.isVpnBlackholeEnabled != com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED) {
                     val reconciled = loaded.copy(
                         isVpnBlackholeEnabled = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED,
                         updatedAt = System.currentTimeMillis()
@@ -143,6 +162,26 @@ class PolicyRepository private constructor(context: Context) {
                                     val current = _currentPolicyFlow.value
                                     if (cloudPolicy.version > current.version || (cloudPolicy.version == current.version && cloudPolicy.updatedAt > current.updatedAt)) {
                                         Log.i(TAG, "Received newer policy from cloud (v${cloudPolicy.version})")
+                                        val wasSupervised = current.isSupervised
+                                        val isNowSupervised = cloudPolicy.isSupervised
+
+                                        if (wasSupervised && !isNowSupervised) {
+                                            Log.i(TAG, "Supervision revocation detected from cloud snapshot! Restoring standalone mode...")
+                                            AccountabilityRepository.getInstance(appContext).onSupervisionRevokedLocally()
+                                        } else if (isNowSupervised && !cloudPolicy.guardianUid.isNullOrBlank()) {
+                                            Log.i(TAG, "Guardian detected from cloud snapshot: ${cloudPolicy.guardianName} (${cloudPolicy.guardianUid})")
+                                            val partner = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity(
+                                                id = cloudPolicy.guardianUid,
+                                                pairingCode = AccountabilityRepository.CODE_LOCKED,
+                                                displayName = cloudPolicy.guardianName ?: appContext.getString(R.string.guardian_default_name),
+                                                role = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN,
+                                                status = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.STATUS_ACTIVE,
+                                                createdAt = System.currentTimeMillis(),
+                                                lastSyncAt = System.currentTimeMillis()
+                                            )
+                                            database.savePartner(partner)
+                                        }
+
                                         updateLocalPolicyAndEnforce(cloudPolicy)
                                     }
                                 } catch (e: Exception) {

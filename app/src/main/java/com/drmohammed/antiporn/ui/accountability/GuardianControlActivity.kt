@@ -56,6 +56,7 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var switchLockNewInstalls: MaterialSwitch
     private lateinit var tilDnsHost: TextInputLayout
     private lateinit var etDnsHost: TextInputEditText
+    private lateinit var btnPresetAdguard: MaterialButton
     private lateinit var btnPresetCloudflare: MaterialButton
     private lateinit var btnPresetNextDns: MaterialButton
     private lateinit var layoutPendingApps: LinearLayout
@@ -131,6 +132,7 @@ class GuardianControlActivity : AppCompatActivity() {
 
         tilDnsHost = findViewById(R.id.tilDnsHost)
         etDnsHost = findViewById(R.id.etDnsHost)
+        btnPresetAdguard = findViewById(R.id.btnPresetAdguard)
         btnPresetCloudflare = findViewById(R.id.btnPresetCloudflare)
         btnPresetNextDns = findViewById(R.id.btnPresetNextDns)
 
@@ -148,6 +150,7 @@ class GuardianControlActivity : AppCompatActivity() {
         switchIncognitoBlocked.isEnabled = enabled
         switchLockNewInstalls.isEnabled = enabled
         etDnsHost.isEnabled = enabled
+        btnPresetAdguard.isEnabled = enabled
         btnPresetCloudflare.isEnabled = enabled
         btnPresetNextDns.isEnabled = enabled
         btnSavePolicyChanges.isEnabled = enabled
@@ -189,6 +192,11 @@ class GuardianControlActivity : AppCompatActivity() {
                 updateTimingLabels()
             }
             picker.show(supportFragmentManager, "end_time_picker")
+        }
+
+        btnPresetAdguard.setOnClickListener {
+            etDnsHost.setText(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST)
+            tilDnsHost.error = null
         }
 
         btnPresetCloudflare.setOnClickListener {

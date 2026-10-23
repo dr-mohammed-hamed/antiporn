@@ -342,10 +342,20 @@
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <!-- 1-Click Presets -->
-                <LinearLayout
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPresetAdguard"
+                    style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:text="@string/btn_dns_preset_adguard"
+                    android:textSize="12sp"
+                    app:cornerRadius="10dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:orientation="horizontal">
 
                     <com.google.android.material.button.MaterialButton

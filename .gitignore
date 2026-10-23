@@ -9,6 +9,9 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
+/Halalify-kotlin/
+/devolopment
+/test_samples
 /captures
 .externalNativeBuild
 .cxx
