@@ -12,8 +12,9 @@ import java.util.TimeZone
 
 class CurfewTest {
 
-    private fun createCalendar(hourOfDay: Int, minute: Int): Calendar {
+    private fun createCalendar(hourOfDay: Int, minute: Int, dayOfWeek: Int = Calendar.WEDNESDAY): Calendar {
         return Calendar.getInstance(TimeZone.getTimeZone(CurfewConfig.MAKKAH_TIMEZONE_ID)).apply {
+            set(Calendar.DAY_OF_WEEK, dayOfWeek)
             set(Calendar.HOUR_OF_DAY, hourOfDay)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
@@ -323,5 +324,18 @@ class CurfewTest {
         assertEquals(0, CurfewConfig.START_MINUTE)
         assertEquals(7, CurfewConfig.END_HOUR)
         assertEquals(0, CurfewConfig.END_MINUTE)
+    }
+
+    @Test
+    fun testCurfewPolicyBundleDefaults() {
+        val bundle = com.drmohammed.antiporn.core.model.DevicePolicyBundle.defaultPolicy()
+        assertTrue(bundle.isCurfewEnabled)
+        assertFalse(bundle.isInstantInternetKillEnabled)
+        assertFalse(bundle.isWeekendCurfewEnabled)
+        assertEquals(20, bundle.weekendCurfewStartHour)
+        assertEquals(0, bundle.weekendCurfewStartMinute)
+        assertEquals(7, bundle.weekendCurfewEndHour)
+        assertEquals(0, bundle.weekendCurfewEndMinute)
+        assertTrue(bundle.protectedAppPackages.isEmpty())
     }
 }

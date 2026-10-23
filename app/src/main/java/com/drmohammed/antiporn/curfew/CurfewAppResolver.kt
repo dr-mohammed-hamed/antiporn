@@ -45,7 +45,7 @@ object CurfewAppResolver {
         } catch (e: Exception) {
             ""
         }
-        val labelTokens = label.split(Regex("[\\s_\\-.,;:!?/\\\\\\[\\]()]+")).filter { it.isNotBlank() }
+        val labelTokens = label.split(Regex("[\\s_\\-.,;:!?/\\\\[\\]()]+")).filter { it.isNotBlank() }
         val islamicTokens = setOf(
             "قرآن", "قران", "مصحف", "آية", "اية", "أذكار", "اذكار",
             "تفسير", "أذان", "اذان", "صلاة", "quran",
@@ -70,7 +70,7 @@ object CurfewAppResolver {
         if (keywords.any { pkg.contains(it) }) return true
 
         val label = try { pm.getApplicationLabel(appInfo).toString().lowercase() } catch (e: Exception) { "" }
-        val labelTokens = label.split(Regex("[\\s_\\-.,;:!?/\\\\\\[\\]()]+")).filter { it.isNotBlank() }
+        val labelTokens = label.split(Regex("[\\s_\\-.,;:!?/\\\\[\\]()]+")).filter { it.isNotBlank() }
         val audioTokens = setOf("بودكاست", "audiobook", "podcast", "podcasts", "audiobooks")
         if (labelTokens.any { audioTokens.contains(it) }) return true
 
@@ -90,7 +90,7 @@ object CurfewAppResolver {
         if (keywords.any { pkg.contains(it) }) return true
 
         val label = try { pm.getApplicationLabel(appInfo).toString().lowercase() } catch (e: Exception) { "" }
-        val labelTokens = label.split(Regex("[\\s_\\-.,;:!?/\\\\\\[\\]()]+")).filter { it.isNotBlank() }
+        val labelTokens = label.split(Regex("[\\s_\\-.,;:!?/\\\\[\\]()]+")).filter { it.isNotBlank() }
         val exactMatchTokens = setOf(
             "جرعات", "أدوية", "ادوية", "طبي", "طبية", "صيدلة", "medical", "pharma", "pediatric", "pedidose"
         )
@@ -109,7 +109,7 @@ object CurfewAppResolver {
         if (keywords.any { pkg.contains(it) }) return true
 
         val label = try { pm.getApplicationLabel(appInfo).toString().lowercase() } catch (e: Exception) { "" }
-        val labelTokens = label.split(Regex("[\\s_\\-.,;:!?/\\\\\\[\\]()]+")).filter { it.isNotBlank() }
+        val labelTokens = label.split(Regex("[\\s_\\-.,;:!?/\\\\[\\]()]+")).filter { it.isNotBlank() }
         val playerTokens = setOf("newpipe", "puretube", "tubular", "mxplayer")
         if (labelTokens.any { playerTokens.contains(it) }) return true
 
@@ -139,6 +139,23 @@ object CurfewAppResolver {
         immune.addAll(CurfewConfig.SYSTEM_CRITICAL_PACKAGES)
         immune.addAll(CurfewConfig.STATIC_WHITELIST)
         immune.add(context.packageName)
+
+        // Custom Curfew Whitelist from Policy (excluding any custom blacklisted packages)
+        val customBlacklist = try {
+            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context)
+                .getCurrentPolicy().customBlacklistPackages
+        } catch (e: Exception) {
+            Log.w(TAG, "Error querying customBlacklistPackages", e)
+            emptySet()
+        }
+
+        try {
+            val customWhitelist = com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context)
+                .getCurrentPolicy().customCurfewWhitelistPackages
+            immune.addAll(customWhitelist - customBlacklist)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error querying customCurfewWhitelistPackages", e)
+        }
 
         // 2. Dynamic Discovery of ALL Quran, Islamic, Audiobook, Podcast, Medical, and Game apps installed on the phone
         try {
@@ -261,8 +278,9 @@ object CurfewAppResolver {
             Log.w(TAG, "Error resolving utility packages", e)
         }
 
-        // Strictly ensure no blacklisted, app store, or curfew search loophole package ever gains immunity
+        // Strictly ensure no blacklisted, custom blacklisted, app store, or curfew search loophole package ever gains immunity
         immune.removeAll { AppSuspensionShield.isBlacklisted(it) }
+        immune.removeAll(customBlacklist)
         immune.removeAll(CurfewConfig.KNOWN_APP_STORES)
         immune.removeAll(CurfewConfig.CURFEW_SEARCH_APPS)
 
@@ -318,8 +336,6 @@ object CurfewAppResolver {
         targets.addAll(CurfewConfig.CURFEW_SEARCH_APPS)
 
         // Filter out immune packages, self, Google Play Store, and Google Search.
-        // Google Play Store and Google Search are kept unsuspended so games can access background IPC services,
-        // while their UI is protected via CurfewForegroundWatcher.
         val finalTargets = targets
             .filterNot { immunePackages.contains(it) }
             .filterNot { it == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE }

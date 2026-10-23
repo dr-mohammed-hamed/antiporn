@@ -17,7 +17,7 @@ import java.util.concurrent.Executors
 /**
  * Enforces and releases app suspensions based on the night curfew schedule.
  * Strictly guarantees:
- * 1. 24/7 blacklisted apps (Telegram, TikTok, proxy browsers) are NEVER unsuspended.
+ * 1. 24/7 blacklisted apps (Telegram, TikTok, proxy browsers, custom blacklist) are NEVER unsuspended.
  * 2. Play Store and OEM stores are completely hidden and suspended.
  * 3. Newly installed non-whitelisted apps are immediately frozen if curfew is active.
  */
@@ -25,6 +25,14 @@ object CurfewEnforcer {
 
     private const val TAG = "AntiPorn_CurfewEnforcer"
     private val bgExecutor = Executors.newSingleThreadExecutor()
+
+    private fun isMinuteInWindow(minuteOfDay: Int, startMinute: Int, endMinute: Int): Boolean {
+        return if (startMinute <= endMinute) {
+            minuteOfDay in startMinute until endMinute
+        } else {
+            minuteOfDay >= startMinute || minuteOfDay < endMinute
+        }
+    }
 
     /**
      * Determines whether the current Makkah time falls within the curfew window.
@@ -34,25 +42,50 @@ object CurfewEnforcer {
         val startMinute = CurfewConfig.START_HOUR * 60 + CurfewConfig.START_MINUTE
         val endMinute = CurfewConfig.END_HOUR * 60 + CurfewConfig.END_MINUTE
 
-        return if (startMinute <= endMinute) {
-            minuteOfDay in startMinute until endMinute
-        } else {
-            minuteOfDay >= startMinute || minuteOfDay < endMinute
-        }
+        return isMinuteInWindow(minuteOfDay, startMinute, endMinute)
     }
 
     fun isCurfewActive(context: Context, calendar: Calendar = CurfewConfig.getCurfewCalendar()): Boolean {
-        val minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
-        val startMinute = CurfewConfig.getCurfewStartHour(context) * 60 + CurfewConfig.getCurfewStartMinute(context)
-        val endMinute = CurfewConfig.getCurfewEndHour(context) * 60 + CurfewConfig.getCurfewEndMinute(context)
+        if (!CurfewConfig.isCurfewEnabled(context)) return false
 
-        return if (startMinute <= endMinute) {
-            minuteOfDay in startMinute until endMinute
-        } else {
-            minuteOfDay >= startMinute || minuteOfDay < endMinute
+        val minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+        val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+
+        val weekdayStart = CurfewConfig.getCurfewStartHour(context) * 60 + CurfewConfig.getCurfewStartMinute(context)
+        val weekdayEnd = CurfewConfig.getCurfewEndHour(context) * 60 + CurfewConfig.getCurfewEndMinute(context)
+
+        if (!CurfewConfig.isWeekendCurfewEnabled(context)) {
+            return isMinuteInWindow(minuteOfDay, weekdayStart, weekdayEnd)
+        }
+
+        val weekendStart = CurfewConfig.getWeekendCurfewStartHour(context) * 60 + CurfewConfig.getWeekendCurfewStartMinute(context)
+        val weekendEnd = CurfewConfig.getWeekendCurfewEndHour(context) * 60 + CurfewConfig.getWeekendCurfewEndMinute(context)
+
+        return when (dayOfWeek) {
+            Calendar.FRIDAY, Calendar.SATURDAY -> {
+                isMinuteInWindow(minuteOfDay, weekendStart, weekendEnd)
+            }
+            Calendar.THURSDAY -> {
+                // Morning window (from Wednesday night) ends at weekdayEnd
+                val inMorning = if (weekdayStart > weekdayEnd) {
+                    minuteOfDay < weekdayEnd
+                } else {
+                    minuteOfDay in weekdayStart until weekdayEnd
+                }
+                // Evening window (weekend night begins) starts at weekendStart
+                val inEvening = if (weekendStart > weekendEnd) {
+                    minuteOfDay >= weekendStart
+                } else {
+                    minuteOfDay in weekendStart until weekendEnd
+                }
+                inMorning || inEvening
+            }
+            else -> {
+                // Sunday, Monday, Tuesday, Wednesday
+                isMinuteInWindow(minuteOfDay, weekdayStart, weekdayEnd)
+            }
         }
     }
-
 
     fun isCurfewFeatureEnabled(context: Context): Boolean {
         val prefs = context.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
@@ -128,7 +161,9 @@ object CurfewEnforcer {
     fun isEffectiveCurfewActive(context: Context): Boolean {
         if (!isCurfewFeatureEnabled(context)) return false
         if (isSnoozeActive(context)) return false
-        return isManualTestActive(context) || isCurfewActive(context)
+        if (isManualTestActive(context)) return true
+        if (!CurfewConfig.isCurfewEnabled(context)) return false
+        return isCurfewActive(context)
     }
 
     /**
@@ -151,40 +186,52 @@ object CurfewEnforcer {
             return false
         }
 
-        // Ironclad Security Invariant: NEVER release block (morning wakeup / nap end) if current time is within
+        // Ironclad Security Invariant: NEVER release block if current time is within
         // scheduled night window OR a nap is still active (unless an explicit snooze is active).
-        if (!activate && !isSnoozeActive(context) && (isCurfewActive(context, calendar) || NapController.isNapActive(context))) {
+        val isCurfewEffective = CurfewConfig.isCurfewEnabled(context) && isCurfewActive(context, calendar)
+        if (!activate && !isSnoozeActive(context) && (isCurfewEffective || NapController.isNapActive(context))) {
             Log.w(TAG, "Security Alert: Block release rejected - night curfew window or active nap still holds!")
             return true
         }
 
         val prefs = context.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
 
+        // 0. Unified VPN Blackhole & Instant Internet Kill Control
+        val instantKill = CurfewConfig.isInstantInternetKillEnabled(context)
+        val vpnEnabled = instantKill || (activate && CurfewConfig.isVpnBlackholeEnabled(context))
+
+        if (vpnEnabled) {
+            try {
+                val currentVpn = dpm.getAlwaysOnVpnPackage(admin)
+                val bypassedPackages = CurfewConfig.getVpnBypassedPackages(context)
+                if (currentVpn != context.packageName) {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        dpm.setAlwaysOnVpnPackage(admin, context.packageName, true, bypassedPackages)
+                    } else {
+                        dpm.setAlwaysOnVpnPackage(admin, context.packageName, true)
+                    }
+                    Log.i(TAG, "Always-on Blackhole VPN configured to ${context.packageName} with lockdown=true")
+                }
+                CurfewBlackholeVpnService.start(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error configuring Always-On Blackhole VPN", e)
+            }
+        } else {
+            try {
+                CurfewBlackholeVpnService.forceReleaseVpn(context)
+                if (dpm.getAlwaysOnVpnPackage(admin) == context.packageName) {
+                    dpm.setAlwaysOnVpnPackage(admin, null, false)
+                    Log.i(TAG, "Always-on Blackhole VPN released")
+                }
+                Log.i(TAG, "VPN Blackhole is disabled and network is released.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error releasing Always-On Blackhole VPN", e)
+            }
+        }
+
         return if (activate) {
             val targets = CurfewAppResolver.getCurfewTargetPackages(context)
             Log.i(TAG, "Enforcing Curfew ON for ${targets.size} targeted packages")
-
-            // 0. Enforce network blackout via Always-On Blackhole VPN ONLY IF enabled in policy
-            if (CurfewConfig.isVpnBlackholeEnabled(context)) {
-                try {
-                    val currentVpn = dpm.getAlwaysOnVpnPackage(admin)
-                    val bypassedPackages = CurfewConfig.getVpnBypassedPackages(context)
-                    if (currentVpn != context.packageName) {
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                            dpm.setAlwaysOnVpnPackage(admin, context.packageName, true, bypassedPackages)
-                        } else {
-                            dpm.setAlwaysOnVpnPackage(admin, context.packageName, true)
-                        }
-                        Log.i(TAG, "Always-on Blackhole VPN configured to ${context.packageName} with lockdown=true")
-                    }
-                    CurfewBlackholeVpnService.start(context)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error configuring Always-On Blackhole VPN during curfew", e)
-                }
-            } else {
-                Log.i(TAG, "VPN Blackhole is disabled by policy; keeping network active during curfew")
-            }
-
 
             // 1. Lockdown OEM App Stores & Search loophole apps completely (Hide from launcher and apps list)
             val packagesToHide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
@@ -236,9 +283,18 @@ object CurfewEnforcer {
             }
 
             // Ensure any whitelisted or immune package that might have been previously suspended is immediately unsuspended
+            // strictly verifying it is NOT in permanent blacklist AND NOT in custom blacklist!
+            val customBlacklist = try {
+                PolicyRepository.getInstance(context).getCurrentPolicy().customBlacklistPackages
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed querying customBlacklistPackages during curfew enforcement", e)
+                emptySet()
+            }
             val immunePackages = CurfewAppResolver.resolveImmunePackages(context)
             val immuneToUnsuspend = immunePackages.filter { pkg ->
-                !AppSuspensionShield.isBlacklisted(pkg) && try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+                !AppSuspensionShield.isBlacklisted(pkg) &&
+                !customBlacklist.contains(pkg) &&
+                try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
             }
             if (immuneToUnsuspend.isNotEmpty()) {
                 try {
@@ -249,9 +305,7 @@ object CurfewEnforcer {
                 }
             }
 
-            // Ensure DISALLOW_INSTALL_APPS is NOT active, preserving ADB developer workflow (Constitution Article 1).
-            // App installation prevention is handled safely via CurfewForegroundWatcher (Play Store kickout),
-            // OEM store hiding/suspension, and handlePackageAdded instant freezing.
+            // Ensure DISALLOW_INSTALL_APPS is NOT active, preserving ADB developer workflow.
             try {
                 dpm.clearUserRestriction(admin, UserManager.DISALLOW_INSTALL_APPS)
             } catch (e: Exception) {
@@ -270,17 +324,6 @@ object CurfewEnforcer {
         } else {
             // Wakeup: Restore daytime apps and stores
             Log.i(TAG, "Enforcing Curfew OFF: Releasing daytime apps and stores")
-
-            // 0. Release Always-On Blackhole VPN and clear OS Lockdown
-            try {
-                CurfewBlackholeVpnService.stop(context)
-                if (dpm.getAlwaysOnVpnPackage(admin) == context.packageName) {
-                    dpm.setAlwaysOnVpnPackage(admin, null, false)
-                    Log.i(TAG, "Always-on Blackhole VPN released on curfew wakeup")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error releasing Always-On Blackhole VPN during wakeup", e)
-            }
 
             // 1. Restore OEM App Stores & Search apps (Unhide)
             val packagesToUnhide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
@@ -338,7 +381,7 @@ object CurfewEnforcer {
                 return false
             }
 
-            // IRON RULE: NEVER unsuspend permanently blacklisted apps (Telegram, TikTok, etc.) or pending unapproved apps or custom blacklists!
+            // IRON RULE: NEVER unsuspend permanently blacklisted apps or pending unapproved apps or custom blacklists!
             val safeToUnsuspend = candidates.filter { pkg ->
                 !AppSuspensionShield.isBlacklisted(pkg) &&
                 !pendingApprovalPackages.contains(pkg) &&
@@ -368,7 +411,7 @@ object CurfewEnforcer {
     /**
      * Evaluates current conditions and synchronizes system state accordingly.
      */
-     fun syncCurfewState(context: Context) {
+    fun syncCurfewState(context: Context) {
         val shouldBeActive = isEffectiveCurfewActive(context)
         Log.d(TAG, "Syncing curfew state: shouldBeActive = $shouldBeActive")
         enforce(context, shouldBeActive)

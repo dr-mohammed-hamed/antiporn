@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.R
+import java.lang.ref.WeakReference
 
 /**
  * Silent kernel-level Blackhole VPN service running during night curfew.
@@ -27,25 +28,29 @@ class CurfewBlackholeVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        activeService = WeakReference(this)
         // Guaranteed FGS compliance: Always bring foreground notification up first on Android 8+
         startForegroundNotification()
 
+        val shouldVpnBeActive = CurfewConfig.isInstantInternetKillEnabled(this) ||
+                (CurfewEnforcer.isEffectiveBlockActive(this) && CurfewConfig.isVpnBlackholeEnabled(this))
+
         val action = intent?.action
         if (action == ACTION_STOP) {
-            if (CurfewEnforcer.isEffectiveBlockActive(this)) {
-                Log.w(TAG, "Security Alert: Rejected ACTION_STOP because Curfew or Nap block is still actively enforced!")
+            if (shouldVpnBeActive) {
+                Log.w(TAG, "Rejected ACTION_STOP because VPN blackout is still actively enforced!")
                 establishTunnel()
                 return START_STICKY
             }
-            Log.i(TAG, "Received ACTION_STOP and block is inactive. Tearing down Blackhole VPN.")
+            Log.i(TAG, "Received ACTION_STOP and VPN blackout is not required. Tearing down.")
             stopVpn()
             stopSelf()
             return START_NOT_STICKY
         }
 
-        // Verify that curfew or nap block should effectively be running
-        if (!CurfewEnforcer.isEffectiveBlockActive(this)) {
-            Log.w(TAG, "Blackhole VPN started but block is inactive; stopping service")
+        // Verify that VPN blackout should effectively be running
+        if (!shouldVpnBeActive) {
+            Log.w(TAG, "Blackhole VPN started but VPN blackout is not required; stopping service")
             stopVpn()
             stopSelf()
             return START_NOT_STICKY
@@ -178,6 +183,9 @@ class CurfewBlackholeVpnService : VpnService() {
     override fun onDestroy() {
         super.onDestroy()
         Log.i(TAG, "CurfewBlackholeVpnService destroyed")
+        if (activeService?.get() === this) {
+            activeService = null
+        }
         stopVpn()
     }
 
@@ -190,8 +198,22 @@ class CurfewBlackholeVpnService : VpnService() {
         const val ACTION_STOP = "com.drmohammed.antiporn.curfew.ACTION_STOP_VPN"
 
         @Volatile
+        private var activeService: WeakReference<CurfewBlackholeVpnService>? = null
+
+        @Volatile
         var isRunning: Boolean = false
             private set
+
+        fun forceReleaseVpn(context: Context) {
+            Log.i(TAG, "Force releasing VPN interface and service")
+            activeService?.get()?.let { service ->
+                service.stopVpn()
+                service.stopSelf()
+            }
+            activeService = null
+            isRunning = false
+            stop(context)
+        }
 
         fun start(context: Context) {
             val appContext = context.applicationContext
@@ -217,9 +239,21 @@ class CurfewBlackholeVpnService : VpnService() {
                     action = ACTION_STOP
                 }
                 appContext.startService(intent)
-                Log.i(TAG, "Requested stop of CurfewBlackholeVpnService")
+                Log.i(TAG, "Requested stop of CurfewBlackholeVpnService via ACTION_STOP")
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "Cannot startService with ACTION_STOP in background; stopping service directly", e)
+                try {
+                    appContext.stopService(Intent(appContext, CurfewBlackholeVpnService::class.java))
+                } catch (stopEx: Exception) {
+                    Log.e(TAG, "Failed fallback stopService for CurfewBlackholeVpnService", stopEx)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to stop CurfewBlackholeVpnService", e)
+                try {
+                    appContext.stopService(Intent(appContext, CurfewBlackholeVpnService::class.java))
+                } catch (stopEx: Exception) {
+                    Log.e(TAG, "Failed emergency stop of CurfewBlackholeVpnService", stopEx)
+                }
             }
         }
     }

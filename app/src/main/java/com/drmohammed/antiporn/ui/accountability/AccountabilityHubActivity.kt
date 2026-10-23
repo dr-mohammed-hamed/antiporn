@@ -368,6 +368,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
 
         // Dialog is dedicated to adding Wards (people I protect)
         rbGuardian?.visibility = View.GONE
+        dialogView.findViewById<View>(R.id.tvGuardianDesc)?.visibility = View.GONE
         rbWard.isChecked = true
         rbWard.text = getString(R.string.dialog_add_as_ward)
         tilCode?.helperText = getString(R.string.dialog_add_ward_only_note)

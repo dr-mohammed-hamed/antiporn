@@ -42,16 +42,39 @@
             android:checked="true"
             android:text="@string/dialog_add_as_ward"
             android:textColor="?attr/colorOnSurface"
-            android:textSize="14sp" />
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvWardDesc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/dialog_add_as_ward_desc"
+            android:textColor="?attr/colorOutline"
+            android:textSize="12sp" />
 
         <com.google.android.material.radiobutton.MaterialRadioButton
             android:id="@+id/rbAddAsGuardian"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="4dp"
             android:text="@string/dialog_add_as_guardian"
             android:textColor="?attr/colorOnSurface"
-            android:textSize="14sp" />
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvGuardianDesc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="8dp"
+            android:text="@string/dialog_add_as_guardian_desc"
+            android:textColor="?attr/colorOutline"
+            android:textSize="12sp" />
     </RadioGroup>
 
 </LinearLayout>

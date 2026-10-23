@@ -1,0 +1,39 @@
+<resources>
+    <string name="toast_app_suspended_by_guardian">This app has been suspended pending guardian approval</string>
+    <string name="guardian_curfew_master_switch_title">Enable Scheduled Night Curfew</string>
+    <string name="guardian_curfew_master_switch_desc">Enable or completely turn off automated night curfew on ward device</string>
+    <string name="guardian_weekend_curfew_title">Weekend Schedule (Thursday &amp; Friday)</string>
+    <string name="guardian_weekend_curfew_desc">Customize different start and end times for weekends</string>
+    <string name="guardian_weekend_curfew_switch">Enable weekend schedule</string>
+    <string name="guardian_weekend_curfew_start_label">Weekend curfew start</string>
+    <string name="guardian_weekend_curfew_end_label">Weekend curfew end</string>
+    <string name="btn_change_weekend_start_time">Change</string>
+    <string name="btn_change_weekend_end_time">Change</string>
+    <string name="guardian_instant_internet_kill_title">Instant Internet Kill (24/7)</string>
+    <string name="guardian_instant_internet_kill_desc">Instantly cut all internet data on ward device at any time 24/7 with 1 click</string>
+    <string name="guardian_mode_vpn_blackhole_desc">Automatically cut internet during night curfew hours only</string>
+    <string name="guardian_app_manager_card_title">Remote App Manager</string>
+    <string name="guardian_app_manager_card_desc">Comprehensive inventory with 24/7 freeze, curfew whitelist, and uninstall protection</string>
+    <string name="btn_open_app_manager">Open App Manager</string>
+    <string name="remote_app_manager_title">Ward Applications</string>
+    <string name="remote_app_manager_search_hint">Search by app name or package...</string>
+    <string name="remote_app_manager_empty">No inventoried apps found yet</string>
+    <string name="remote_app_manager_freeze_switch">24/7 Freeze</string>
+    <string name="remote_app_manager_curfew_switch">Allow in Curfew</string>
+    <string name="remote_app_manager_protect_switch">Prevent Uninstall/Stop</string>
+    <string name="btn_save_app_manager_changes">Save Changes</string>
+    <string name="toast_app_manager_saved">App policies successfully saved</string>
+    <string name="toast_app_manager_save_failed">Failed to save app policies</string>
+    <string name="ai_alert_hard_porn">🚨 Critical Warning: Explicit pornographic content detected! (%1$d%%)</string>
+    <string name="ai_alert_soft_porn">⚠️ Alert: Inappropriate content / partial nudity detected: %1$s (%2$d%%)</string>
+
+    <!-- Unsaved Changes & Dialog Clarifications -->
+    <string name="dialog_unsaved_changes_title">Unsaved Changes ⚠️</string>
+    <string name="dialog_unsaved_changes_msg">You have unsaved changes. Do you want to discard them and exit or keep editing?</string>
+    <string name="btn_discard_changes">Discard &amp; Exit</string>
+    <string name="btn_keep_editing">Keep Editing</string>
+    <string name="dialog_add_as_ward_desc">You will control their curfew schedule, manage their apps, and approve new installs.</string>
+    <string name="dialog_add_as_guardian_desc">They will have supervisory authority over your device, curfew, and apps.</string>
+    <string name="remote_app_manager_curfew_disabled_hint">Unavailable because app is frozen 24/7</string>
+    <string name="btn_back">Back</string>
+</resources>

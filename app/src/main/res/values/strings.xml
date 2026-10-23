@@ -113,6 +113,7 @@
     <string name="ai_fps_format">معدل الفحص: %1$.1f FPS</string>
     <string name="ai_last_detection_format">آخر رصد: %1$s (الثقة: %2$d%%)</string>
     <string name="ai_no_detections_yet">لم يتم رصد أي مخالفات بعد</string>
+    <string name="ai_alert_toast_format">⚠️ رصد محتوى غير محتشم: %1$s (الثقة: %2$d%%)</string>
     <string name="ai_alert_hard_porn">🚨 تحذير عاجل: تم رصد محتوى إباحي صريح! (الثقة: %1$d%%)</string>
     <string name="ai_alert_soft_porn">⚠️ تنبيه: تم رصد محتوى فاضح / عري جزئي: %1$s (الثقة: %2$d%%)</string>
     <string name="ai_service_notification_title">فحص الذكاء الاصطناعي نشط 🤖</string>
@@ -207,7 +208,45 @@
     <string name="dialog_revoke_ward_msg">هل أنت متأكد من إلغاء الإشراف على %1$s؟ سيعود جهازه حراً بالكامل وستُعاد سياساته للإعدادات الافتراضية الآمنة مع توليد رمز اقتران جديد له.</string>
     <string name="toast_supervision_revoked">تم إلغاء الإشراف بنجاح واستعادة حرية الجهاز 🕊️</string>
     <string name="toast_supervision_revoked_ward">تم إلغاء الإشراف من قِبل المشرف — استعادة الوضع المستقل وتوليد رمز جديد</string>
-    <string name="overlay_permission_prompt">يرجى تفعيل خيار (الظهور فوق التطبيقات الأخرى) لتمكين درع التعتيم الموضعي</string>
+    <string name="overlay_permission_prompt">يرجى تفعيل خيار (الظهور فوق التطبيقات الأخرى) لتمكين درع التعتيم الموضعي</string>
+
     <string name="guardian_status_active">🔒 مشرف حماية نشط وموثق</string>
     <string name="dialog_add_ward_only_note">أدخل رمز اقتران الشخص الذي ترغب في حمايته والإشراف عليه. إذا كنت ترغب في أن يشرف شخص آخر عليك، فشارك معه رمزك الظاهر في الشاشة الرئيسية.</string>
+    <string name="toast_app_suspended_by_guardian">تم إيقاف هذا التطبيق بانتظار موافقة المشرف</string>
+
+    <!-- Remote Curfew & App Management Controls -->
+    <string name="guardian_curfew_master_switch_title">تفعيل الحظر الليلي المجدول</string>
+    <string name="guardian_curfew_master_switch_desc">تشغيل أو إيقاف الحظر الليلي التلقائي بالكامل عن هاتف الصديق</string>
+    <string name="guardian_weekend_curfew_title">جدولة عطلة نهاية الأسبوع (الخميس والجمعة)</string>
+    <string name="guardian_weekend_curfew_desc">تخصيص مواعيد بدء وانتهاء مختلفة لعطلة نهاية الأسبوع</string>
+    <string name="guardian_weekend_curfew_switch">تفعيل جدولة نهاية الأسبوع</string>
+    <string name="guardian_weekend_curfew_start_label">بدء حظر العطلة</string>
+    <string name="guardian_weekend_curfew_end_label">انتهاء حظر العطلة</string>
+    <string name="btn_change_weekend_start_time">تغيير</string>
+    <string name="btn_change_weekend_end_time">تغيير</string>
+    <string name="guardian_instant_internet_kill_title">قطع الإنترنت اللحظي (24/7)</string>
+    <string name="guardian_instant_internet_kill_desc">قطع بيانات الإنترنت فوراً عن هاتف الصديق في أي وقت طوال اليوم بنقرة واحدة</string>
+    <string name="guardian_mode_vpn_blackhole_desc">قطع الإنترنت تلقائياً أثناء ساعات الحظر الليلي فقط</string>
+    <string name="guardian_app_manager_card_title">إدارة تطبيقات الصديق</string>
+    <string name="guardian_app_manager_card_desc">جرد شامل لجميع التطبيقات المثبتة مع إمكانية التجميد 24/7، الاستثناء ليلاً، ومنع الحذف</string>
+    <string name="btn_open_app_manager">فتح إدارة التطبيقات</string>
+    <string name="remote_app_manager_title">تطبيقات الصديق</string>
+    <string name="remote_app_manager_search_hint">بحث باسم التطبيق أو الحزمة...</string>
+    <string name="remote_app_manager_empty">لا توجد تطبيقات تم جردها بعد أو تعذر الاتصال</string>
+    <string name="remote_app_manager_freeze_switch">تجميد دائم 24/7</string>
+    <string name="remote_app_manager_curfew_switch">متاح في الحظر الليلي</string>
+    <string name="remote_app_manager_protect_switch">منع الإلغاء والإيقاف</string>
+    <string name="btn_save_app_manager_changes">حفظ التغييرات</string>
+    <string name="toast_app_manager_saved">تم حفظ وتطبيق سياسات التطبيقات بنجاح</string>
+    <string name="toast_app_manager_save_failed">فشل حفظ سياسات التطبيقات</string>
+
+    <!-- Unsaved Changes & Dialog Clarifications -->
+    <string name="dialog_unsaved_changes_title">تعديلات غير محفوظة ⚠️</string>
+    <string name="dialog_unsaved_changes_msg">لديك تعديلات غير محفوظة. هل ترغب في تجاهل التعديلات والخروج أم البقاء؟</string>
+    <string name="btn_discard_changes">تجاهل والخروج</string>
+    <string name="btn_keep_editing">متابعة التعديل</string>
+    <string name="dialog_add_as_ward_desc">ستتمكن من تحديد مواعيد نومه، وإدارة تطبيقاته، والموافقة على تثبيتاته.</string>
+    <string name="dialog_add_as_guardian_desc">سيمتلك صلاحية الإشراف على جهازك وتحديد أوقات الحظر وإدارة تطبيقاتك.</string>
+    <string name="remote_app_manager_curfew_disabled_hint">غير متاح لأن التطبيق مجمّد كلياً 24/7</string>
+    <string name="btn_back">رجوع</string>
 </resources>

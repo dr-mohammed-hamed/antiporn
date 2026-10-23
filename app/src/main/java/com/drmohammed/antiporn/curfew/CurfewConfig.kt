@@ -51,6 +51,55 @@ object CurfewConfig {
         END_MINUTE
     }
 
+    fun isCurfewEnabled(context: Context): Boolean = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isCurfewEnabled
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        true
+    }
+
+    fun isInstantInternetKillEnabled(context: Context): Boolean = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isInstantInternetKillEnabled
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        false
+    }
+
+    fun isWeekendCurfewEnabled(context: Context): Boolean = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isWeekendCurfewEnabled
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        false
+    }
+
+    fun getWeekendCurfewStartHour(context: Context): Int = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().weekendCurfewStartHour
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        START_HOUR
+    }
+
+    fun getWeekendCurfewStartMinute(context: Context): Int = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().weekendCurfewStartMinute
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        START_MINUTE
+    }
+
+    fun getWeekendCurfewEndHour(context: Context): Int = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().weekendCurfewEndHour
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        END_HOUR
+    }
+
+    fun getWeekendCurfewEndMinute(context: Context): Int = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().weekendCurfewEndMinute
+    } catch (e: Exception) {
+        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        END_MINUTE
+    }
+
     /**
      * Central Single Source of Truth Feature Flag for Night Curfew Internet Blackout.
      * Set to true to enforce 100% complete data blackout by default in standalone versions.
@@ -64,7 +113,6 @@ object CurfewConfig {
         Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
         DEFAULT_VPN_BLACKHOLE_ENABLED
     }
-
 
     const val PREFS_NAME = "antiporn_curfew_prefs"
     const val KEY_CURFEW_ENABLED = "key_curfew_enabled"

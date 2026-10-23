@@ -132,6 +132,9 @@
             android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize"
             android:label="@string/title_guardian_control" />
+        <activity
+            android:name=".ui.accountability.RemoteAppManagerActivity"
+            android:exported="false" />
     </application>
 
 </manifest>
