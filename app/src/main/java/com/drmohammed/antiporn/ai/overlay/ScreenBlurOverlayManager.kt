@@ -99,11 +99,11 @@ class ScreenBlurOverlayManager(
         /** مدة الثبات الافتراضية لمنع الرمشة (400 مللي ثانية) */
         const val DEFAULT_PERSISTENCE_MS = 400L
 
-        /** لون التظليل المعتدل الأنيق: داكن شبه معتم (Color.argb(232, 18, 20, 26)) */
-        const val COLOR_OVERLAY_FILL = 0xE812141A.toInt()
+        /** لون التظليل الداكن الأنيق: معتم تماماً بنسبة 100% (Color.argb(255, 18, 20, 26)) لمنع أي تسريب بصري */
+        const val COLOR_OVERLAY_FILL = 0xFF12141A.toInt()
 
-        /** لون الإطار الناعم المحيط بالتعتيم (Color.argb(180, 45, 50, 65)) */
-        const val COLOR_OVERLAY_STROKE = 0xB42D3241.toInt()
+        /** لون الإطار الناعم المحيط بالتعتيم: معتم تماماً (Color.argb(255, 45, 50, 65)) */
+        const val COLOR_OVERLAY_STROKE = 0xFF2D3241.toInt()
 
         /** نصف قطر تدوير أركان المستطيلات (Rounded Rectangles) */
         const val DEFAULT_CORNER_RADIUS_DP = 16f

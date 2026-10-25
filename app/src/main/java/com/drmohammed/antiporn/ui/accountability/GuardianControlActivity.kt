@@ -19,6 +19,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
+import com.drmohammed.antiporn.core.network.DnsFilteringValidator
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
@@ -294,6 +295,7 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun showDiscardConfirmationDialog() {
+        if (isFinishing || isDestroyed) return
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_unsaved_changes_title)
             .setMessage(R.string.dialog_unsaved_changes_msg)
@@ -602,6 +604,7 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun saveAndPushPolicy() {
+        if (isFinishing || isDestroyed || isSavingPolicy || !hasUnsavedChanges()) return
         val rawDns = getCleanDnsHost()
         if (!rawDns.matches(Regex("^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"))) {
             tilDnsHost.error = getString(R.string.error_invalid_dns_host)
@@ -610,21 +613,81 @@ class GuardianControlActivity : AppCompatActivity() {
         }
         tilDnsHost.error = null
 
-        if (isSavingPolicy || !hasUnsavedChanges()) return
+
         isSavingPolicy = true
         setInputsEnabled(false)
+
+        val progressDialog = MaterialAlertDialogBuilder(this@GuardianControlActivity)
+            .setTitle(R.string.dns_probe_progress_title)
+            .setMessage(R.string.dns_probe_progress_message)
+            .setCancelable(false)
+            .create()
+        progressDialog.show()
+
         lifecycleScope.launch {
             if (isFinishing || isDestroyed) {
                 isSavingPolicy = false
                 return@launch
             }
             try {
+                // Pre-flight DNS validation if DNS host is not a verified preset
+                val validationResult = withContext(Dispatchers.IO) {
+                    DnsFilteringValidator.validateDnsHost(rawDns)
+                }
+
+                if (isFinishing || isDestroyed) return@launch
+                if (progressDialog.isShowing) {
+                    try { progressDialog.dismiss() } catch (e: Exception) { Log.d(TAG, "Dismiss progressDialog non-critical: ${e.message}") }
+                }
+
+                when (validationResult) {
+                    is DnsFilteringValidator.ValidationResult.Valid -> {
+                        // All checks passed! Proceed to save policy
+                    }
+                    is DnsFilteringValidator.ValidationResult.UnfilteredPorn -> {
+                        isSavingPolicy = false
+                        setInputsEnabled(true)
+                        tilDnsHost.error = getString(R.string.dns_probe_error_not_blocking)
+                        etDnsHost.requestFocus()
+                        MaterialAlertDialogBuilder(this@GuardianControlActivity)
+                            .setTitle(R.string.dns_probe_dialog_failed_title)
+                            .setMessage(getString(R.string.dns_probe_error_not_blocking_detail, validationResult.domain, validationResult.resolvedIp))
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                        return@launch
+                    }
+                    is DnsFilteringValidator.ValidationResult.Unreachable -> {
+                        isSavingPolicy = false
+                        setInputsEnabled(true)
+                        tilDnsHost.error = getString(R.string.dns_probe_error_unreachable)
+                        etDnsHost.requestFocus()
+                        MaterialAlertDialogBuilder(this@GuardianControlActivity)
+                            .setTitle(R.string.dns_probe_dialog_failed_title)
+                            .setMessage(getString(R.string.dns_probe_error_unreachable_detail, validationResult.reason))
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                        return@launch
+                    }
+                    is DnsFilteringValidator.ValidationResult.ResolverBroken -> {
+                        isSavingPolicy = false
+                        setInputsEnabled(true)
+                        tilDnsHost.error = getString(R.string.dns_probe_error_broken)
+                        etDnsHost.requestFocus()
+                        MaterialAlertDialogBuilder(this@GuardianControlActivity)
+                            .setTitle(R.string.dns_probe_dialog_failed_title)
+                            .setMessage(getString(R.string.dns_probe_error_broken_detail, validationResult.reason))
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                        return@launch
+                    }
+                }
+
                 val policyRepo = PolicyRepository.getInstance(applicationContext)
                 val firestore = FirebaseFirestore.getInstance()
                 val latestPolicy = try {
                     val snap = firestore.collection("policies").document(wardId).get().await()
                     if (snap != null && snap.exists() && snap.data != null) {
-                        DevicePolicyBundle.fromMap(snap.data!!)
+                        DevicePolicyBundle.fromMap(snap.data ?: emptyMap())
                     } else {
                         currentPolicy
                     }
@@ -669,6 +732,9 @@ class GuardianControlActivity : AppCompatActivity() {
                 Log.e(TAG, "Error pushing policy to ward", e)
                 Toast.makeText(this@GuardianControlActivity, getString(R.string.toast_policy_push_failed), Toast.LENGTH_LONG).show()
             } finally {
+                if (progressDialog.isShowing) {
+                    try { progressDialog.dismiss() } catch (e: Exception) { Log.d(TAG, "Dismiss progressDialog non-critical: ${e.message}") }
+                }
                 isSavingPolicy = false
                 if (!isFinishing && !isDestroyed) {
                     setInputsEnabled(true)

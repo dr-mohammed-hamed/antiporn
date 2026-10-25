@@ -15,6 +15,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+import android.app.PendingIntent
+import android.os.Build
+import android.provider.Settings
+import com.drmohammed.antiporn.provisioning.engine.AccountAuditor
+import com.drmohammed.antiporn.provisioning.ui.ProvisioningWizardActivity
+
 /**
  * BroadcastReceiver triggered when the user enters the 6-digit pairing code
  * into the interactive notification drawer.
@@ -88,12 +94,72 @@ class PairingCodeReceiver : BroadcastReceiver() {
                     }
                     is PromotionResult.Failure -> {
                         Log.e(TAG, "Device Owner provisioning failed: ${result.message}")
-                        val failureNotification = NotificationCompat.Builder(appContext, AdbPairingNotificationService.CHANNEL_ID)
-                            .setSmallIcon(R.mipmap.ic_launcher)
-                            .setContentTitle(appContext.getString(R.string.provisioning_failed_title))
-                            .setContentText(result.message)
-                            .setAutoCancel(true)
-                            .build()
+
+                        val accounts = AccountAuditor.getActiveAccounts(appContext)
+                        val isAccountsIssue = accounts.isNotEmpty() && (
+                            result.message.contains("accounts", ignoreCase = true) ||
+                            result.message.contains("users", ignoreCase = true) ||
+                            !AccountAuditor.isReadyForProvisioning(appContext)
+                        )
+
+                        val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        } else {
+                            PendingIntent.FLAG_UPDATE_CURRENT
+                        }
+
+                        val wizardIntent = Intent(appContext, ProvisioningWizardActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            putExtra(ProvisioningWizardActivity.EXTRA_FOCUS_ACCOUNTS, true)
+                        }
+                        val wizardPendingIntent = PendingIntent.getActivity(
+                            appContext,
+                            1001,
+                            wizardIntent,
+                            pendingFlags
+                        )
+
+                        val failureNotification = if (isAccountsIssue) {
+                            val summaryList = AccountAuditor.getAccountSummaryList(appContext)
+                            val accountsFormatted = summaryList.joinToString("\n• ", prefix = "• ")
+                            val title = appContext.getString(R.string.provisioning_failed_accounts_title)
+                            val shortDesc = appContext.getString(R.string.provisioning_failed_accounts_desc, accounts.size)
+                            val actionText = appContext.getString(R.string.provisioning_failed_accounts_action)
+                            val fullBigText = "$shortDesc\n\n$accountsFormatted\n\n$actionText"
+
+                            val openAccountsIntent = Intent(Settings.ACTION_SYNC_SETTINGS).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            val openAccountsPendingIntent = PendingIntent.getActivity(
+                                appContext,
+                                1002,
+                                openAccountsIntent,
+                                pendingFlags
+                            )
+
+                            NotificationCompat.Builder(appContext, AdbPairingNotificationService.CHANNEL_ID)
+                                .setSmallIcon(R.mipmap.ic_launcher)
+                                .setContentTitle(title)
+                                .setContentText(shortDesc)
+                                .setStyle(NotificationCompat.BigTextStyle().bigText(fullBigText))
+                                .setContentIntent(wizardPendingIntent)
+                                .addAction(
+                                    R.drawable.ic_person,
+                                    appContext.getString(R.string.provisioning_btn_open_accounts),
+                                    openAccountsPendingIntent
+                                )
+                                .setAutoCancel(true)
+                                .build()
+                        } else {
+                            NotificationCompat.Builder(appContext, AdbPairingNotificationService.CHANNEL_ID)
+                                .setSmallIcon(R.mipmap.ic_launcher)
+                                .setContentTitle(appContext.getString(R.string.provisioning_failed_title))
+                                .setContentText(result.message)
+                                .setContentIntent(wizardPendingIntent)
+                                .setAutoCancel(true)
+                                .build()
+                        }
+
                         notificationManager.notify(AdbPairingNotificationService.NOTIFICATION_ID, failureNotification)
 
                         val failIntent = Intent(ACTION_PROVISIONING_RESULT).apply {

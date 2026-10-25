@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.Image
@@ -36,6 +37,7 @@ import com.drmohammed.antiporn.ai.core.model.NudeNetDetection
 import com.drmohammed.antiporn.ai.core.model.NudeNetResult
 import com.drmohammed.antiporn.ai.core.pipeline.ContextualGatingWatcher
 import com.drmohammed.antiporn.ai.core.pipeline.FrameDifferencer
+import com.drmohammed.antiporn.ai.core.tracking.KltOpticalFlowTracker
 import com.drmohammed.antiporn.ai.diagnostic.TelegramAlertDispatcher
 import com.drmohammed.antiporn.ai.overlay.ScreenBlurOverlayManager
 import java.util.concurrent.atomic.AtomicBoolean
@@ -56,6 +58,10 @@ class ScreenAiProjectionService : Service() {
     private var backgroundHandler: Handler? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private var inferenceThread: HandlerThread? = null
+    private var inferenceHandler: Handler? = null
+
+    private lateinit var kltTracker: KltOpticalFlowTracker
     private lateinit var halalifyDetector: HalalifyGenderDetector
     private lateinit var nudeNetDetector: NudeNetDetector
     private lateinit var blurOverlayManager: ScreenBlurOverlayManager
@@ -64,8 +70,10 @@ class ScreenAiProjectionService : Service() {
 
     // صمام إسقاط الإطارات لمنع تراكم الذاكرة وتأخر استجابة الهاتف (Drop Latest)
     private val isProcessingFrame = AtomicBoolean(false)
+    private val isHalalifyInferring = AtomicBoolean(false)
+    private var lastAnchorCheckTimeMs: Long = 0L
 
-    private var scratchBitmap: Bitmap? = null
+    private var inferenceBitmap: Bitmap? = null
     private var scratchPixels: IntArray? = null
     private var scratchRowBytes: ByteArray? = null
 
@@ -79,6 +87,7 @@ class ScreenAiProjectionService : Service() {
         private const val CHANNEL_ID = "antiporn_ai_channel"
         private const val NOTIFICATION_ID = 2001
         private const val ALERT_DEBOUNCE_MS = 5000L // خافق التكرار لمنع الإغراق
+        const val ANCHOR_INTERVAL_MS = 200L
 
         const val ACTION_START = "com.drmohammed.antiporn.ai.action.START"
         const val ACTION_STOP = "com.drmohammed.antiporn.ai.action.STOP"
@@ -140,9 +149,16 @@ class ScreenAiProjectionService : Service() {
         backgroundThread = thread
         backgroundHandler = Handler(thread.looper)
 
+        kltTracker = KltOpticalFlowTracker()
+
+        val infThread = HandlerThread("AiInferenceWorker", android.os.Process.THREAD_PRIORITY_BACKGROUND)
+        infThread.start()
+        inferenceThread = infThread
+        inferenceHandler = Handler(infThread.looper)
+
         halalifyDetector = HalalifyGenderDetector(applicationContext)
         nudeNetDetector = NudeNetDetector()
-        backgroundHandler?.post {
+        inferenceHandler?.post {
             val nudeOk = nudeNetDetector.initialize(applicationContext)
             if (!nudeOk) {
                 initError = "NudeNet initialization failed"
@@ -160,8 +176,13 @@ class ScreenAiProjectionService : Service() {
             applicationContext,
             onStateChanged = { isTarget, _ ->
                 frameDifferencer.reset()
-                if (!isTarget && ::blurOverlayManager.isInitialized) {
-                    blurOverlayManager.dismissFast()
+                if (!isTarget) {
+                    if (::kltTracker.isInitialized) {
+                        kltTracker.flush()
+                    }
+                    if (::blurOverlayManager.isInitialized) {
+                        blurOverlayManager.dismissFast()
+                    }
                 }
             }
         )
@@ -179,6 +200,10 @@ class ScreenAiProjectionService : Service() {
             // STOP→START would otherwise overwrite live handles (leak + double VirtualDisplay).
             isStopping = true
             isProcessingFrame.set(false)
+            isHalalifyInferring.set(false)
+            if (::kltTracker.isInitialized) {
+                kltTracker.flush()
+            }
             try { imageReader?.setOnImageAvailableListener(null, null) } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
             try { virtualDisplay?.release() } catch (e: Exception) { Log.e(TAG, "Error releasing display on STOP", e) }
             if (::blurOverlayManager.isInitialized) {
@@ -189,12 +214,23 @@ class ScreenAiProjectionService : Service() {
                     Log.e(TAG, "Error closing blurOverlayManager on STOP", e)
                 }
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(Service.STOP_FOREGROUND_REMOVE)
+            val infWorker = inferenceThread
+            val infHandler = inferenceHandler
+            inferenceThread = null
+            inferenceHandler = null
+            if (infWorker != null && infWorker.isAlive && infHandler != null) {
+                infHandler.removeCallbacksAndMessages(null)
+                infHandler.post {
+                    try { inferenceBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+                    inferenceBitmap = null
+                    try { infWorker.quitSafely() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+                }
             } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
+                try { inferenceBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+                inferenceBitmap = null
             }
+
+            stopForeground(Service.STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -215,6 +251,21 @@ class ScreenAiProjectionService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
+
+            // تأكد من جاهزية خيوط المعالجة في حال تم إيقاف الخدمة وإعادة تشغيلها
+            if (inferenceThread == null || inferenceThread?.isAlive != true) {
+                val infThread = HandlerThread("AiInferenceWorker", android.os.Process.THREAD_PRIORITY_BACKGROUND)
+                infThread.start()
+                inferenceThread = infThread
+                inferenceHandler = Handler(infThread.looper)
+            }
+            if (backgroundThread == null || backgroundThread?.isAlive != true) {
+                val bgThread = HandlerThread("AiProjectionWorker", android.os.Process.THREAD_PRIORITY_BACKGROUND)
+                bgThread.start()
+                backgroundThread = bgThread
+                backgroundHandler = Handler(bgThread.looper)
+            }
+
             val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
             val resultData: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 intent.getParcelableExtra(EXTRA_DATA, Intent::class.java)
@@ -240,12 +291,7 @@ class ScreenAiProjectionService : Service() {
                 }
                 isRunning = false
                 isStopping = false
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    stopForeground(Service.STOP_FOREGROUND_REMOVE)
-                } else {
-                    @Suppress("DEPRECATION")
-                    stopForeground(true)
-                }
+                stopForeground(Service.STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
         }
@@ -262,6 +308,11 @@ class ScreenAiProjectionService : Service() {
         frameCounter = 0
         fpsTimerStart = 0L
         isProcessingFrame.set(false)
+        isHalalifyInferring.set(false)
+        lastAnchorCheckTimeMs = 0L
+        if (::kltTracker.isInitialized) {
+            kltTracker.flush()
+        }
         val notification = buildServiceNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -366,6 +417,9 @@ class ScreenAiProjectionService : Service() {
 
                 // صمام الأمان: إهمال فوري للإطار وإزالة البلور فوراً إذا انتقل المستخدم لتطبيق آمن
                 if (!contextualWatcher.isTargetAppForeground) {
+                    if (::kltTracker.isInitialized) {
+                        kltTracker.flush()
+                    }
                     if (::blurOverlayManager.isInitialized && blurOverlayManager.hasActiveRegions) {
                         blurOverlayManager.dismissFast()
                     }
@@ -379,12 +433,15 @@ class ScreenAiProjectionService : Service() {
                     return@setOnImageAvailableListener
                 }
                 val plane = planes[0]
+                val pixelStride = plane.pixelStride
+                val rowStride = plane.rowStride
+
                 if (!frameDifferencer.hasScreenChanged(
                         rawBuffer = plane.buffer,
                         width = width,
                         height = height,
-                        rowStride = plane.rowStride,
-                        pixelStride = plane.pixelStride
+                        rowStride = rowStride,
+                        pixelStride = pixelStride
                     )) {
                     // الشاشة ساكنة تماماً: تثبيت البلور الحالي إن وجد ومنع أي وميض أو سقوط
                     if (::blurOverlayManager.isInitialized && blurOverlayManager.hasActiveRegions && !blurOverlayManager.isPendingClear) {
@@ -393,53 +450,108 @@ class ScreenAiProjectionService : Service() {
                     return@setOnImageAvailableListener
                 }
 
-                // درع Halalify: كشف وتعتيم الوجوه والأجسام النسائية فورياً (Pure Visual Shield)
-                val rawBitmap = createBitmapFromImage(image)
-                if (rawBitmap != null) {
-                    val startHalalify = SystemClock.elapsedRealtime()
-                    val detections = halalifyDetector.detect(rawBitmap)
-                    val halalifyLatency = SystemClock.elapsedRealtime() - startHalalify
-                    val femaleDetections = detections.filter { it.isFemale }
-                    val displayMetrics = resources.displayMetrics
-                    val screenWidth = displayMetrics.widthPixels
-                    val screenHeight = displayMetrics.heightPixels
+                // فحص الانتقال المفاجئ الكاسح للمشهد (Hard Scene Cut: تغير أكثر من 70% من الشاشة في إطار واحد)
+                if (frameDifferencer.lastChangeRatio >= 0.70f) {
+                    if (::kltTracker.isInitialized) {
+                        kltTracker.flush()
+                    }
+                }
 
-                    if (femaleDetections.isNotEmpty()) {
-                        lastOverlayRenderTimeMs = SystemClock.elapsedRealtime()
-                        val femaleBoxes = femaleDetections.map { it.boundingBox }
+                // -----------------------------------------------------------------
+                // المسار السريع: تتبع التدفق البصري بنبضات الشاشة (60 FPS @ ~1.2ms)
+                // -----------------------------------------------------------------
+                if (::kltTracker.isInitialized && kltTracker.hasActiveTracks()) {
+                    val trackedBoxes = kltTracker.update(
+                        rawBuffer = plane.buffer,
+                        width = width,
+                        height = height,
+                        rowStride = rowStride,
+                        pixelStride = pixelStride,
+                        timestampMs = now
+                    )
+                    if (trackedBoxes.isNotEmpty()) {
+                        val screenMetrics = resources.displayMetrics
+                        val paddedBoxes = kltTracker.getPaddedBoxes()
                         blurOverlayManager.updateRegionsMapped(
-                            rawRegions = femaleBoxes,
-                            targetWidth = screenWidth,
-                            targetHeight = screenHeight,
+                            rawRegions = paddedBoxes,
+                            targetWidth = screenMetrics.widthPixels,
+                            targetHeight = screenMetrics.heightPixels,
                             sourceWidth = 1,
                             sourceHeight = 1
                         )
-                        Log.i(TAG, "[Halalify Shield] Active | Female Detections: ${femaleDetections.size} | Top Conf: ${"%.1f".format((femaleDetections.maxOfOrNull { it.confidence } ?: 0f) * 100)}% | Latency: ${halalifyLatency}ms | Boxes: ${femaleBoxes.joinToString { "[${"%.2f".format(it.left)}, ${"%.2f".format(it.top)}, ${"%.2f".format(it.right)}, ${"%.2f".format(it.bottom)}]" }}")
+                        lastOverlayRenderTimeMs = now
+                    }
+                }
 
-                        // الشرط الأول الإلزامي: ربط الاستدعاء المشروط (Gated Execution)
-                        // لا يتم تمرير الإطار إلى NudeNetDetector إلا إذا اكتشف Halalify وجود شبهة جسد أو أنثى على الشاشة لتوفير طاقة المعالج ومنع السخونة
-                        if (::nudeNetDetector.isInitialized) {
-                            val nudeResult = nudeNetDetector.detect(rawBitmap)
-                            handleNudeNetResult(nudeResult)
+                // -----------------------------------------------------------------
+                // المسار غير المتزامن: إطلاق استدلال Halalify (Anchor Trigger @ 4-5 FPS)
+                // -----------------------------------------------------------------
+                val shouldTriggerAnchor = !isHalalifyInferring.get() &&
+                        ((now - lastAnchorCheckTimeMs >= ANCHOR_INTERVAL_MS) || (::kltTracker.isInitialized && !kltTracker.hasActiveTracks()))
+
+                if (shouldTriggerAnchor && isHalalifyInferring.compareAndSet(false, true)) {
+                    val bitmap = copyFrameToInferenceBitmap(image)
+                    if (bitmap != null) {
+                        val captureTimestamp = now
+                        inferenceHandler?.post {
+                            try {
+                                if (!isRunning || isStopping) return@post
+                                val startHalalify = SystemClock.elapsedRealtime()
+                                val detections = halalifyDetector.detect(bitmap)
+                                val halalifyLatency = SystemClock.elapsedRealtime() - startHalalify
+                                val femaleDetections = detections.filter { it.isFemale }
+
+                                if (::kltTracker.isInitialized) {
+                                    kltTracker.initOrUpdateAnchorsFromHalalify(
+                                        detections = femaleDetections,
+                                        frameWidth = width,
+                                        frameHeight = height,
+                                        timestampMs = captureTimestamp
+                                    )
+                                }
+
+                                if (femaleDetections.isNotEmpty()) {
+                                    val paddedBoxes = if (::kltTracker.isInitialized) {
+                                        val tracks = kltTracker.getPaddedBoxes()
+                                        if (tracks.isNotEmpty()) tracks else femaleDetections.map { it.boundingBox }
+                                    } else {
+                                        femaleDetections.map { it.boundingBox }
+                                    }
+                                    val screenMetrics = resources.displayMetrics
+                                    blurOverlayManager.updateRegionsMapped(
+                                        rawRegions = paddedBoxes,
+                                        targetWidth = screenMetrics.widthPixels,
+                                        targetHeight = screenMetrics.heightPixels,
+                                        sourceWidth = 1,
+                                        sourceHeight = 1
+                                    )
+                                    lastOverlayRenderTimeMs = SystemClock.elapsedRealtime()
+                                    Log.i(TAG, "[Halalify Shield] Active | Female Detections: ${femaleDetections.size} | Top Conf: ${"%.1f".format((femaleDetections.maxOfOrNull { it.confidence } ?: 0f) * 100)}% | Latency: ${halalifyLatency}ms | Boxes: ${paddedBoxes.joinToString { "[${"%.2f".format(it.left)}, ${"%.2f".format(it.top)}, ${"%.2f".format(it.right)}, ${"%.2f".format(it.bottom)}]" }}")
+
+                                    // الشرط الأول الإلزامي: ربط الاستدعاء المشروط (Gated Execution)
+                                    // لا يتم تمرير الإطار إلى NudeNetDetector إلا إذا اكتشف Halalify وجود شبهة جسد أو أنثى على الشاشة لتوفير طاقة المعالج ومنع السخونة
+                                    if (::nudeNetDetector.isInitialized) {
+                                        val nudeResult = nudeNetDetector.detect(bitmap)
+                                        handleNudeNetResult(nudeResult)
+                                    }
+                                } else if (::kltTracker.isInitialized && !kltTracker.hasActiveTracks()) {
+                                    blurOverlayManager.updateRegions(emptyList())
+                                    val nowMs = SystemClock.elapsedRealtime()
+                                    if (nowMs - lastHalalifyIdleLogMs >= 2000L) {
+                                        lastHalalifyIdleLogMs = nowMs
+                                        val rawConfPercent = (halalifyDetector.lastMaxRawFemaleConfidence * 100).toInt()
+                                        Log.i(TAG, "[Halalify Shield] Idle | Female Detections: 0 | Max Raw Conf: $rawConfPercent% | Latency: ${halalifyLatency}ms")
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error during background Halalify/NudeNet inference", e)
+                            } finally {
+                                lastAnchorCheckTimeMs = SystemClock.elapsedRealtime()
+                                isHalalifyInferring.set(false)
+                            }
                         }
                     } else {
-                        // لم يتم رصد أي أنثى في الإطار الجديد
-                        val nowMs = SystemClock.elapsedRealtime()
-                        val isOverlayRecentlyRendered = ::blurOverlayManager.isInitialized &&
-                                (nowMs - lastOverlayRenderTimeMs < blurOverlayManager.persistenceMs)
-
-                        if (frameDifferencer.isSignificantMotion()) {
-                            blurOverlayManager.dismissFast()
-                        } else if (frameDifferencer.isSceneStatic(0.02f) && isOverlayRecentlyRendered) {
-                            blurOverlayManager.retainActiveRegions()
-                        } else {
-                            blurOverlayManager.updateRegions(emptyList())
-                        }
-                        if (nowMs - lastHalalifyIdleLogMs >= 2000L) {
-                            lastHalalifyIdleLogMs = nowMs
-                            val rawConfPercent = (halalifyDetector.lastMaxRawFemaleConfidence * 100).toInt()
-                            Log.i(TAG, "[Halalify Shield] Idle | Female Detections: 0 | Max Raw Conf: $rawConfPercent% | Latency: ${halalifyLatency}ms")
-                        }
+                        isHalalifyInferring.set(false)
                     }
                 }
             } catch (e: Exception) {
@@ -465,7 +577,7 @@ class ScreenAiProjectionService : Service() {
         Log.i(TAG, "VirtualDisplay created successfully at ${width}x${height}")
     }
 
-    private fun createBitmapFromImage(image: Image): Bitmap? {
+    private fun copyFrameToInferenceBitmap(image: Image): Bitmap? {
         val plane = image.planes.firstOrNull() ?: return null
         val buffer = plane.buffer
         val width = image.width
@@ -488,11 +600,11 @@ class ScreenAiProjectionService : Service() {
             scratchRowBytes = rowBytes
         }
 
-        var bitmap = scratchBitmap
+        var bitmap = inferenceBitmap
         if (bitmap == null || bitmap.isRecycled || bitmap.width != width || bitmap.height != height) {
             try { bitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
             bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            scratchBitmap = bitmap
+            inferenceBitmap = bitmap
         }
 
         val savedPos = buffer.position()
@@ -513,7 +625,7 @@ class ScreenAiProjectionService : Service() {
             bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
             return bitmap
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to create bitmap from image", e)
+            Log.e(TAG, "Failed to copy frame to inference bitmap", e)
             return null
         } finally {
             try { buffer.position(savedPos) } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
@@ -707,9 +819,15 @@ class ScreenAiProjectionService : Service() {
         isRunning = false
         isStopping = false
         currentFps = 0f
+        isProcessingFrame.set(false)
+        isHalalifyInferring.set(false)
 
         if (::contextualWatcher.isInitialized) {
             contextualWatcher.stop()
+        }
+
+        if (::kltTracker.isInitialized) {
+            kltTracker.flush()
         }
 
         if (::blurOverlayManager.isInitialized) {
@@ -732,43 +850,28 @@ class ScreenAiProjectionService : Service() {
         // MINOR: cancel stale Toast/alert callbacks queued just before STOP.
         mainHandler.removeCallbacksAndMessages(null)
 
-        // 2. CRITICAL(C6): never join() on main (ANR). Drain worker WITHOUT blocking:
-        // close detector ON the worker at front of queue, then quit. Never null a live handler
-        // while in-flight tasks run, and never imageReader.close() while worker is in extract().
-        val worker = backgroundThread
-        val workerHandler = backgroundHandler
-        backgroundThread = null
-        backgroundHandler = null
-        if (worker != null && worker.isAlive && workerHandler != null) {
-            workerHandler.postAtFrontOfQueue {
+        // 2. إيقاف خيط الاستدلال الخلفي (AiInferenceWorker) وإغلاق كواشف الذكاء الاصطناعي على خيطها الأصلي
+        val infWorker = inferenceThread
+        val infHandler = inferenceHandler
+        inferenceThread = null
+        inferenceHandler = null
+        if (infWorker != null && infWorker.isAlive && infHandler != null) {
+            infHandler.removeCallbacksAndMessages(null)
+            infHandler.post {
                 try {
                     if (::halalifyDetector.isInitialized) halalifyDetector.close()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error closing halalifyDetector on worker", e)
+                    Log.e(TAG, "Error closing halalifyDetector on inference worker", e)
                 }
                 try {
                     if (::nudeNetDetector.isInitialized) nudeNetDetector.close()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error closing nudeNetDetector on worker", e)
-                } finally {
-                    try { worker.quitSafely() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+                    Log.e(TAG, "Error closing nudeNetDetector on inference worker", e)
                 }
-                try {
-                    imageReader?.close()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error closing image reader on worker", e)
-                } finally {
-                    imageReader = null
-                }
-                try { scratchBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
-                scratchBitmap = null
-                scratchPixels = null
-                scratchRowBytes = null
+                try { inferenceBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+                inferenceBitmap = null
+                try { infWorker.quitSafely() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
             }
-            // Best-effort fallback: force quit after 3s WITHOUT blocking main.
-            mainHandler.postDelayed({
-                try { if (worker.isAlive) worker.quit() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
-            }, 3000L)
         } else {
             if (::halalifyDetector.isInitialized) {
                 try { halalifyDetector.close() } catch (e: Exception) {
@@ -780,11 +883,36 @@ class ScreenAiProjectionService : Service() {
                     Log.e(TAG, "Error closing nudeNetDetector", e)
                 }
             }
+            try { inferenceBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+            inferenceBitmap = null
+        }
+
+        // 3. إيقاف خيط التقاط الإطارات (Capture Worker Thread) وإغلاق ImageReader
+        val worker = backgroundThread
+        val workerHandler = backgroundHandler
+        backgroundThread = null
+        backgroundHandler = null
+        if (worker != null && worker.isAlive && workerHandler != null) {
+            workerHandler.postAtFrontOfQueue {
+                try {
+                    imageReader?.close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error closing image reader on worker", e)
+                } finally {
+                    imageReader = null
+                }
+                scratchPixels = null
+                scratchRowBytes = null
+                try { worker.quitSafely() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+            }
+            // Best-effort fallback: force quit after 3s WITHOUT blocking main.
+            mainHandler.postDelayed({
+                try { if (worker.isAlive) worker.quit() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
+            }, 3000L)
+        } else {
             try { imageReader?.close() } catch (e: Exception) {
                 Log.e(TAG, "Error closing image reader", e)
             } finally { imageReader = null }
-            try { scratchBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
-            scratchBitmap = null
             scratchPixels = null
             scratchRowBytes = null
         }

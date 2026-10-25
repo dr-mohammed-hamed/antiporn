@@ -102,6 +102,20 @@
     <string name="provisioning_success_title">Maximum Protection Activated!</string>
     <string name="provisioning_success_desc">AntiPorn is now Device Owner. You can safely re-add your accounts.</string>
     <string name="provisioning_failed_title">Failed to activate Device Owner</string>
+    <string name="provisioning_failed_accounts_title">Activation Failed: Accounts Must Be Removed</string>
+    <string name="provisioning_failed_accounts_desc">Found %1$d active accounts on device preventing Device Owner.</string>
+    <string name="provisioning_failed_accounts_action">Tap here to open Settings and remove them temporarily.</string>
     <string name="toast_provisioning_success">Congratulations! Device Owner permission activated successfully</string>
     <string name="toast_provisioning_failed">Pairing failed: %1$s</string>
+    <!-- DNS Probing & Validation Strings -->
+    <string name="dns_probe_progress_title">Verifying DNS Server&#8230;</string>
+    <string name="dns_probe_progress_message">Testing server response via encrypted DoT (port 853) and verifying adult content filtering&#8230;</string>
+    <string name="dns_probe_dialog_failed_title">DNS Verification Failed</string>
+    <string name="dns_probe_error_not_blocking">This DNS server does not block adult content!</string>
+    <string name="dns_probe_error_not_blocking_detail">The server was rejected because verification confirmed it resolves explicit adult domains (%1$s -> %2$s).\n\nTo protect the phone, please enable the adult filter in your DNS account settings first or choose one of the pre-approved family filters.</string>
+    <string name="dns_probe_error_unreachable">Failed to connect to DNS server via encrypted DoT (port 853)</string>
+    <string name="dns_probe_error_unreachable_detail">Connection to DoT server failed (%1$s).\n\nPlease verify your internet connection, the hostname accuracy, and that the server supports DNS over TLS on port 853 to prevent internet outage on the ward\'s phone.</string>
+    <string name="dns_probe_error_broken">The DNS server fails basic internet resolution</string>
+    <string name="dns_probe_error_broken_detail">The server connected but failed to resolve standard internet domains (%1$s). Please check your DNS server configuration.</string>
+
 </resources>

@@ -1,6 +1,7 @@
 package com.drmohammed.antiporn.provisioning.ui
 
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -84,7 +85,24 @@ class ProvisioningWizardActivity : AppCompatActivity() {
                         onProvisioningSuccessful()
                     } else {
                         val error = intent.getStringExtra(PairingCodeReceiver.EXTRA_ERROR_MESSAGE)
-                        Toast.makeText(this@ProvisioningWizardActivity, getString(R.string.toast_provisioning_failed, error ?: ""), Toast.LENGTH_LONG).show()
+                        val accounts = AccountAuditor.getActiveAccounts(this@ProvisioningWizardActivity)
+                        val isAccountsIssue = accounts.isNotEmpty() && (
+                            error?.contains("accounts", ignoreCase = true) == true ||
+                            error?.contains("users", ignoreCase = true) == true ||
+                            !AccountAuditor.isReadyForProvisioning(this@ProvisioningWizardActivity)
+                        )
+
+                        if (isAccountsIssue) {
+                            Toast.makeText(
+                                this@ProvisioningWizardActivity,
+                                getString(R.string.provisioning_failed_accounts_desc, accounts.size),
+                                Toast.LENGTH_LONG
+                            ).show()
+                            checkAccountsStatus()
+                            this@ProvisioningWizardActivity.focusOnAccountsCard()
+                        } else {
+                            Toast.makeText(this@ProvisioningWizardActivity, getString(R.string.toast_provisioning_failed, error ?: ""), Toast.LENGTH_LONG).show()
+                        }
                         isPromoting = false
                         btnPairAndActivate.setText(R.string.provisioning_btn_pair_and_activate)
                         validateInputs()
@@ -111,6 +129,25 @@ class ProvisioningWizardActivity : AppCompatActivity() {
 
         bindViews()
         setupListeners()
+
+        if (intent?.getBooleanExtra(EXTRA_FOCUS_ACCOUNTS, false) == true) {
+            focusOnAccountsCard()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_FOCUS_ACCOUNTS, false)) {
+            focusOnAccountsCard()
+        }
+    }
+
+    private fun focusOnAccountsCard() {
+        cardStep1.post {
+            val scrollView = findViewById<android.widget.ScrollView>(R.id.scrollWizard)
+            scrollView?.smoothScrollTo(0, cardStep1.top)
+        }
     }
 
     private fun bindViews() {
@@ -139,20 +176,48 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         }
 
         btnOpenDevOptions.setOnClickListener {
+            // Priority 1: Direct jump to Wireless Debugging sub-screen (Android 12+ QS Tile route)
             try {
-                startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+                val directIntent = Intent("android.service.quicksettings.action.QS_TILE_PREFERENCES").apply {
+                    putExtra(
+                        Intent.EXTRA_COMPONENT_NAME,
+                        ComponentName("com.android.settings", "com.android.settings.development.qstile.DevelopmentTiles\$WirelessDebugging")
+                    )
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(directIntent)
             } catch (e: Exception) {
-                Log.w(TAG, "Failed opening development settings directly, opening general settings", e)
+                Log.w(TAG, "Direct jump to Wireless Debugging failed, falling back to Development Settings: ${e.message}")
+                // Priority 2: Standard Developer Options (starts at top of page)
                 try {
-                    startActivity(Intent(Settings.ACTION_SETTINGS))
+                    startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    })
                 } catch (ex: Exception) {
-                    Toast.makeText(this, R.string.toast_open_settings_failed, Toast.LENGTH_SHORT).show()
+                    Log.w(TAG, "Failed opening development settings directly, opening general settings", ex)
+                    // Priority 3: General Settings fallback
+                    try {
+                        startActivity(Intent(Settings.ACTION_SETTINGS).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        })
+                    } catch (finalEx: Exception) {
+                        Toast.makeText(this, R.string.toast_open_settings_failed, Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
 
         btnPairAndActivate.setOnClickListener {
             if (isPromoting) return@setOnClickListener
+
+            if (!AccountAuditor.isReadyForProvisioning(this)) {
+                val count = AccountAuditor.getAccountCount(this)
+                Toast.makeText(this, getString(R.string.provisioning_failed_accounts_desc, count), Toast.LENGTH_LONG).show()
+                focusOnAccountsCard()
+                AccountAuditor.openAccountSettings(this)
+                return@setOnClickListener
+            }
+
             val code = etPairingCode.text?.toString()?.trim() ?: ""
             if (code.length != 6) {
                 Toast.makeText(this, R.string.provisioning_input_label, Toast.LENGTH_SHORT).show()
@@ -180,7 +245,23 @@ class ProvisioningWizardActivity : AppCompatActivity() {
                         if (result is PromotionResult.Success) {
                             onProvisioningSuccessful()
                         } else if (result is PromotionResult.Failure) {
-                            Toast.makeText(this@ProvisioningWizardActivity, getString(R.string.toast_provisioning_failed, result.message), Toast.LENGTH_LONG).show()
+                            val accounts = AccountAuditor.getActiveAccounts(this@ProvisioningWizardActivity)
+                            val isAccountsIssue = accounts.isNotEmpty() && (
+                                result.message.contains("accounts", ignoreCase = true) ||
+                                result.message.contains("users", ignoreCase = true) ||
+                                !AccountAuditor.isReadyForProvisioning(this@ProvisioningWizardActivity)
+                            )
+                            if (isAccountsIssue) {
+                                Toast.makeText(
+                                    this@ProvisioningWizardActivity,
+                                    getString(R.string.provisioning_failed_accounts_desc, accounts.size),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                checkAccountsStatus()
+                                focusOnAccountsCard()
+                            } else {
+                                Toast.makeText(this@ProvisioningWizardActivity, getString(R.string.toast_provisioning_failed, result.message), Toast.LENGTH_LONG).show()
+                            }
                             btnPairAndActivate.setText(R.string.provisioning_btn_pair_and_activate)
                         }
                     }
@@ -327,5 +408,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "AntiPorn_WizardAct"
+        const val EXTRA_FOCUS_ACCOUNTS = "extra_focus_accounts"
     }
 }

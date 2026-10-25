@@ -546,6 +546,9 @@
     <string name="provisioning_success_desc">أصبح التطبيق الآن مسؤول المالك. يمكنك إعادة إضافة حساباتك بأمان.</string>
 
     <string name="provisioning_failed_title">تعذر تفعيل صلاحية المالك</string>
+    <string name="provisioning_failed_accounts_title">تعذر التفعيل: يرجى حذف الحسابات أولاً</string>
+    <string name="provisioning_failed_accounts_desc">يوجد %1$d حسابات مسجلة على الهاتف تمنع تفعيل صلاحية المالك.</string>
+    <string name="provisioning_failed_accounts_action">اضغط هنا لفتح الحسابات وحذفها مؤقتاً ثم إعادة المحاولة.</string>
 
     <string name="toast_provisioning_success">مبروك! تم تفعيل صلاحية المالك (Device Owner) بنجاح</string>
 
@@ -563,5 +566,17 @@
     <string name="toast_name_saved">تم تحديث الاسم بنجاح</string>
     <string name="btn_save">حفظ</string>
     <string name="btn_edit">تعديل</string>
+
+    <!-- DNS Probing & Validation Strings -->
+    <string name="dns_probe_progress_title">جاري فحص كفاءة خادم الـ DNS&#8230;</string>
+    <string name="dns_probe_progress_message">يتم الآن اختبار استجابة الخادم عبر منفذ DoT المشفر (853) والتأكد من حجب المواقع الإباحية&#8230;</string>
+    <string name="dns_probe_dialog_failed_title">فشل اعتماد خادم الـ DNS</string>
+    <string name="dns_probe_error_not_blocking">عذراً، هذا الخادم لا يحجب المواقع الإباحية!</string>
+    <string name="dns_probe_error_not_blocking_detail">تم رفض الخادم لأن الفحص أثبت سماحه بنطاقات إباحية صريحة (%1$s -> %2$s).\n\nلحماية الهاتف، يرجى تفعيل فلتر الحظر في لوحة تحكم حساب الخادم أولاً أو اختيار أحد الخوادم العائلية الجاهزة.</string>
+    <string name="dns_probe_error_unreachable">تعذر الاتصال بالخادم عبر منفذ DoT (853) المشفر</string>
+    <string name="dns_probe_error_unreachable_detail">فشل الاتصال بالخادم عبر منفذ DoT (853) المشفر (%1$s).\n\nتأكد من اتصال هاتفك بالإنترنت ومن صحة اسم الخادم ودعمه لبروتوكول DNS over TLS لحماية هاتف المكفول من انقطاع الإنترنت.</string>
+    <string name="dns_probe_error_broken">الخادم لا يستجيب لاستعلامات الإنترنت الأساسية</string>
+    <string name="dns_probe_error_broken_detail">الخادم متصل ولكنه عاجز عن حل نطاقات الإنترنت الأساسية (%1$s). يرجى مراجعة إعدادات الخادم.</string>
+
 
 </resources>
