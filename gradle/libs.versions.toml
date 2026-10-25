@@ -12,8 +12,10 @@ googleServices = "4.4.2"
 firebaseBom = "33.10.0"
 coroutines = "1.10.1"
 room = "2.6.1"
+adbKt = "v1.0.13"
 
 [libraries]
+adb-kt = { group = "com.github.rhythmcache", name = "adb-kt", version.ref = "adbKt" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activity" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

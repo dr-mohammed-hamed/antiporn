@@ -49,6 +49,7 @@ class GuardianControlActivity : AppCompatActivity() {
 
     private lateinit var toolbar: MaterialToolbar
     private lateinit var tvWardName: TextView
+    private lateinit var btnEditWardName: MaterialButton
     private lateinit var cardOfflineBanner: MaterialCardView
     private lateinit var tvOfflineStatus: TextView
     private lateinit var btnRetryLoadPolicy: MaterialButton
@@ -103,6 +104,7 @@ class GuardianControlActivity : AppCompatActivity() {
 
     private lateinit var approvalsViewBinder: GuardianApprovalsViewBinder
     private var hasLoadedInitialPolicy = false
+    private var lastEditNameClickTime = 0L
 
     private val appManagerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -178,6 +180,7 @@ class GuardianControlActivity : AppCompatActivity() {
 
         tvWardName = findViewById(R.id.tvWardName)
         tvWardName.text = getString(R.string.guardian_control_ward_name, wardName)
+        btnEditWardName = findViewById(R.id.btnEditWardName)
 
         cardOfflineBanner = findViewById(R.id.cardOfflineBanner)
         tvOfflineStatus = findViewById(R.id.tvOfflineStatus)
@@ -397,6 +400,13 @@ class GuardianControlActivity : AppCompatActivity() {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+
+        btnEditWardName.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastEditNameClickTime < 800L) return@setOnClickListener
+            lastEditNameClickTime = now
+            showEditWardNameDialog()
+        }
 
         btnOpenAppManager.setOnClickListener {
             val intent = Intent(this@GuardianControlActivity, RemoteAppManagerActivity::class.java).apply {
@@ -665,6 +675,47 @@ class GuardianControlActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showEditWardNameDialog() {
+        if (isFinishing || isDestroyed) return
+        val input = TextInputEditText(this).apply {
+            setText(wardName)
+            hint = getString(R.string.dialog_edit_ward_name_hint)
+            setSingleLine()
+            setSelection(text?.length ?: 0)
+            filters = arrayOf(android.text.InputFilter.LengthFilter(28))
+        }
+        val frame = android.widget.FrameLayout(this).apply {
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, (8 * resources.displayMetrics.density).toInt(), pad, 0)
+            addView(input)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_edit_ward_name_title)
+            .setView(frame)
+            .setPositiveButton(R.string.btn_save) { dialog, _ ->
+                val newName = input.text?.toString()?.trim() ?: ""
+                if (newName.isNotBlank() && newName != wardName) {
+                    lifecycleScope.launch {
+                        val repository = com.drmohammed.antiporn.data.repository.AccountabilityRepository.getInstance(applicationContext)
+                        val result = repository.renamePartner(wardId, newName)
+                        if (isFinishing || isDestroyed) return@launch
+                        result.onSuccess {
+                            wardName = newName
+                            tvWardName.text = getString(R.string.guardian_control_ward_name, wardName)
+                            Toast.makeText(this@GuardianControlActivity, R.string.toast_name_saved, Toast.LENGTH_SHORT).show()
+                        }.onFailure { e ->
+                            Log.e(TAG, "Failed to rename ward", e)
+                            Toast.makeText(this@GuardianControlActivity, getString(R.string.toast_partner_failed, e.localizedMessage), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.dialog_btn_cancel, null)
+            .show()
     }
 
     companion object {

@@ -4,6 +4,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.text.HtmlCompat
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.shields.AppSuspensionShield
@@ -55,9 +56,19 @@ class MainViewBinder(rootView: View) {
     private val tvNapCountdown: TextView = rootView.findViewById(R.id.tvNapCountdown)
     val btnNapStart: MaterialButton = rootView.findViewById(R.id.btnNapStart)
     val btnNapExtend: MaterialButton = rootView.findViewById(R.id.btnNapExtend)
-    private val cardAdbHelp: MaterialCardView = rootView.findViewById(R.id.cardAdbHelp)
+    val cardAdbHelp: MaterialCardView = rootView.findViewById(R.id.cardAdbHelp)
     val btnOpenAccountabilityHub: MaterialButton = rootView.findViewById(R.id.btnOpenAccountabilityHub)
     val btnEnforceNow: MaterialButton = rootView.findViewById(R.id.btnEnforceNow)
+    private val tvHeaderAyah: TextView? = rootView.findViewById(R.id.tvHeaderAyah)
+
+    init {
+        tvHeaderAyah?.let {
+            it.text = HtmlCompat.fromHtml(
+                context.getString(R.string.header_ayah_quran),
+                HtmlCompat.FROM_HTML_MODE_LEGACY
+            )
+        }
+    }
 
 
     /**
@@ -114,6 +125,8 @@ class MainViewBinder(rootView: View) {
             val allActive = dnsActive && vpnActive && browserActive && tamperActive && appSuspensionActive && curfewActive
 
             if (allActive) {
+                cardMainStatus.visibility = View.GONE
+                btnEnforceNow.visibility = View.GONE
                 tvOverallStatusBadge.text = context.getString(R.string.status_active_title)
                 tvOverallStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.shield_emerald_radiant))
                 tvOverallStatusBadge.setBackgroundResource(R.drawable.bg_shield_status_badge)
@@ -122,6 +135,8 @@ class MainViewBinder(rootView: View) {
                 cardMainStatus.setCardBackgroundColor(ContextCompat.getColor(context, R.color.shield_hero_bg))
                 cardMainStatus.strokeColor = ContextCompat.getColor(context, R.color.shield_hero_stroke)
             } else {
+                cardMainStatus.visibility = View.VISIBLE
+                btnEnforceNow.visibility = View.VISIBLE
                 tvOverallStatusBadge.text = context.getString(R.string.status_need_enforce_title)
                 tvOverallStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.shield_amber_calm))
                 tvOverallStatusBadge.setBackgroundResource(R.drawable.bg_shield_status_badge_amber)
@@ -261,6 +276,8 @@ class MainViewBinder(rootView: View) {
         } else {
             // Not Device Owner
             cardAdbHelp.visibility = View.VISIBLE
+            cardMainStatus.visibility = View.VISIBLE
+            btnEnforceNow.visibility = View.VISIBLE
             tvOverallStatusBadge.text = context.getString(R.string.status_no_device_owner_title)
             tvOverallStatusBadge.setTextColor(ContextCompat.getColor(context, R.color.shield_amber_calm))
             tvOverallStatusBadge.setBackgroundResource(R.drawable.bg_shield_status_badge_amber)

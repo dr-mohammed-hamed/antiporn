@@ -10,7 +10,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.RadioButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -41,6 +40,10 @@ class AccountabilityHubActivity : AppCompatActivity() {
 
     private lateinit var accountabilityRepo: AccountabilityRepository
 
+    private lateinit var cardSupervisedBanner: MaterialCardView
+    private lateinit var cardMyPairingCode: MaterialCardView
+    private lateinit var tvMyDisplayName: TextView
+    private lateinit var btnEditMyName: MaterialButton
     private lateinit var tvMyPairingCode: TextView
     private lateinit var btnCopyCode: MaterialButton
     private lateinit var btnAddPartner: MaterialButton
@@ -51,6 +54,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
 
     private var lastAddPartnerClickTime = 0L
     private var lastManageClickTime = 0L
+    private var lastEditNameClickTime = 0L
     private var isPairingInProgress = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,10 +92,11 @@ class AccountabilityHubActivity : AppCompatActivity() {
                     .currentPolicyFlow.collect { policy ->
                         if (isFinishing || isDestroyed) return@collect
                         if (policy.isSupervised) {
-                            tvMyPairingCode.text = getString(R.string.pairing_code_locked_badge)
-                            btnCopyCode.visibility = View.GONE
+                            cardSupervisedBanner.visibility = View.VISIBLE
+                            cardMyPairingCode.visibility = View.GONE
                         } else {
-                            btnCopyCode.visibility = View.VISIBLE
+                            cardSupervisedBanner.visibility = View.GONE
+                            cardMyPairingCode.visibility = View.VISIBLE
                             loadPairingCode()
                         }
                         loadPartners()
@@ -107,6 +112,11 @@ class AccountabilityHubActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
+        cardSupervisedBanner = findViewById(R.id.cardSupervisedBanner)
+        cardMyPairingCode = findViewById(R.id.cardMyPairingCode)
+        tvMyDisplayName = findViewById(R.id.tvMyDisplayName)
+        btnEditMyName = findViewById(R.id.btnEditMyName)
+        tvMyDisplayName.text = accountabilityRepo.getMyDisplayName()
         tvMyPairingCode = findViewById(R.id.tvMyPairingCode)
         btnCopyCode = findViewById(R.id.btnCopyCode)
         btnAddPartner = findViewById(R.id.btnAddPartner)
@@ -127,6 +137,13 @@ class AccountabilityHubActivity : AppCompatActivity() {
             }
         }
 
+        btnEditMyName.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastEditNameClickTime < 800L) return@setOnClickListener
+            lastEditNameClickTime = now
+            showEditMyNameDialog()
+        }
+
         btnAddPartner.setOnClickListener {
             val now = android.os.SystemClock.elapsedRealtime()
             if (now - lastAddPartnerClickTime < 800L) return@setOnClickListener
@@ -141,16 +158,18 @@ class AccountabilityHubActivity : AppCompatActivity() {
             try {
                 val currentPolicy = com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
                 if (currentPolicy.isSupervised) {
-                    tvMyPairingCode.text = getString(R.string.pairing_code_locked_badge)
-                    btnCopyCode.visibility = View.GONE
+                    cardSupervisedBanner.visibility = View.VISIBLE
+                    cardMyPairingCode.visibility = View.GONE
                     return@launch
                 }
                 val code = accountabilityRepo.getOrCreateMyPairingCode()
                 if (isFinishing || isDestroyed) return@launch
                 if (code == AccountabilityRepository.CODE_LOCKED) {
-                    tvMyPairingCode.text = getString(R.string.pairing_code_locked_badge)
-                    btnCopyCode.visibility = View.GONE
+                    cardSupervisedBanner.visibility = View.VISIBLE
+                    cardMyPairingCode.visibility = View.GONE
                 } else {
+                    cardSupervisedBanner.visibility = View.GONE
+                    cardMyPairingCode.visibility = View.VISIBLE
                     tvMyPairingCode.text = code
                     btnCopyCode.visibility = View.VISIBLE
                 }
@@ -239,6 +258,25 @@ class AccountabilityHubActivity : AppCompatActivity() {
             setPadding(pad, pad, pad, pad)
         }
 
+        val nameRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            minimumHeight = (48 * resources.displayMetrics.density).toInt()
+            if (isWard) {
+                val typedValue = android.util.TypedValue()
+                theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
+                setBackgroundResource(typedValue.resourceId)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (now - lastEditNameClickTime < 800L) return@setOnClickListener
+                    lastEditNameClickTime = now
+                    showEditWardNameDialog(partner)
+                }
+            }
+        }
+
         val nameView = TextView(this).apply {
             text = partner.displayName
             textSize = 15f
@@ -250,8 +288,33 @@ class AccountabilityHubActivity : AppCompatActivity() {
                 )
             )
             typeface = android.graphics.Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
-        container.addView(nameView)
+        nameRow.addView(nameView)
+
+        if (isWard) {
+            val editIcon = android.widget.ImageView(this).apply {
+                setImageResource(R.drawable.ic_edit)
+                val iconSize = (16 * resources.displayMetrics.density).toInt()
+                val marginSide = (8 * resources.displayMetrics.density).toInt()
+                layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                    setMargins(marginSide, 0, marginSide, 0)
+                }
+                setColorFilter(
+                    MaterialColors.getColor(
+                        this@AccountabilityHubActivity,
+                        androidx.appcompat.R.attr.colorPrimary,
+                        android.graphics.Color.DKGRAY
+                    )
+                )
+                contentDescription = getString(R.string.btn_edit)
+            }
+            nameRow.addView(editIcon)
+        }
+        container.addView(nameRow)
 
         val codeView = TextView(this).apply {
             text = if (isWard) {
@@ -363,15 +426,6 @@ class AccountabilityHubActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_partner, null)
         val tilCode = dialogView.findViewById<TextInputLayout>(R.id.tilPartnerCode)
         val etCode = dialogView.findViewById<EditText>(R.id.etPartnerCode)
-        val rbWard = dialogView.findViewById<RadioButton>(R.id.rbAddAsWard)
-        val rbGuardian = dialogView.findViewById<RadioButton>(R.id.rbAddAsGuardian)
-
-        // Dialog is dedicated to adding Wards (people I protect)
-        rbGuardian?.visibility = View.GONE
-        dialogView.findViewById<View>(R.id.tvGuardianDesc)?.visibility = View.GONE
-        rbWard.isChecked = true
-        rbWard.text = getString(R.string.dialog_add_as_ward)
-        tilCode?.helperText = getString(R.string.dialog_add_ward_only_note)
 
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_add_partner_title)
@@ -428,6 +482,85 @@ class AccountabilityHubActivity : AppCompatActivity() {
                 isPairingInProgress = false
             }
         }
+    }
+
+    private fun showEditMyNameDialog() {
+        if (isFinishing || isDestroyed) return
+        val currentName = accountabilityRepo.getMyDisplayName()
+        val input = EditText(this).apply {
+            setText(currentName)
+            setSelection(text?.length ?: 0)
+            hint = getString(R.string.dialog_edit_my_name_hint)
+            setSingleLine(true)
+            filters = arrayOf(android.text.InputFilter.LengthFilter(28))
+        }
+        val frame = android.widget.FrameLayout(this).apply {
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, (8 * resources.displayMetrics.density).toInt(), pad, 0)
+            addView(input)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_edit_my_name_title)
+            .setView(frame)
+            .setPositiveButton(R.string.btn_save) { dialog, _ ->
+                val newName = input.text?.toString()?.trim() ?: ""
+                if (newName.isNotBlank() && newName != currentName) {
+                    lifecycleScope.launch {
+                        val result = accountabilityRepo.setMyDisplayName(newName)
+                        if (isFinishing || isDestroyed) return@launch
+                        result.onSuccess {
+                            tvMyDisplayName.text = accountabilityRepo.getMyDisplayName()
+                            Toast.makeText(this@AccountabilityHubActivity, R.string.toast_name_saved, Toast.LENGTH_SHORT).show()
+                        }.onFailure { e ->
+                            Log.e(TAG, "Failed to save my display name", e)
+                            Toast.makeText(this@AccountabilityHubActivity, getString(R.string.toast_partner_failed, e.localizedMessage), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.dialog_btn_cancel, null)
+            .show()
+    }
+
+    private fun showEditWardNameDialog(partner: PartnerEntity) {
+        if (isFinishing || isDestroyed) return
+        val input = EditText(this).apply {
+            setText(partner.displayName)
+            setSelection(text?.length ?: 0)
+            hint = getString(R.string.dialog_edit_ward_name_hint)
+            setSingleLine(true)
+            filters = arrayOf(android.text.InputFilter.LengthFilter(28))
+        }
+        val frame = android.widget.FrameLayout(this).apply {
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, (8 * resources.displayMetrics.density).toInt(), pad, 0)
+            addView(input)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_edit_ward_name_title)
+            .setView(frame)
+            .setPositiveButton(R.string.btn_save) { dialog, _ ->
+                val newName = input.text?.toString()?.trim() ?: ""
+                if (newName.isNotBlank() && newName != partner.displayName) {
+                    lifecycleScope.launch {
+                        val result = accountabilityRepo.renamePartner(partner.id, newName)
+                        if (isFinishing || isDestroyed) return@launch
+                        result.onSuccess {
+                            loadPartners()
+                            Toast.makeText(this@AccountabilityHubActivity, R.string.toast_name_saved, Toast.LENGTH_SHORT).show()
+                        }.onFailure { e ->
+                            Log.e(TAG, "Failed to rename partner", e)
+                            Toast.makeText(this@AccountabilityHubActivity, getString(R.string.toast_partner_failed, e.localizedMessage), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.dialog_btn_cancel, null)
+            .show()
     }
 
     companion object {

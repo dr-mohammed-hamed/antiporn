@@ -6,6 +6,15 @@
     android:orientation="vertical"
     android:padding="20dp">
 
+    <TextView
+        android:id="@+id/tvDialogAddWardHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="@string/dialog_add_ward_hint"
+        android:textColor="?attr/colorOutline"
+        android:textSize="13sp" />
+
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/tilPartnerCode"
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -24,57 +33,9 @@
             android:fontFamily="monospace"
             android:gravity="center"
             android:inputType="textCapCharacters"
-            android:letterSpacing="0.1"
+            android:letterSpacing="0.15"
             android:maxLength="6"
-            android:textSize="20sp" />
+            android:textSize="22sp" />
     </com.google.android.material.textfield.TextInputLayout>
-
-    <RadioGroup
-        android:id="@+id/rgPartnerRole"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp">
-
-        <com.google.android.material.radiobutton.MaterialRadioButton
-            android:id="@+id/rbAddAsWard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:checked="true"
-            android:text="@string/dialog_add_as_ward"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvWardDesc"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="32dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="8dp"
-            android:text="@string/dialog_add_as_ward_desc"
-            android:textColor="?attr/colorOutline"
-            android:textSize="12sp" />
-
-        <com.google.android.material.radiobutton.MaterialRadioButton
-            android:id="@+id/rbAddAsGuardian"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/dialog_add_as_guardian"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvGuardianDesc"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="32dp"
-            android:layout_marginEnd="8dp"
-            android:text="@string/dialog_add_as_guardian_desc"
-            android:textColor="?attr/colorOutline"
-            android:textSize="12sp" />
-    </RadioGroup>
 
 </LinearLayout>

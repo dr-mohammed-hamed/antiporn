@@ -1,252 +1,567 @@
 <resources>
-    <string name="app_name">AntiPorn Guard</string>
-    <string name="header_title">AntiPorn Guard 🛡️</string>
+    <string name="app_name">عصمة</string>
+
+    <string name="header_title">عِصمة</string>
+    <string name="header_title_unified">عِصمة | ISMAH</string>
+    <string name="header_ayah_quran"><![CDATA[﴿ وَلَقَدْ رَاوَدتُّهُ عَن نَّفْسِهِ <font color="#FFA834"><b>فَاسْتَعْصَمَ</b></font> ﴾]]></string>
+    <string name="header_ayah_ref">سورة يوسف: ٣٢</string>
+
     <string name="header_subtitle">درع الحماية المشفر بصلاحية Device Owner</string>
-    <string name="status_active_title">🔒 الحماية نشطة ومقفولة</string>
+
+    <string name="status_active_title">الحماية نشطة ومقفولة</string>
+
     <string name="status_active_desc">نظام NextDNS مفروض على كامل الجهاز مع حظر الـ VPN وقفل التصفح المتخفي وفرض البحث الآمن.</string>
-    <string name="status_need_enforce_title">⚠️ الحماية بحاجة لتأكيد التطبيق</string>
+
+    <string name="status_need_enforce_title">الحماية بحاجة لتأكيد التطبيق</string>
+
     <string name="status_need_enforce_desc">صلاحية Device Owner نشطة، اضغط على الزر أدناه لتطبيق وتثبيت إعدادات NextDNS وحماية المتصفحات.</string>
-    <string name="status_no_device_owner_title">❌ صلاحية Device Owner غير مفعلة</string>
+
+    <string name="status_no_device_owner_title">صلاحية Device Owner غير مفعلة</string>
+
     <string name="status_no_device_owner_desc">يحتاج التطبيق لصلاحية مسؤل الجهاز المالك لتثبيت الـ DNS وحظر الـ VPN وقفل المتصفحات على مستوى النظام.</string>
+
     <string name="section_details_title">تفاصيل دروع الحماية</string>
-    <string name="card_device_owner_title">👑 صلاحية مسؤل الجهاز (Device Owner)</string>
-    <string name="card_device_owner_active">مفعلة وتتحكم بالنظام بالكامل 👑</string>
+
+    <string name="card_device_owner_title">صلاحية مسؤل الجهاز (Device Owner)</string>
+
+    <string name="card_device_owner_active">مفعلة وتتحكم بالنظام بالكامل</string>
+
     <string name="card_device_owner_inactive">غير مفعلة (مطلوب أمر ADB)</string>
-    <string name="card_nextdns_title">🌐 خادم NextDNS الإجباري المشفر</string>
+
+    <string name="card_nextdns_title">خادم NextDNS الإجباري المشفر</string>
+
     <string name="card_nextdns_default">family.cloudflare-dns.com (مفروض ومقفل)</string>
+
     <string name="card_nextdns_active">%1$s (مفروض ومقفل)</string>
+
     <string name="card_nextdns_pending">المضيف الحالي: %1$s (سيتم التحديث إلى %2$s)</string>
+
     <string name="card_nextdns_inactive">غير مفروض</string>
+
     <string name="card_nextdns_locked">إعدادات الـ DNS في الهاتف مقفولة وممنوع تعديلها نهائياً.</string>
+
     <string name="card_nextdns_unlocked">مفعل على النظام.</string>
-    <string name="card_vpn_title">🚫 إغلاق ثغرة الـ VPN وتطبيقات التجاوز</string>
+
+    <string name="card_vpn_title">إغلاق ثغرة الـ VPN وتطبيقات التجاوز</string>
+
     <string name="card_vpn_blocked">ممنوع استخدام أو إعداد أي تطبيق VPN (DISALLOW_CONFIG_VPN)</string>
+
     <string name="card_vpn_unblocked">ثغرة الـ VPN غير مقفولة حالياً</string>
+
     <string name="card_vpn_inactive">غير مقفول</string>
-    <string name="card_browser_title">🔒 قفل التصفح المتخفي وفرض البحث الآمن (Chrome &amp; Brave)</string>
+
+    <string name="card_browser_title">قفل التصفح المتخفي وفرض البحث الآمن (Chrome &amp; Brave)</string>
+
     <string name="card_browser_active">مفعل ومقفل على جميع المتصفحات الرئيسية</string>
+
     <string name="card_browser_subtext">تم إلغاء وتعطيل وضع التصفح المتخفي نهائياً وفرض البحث الآمن</string>
+
     <string name="card_browser_inactive">غير مفعل (يتطلب صلاحية Device Owner)</string>
+
     <string name="card_browser_unblocked">حماية المتصفحات غير مطبقة حالياً</string>
-    <string name="card_developer_title">🛠️ بيئة المطور وتصحيح أخطاء USB</string>
+
+    <string name="card_developer_title">بيئة المطور وتصحيح أخطاء USB</string>
+
     <string name="card_developer_desc">مفتوح ومتاح دائماً لأعمال تطوير وبرمجة التطبيقات</string>
-    <string name="card_adb_help_title">⚠️ التفعيل عبر ADB مطلوب:</string>
+
+    <string name="card_adb_help_title">التفعيل عبر ADB مطلوب:</string>
+
     <string name="card_adb_help_cmd">adb shell dpm set-device-owner com.drmohammed.antiporn/.AdminReceiver</string>
-    <string name="btn_enforce_now">تطبيق وتأكيد القفل الآن 🔒</string>
-    <string name="btn_enforcing">جاري تطبيق الإعدادات&#8230; ⏳</string>
+
+    <string name="btn_enforce_now">تطبيق وتأكيد القفل الآن</string>
+
+    <string name="btn_enforcing">جاري تطبيق الإعدادات&#8230;</string>
+
     <string name="toast_enforce_success">تم فرض NextDNS (%1$s) وحظر الـ VPN وقفل التصفح المتخفي بنجاح!</string>
+
     <string name="toast_enforce_status_code">تم إرسال إعدادات NextDNS برمز حالة: %1$d</string>
+
     <string name="toast_dpm_missing">فشل الوصول لخدمة DevicePolicyManager</string>
+
     <string name="toast_not_device_owner">التطبيق لا يملك صلاحية Device Owner حالياً. يرجى تفعيلها عبر ADB.</string>
+
     <string name="toast_error_applying">خطأ أثناء تطبيق السياسات: %1$s</string>
-    <string name="watchdog_notification_title">حماية AntiPorn نشطة 🛡️</string>
+
+    <string name="watchdog_notification_title">حماية AntiPorn نشطة</string>
+
     <string name="watchdog_notification_desc">مراقبة الـ DNS والشبكة تعمل في الخلفية</string>
+
     <string name="admin_disable_warning">تحذير أمني: لا يمكن تعطيل حماية AntiPorn لمنع الالتفاف على المحتوى المحظور!</string>
-    <string name="card_system_tamper_title">🛡️ حماية النظام ومنع الالتفاف (Anti-Tamper)</string>
-    <string name="card_system_tamper_active">قفل التوقيت بمكة (GMT+3)، ومنع الوضع الآمن والفورمات وإلغاء التثبيت 🛡️</string>
+
+    <string name="card_system_tamper_title">حماية النظام ومنع الالتفاف (Anti-Tamper)</string>
+
+    <string name="card_system_tamper_active">قفل التوقيت بمكة (GMT+3)، ومنع الوضع الآمن والفورمات وإلغاء التثبيت</string>
+
     <string name="card_system_tamper_inactive">غير مفعلة (يتطلب صلاحية Device Owner)</string>
+
     <string name="card_system_tamper_pending">حماية النظام وتثبيت التوقيت بحاجة للتطبيق</string>
+
     <string name="card_system_tamper_subtext">منع التلاعب بالوقت، تثبيت توقيت مكة، حظر الوضع الآمن وإعادة ضبط المصنع ومنع إلغاء التثبيت</string>
+
     <string name="shield_dns_success">تم فرض خادم NextDNS وحظر تغيير الإعدادات بنجاح</string>
+
     <string name="shield_vpn_success">تم حظر تطبيقات الـ VPN ومنع التجاوز بنجاح</string>
+
     <string name="shield_browser_success">تم قفل التصفح المتخفي وفرض البحث الآمن بنجاح</string>
+
     <string name="shield_system_tamper_success">تم قفل التوقيت على مكة المكرمة (GMT+3) وحظر الفورمات وإلغاء التثبيت بنجاح</string>
+
     <string name="shield_dns_unsupported">ميزة Private DNS تتطلب أندرويد 10 (API 29) أو أحدث</string>
+
     <string name="default_dns_text">تلقائي</string>
-    <string name="card_app_suspension_title">🚫 حظر وتجميد التطبيقات غير المقيدة (App Blocker)</string>
-    <string name="card_app_suspension_active">تليجرام والمتصفحات غير المقيدة محظورة ومجمدة بالكامل 🚫</string>
+
+    <string name="card_app_suspension_title">حظر وتجميد التطبيقات غير المقيدة (App Blocker)</string>
+
+    <string name="card_app_suspension_active">تليجرام والمتصفحات غير المقيدة محظورة ومجمدة بالكامل</string>
+
     <string name="card_app_suspension_suspended">تم تجميد %1$d من التطبيقات المحظورة وجاري إزالتها</string>
+
     <string name="card_app_suspension_pending">توجد %1$d تطبيقات محظورة بحاجة للتجميد والحذف</string>
+
     <string name="card_app_suspension_inactive">غير مفعلة (يتطلب صلاحية Device Owner)</string>
+
     <string name="card_app_suspension_subtext">تجميد وحذف فوري لتطبيقات تليجرام ومتصفحات البروكسي (Firefox, Tor, DuckDuckGo)</string>
+
     <string name="shield_app_suspension_none_found">تم الفحص: لا توجد أي تطبيقات محظورة مثبتة على الجهاز</string>
+
     <string name="shield_app_suspension_blocked_count">تم تجميد وإلغاء تثبيت %1$d من التطبيقات المحظورة بنجاح</string>
 
     <!-- Night Curfew Strings -->
-    <string name="card_curfew_title">🌙 حظر النوم الآلي المجدول (Night Curfew)</string>
+    <string name="card_curfew_title">حظر النوم الآلي المجدول (Night Curfew)</string>
+
     <string name="card_curfew_active_desc">حظر النوم نشط حالياً (8:00 م - 7:00 ص) - تطبيقات التشتيت معلقة</string>
+
     <string name="card_curfew_active_desc_test">حظر النوم نشط حالياً (8:00 م - 7:00 ص) - تطبيقات التشتيت معلقة (تجريبي)</string>
+
     <string name="card_curfew_scheduled_desc">مجدول يومياً (8:00 م - 7:00 ص) - جميع التطبيقات المسموحة نشطة</string>
+
     <string name="card_curfew_inactive_desc">غير مفعل (يتطلب صلاحية Device Owner)</string>
+
     <string name="card_curfew_subtext">تعليق تلقائي لتطبيقات التشتيت (يوتيوب، المتجر، الألعاب) واستثناء تطبيقات العمل والقرآن والأدوات الأساسية</string>
+
     <string name="shield_curfew_active_applied">تم تفعيل حظر النوم الليلي وتعليق التطبيقات الترفيهية</string>
+
     <string name="shield_curfew_scheduled_applied">تمت جدولة حظر النوم بنجاح (8:00 م - 7:00 ص)</string>
-    <string name="btn_test_curfew_on">اختبار قفل النوم الآن 🌙</string>
-    <string name="btn_test_curfew_off">إنهاء اختبار القفل ☀️</string>
+
+    <string name="btn_test_curfew_on">اختبار قفل النوم الآن</string>
+
+    <string name="btn_test_curfew_off">إنهاء اختبار القفل</string>
+
     <string name="toast_curfew_test_on">تم تفعيل قفل النوم تجريبياً (تطبيقات التشتيت معلقة الآن)</string>
+
     <string name="toast_curfew_test_off">تم إنهاء الاختبار وفك التعليق عن تطبيقات النهار بنجاح</string>
-    <string name="btn_curfew_night_locked">الحظر الليلي نشط تلقائياً 🌙</string>
+
+    <string name="btn_curfew_night_locked">الحظر الليلي نشط تلقائياً</string>
+
     <string name="card_curfew_night_locked_hint">الحظر الليلي قيد التشغيل المجدول (8:00 م - 7:00 ص) ولا يمكن إيقافه أثناء ساعات النوم</string>
-    <string name="curfew_play_store_blocked">🚫 متجر Google Play مغلق أثناء حظر التجول الليلي لحماية وقتك!</string>
+
+    <string name="curfew_play_store_blocked">متجر Google Play مغلق أثناء حظر التجول الليلي لحماية وقتك!</string>
+
     <string name="btn_grant_usage_access">منح إذن الوصول لبيانات الاستخدام</string>
-    <string name="card_curfew_usage_missing_subtext">⚠️ إذن الوصول لبيانات الاستخدام مطلوب لتأمين إغلاق متجر Google Play أثناء الحظر.</string>
+
+    <string name="card_curfew_usage_missing_subtext">إذن الوصول لبيانات الاستخدام مطلوب لتأمين إغلاق متجر Google Play أثناء الحظر.</string>
+
     <string name="toast_open_settings_failed">تعذر فتح شاشة الإعدادات</string>
-    <string name="curfew_google_search_blocked">🚫 بحث Google وتطبيق Gemini مغلقان أثناء حظر التجول الليلي!</string>
+
+    <string name="curfew_google_search_blocked">بحث Google وتطبيق Gemini مغلقان أثناء حظر التجول الليلي!</string>
 
     <!-- Nap Mode Strings -->
     <string name="btn_nap_start">وضع القيلولة — ساعة كاملة</string>
+
     <string name="btn_nap_active">القيلولة مفعّلة</string>
+
     <string name="btn_nap_extend">+ ساعة</string>
+
     <string name="btn_nap_night_locked">الحظر الليلي مفعّل</string>
+
     <string name="dialog_nap_confirm_title">تأكيد وضع القيلولة</string>
+
     <string name="dialog_nap_confirm_msg">سيُحظر الهاتف تماماً لمدة ساعة كاملة بدون نت، ولا يمكن الفك أو التقليل من داخل التطبيق. متأكد؟</string>
+
     <string name="toast_nap_started">بدأت القيلولة — ساعة كاملة</string>
+
     <string name="toast_nap_extended">تمت إضافة ساعة</string>
+
     <string name="nap_countdown_format">متبقٍ %1$02d:%2$02d</string>
 
     <!-- Curfew Blackhole VPN Strings -->
-    <string name="curfew_vpn_channel_name">عزل شبكة الحظر الليلي 🌙</string>
+    <string name="curfew_vpn_channel_name">عزل شبكة الحظر الليلي</string>
+
     <string name="curfew_vpn_channel_desc">قناة إشعارات حظر الإنترنت التام أثناء فترة النوم</string>
-    <string name="curfew_vpn_notification_title">الحظر الليلي نشط: تم عزل الإنترنت 🌙</string>
+
+    <string name="curfew_vpn_notification_title">الحظر الليلي نشط: تم عزل الإنترنت</string>
+
     <string name="curfew_vpn_notification_desc">تم قطع اتصال الإنترنت بالكامل حتى 07:00 ص. المكالمات ورسائل SMS تعمل بشكل طبيعي.</string>
+
     <string name="curfew_vpn_session_name">AntiPorn Curfew Blackhole</string>
 
     <!-- AI Shield Strings -->
-    <string name="card_ai_shield_title">🤖 فحص الذكاء الاصطناعي (YOLO11 تجريبي)</string>
+    <string name="card_ai_shield_title">فحص الذكاء الاصطناعي (YOLO11 تجريبي)</string>
+
     <string name="card_ai_shield_active_desc">الفحص اللحظي نشط: يراقب الريلز والشورتس والمتصفحات</string>
+
     <string name="card_ai_shield_idle_desc">الفحص متوقف حالياً. اضغط للتشغيل والتجربة الميدانية</string>
+
     <string name="card_ai_shield_subtext">فحص محلي 100% بنموذج YOLO11n لحفظ العورات مع اهتزاز وتنبيه فوري</string>
+
     <string name="ai_model_active_format">الموديل: %1$s</string>
+
     <string name="ai_init_failed_desc">تعذر تحميل موديل الذكاء الاصطناعي (دخل الموديل %1$d) — أعد التشغيل وتحقق من الأصول</string>
-    <string name="btn_ai_shield_start">تشغيل فحص الذكاء الاصطناعي 🚀</string>
-    <string name="btn_ai_shield_stop">إيقاف فحص الذكاء الاصطناعي ⏹️</string>
+
+    <string name="btn_ai_shield_start">تشغيل فحص الذكاء الاصطناعي</string>
+
+    <string name="btn_ai_shield_stop">إيقاف فحص الذكاء الاصطناعي</string>
+
     <string name="ai_fps_format">معدل الفحص: %1$.1f FPS</string>
+
     <string name="ai_last_detection_format">آخر رصد: %1$s (الثقة: %2$d%%)</string>
+
     <string name="ai_no_detections_yet">لم يتم رصد أي مخالفات بعد</string>
-    <string name="ai_alert_toast_format">⚠️ رصد محتوى غير محتشم: %1$s (الثقة: %2$d%%)</string>
-    <string name="ai_alert_hard_porn">🚨 تحذير عاجل: تم رصد محتوى إباحي صريح! (الثقة: %1$d%%)</string>
-    <string name="ai_alert_soft_porn">⚠️ تنبيه: تم رصد محتوى فاضح / عري جزئي: %1$s (الثقة: %2$d%%)</string>
-    <string name="ai_service_notification_title">فحص الذكاء الاصطناعي نشط 🤖</string>
+
+    <string name="ai_alert_toast_format">رصد محتوى غير محتشم: %1$s (الثقة: %2$d%%)</string>
+
+    <string name="ai_alert_hard_porn">تحذير عاجل: تم رصد محتوى إباحي صريح! (الثقة: %1$d%%)</string>
+
+    <string name="ai_alert_soft_porn">تنبيه: تم رصد محتوى فاضح / عري جزئي: %1$s (الثقة: %2$d%%)</string>
+
+    <string name="ai_service_notification_title">فحص الذكاء الاصطناعي نشط</string>
+
     <string name="ai_service_notification_desc">مراقبة الشاشة وحفظ العورات تعمل محلياً على الهاتف</string>
+
     <string name="ai_service_channel_name">درع الذكاء الاصطناعي (AI Shield)</string>
+
     <string name="ai_service_channel_desc">إشعارات خدمة التقاط الشاشة وتحليل النماذج المحلية</string>
+
     <string name="ai_service_action_stop">إيقاف</string>
+
     <string name="ai_permission_denied">تم رفض إذن التقاط الشاشة</string>
 
     <!-- Accountability Hub Strings -->
-    <string name="title_accountability_hub">مركز شريك المساءلة 🤝</string>
+    <string name="title_accountability_hub">مركز شريك المساءلة</string>
+
     <string name="subtitle_accountability_hub">إدارة الحماية المشتركة والتحكم التبادلي بين الأصدقاء</string>
-    <string name="title_guardian_control">لوحة تحكم الصديق 🛡️</string>
+
+    <string name="title_guardian_control">لوحة تحكم الصديق</string>
+
     <string name="my_pairing_code_label">رمز الاقتران الخاص بجهازي</string>
+
     <string name="my_pairing_code_hint">شارك هذا الرمز المكون من 6 خانات مع صديقك ليتمكن من ربط حمايتك</string>
-    <string name="btn_copy_code">نسخ الرمز 📋</string>
-    <string name="btn_add_partner">إضافة صديق / شريك جديد ➕</string>
+
+    <string name="btn_copy_code">نسخ الرمز</string>
+
+    <string name="btn_add_partner">إضافة صديق / شريك جديد</string>
+
     <string name="section_my_wards">من أحميهم (مكفولون تحت إشرافي)</string>
+
     <string name="section_my_guardians">من يحمونني (أولياء وأصدقاء يتحكمون بحمايتي)</string>
+
     <string name="empty_wards_msg">لا يوجد أشخاص تحت إشرافك حالياً. أضف صديقك عبر رمزه لحمايته.</string>
+
     <string name="empty_guardians_msg">لم تربط حمايتك بأي صديق بعد. شارك رمزك مع صديق موثوق.</string>
+
     <string name="dialog_add_partner_title">إضافة شريك مساءلة</string>
+
     <string name="dialog_add_partner_code_hint">أدخل الرمز المكون من 6 أرقام/أحرف</string>
+
     <string name="dialog_add_as_ward">أنا سأحميه (أكون ولياً ومشرفاً عليه)</string>
+
     <string name="dialog_add_as_guardian">هو سيحميني (يكون ولياً ومشرفاً علي)</string>
-    <string name="dialog_btn_connect">ربط الآن 🤝</string>
+
+    <string name="dialog_btn_connect">ربط الآن</string>
+
     <string name="dialog_btn_cancel">إلغاء</string>
+
     <string name="toast_code_copied">تم نسخ رمز الاقتران إلى الحافظة</string>
-    <string name="toast_partner_added">تم ربط الشريك بنجاح! 🤝</string>
+
+    <string name="toast_partner_added">تم ربط الشريك بنجاح!</string>
+
     <string name="toast_partner_failed">فشل ربط الشريك: %1$s</string>
-    <string name="toast_policy_saved">تم إرسال السياسة الجديدة إلى جهاز الصديق بنجاح 🚀</string>
-    <string name="btn_open_accountability_hub">مركز المساءلة وشريك الحماية 🤝</string>
-    <string name="card_accountability_title">🤝 شريك المساءلة السحابي (Accountability Hub)</string>
+
+    <string name="toast_policy_saved">تم إرسال السياسة الجديدة إلى جهاز الصديق بنجاح</string>
+
+    <string name="btn_open_accountability_hub">مركز المساءلة وشريك الحماية</string>
+
+    <string name="card_accountability_title">شريك المساءلة السحابي (Accountability Hub)</string>
+
     <string name="card_accountability_subtext">شارك رمزك مع صديق موثوق للتحكم بحمايتك عن بعد ومنع الإلغاء الذاتي</string>
+
     <string name="guardian_control_ward_name">التحكم في حماية: %1$s</string>
-    <string name="guardian_curfew_timings_title">🌙 مواقيت الحظر الليلي</string>
+
+    <string name="guardian_curfew_timings_title">مواقيت الحظر الليلي</string>
+
     <string name="guardian_curfew_start_label">وقت بداية الحظر</string>
+
     <string name="guardian_curfew_end_label">وقت نهاية الحظر</string>
+
     <string name="guardian_curfew_time_format">%1$02d:%2$02d</string>
-    <string name="guardian_enforcement_strength_title">⚡ قوة المنع أثناء الحظر</string>
-    <string name="guardian_mode_vpn_blackhole">قطع الإنترنت بالكامل (VPN Blackhole) 🌐❌</string>
-    <string name="guardian_mode_app_freeze_only">تجميد التطبيقات المحددة فقط مع إبقاء الإنترنت 📱</string>
-    <string name="guardian_incognito_title">🔒 قفل التصفح المتخفي ومحركات البحث</string>
+
+    <string name="guardian_enforcement_strength_title">قوة المنع أثناء الحظر</string>
+
+    <string name="guardian_mode_vpn_blackhole">قطع الإنترنت بالكامل (VPN Blackhole)</string>
+
+    <string name="guardian_mode_app_freeze_only">تجميد التطبيقات المحددة فقط مع إبقاء الإنترنت</string>
+
+    <string name="guardian_incognito_title">قفل التصفح المتخفي ومحركات البحث</string>
+
     <string name="guardian_incognito_desc">منع التصفح المتخفي وفرض البحث الآمن في Chrome و Brave</string>
-    <string name="guardian_zero_trust_title">🛡️ تجميد أي تطبيق جديد فوراً (Strict Zero-Trust)</string>
+
+    <string name="guardian_zero_trust_title">تجميد أي تطبيق جديد فوراً (Strict Zero-Trust)</string>
+
     <string name="guardian_zero_trust_desc">أي تطبيق يتم تثبيته يُقفل فوراً حتى توافق عليه من هذه الشاشة</string>
-    <string name="guardian_pending_apps_title">⏳ التطبيقات الجديدة بانتظار موافقتك</string>
-    <string name="guardian_no_pending_apps">لا توجد تطبيقات جديدة بانتظار الموافقة ✅</string>
-    <string name="btn_approve_app">موافقة ✅</string>
-    <string name="btn_reject_app">رفض ❌</string>
-    <string name="btn_save_policy_changes">حفظ وتطبيق التغييرات عن بُعد 🚀</string>
+
+    <string name="guardian_pending_apps_title">التطبيقات الجديدة بانتظار موافقتك</string>
+
+    <string name="guardian_no_pending_apps">لا توجد تطبيقات جديدة بانتظار الموافقة</string>
+
+    <string name="btn_approve_app">موافقة</string>
+
+    <string name="btn_reject_app">رفض</string>
+
+    <string name="btn_save_policy_changes">حفظ وتطبيق التغييرات عن بُعد</string>
+
     <string name="btn_change_start_time">تعديل وقت البدء</string>
+
     <string name="btn_change_end_time">تعديل وقت الانتهاء</string>
+
     <string name="status_ward_badge">مكفول</string>
-    <string name="btn_manage_ward">إدارة الحماية ⚙️</string>
-    <string name="btn_delete_partner">حذف 🗑️</string>
+
+    <string name="btn_manage_ward">إدارة الحماية</string>
+
+    <string name="btn_delete_partner">حذف</string>
+
     <string name="guardian_default_name">الحارس</string>
+
     <string name="toast_approval_granted">تمت الموافقة وفك التجميد</string>
+
     <string name="toast_approval_rejected">تم رفض التطبيق</string>
+
     <string name="toast_approval_failed">فشلت معالجة طلب الموافقة</string>
+
     <string name="toast_policy_push_failed">فشل إرسال السياسة إلى السحابة</string>
+
     <string name="partner_pairing_code_label">رمز الربط: %1$s</string>
+
     <string name="dialog_delete_partner_title">حذف شريك المساءلة</string>
+
     <string name="dialog_delete_partner_msg">هل أنت متأكد من حذف الشريك %1$s؟</string>
+
     <string name="error_pairing_code_not_found">رمز الاقتران غير موجود أو غير صالح</string>
+
     <string name="error_pairing_code_incomplete">بيانات الرمز غير مكتملة</string>
+
     <string name="partner_default_name">صديق المساءلة</string>
+
     <string name="error_cannot_pair_self">لا يمكنك الاقتران مع رمز جهازك نفسه!</string>
-    <string name="dialog_cannot_delete_guardian_title">🔒 حماية شريك المساءلة</string>
+
+    <string name="dialog_cannot_delete_guardian_title">حماية شريك المساءلة</string>
+
     <string name="dialog_cannot_delete_guardian_msg">لا يمكن حذف شريك الحماية من هذا الجهاز منعاً للالتفاف الذاتي. يجب على المشرف إزالتك من تطبيقه أو استخدام منفذ ADB للطوارئ.</string>
-    <string name="guardian_dns_title">🔒 خادم حظر المواقع الإباحية (DNS)</string>
+
+    <string name="guardian_dns_title">خادم حظر المواقع الإباحية (DNS)</string>
+
     <string name="guardian_dns_desc">يتحكم في تشفير وتصفية اتصالات الجهاز بالكامل لمنع المواقع الإباحية والإعلانات الخبيثة عبر Private DNS.</string>
+
     <string name="guardian_dns_hint">عنوان خادم DNS المشفر (DoT Hostname)</string>
-    <string name="btn_dns_preset_adguard">🛡️ AdGuard Family (إعلانات + بورن)</string>
-    <string name="btn_dns_preset_cloudflare">🛡️ Cloudflare Family</string>
-    <string name="btn_dns_preset_nextdns">⚡ NextDNS الخاص</string>
+
+    <string name="btn_dns_preset_adguard">AdGuard Family (إعلانات + بورن)</string>
+
+    <string name="btn_dns_preset_cloudflare">Cloudflare Family</string>
+
+    <string name="btn_dns_preset_nextdns">NextDNS الخاص</string>
+
     <string name="error_invalid_dns_host">يرجى إدخال عنوان خادم DNS صحيح (مثال: family.adguard-dns.com)</string>
+
     <string name="error_unknown">خطأ غير معروف</string>
-    <string name="toast_partner_deleted">تم حذف الشريك بنجاح 🗑️</string>
+
+    <string name="toast_partner_deleted">تم حذف الشريك بنجاح</string>
+
     <string name="toast_partner_delete_failed">فشل حذف الشريك: %1$s</string>
+
     <string name="toast_load_policy_failed">فشل تحميل سياسة الحماية الحالية. يرجى التحقق من الاتصال بالإنترنت.</string>
+
     <string name="error_loading_pending_apps">تعذر تحميل طلبات الموافقة المعلقة. تحقق من الاتصال بالإنترنت.</string>
+
     <string name="btn_retry">إعادة المحاولة</string>
+
     <string name="guardian_offline_banner_desc">تعذر الاتصال بالخادم. يتم عرض السياسة المحلية/المؤقتة.</string>
+
     <string name="toast_offline_policy_edit_note">تعذر الوصول إلى الخادم؛ يرجى التحقق من الاتصال بالإنترنت ثم إعادة المحاولة.</string>
+
     <string name="error_ward_already_has_guardian">هذا الجهاز مقيد بالفعل بمشرف آخر ولا يمكن ربطه!</string>
+
     <string name="error_already_supervised">جهازك مقيد بالفعل بمشرف معتمد!</string>
-    <string name="pairing_code_locked_badge">🔒 الجهاز مقيد بمشرف</string>
-    <string name="status_supervised_banner_title">🔒 جهازك مقيد تحت إشراف معتمد</string>
+
+    <string name="pairing_code_locked_badge">الجهاز مقيد بمشرف</string>
+
+    <string name="status_supervised_banner_title">جهازك مقيد تحت إشراف معتمد</string>
+
     <string name="status_supervised_banner_desc">تم حجب رمز الاقتران لمنع الالتفاف أو إضافة أي مشرفين آخرين. فك الإشراف مقتصر على المشرف فقط من تطبيقه.</string>
+
     <string name="dialog_revoke_ward_title">إلغاء الإشراف وفك الحماية</string>
+
     <string name="dialog_revoke_ward_msg">هل أنت متأكد من إلغاء الإشراف على %1$s؟ سيعود جهازه حراً بالكامل وستُعاد سياساته للإعدادات الافتراضية الآمنة مع توليد رمز اقتران جديد له.</string>
-    <string name="toast_supervision_revoked">تم إلغاء الإشراف بنجاح واستعادة حرية الجهاز 🕊️</string>
+
+    <string name="toast_supervision_revoked">تم إلغاء الإشراف بنجاح واستعادة حرية الجهاز</string>
+
     <string name="toast_supervision_revoked_ward">تم إلغاء الإشراف من قِبل المشرف — استعادة الوضع المستقل وتوليد رمز جديد</string>
+
     <string name="overlay_permission_prompt">يرجى تفعيل خيار (الظهور فوق التطبيقات الأخرى) لتمكين درع التعتيم الموضعي</string>
 
-    <string name="guardian_status_active">🔒 مشرف حماية نشط وموثق</string>
+    <string name="guardian_status_active">مشرف حماية نشط وموثق</string>
+
     <string name="dialog_add_ward_only_note">أدخل رمز اقتران الشخص الذي ترغب في حمايته والإشراف عليه. إذا كنت ترغب في أن يشرف شخص آخر عليك، فشارك معه رمزك الظاهر في الشاشة الرئيسية.</string>
+
     <string name="toast_app_suspended_by_guardian">تم إيقاف هذا التطبيق بانتظار موافقة المشرف</string>
 
     <!-- Remote Curfew & App Management Controls -->
     <string name="guardian_curfew_master_switch_title">تفعيل الحظر الليلي المجدول</string>
+
     <string name="guardian_curfew_master_switch_desc">تشغيل أو إيقاف الحظر الليلي التلقائي بالكامل عن هاتف الصديق</string>
+
     <string name="guardian_weekend_curfew_title">جدولة عطلة نهاية الأسبوع (الخميس والجمعة)</string>
+
     <string name="guardian_weekend_curfew_desc">تخصيص مواعيد بدء وانتهاء مختلفة لعطلة نهاية الأسبوع</string>
+
     <string name="guardian_weekend_curfew_switch">تفعيل جدولة نهاية الأسبوع</string>
+
     <string name="guardian_weekend_curfew_start_label">بدء حظر العطلة</string>
+
     <string name="guardian_weekend_curfew_end_label">انتهاء حظر العطلة</string>
+
     <string name="btn_change_weekend_start_time">تغيير</string>
+
     <string name="btn_change_weekend_end_time">تغيير</string>
+
     <string name="guardian_instant_internet_kill_title">قطع الإنترنت اللحظي (24/7)</string>
+
     <string name="guardian_instant_internet_kill_desc">قطع بيانات الإنترنت فوراً عن هاتف الصديق في أي وقت طوال اليوم بنقرة واحدة</string>
+
     <string name="guardian_mode_vpn_blackhole_desc">قطع الإنترنت تلقائياً أثناء ساعات الحظر الليلي فقط</string>
+
     <string name="guardian_app_manager_card_title">إدارة تطبيقات الصديق</string>
+
     <string name="guardian_app_manager_card_desc">جرد شامل لجميع التطبيقات المثبتة مع إمكانية التجميد 24/7، الاستثناء ليلاً، ومنع الحذف</string>
+
     <string name="btn_open_app_manager">فتح إدارة التطبيقات</string>
+
     <string name="remote_app_manager_title">تطبيقات الصديق</string>
+
     <string name="remote_app_manager_search_hint">بحث باسم التطبيق أو الحزمة...</string>
+
     <string name="remote_app_manager_empty">لا توجد تطبيقات تم جردها بعد أو تعذر الاتصال</string>
+
     <string name="remote_app_manager_freeze_switch">تجميد دائم 24/7</string>
+
     <string name="remote_app_manager_curfew_switch">متاح في الحظر الليلي</string>
+
     <string name="remote_app_manager_protect_switch">منع الإلغاء والإيقاف</string>
+
     <string name="btn_save_app_manager_changes">حفظ التغييرات</string>
+
     <string name="toast_app_manager_saved">تم حفظ وتطبيق سياسات التطبيقات بنجاح</string>
+
     <string name="toast_app_manager_save_failed">فشل حفظ سياسات التطبيقات</string>
 
     <!-- Unsaved Changes & Dialog Clarifications -->
-    <string name="dialog_unsaved_changes_title">تعديلات غير محفوظة ⚠️</string>
+    <string name="dialog_unsaved_changes_title">تعديلات غير محفوظة</string>
+
     <string name="dialog_unsaved_changes_msg">لديك تعديلات غير محفوظة. هل ترغب في تجاهل التعديلات والخروج أم البقاء؟</string>
+
     <string name="btn_discard_changes">تجاهل والخروج</string>
+
     <string name="btn_keep_editing">متابعة التعديل</string>
+
     <string name="dialog_add_as_ward_desc">ستتمكن من تحديد مواعيد نومه، وإدارة تطبيقاته، والموافقة على تثبيتاته.</string>
+
     <string name="dialog_add_as_guardian_desc">سيمتلك صلاحية الإشراف على جهازك وتحديد أوقات الحظر وإدارة تطبيقاتك.</string>
+
     <string name="remote_app_manager_curfew_disabled_hint">غير متاح لأن التطبيق مجمّد كلياً 24/7</string>
+
     <string name="btn_back">رجوع</string>
+
+    <!-- In-App Provisioning Wizard Strings -->
+    <string name="provisioning_wizard_title">معالج تفعيل الحماية القصوى</string>
+
+    <string name="provisioning_wizard_subtitle">تفعيل صلاحية المالك (Device Owner) ذاتياً بدون كمبيوتر بأقل احتكاك</string>
+
+    <string name="provisioning_step1_title">الخطوة 1: فحص الحسابات (إلزامي لأندرويد)</string>
+
+    <string name="provisioning_step1_ready">الجهاز جاهز للاقتران بنجاح (لا توجد حسابات مسجلة)</string>
+
+    <string name="provisioning_step1_accounts_found">يوجد %1$d حسابات مسجلة يجب حذفها مؤقتاً لتفعيل صلاحية المالك.</string>
+
+    <string name="provisioning_btn_open_accounts">فتح شاشة الحسابات للحذف المؤقت</string>
+
+    <string name="provisioning_step2_title">الخطوة 2: تشغيل تصحيح الأخطاء اللاسلكي</string>
+
+    <string name="provisioning_step2_desc">1. اضغط على الزر أدناه لفتح خيارات المطور.\n2. فعّل خيار "تصحيح الأخطاء اللاسلكي" (Wireless Debugging).\n3. اضغط على "إقران الجهاز برمز إقران".</string>
+
+    <string name="provisioning_btn_open_dev_options">فتح خيارات المطور</string>
+
+    <string name="provisioning_step3_title">الخطوة 3: إدخال رمز الاقتران (6 أرقام)</string>
+
+    <string name="provisioning_radar_waiting">الرادار يبحث عن إشارة الاقتران اللاسلكي...</string>
+
+    <string name="provisioning_radar_port_found">تم التقاط المنفذ تلقائياً (%1$d)</string>
+
+    <string name="provisioning_input_hint">أدخل رمز الـ 6 أرقام هنا</string>
+
+    <string name="provisioning_btn_pair_and_activate">تأكيد وتفعيل الحماية القصوى</string>
+
+    <string name="provisioning_notification_hint">نصيحة ذكية: يمكنك إدخال الرمز مباشرة من شريط الإشعارات العلوي دون مغادرة شاشة الإعدادات!</string>
+
+    <string name="provisioning_shizuku_title">مسار Shizuku السريع (نقرة واحدة)</string>
+
+    <string name="provisioning_shizuku_desc">تم اكتشاف أن تطبيق Shizuku يعمل على هذا الجهاز! يمكنك التفعيل بنقرة واحدة بدون أكواد.</string>
+
+    <string name="provisioning_btn_shizuku_activate">تفعيل فوري عبر Shizuku</string>
+    <string name="provisioning_shizuku_requesting">جاري طلب إذن Shizuku وتفعيل الصلاحية...</string>
+
+    <string name="provisioning_otg_title">هل تواجه مشكلة أو لا تملك Wi-Fi؟</string>
+
+    <string name="provisioning_otg_desc">يمكنك توصيل هاتفك بهاتف آخر عبر كابل الشاحن (Type-C to Type-C) وتفعيل الحماية بضغطة واحدة من هاتف الصديق دون الحاجة لشبكة Wi-Fi أو كمبيوتر.</string>
+
+    <string name="provisioning_radar_active_title">رادار اقتران Device Owner نشط</string>
+
+    <string name="provisioning_radar_active_desc">بانتظار فتح نافذة الاقتران برمز في خيارات المطور...</string>
+
+    <string name="provisioning_prompt_title">أدخل رمز اقتران Device Owner</string>
+
+    <string name="provisioning_prompt_desc">تم التقاط المنفذ (%1$d). أدخل الـ 6 أرقام الظاهرة على الشاشة:</string>
+
+    <string name="provisioning_input_label">أدخل رمز الـ 6 أرقام</string>
+
+    <string name="provisioning_action_submit">إرسال وتفعيل</string>
+
+    <string name="provisioning_channel_name">معالج اقتران Device Owner</string>
+
+    <string name="provisioning_channel_desc">إشعارات تفاعلية لإدخال كود اقتران أندرويد اللاسلكي</string>
+
+    <string name="provisioning_in_progress_title">جاري تفعيل صلاحية المالك...</string>
+
+    <string name="provisioning_in_progress_desc">يتم الآن تطبيق التشفير ومنح صلاحية Device Owner للهاتف.</string>
+
+    <string name="provisioning_success_title">تم تفعيل الحماية القصوى بنجاح!</string>
+
+    <string name="provisioning_success_desc">أصبح التطبيق الآن مسؤول المالك. يمكنك إعادة إضافة حساباتك بأمان.</string>
+
+    <string name="provisioning_failed_title">تعذر تفعيل صلاحية المالك</string>
+
+    <string name="toast_provisioning_success">مبروك! تم تفعيل صلاحية المالك (Device Owner) بنجاح</string>
+
+    <string name="toast_provisioning_failed">فشل الاقتران: %1$s</string>
+
+
+    <!-- Accountability Supervision Additional Strings -->
+    <string name="status_device_supervised_compact">الجهاز مقيد بمشرف واحد ومعتمد</string>
+    <string name="dialog_add_ward_hint">أدخل رمز اقتران الجهاز لإضافته تحت إشرافك وإدارة حمايته:</string>
+    <string name="my_display_name_label">اسمي في الحماية:</string>
+    <string name="dialog_edit_my_name_title">تعديل اسمك الظاهر</string>
+    <string name="dialog_edit_my_name_hint">أدخل اسمك (مثال: محمد، أبي...)</string>
+    <string name="dialog_edit_ward_name_title">تعديل اسم المكفول</string>
+    <string name="dialog_edit_ward_name_hint">أدخل اسماً مخصصاً لهذا الجهاز (مثال: هاتف عمر)</string>
+    <string name="toast_name_saved">تم تحديث الاسم بنجاح</string>
+    <string name="btn_save">حفظ</string>
+    <string name="btn_edit">تعديل</string>
+
 </resources>

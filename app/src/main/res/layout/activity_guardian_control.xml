@@ -32,15 +32,38 @@
         android:paddingTop="8dp"
         android:paddingBottom="16dp">
 
-        <TextView
-            android:id="@+id/tvWardName"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            tools:text="الخاضع للحماية: أحمد" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvWardName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="الخاضع للحماية: أحمد" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnEditWardName"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:paddingHorizontal="8dp"
+                android:text="@string/btn_edit"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="13sp"
+                app:icon="@drawable/ic_edit"
+                app:iconSize="16dp"
+                app:iconPadding="4dp"
+                app:iconGravity="textStart" />
+        </LinearLayout>
 
         <!-- Offline Banner -->
         <com.google.android.material.card.MaterialCardView

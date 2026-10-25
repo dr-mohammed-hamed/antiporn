@@ -91,9 +91,7 @@ class AccountabilityRepository private constructor(context: Context) {
         // Publish/refresh code in Firestore /pairings/{code}
         try {
             val uid = getOrCreateCurrentUid()
-            val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString()
-            }
+            val deviceName = getMyDisplayName()
             val pairingDoc = mapOf(
                 "pairingCode" to code,
                 "ownerUid" to uid,
@@ -102,7 +100,7 @@ class AccountabilityRepository private constructor(context: Context) {
                 "createdAt" to System.currentTimeMillis()
             )
             firestore.collection("pairings").document(code).set(pairingDoc).await()
-            Log.i(TAG, "Successfully registered pairing code $code for UID $uid")
+            Log.i(TAG, "Successfully registered pairing code $code for UID $uid (name: $deviceName)")
         } catch (e: Exception) {
             Log.e(TAG, "Error publishing pairing code to Firestore", e)
         }
@@ -135,9 +133,7 @@ class AccountabilityRepository private constructor(context: Context) {
                 return@withContext Result.failure(IllegalArgumentException(appContext.getString(R.string.error_cannot_pair_self)))
             }
 
-            val myDeviceName = "${Build.MANUFACTURER} ${Build.MODEL}".replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString()
-            }
+            val myDeviceName = getMyDisplayName()
 
             if (role == PartnerEntity.ROLE_WARD) {
                 // I am protecting targetUid (targetUid is my WARD, I am their GUARDIAN)
@@ -306,9 +302,7 @@ class AccountabilityRepository private constructor(context: Context) {
 
             // 4. Publish new code to Firestore
             val uid = getOrCreateCurrentUid()
-            val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString()
-            }
+            val deviceName = getMyDisplayName()
             val pairingDoc = mapOf(
                 "pairingCode" to newCode,
                 "ownerUid" to uid,
@@ -377,6 +371,119 @@ class AccountabilityRepository private constructor(context: Context) {
         }
     }
 
+    /**
+     * Gets the user's configured display name, falling back to hardware device model.
+     */
+    fun getMyDisplayName(): String {
+        val customName = prefs.getString(KEY_MY_DISPLAY_NAME, null)?.trim()
+        if (!customName.isNullOrBlank()) {
+            return customName
+        }
+        return "${Build.MANUFACTURER} ${Build.MODEL}".replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString()
+        }
+    }
+
+    /**
+     * Sets and persists the user's custom display name locally and syncs to Firestore.
+     */
+    suspend fun setMyDisplayName(newName: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val cleanName = newName.trim().take(28)
+            if (cleanName.isBlank()) {
+                prefs.edit().remove(KEY_MY_DISPLAY_NAME).apply()
+            } else {
+                prefs.edit().putString(KEY_MY_DISPLAY_NAME, cleanName).apply()
+            }
+
+            val effectiveName = getMyDisplayName()
+            val myUid = getOrCreateCurrentUid()
+
+            // 1. Sync to /users/{myUid}
+            val userData = mapOf(
+                "uid" to myUid,
+                "displayName" to effectiveName,
+                "deviceModel" to "${Build.MANUFACTURER} ${Build.MODEL}",
+                "updatedAt" to System.currentTimeMillis()
+            )
+            try {
+                firestore.collection("users").document(myUid)
+                    .set(userData, com.google.firebase.firestore.SetOptions.merge())
+                    .await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Sync to /users/$myUid failed: ${e.message}")
+            }
+
+            // 2. Sync to active pairing doc if present
+            val code = prefs.getString(KEY_MY_PAIRING_CODE, null)
+            if (!code.isNullOrBlank()) {
+                try {
+                    firestore.collection("pairings").document(code)
+                        .update("ownerName", effectiveName)
+                        .await()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Update ownerName in /pairings/$code failed: ${e.message}")
+                }
+            }
+
+            // 3. Update guardianName in policies of all my wards
+            val wards = database.getPartnersByRole(PartnerEntity.ROLE_WARD)
+            for (ward in wards) {
+                try {
+                    firestore.collection("policies").document(ward.id)
+                        .update("guardianName", effectiveName)
+                        .await()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Update guardianName in /policies/${ward.id} failed: ${e.message}")
+                }
+            }
+
+            Log.i(TAG, "Successfully updated my display name to '$effectiveName'")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting my display name", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Renames a partner (ward or guardian) locally in SQLite and in cloud Firestore.
+     */
+    suspend fun renamePartner(partnerId: String, newName: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val cleanName = newName.trim().take(28)
+            if (cleanName.isBlank()) {
+                return@withContext Result.failure(IllegalArgumentException("Name cannot be blank"))
+            }
+
+            // 1. Update SQLite locally (immediate)
+            database.updatePartnerDisplayName(partnerId, cleanName)
+
+            // 2. Sync to Firestore in background
+            val myUid = getOrCreateCurrentUid()
+            try {
+                firestore.collection("users").document(myUid)
+                    .collection("partners").document(partnerId)
+                    .set(
+                        mapOf(
+                            "partnerName" to cleanName,
+                            "updatedAt" to System.currentTimeMillis()
+                        ),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    )
+                    .await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Cloud sync for partnerName $partnerId failed: ${e.message}")
+            }
+
+            Log.i(TAG, "Successfully renamed partner $partnerId to '$cleanName'")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error renaming partner $partnerId", e)
+            Result.failure(e)
+        }
+    }
+
     private fun generateRandomCode(): String {
         val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         val random = SecureRandom()
@@ -391,6 +498,7 @@ class AccountabilityRepository private constructor(context: Context) {
         private const val TAG = "AntiPorn_AccRepo"
         private const val PREFS_NAME = "antiporn_accountability_prefs"
         private const val KEY_MY_PAIRING_CODE = "key_my_pairing_code"
+        private const val KEY_MY_DISPLAY_NAME = "key_my_display_name"
         private const val KEY_PERSISTED_UID = "key_persisted_uid"
         const val CODE_LOCKED = "LOCKED"
 

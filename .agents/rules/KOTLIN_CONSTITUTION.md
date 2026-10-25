@@ -12,4 +12,10 @@ All AI agents working on this repository MUST strictly comply with the project c
 6. **Strings in Resources**: All user-facing strings must reside in `res/values/strings.xml`.
 7. **Mandatory Pluggable Shield Architecture**: Every protection feature must be encapsulated in an isolated `ProtectionShield` file (< 200 lines) with zero collateral damage to existing shields.
 8. **File Size Ceiling & Modular Naming**: Files must NEVER reach 1000 lines (target 300–500 lines). Decompose using canonical suffixes (`...Shield`, `...Engine`, `...Watcher`, `...Bridge`, `...Handler`, `...ViewBinder`, `...Ext`).
-9. **Empirical Gate**: Verify using `.\gradlew.bat compileDebugSources` and `.\gradlew.bat lintDebug` (0 errors) before presenting.
+9. **Strict No-Emoji UI Rule**: NEVER use Unicode emojis (🛡️, 🔒, 🚫, 👑, etc.) in user interfaces, buttons, notifications, or strings. Use clean Material Vector icons (`@drawable/...`) exclusively.
+10. **Account Lockout Prevention**: NEVER enable `DISALLOW_MODIFY_ACCOUNTS` automatically upon Device Owner activation. Users must be able to re-add Google accounts.
+11. **Monotonic Clock Enforcement**: For curfews and lock timers, ALWAYS use `SystemClock.elapsedRealtime()`. NEVER rely on `System.currentTimeMillis()` alone (prevents wall-clock manipulation bypass).
+12. **Zero Busy-Waiting**: NEVER use `while(true) { Thread.sleep(...) }`. Rely strictly on OS callbacks (`UsageEvents`, `NetworkCallback`, `AlarmManager`).
+13. **Lifecycle Safety Guard**: Always wrap asynchronous UI calls with `if (!isFinishing && !isDestroyed)` before touching views.
+14. **Packaging & Metadata Pre-flight**: When adding dependencies, proactively add duplicate resource excludes in `packaging.resources.excludes` and `-Xskip-metadata-version-check`.
+15. **Empirical Gate**: Verify using `.\gradlew.bat compileDebugSources` and `.\gradlew.bat lintDebug` (0 errors) before presenting.

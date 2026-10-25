@@ -27,6 +27,10 @@ class FrameDifferencer(
     private var forcedBurstFrames: Int = BURST_FRAMES_ON_RESET
     private var lastScanTimeMs: Long = 0L
 
+    @Volatile
+    var lastChangeRatio: Float = 0f
+        private set
+
     companion object {
         /** Upper bound shared with detectors — caps IntArray allocs against tampered dims. */
         const val MAX_DIM = 1920
@@ -97,6 +101,7 @@ class FrameDifferencer(
         }
 
         val changeRatio = if (totalSamples > 0) changedCount.toFloat() / totalSamples.toFloat() else 0f
+        lastChangeRatio = changeRatio
         val hasChanged = changeRatio >= changeRatioThreshold || isForced || isHeartbeat
 
         if (hasChanged) {
@@ -111,5 +116,20 @@ class FrameDifferencer(
         previousSamples = null
         forcedBurstFrames = BURST_FRAMES_ON_RESET
         lastScanTimeMs = 0L
+        lastChangeRatio = 0f
+    }
+
+    /**
+     * هل المشهد ساكن تماماً (نسبة التغير أقل من العتبة المحددة، افتراضياً 2%)
+     */
+    fun isSceneStatic(threshold: Float = 0.02f): Boolean {
+        return lastChangeRatio < threshold
+    }
+
+    /**
+     * هل حدثت حركة معتبرة (مثل التمرير السريع باليد، نسبة التغير أكبر من العتبة، افتراضياً 5%)
+     */
+    fun isSignificantMotion(threshold: Float = 0.05f): Boolean {
+        return lastChangeRatio >= threshold
     }
 }

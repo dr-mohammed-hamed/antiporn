@@ -16,32 +16,73 @@
         android:paddingTop="16dp"
         android:paddingBottom="24dp">
 
-        <!-- Header -->
-        <TextView
-            android:id="@+id/tvHeaderTitle"
+        <!-- Serene Centered Brand Header -->
+        <LinearLayout
+            android:id="@+id/layoutBrandHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/header_title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingTop="8dp"
+            android:paddingBottom="18dp">
 
-        <TextView
-            android:id="@+id/tvHeaderSubtitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/header_subtitle"
-            android:textColor="?attr/colorOutline"
-            android:textSize="14sp" />
+            <!-- Center Emblem with Soft Amber Glow Ring -->
+            <FrameLayout
+                android:layout_width="68dp"
+                android:layout_height="68dp"
+                android:background="@drawable/bg_header_emblem_glow">
 
-        <!-- Inspiring Hero Status Card (Modern Slate + Radiant Emerald & Cyan) -->
+                <ImageView
+                    android:id="@+id/ivHeaderLogo"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/app_name"
+                    android:src="@drawable/ic_ismah_emblem" />
+            </FrameLayout>
+
+            <!-- Unified Brand Title (عِصمة | ISMAH) -->
+            <TextView
+                android:id="@+id/tvHeaderTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/header_title_unified"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <!-- Holy Quran Ayah with Tashkeel and Highlighted 'فَاسْتَعْصَمَ' -->
+            <TextView
+                android:id="@+id/tvHeaderAyah"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:lineSpacingExtra="5dp"
+                android:text="@string/header_ayah_quran"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <!-- Ayah Reference Badge -->
+            <TextView
+                android:id="@+id/tvHeaderAyahRef"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="@string/header_ayah_ref"
+                android:textColor="?attr/colorOutline"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Status Card (Shown only if not Device Owner yet; GONE when fully configured) -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardMainStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            app:cardCornerRadius="24dp"
+            android:layout_marginBottom="12dp"
+            app:cardCornerRadius="20dp"
             app:cardElevation="0dp"
             app:strokeWidth="1.5dp"
             app:strokeColor="@color/shield_hero_stroke"
@@ -52,7 +93,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="22dp">
+                android:padding="20dp">
 
                 <TextView
                     android:id="@+id/tvOverallStatusBadge"

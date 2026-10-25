@@ -472,6 +472,119 @@ class ScreenBlurOverlayManagerTest {
         assertTrue(manager.getActiveRegions().isEmpty())
     }
 
+    @Test
+    fun testRetainActiveRegions_cancelsClearAndMaintainsShield() {
+        val scheduler = TestOverlayScheduler()
+        val manager = ScreenBlurOverlayManager(
+            context = stubContext,
+            scheduler = scheduler,
+            canDrawOverlaysChecker = { false }
+        )
+
+        // رصد أولي
+        manager.updateRegions(listOf(createRect(10f, 20f, 100f, 200f)))
+        assertTrue(manager.hasActiveRegions)
+        assertEquals(1, scheduler.delayedTasks.size)
+
+        // الشاشة ساكنة -> استدعاء retainActiveRegions
+        manager.retainActiveRegions()
+        assertTrue("Latch must be active", manager.isStaticLatch)
+        assertTrue("Active regions must remain", manager.hasActiveRegions)
+
+        // محاولة تنفيذ المهام المجدولة (المؤقت)
+        scheduler.triggerAllDelayed()
+
+        // يجب أن يظل الدرع ثابتاً 100% دون مسح
+        assertTrue("Regions must remain pinned on static screen", manager.hasActiveRegions)
+        assertEquals(1, manager.getActiveRegions().size)
+    }
+
+    @Test
+    fun testDismissFast_instantlyClearsShieldAndUnlatches() {
+        val scheduler = TestOverlayScheduler()
+        val manager = ScreenBlurOverlayManager(
+            context = stubContext,
+            scheduler = scheduler,
+            canDrawOverlaysChecker = { false }
+        )
+
+        // رصد أولي وتثبيت
+        manager.updateRegions(listOf(createRect(10f, 20f, 100f, 200f)))
+        manager.retainActiveRegions()
+        assertTrue(manager.isStaticLatch)
+
+        // تمرير سريع ومغادرة المحتوى
+        manager.dismissFast()
+
+        assertFalse("Latch must be deactivated", manager.isStaticLatch)
+        assertFalse("Regions must be cleared immediately", manager.hasActiveRegions)
+        assertTrue(manager.getActiveRegions().isEmpty())
+    }
+
+    @Test
+    fun testUpdateRegions_emptyListAfterRetain_unlatchesAndExpiresAfterPersistence() {
+        val scheduler = TestOverlayScheduler()
+        val manager = ScreenBlurOverlayManager(
+            context = stubContext,
+            scheduler = scheduler,
+            canDrawOverlaysChecker = { false }
+        )
+
+        // رصد أولي وتثبيت
+        manager.updateRegions(listOf(createRect(10f, 20f, 100f, 200f)))
+        manager.retainActiveRegions()
+        assertTrue(manager.isStaticLatch)
+        assertEquals(0, scheduler.delayedTasks.size)
+
+        // حركة طفيفة وخلو الإطار الجديد
+        manager.updateRegions(emptyList())
+
+        assertFalse("Latch must be deactivated on empty update", manager.isStaticLatch)
+        assertEquals(1, scheduler.delayedTasks.size)
+        assertTrue("Regions must remain active until persistence expires", manager.hasActiveRegions)
+
+        // انتهاء مؤقت الثبات
+        scheduler.triggerAllDelayed()
+
+        assertFalse("Regions must expire after persistence", manager.hasActiveRegions)
+        assertTrue(manager.getActiveRegions().isEmpty())
+    }
+
+    @Test
+    fun testRetainActiveRegions_doesNotCancelPendingClearAfterEmptyUpdate() {
+        val scheduler = TestOverlayScheduler()
+        val manager = ScreenBlurOverlayManager(
+            context = stubContext,
+            scheduler = scheduler,
+            canDrawOverlaysChecker = { false }
+        )
+
+        // 1. Initial detection and overlay update
+        manager.updateRegions(listOf(createRect(10f, 20f, 100f, 200f)))
+        assertTrue("Regions must be active", manager.hasActiveRegions)
+        assertFalse("isPendingClear must be false", manager.isPendingClear)
+        assertFalse("isStaticLatch must be false", manager.isStaticLatch)
+
+        // 2. Frame becomes empty (target gone / transitioning) -> schedules clear with persistence
+        manager.updateRegions(emptyList())
+        assertTrue("isPendingClear must be true after empty update", manager.isPendingClear)
+        assertFalse("isStaticLatch must be false", manager.isStaticLatch)
+        assertEquals("Clear task must be scheduled", 1, scheduler.delayedTasks.size)
+        assertTrue("Regions remain active until persistence expiry", manager.hasActiveRegions)
+
+        // 3. Static scene check calls retainActiveRegions() -> MUST NOT cancel pending clear
+        manager.retainActiveRegions()
+        assertFalse("Static latch must NOT be activated when pending clear", manager.isStaticLatch)
+        assertTrue("isPendingClear must remain true", manager.isPendingClear)
+        assertEquals("Delayed clear task must NOT be removed or cancelled", 1, scheduler.delayedTasks.size)
+
+        // 4. Persistence timer expires -> clearRunnable executes and removes regions
+        scheduler.triggerAllDelayed()
+        assertFalse("hasActiveRegions must be false after persistence expiry", manager.hasActiveRegions)
+        assertTrue("Active regions list must be empty", manager.getActiveRegions().isEmpty())
+        assertFalse("isPendingClear must be reset to false after clearance", manager.isPendingClear)
+    }
+
     // =========================================================================
     // 4. اختبارات معلمات النافذة والأعلام الإلزامية (LayoutParams & Flags Tests)
     // =========================================================================

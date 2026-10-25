@@ -1,117 +1,141 @@
-# الخطة المعمارية الشاملة: تتابع درع Halalify مع قاضي العورات NudeNet والاستجابة التفاعلية
+# الخطة المعمارية الشاملة: التثبيت الذكي لبلور الذكاء الاصطناعي ومنع الوميض والتقطيع (Motion-Gated Blur Stability Engine) 🛡️👁️
 
-> **الوضع:** تحليل معماري عميق وتخطيط مسبق وفق بروتوكول `/deep-analysis` و `/stop-think-search-and-plan` — **ZERO CODE**.  
-> **بانتظار مراجعتك وموافقتك الصريحة (ابدأ / Approved) قبل إجراء أي تعديل برمجى.**  
-
----
-
-## 1. الملخص التنفيذي وتوزيع الأدوار (Executive Summary & Model Roles)
-
-لحسم المعادلة بدقة، سيتم توزيع الوظائف بصرامة بين النموذجين بحيث يكمل كل منهما الآخر دون تضارب أو إهدار لطاقة الهاتف:
-
-### 1. دور نموذج Halalify v2 (`halalify_v2.tflite` - 416x416):
-* **الوظيفة الحصرية:** **درع غض البصر البصري التلقائي (Pure Visual Blur Shield)**.
-* **طريقة العمل:**
-  * يعمل مباشرة على كل إطار لرصد وجوه وأجساد الفتيات بدقة.
-  * يرسل الإحداثيات فورياً إلى مدير التظليل [ScreenBlurOverlayManager.kt](file:///d:/b/antiporn/app/src/main/java/com/drmohammed/antiporn/ai/overlay/ScreenBlurOverlayManager.kt) لرسم مستطيلات تعتيم أنيقة داكنة فوق أجساد ووجوه الفتيات.
-  * **الضمانة:** لا يوقف التطبيقات، ولا يغلق الشاشة، ولا يصدر اهتزازات مزعجة، بل يحفظ بصر المستخدم بسلاسة تامة مع بقاء الهاتف قابلاً للاستخدام الطبيعي.
-
-### 2. دور نموذج NudeNet v3 (`320n.onnx` - 320x320):
-* **الوظيفة الحصرية:** **قاضي ومفتش مستويات المحتوى الفاضح (Content Violation Inspector)**.
-* **طريقة العمل:**
-  * يحلل تفاصيل المشهد عبر 18 فئة تشريحية دقيقة لتصنيف درجة الخطورة وتفعيل استجابة الهاتف:
-    * **المستوى الأول: Hard Porn (إباحية صريحة مغلظة):**
-      * الفئات: `FEMALE_GENITALIA_EXPOSED`، `MALE_GENITALIA_EXPOSED`، `FEMALE_BREAST_EXPOSED`، `ANUS_EXPOSED`.
-      * **استجابة الهاتف:** **اهتزاز قوي مزدوج (Double Heavy Haptic Pulse)** + **إشعار Toast أحمر:**  
-        `"🚨 تحذير عاجل: تم رصد محتوى إباحي صريح!"`
-    * **المستوى الثاني: Soft Porn (عري جزئي صريح ولباس فاضح):**
-      * الفئات: `FEMALE_GENITALIA_COVERED` (ملابس سباحة/داخلية)، `BUTTOCKS_EXPOSED`، `BELLY_EXPOSED`.
-      * **استجابة الهاتف:** **نبضة اهتزاز تنبيهية (Single Haptic Pulse)** + **إشعار Toast برتقالي:**  
-        `"⚠️ تنبيه: تم رصد محتوى فاضح / عري جزئي"`
-    * **فئات اللباس العادي (`FEMALE_BREAST_COVERED` و `FACE_FEMALE`):**
-      * **لا تطلق أي اهتزاز ولا أي Toast**، بل تُدمج تلقائياً مع نوافذ تظليل Halalify لغض البصر فقط دون مضايقة المستخدم.
+> **الوضع:** خطة معمارية شاملة وفق بروتوكول `/stop-think-search-and-plan` — **ZERO CODE**.  
+> **حالة التنفيذ:** **مقفل تماماً بانتظار موافقتك الصريحة (`ابدأ` / `نفذ` / `Approved`)**.  
+> **الهدف الجوهري:** تحويل تعتيم الذكاء الاصطناعي (Halalify & NudeNet) من وميض متقطع (2.5 Hz) إلى درع بصري ثابت 100% كالصخرة على الصور الثابتة، مع إزالة فورية ذكية (<50ms) عند التمرير السريع لمنع تعليق المربع الأسود.
 
 ---
 
-## 2. مخطط تدفق المعالجة الزمني (End-to-End Sequence Diagram)
+## 1. الملخص التنفيذي وقيمة الحل (Executive Summary & Business Value)
+
+* **المشكلة الحالية:**  
+  عند اكتشاف الذكاء الاصطناعي لامرأة في صورة ثابتة، يقوم برسم صندوق بلور داكن فوقها. لكن لأن خدمة تسجيل الشاشة تلتقط الصندوق نفسه (Self-Occlusion)، يعتقد الذكاء الاصطناعي في الإطار التالي أن المرأة اختفت، فينتهي مؤقت الثبات (400ms) ويسقط البلور، فتظهر المرأة مجدداً، ليعيد الذكاء الاصطناعي رسم البلور... وهكذا دواليك كالفلاش المتقطع، مما يزعج عين المستخدم ويسرب لقطات عابرة.
+* **الحل المعماري المقترح (المعتمد باختيارك):**
+  1. **التثبيت الذكي المقترن بالحركة (Motion-Gated Static Latch):**  
+     طالما أن شاشة الهاتف ساكنة (حركة البكسلات < 2% ولم يقم المستخدم بالتمرير أو تغيير التطبيق)، **يتم قفل البلور وتثبيته للأبد** دون مسحه، ودون استهلاك طاقة المعالج في إعادة فحص الصورة الثابتة.
+  2. **الإزالة الفورية عند مغادرة الصورة (Fast Motion Dismissal < 50ms):**  
+     عندما يكتشف كاشف الحركة قيام المستخدم بتمرير سريع (Scroll Delta > 5%) نحو محتوى سليم، يتم مسح البلور فوراً (أقل من 50 ملي ثانية) لمنع بقاء مربع أسود معلق فوق النصوص البريئة (Ghost Box).
+  3. **استئناف الفحص السلس مع الحركة:**  
+     بمجرد تحرك الشاشة، يستأنف الذكاء الاصطناعي فحص الإطارات وتحديث إحداثيات الصندوق بتنعيم حركي انسيابي (EMA Smoothing).
+
+---
+
+## 2. مقارنة التدفق: الوضع الحالي vs المحرك المقترح (Mermaid Flow)
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    actor User as المستخدم
-    participant Screen as شاشة الهاتف (MediaProjection)
-    participant Differ as FrameDifferencer (صمام الأمان)
-    participant Halalify as درع Halalify (416x416)
-    participant Overlay as مدير التظليل (BlurOverlay)
-    participant NudeNet as قاضي NudeNet (320x320)
-    participant Feedback as نظام الاستجابة (Haptic & Toast)
+flowchart TD
+    subgraph Current [الوضع الحالي: حلقة الوميض والتقطيع]
+        C1[رصد امرأة في صورة ثابتة] --> C2[رسم الصندوق الأسود فوقها]
+        C2 --> C3[جدولة مسح بعد 400ms]
+        C3 --> C4[الإطار التالي: الصندوق حجب المرأة]
+        C4 --> C5[الذكاء الاصطناعي: لم أعد أرى امرأة!]
+        C5 --> C6[انتهاء 400ms -> حذف الصندوق وكشف المرأة!]
+        C6 --> C1
+    end
 
-    Screen->>Differ: التقاط إطار شاشة جديد
-    alt الشاشة ثابتة أو التطبيق آمن
-        Differ-->>Screen: إهمال الإطار فوراً (توفير 100% من البطارية)
-    else الشاشة تحركت
-        Differ->>Halalify: تمرير الإطار
-        Halalify->>Halalify: استدلال كشف الإناث (Female Detection)
-        opt توجد أنثى على الشاشة
-            Halalify->>Overlay: إرسال إحداثيات الصناديق
-            Overlay->>User: رسم طبقة التظليل العائمة (Blur Window) فورياً
-        end
+    subgraph Proposed [المحرك الجديد: درع ثابت ومقترن بالحركة 100%]
+        P1[رصد امرأة على الشاشة] --> P2[رسم البلور وقفل الحالة Latch Active]
+        P2 --> P3[فحص حركة الإطار التالي عبر FrameDifferencer]
+        P3 --> P4{هل تحركت الشاشة؟}
         
-        Halalify->>NudeNet: تمرير الإطار للتحقيق الجراحي
-        NudeNet->>NudeNet: فحص الفئات الـ 18
+        P4 -- "لا (حركة < 2%)" --> P5[الشاشة ساكنة: تثبيت البلور 100% وإيقاف الفحص لتوفير البطارية]
+        P5 --> P3
         
-        alt تم رصد Hard Porn (عورة مغلظة مكشوفة)
-            NudeNet->>Feedback: إطلاق إنذار Hard Porn
-            Feedback->>User: اهتزاز قوي مزدوج + Toast تحذير أحمر
-        else تم رصد Soft Porn (عري جزئي / مايوه / بطن)
-            NudeNet->>Feedback: إطلاق تنبيه Soft Porn
-            Feedback->>User: نبضة اهتزاز تنبيهية + Toast تحذير برتقالي
-        else مظهر عادي أو وجوه فقط
-            NudeNet-->>Screen: لا استجابة مزعجة (الاكتفاء بالتظليل المرئي)
-        end
+        P4 -- "نعم (تمرير سريع)" --> P6[فحص الذكاء الاصطناعي للإطار المتحرك]
+        P6 --> P7{هل ما زالت المخالفة موجودة؟}
+        P7 -- نعم --> P8[تحديث إحداثيات البلور بسلاسة مع التمرير]
+        P7 -- لا --> P9[إزالة فورية خلال أقل من 50ms لمنع تعليق المربع]
+        
+        P8 --> P3
+        P9 --> P10[عودة الشاشة للوضع الطبيعي]
     end
 ```
 
 ---
 
-## 3. صمامات الأمان الثلاثة (The 3 Red-Teamed Failure Modes & Mitigations)
+## 3. بوابات الإخفاق الثلاث وخطة تحصينها (The 3 Failure Modes & Mitigations)
 
-### 🔴 الفشل الأول: عاصفة الاهتزازات والإشعارات المتتالية أثناء الفيديوهات (Alert Storm)
-* **المشكلة:** إذا كان المستخدم يشاهد مقطع فيديو يحتوي على لقطة فاضحة مدتها 5 ثوانٍ (بمعدل 10 إلى 20 إطاراً)، فإن استدعاء الاهتزاز و Toast في كل إطار سيجعل الهاتف يهتز بشكل هستيري ويملأ الشاشة بعشرات رسائل Toast المعلقة.
-* **الحل الوقائي الحاسم:** تطبيق **صمام خافق التكرار الذكي (Alert Debounce)**؛ بحيث لا تتكرر استجابة الـ Toast والاهتزاز للمستوى نفسه إلا بعد مرور **5 ثوانٍ على الأقل (`ALERT_DEBOUNCE_MS = 5000L`)** من آخر إنذار.
-
-### 🔴 الفشل الثاني: تكرار فك وإنشاء الـ Bitmaps واستنزاف الذاكرة (Bitmap GC Churn)
-* **المشكلة:** إنشاء `Bitmap` جديد لنموذج Halalify، ثم إنشاء `Bitmap` آخر لنموذج NudeNet في كل إطار سيؤدي إلى استهلاك هائل للذاكرة وتدخل دوري لمجمع النفايات (Garbage Collection)، مما يسبب تقطيعاً (Stutter) في شاشة الهاتف.
-* **الحل الوقائي الحاسم:** إنشاء كائن `Bitmap` واحد فقط ومشاركته بدقة بين النموذجين، مع إعادة تدويره فوراً (`rawBitmap.recycle()`) داخل كتلة `finally` لضمان صفر تسرب للذاكرة.
-
-### 🔴 الفشل الثالث: فخ إطلاق الإنذارات على المحجبات والمعلمات (Modesty False Alarm)
-* **المشكلة:** وسم `FEMALE_BREAST_COVERED` يرصده NudeNet لأي امرأة ترتدي ملابس عادية أو حجاباً؛ فلو أطلق اهتزازاً أو Toast، سيهتز هاتف المستخدم عند تصفح أي محتوى طبيعي.
-* **الحل الوقائي الحاسم:** حصر استجابة الهاتف (الاهتزاز + Toast) **فقط وحصرياً** في فئات العري الصريح (`GENITALIA`, `EXPOSED_BREAST`, `BELLY_EXPOSED`, `FEMALE_GENITALIA_COVERED`)، ومنع أي استجابة تحذيرية لفئة `FEMALE_BREAST_COVERED` أو `FACE_FEMALE`.
+| الرقم | وضع الفشل (Failure Mode) | السيناريو الحرج | آلية التحصين الهندسية في الخطة |
+| :--- | :--- | :--- | :--- |
+| **1** | **تذبذب الحجب الذاتي (Self-Occlusion Loop)** | البلور يحجب المرأة فيعتقد الموديل اختفاءها بعد 400ms. | **تحويل دورة الحياة**: البلور لا يسقط بمؤقت زمني أعمى، بل يسقط فقط إذا أثبتت حركة الشاشة الفعلية مغادرة المنطقة المخالفة. |
+| **2** | **تعليق المربع الأسود (Ghost Box on Harmless Text)** | بقاء الصندوق معلقاً 400ms بعد التمرير السريع فوق نصوص عادية. | **بوابة التفريغ السريع (Fast Dismissal)**: إذا كانت حركة التمرير > 5% وتأكد خلو الإطار الجديد، يُمسح الصندوق فوراً في <50ms بدلاً من 400ms. |
+| **3** | **تغير التطبيق المفاجئ (App Switch Leak)** | المستخدم يضغط زر Home أو يبدل التطبيق لـ WhatsApp أثناء وجود البلور. | **ربط فوري بـ `ContextualGatingWatcher`**: عند تغير التطبيق الأمامي يتم استدعاء `clearImmediate()` فوراً بدون أي تأخير. |
 
 ---
 
-## 4. خطة التعديل الجراحي للملفات (Surgical Implementation Blueprint)
+## 4. المخطط الجراحي للملفات (Surgical File Blueprint)
 
-| المسار | نوع التعديل | التغيير المستهدف |
-| :--- | :---: | :--- |
-| `app/build.gradle.kts` | `[MODIFY]` | إضافة مكتبة ONNX Runtime Mobile الرسمية:<br>`implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")` |
-| `app/src/main/assets/nudenet_320.onnx` | `[NEW]` | نقل ملف النموذج المعتمد والمختبر ميدانياً من `devolopment/320n.onnx` إلى مجلد assets. |
-| `app/.../ai/core/model/NudeNetDetection.kt` | `[NEW]` | صياغة كائنات البيانات والأنواع الممثلة للفئات الـ 18 وتصنيف درجاتها (`HARD_PORN`, `SOFT_PORN`, `VISUAL_BLUR`). |
-| `app/.../ai/core/inference/NudeNetDetector.kt` | `[NEW]` | محرك الاستدلال الآمن والمحصن لـ NudeNet v3 (فك مصفوفات 320x320 + NMS + معالجة Letterbox). |
-| `app/.../ai/service/ScreenAiProjectionService.kt` | `[MODIFY]` | ربط `nudeNetDetector` داخل دورة معالجة الإطارات الحية بالتتابع المعتمد، وتحديث `triggerAlertThrottled` ليدعم اهتزازات ورسائل مختلفة لـ Hard Porn و Soft Porn. |
-| `app/src/main/res/values/strings.xml` | `[MODIFY]` | إضافة نصوص التنبيه الاحترافية لـ Toast باللغتين العربية والإنجليزية. |
+### 1. `FrameDifferencer.kt` [MODIFY]
+* **المسار:** `app/src/main/java/com/drmohammed/antiporn/ai/core/pipeline/FrameDifferencer.kt`
+* **التعديلات الجراحية:**
+  - حفظ آخر نسبة تغير: `var lastChangeRatio: Float = 0f` (قراءة آمنة).
+  - إضافة دالة `isSceneStatic(threshold: Float = 0.02f): Boolean` لتحديد ما إذا كانت الشاشة ساكنة (تغير أقل من 2%).
+  - إضافة دالة `isSignificantMotion(threshold: Float = 0.05f): Boolean` لاكتشاف التمرير السريع (تغير أكبر من 5%).
+
+### 2. `ScreenBlurOverlayManager.kt` [MODIFY]
+* **المسار:** `app/src/main/java/com/drmohammed/antiporn/ai/overlay/ScreenBlurOverlayManager.kt`
+* **التعديلات الجراحية:**
+  - إضافة حالة القفل الثابت: `@Volatile var isStaticLatch: Boolean = false`.
+  - إضافة دالة `retainActiveRegions()`: تقوم بإلغاء `clearRunnable` وتثبيت الصناديق الحالية طالما أن الشاشة ساكنة.
+  - إضافة دالة `dismissFast()`: مسح فوري وسلس في أقل من 50ms عند اكتشاف التمرير بعيداً عن المحتوى.
+  - تعديل دالة `updateRegionsInternal`:
+    - عند استلام مناطق جديدة: تفعيل `isStaticLatch = true` وتحديث الإحداثيات وتثبيت الصندوق.
+    - عدم السماح بحذف الصناديق إلا عبر إشارة حركة مؤكدة من `ScreenAiProjectionService`.
+
+### 3. `ScreenAiProjectionService.kt` [MODIFY]
+* **المسار:** `app/src/main/java/com/drmohammed/antiporn/ai/service/ScreenAiProjectionService.kt`
+* **التعديلات الجراحية:**
+  - في معالج الإطارات `reader.setOnImageAvailableListener`:
+    ```kotlin
+    if (!frameDifferencer.hasScreenChanged(...)) {
+        // الشاشة ساكنة تماماً!
+        if (blurOverlayManager.hasActiveRegions) {
+            blurOverlayManager.retainActiveRegions() // تثبيت البلور دون أي وميض
+        }
+        return@setOnImageAvailableListener // توفير طاقة المعالج
+    }
+    ```
+  - عند اكتشاف حركة (`hasScreenChanged == true`):
+    - فحص الذكاء الاصطناعي `halalifyDetector.detect(rawBitmap)`.
+    - إذا وُجدت إناث: `blurOverlayManager.updateRegionsMapped(...)`.
+    - إذا لم توجد إناث وكانت الحركة كبيرة (`isSignificantMotion`): استدعاء `blurOverlayManager.dismissFast()` لمنع تعليق المربع الأسود.
+
+### 4. `ScreenBlurOverlayManagerTest.kt` [MODIFY]
+* **المسار:** `app/src/test/java/com/drmohammed/antiporn/ai/overlay/ScreenBlurOverlayManagerTest.kt`
+* **التعديلات الجراحية:**
+  - كتابة اختبارات وحدة جديدة تؤكد:
+    1. ثبات الصناديق عند استدعاء `retainActiveRegions()` دون سقوطها بعد 400ms.
+    2. تفريغ الصناديق الفوري عبر `dismissFast()`.
+    3. عمل التنعيم الحركي EMA بالتوازي مع وضع القفل الثابت.
 
 ---
 
-## 5. خطوات التحقق العملي بعد الدمج (PM Verification Steps)
+## 5. خطة توزيع المهام والوكلاء (Subagent Task Breakdown)
 
-1. **التحقق من غض البصر (Halalify):** عند فتح أي صورة لفتاة، تظهر فوراً نافذة التظليل الداكنة الدائرية فوق جسدها ووجهها دون إغلاق الهاتف.
-2. **التحقق من استجابة الـ Soft Porn:** عند ظهور عري جزئي (ملابس سباحة/بطن مكشوف)، يهتز الهاتف نبضة واحدة وتظهر رسالة Toast برتقالية: *"⚠️ تنبيه: تم رصد محتوى فاضح / عري جزئي"*.
-3. **التحقق من استجابة الـ Hard Porn:** عند رصد عورة مغلظة، يهتز الهاتف بنبضتين قويتين وتظهر رسالة Toast تحذيرية حمراء: *"🚨 تحذير: تم رصد محتوى إباحي صريح!"*.
-4. **التحقق من ثبات الأداء:** بقاء الـ FPS سلساً والذاكرة مستقرة دون أي ارتفاع في حرارة الهاتف.
+| الوكيل المتخصص | نطاق العمل (Domain) | المخرجات المتوقعة | بوابة المراجعة (Gate) |
+| :--- | :--- | :--- | :--- |
+| **Subagent 1: Pipeline Specialist** | `FrameDifferencer.kt` | إضافة مقاييس السكون ونسب التغير `isSceneStatic` و `isSignificantMotion` | مراجعة الكود، اختبار عدم وجود تخصيص ذاكرة زائد |
+| **Subagent 2: Overlay Specialist** | `ScreenBlurOverlayManager.kt` | تنفيذ `retainActiveRegions` و `dismissFast` وقفل الثبات | مراجعة التزامن (Thread-Safety) ومؤقتات Handler |
+| **Subagent 3: Service Coordinator** | `ScreenAiProjectionService.kt` | ربط الكاشف بالخدمة ومنع إسقاط البلور أثناء السكون | مراجعة دورة التقاط الإطارات واستهلاك البطارية |
+| **Subagent 4: Quality Auditor** | `Unit Tests & Build` | كتابة الاختبارات وتشغيل `./gradlew test` | التحقق من نجاح كافة الاختبارات بنسبة 100% |
 
 ---
 
-> [!IMPORTANT]
-> **بوابة إذن البدء (Approval Gate):**  
-> يرجى مراجعة الخطة أعلاه. فور كتابتك **"ابدأ"** أو **"Approved"**، سنبدأ مباشرة بتنفيذ التعديلات الجراحية واختبار التطبيق.
+## 6. خطة التحقق والاختبار (Empirical Verification Plan)
+
+1. **الاختبارات الآلية (Automated Tests):**
+   - تشغيل اختبارات الوحدة عبر Gradle:
+     ```powershell
+     ./gradlew testDebugUnitTest --tests "com.drmohammed.antiporn.ai.overlay.ScreenBlurOverlayManagerTest"
+     ```
+   - التأكد من اجتياز 100% من الاختبارات دون أي فشل.
+2. **التحقق البصري والتجريبي على الهاتف (PM Manual Verification Steps):**
+   - **الخطوة 1:** افتح صورة ثابتة تحتوي على مخالفة، ولا تحرك إصبعك على الشاشة لمدة 10 ثوانٍ.
+     - *النتيجة المتوقعة:* يظهر البلور ويبقى ثابتاً 100% دون أي وميض أو ومضة سريعة أو تقطيع كالفلاش.
+   - **الخطوة 2:** مرر إصبعك للأسفل بسرعة لمغادرة الصورة نحو مقال نصي.
+     - *النتيجة المتوقعة:* يختفي البلور فوراً وبسلاسة دون أن يظل معلقاً فوق النصوص البريئة.
+   - **الخطوة 3:** راقب الـ Logcat عبر الأمر:
+     ```powershell
+     adb logcat -v time -s ScreenAiProjectionSvc ScreenBlurOverlay
+     ```
+     - *النتيجة المتوقعة:* في وضع السكون، سترى رسائل تثبيت وثبات الدرع دون أي رسائل تبديل متكررة كل 400ms.

@@ -1,6 +1,7 @@
 package com.drmohammed.antiporn.ai.core.pipeline
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -54,5 +55,43 @@ class RowStrideExtractorTest {
         // Frame 2 after reset must return true due to forced burst (burst=2)
         val frame2 = differencer.hasScreenChanged(dummyBuffer, width, height, width * 4, 4)
         assertTrue("Frame 2 after reset must be scanned (forced burst)", frame2)
+    }
+
+    @Test
+    fun testFrameDifferencer_isSceneStatic_and_isSignificantMotion() {
+        var currentTime = 1000L
+        val differencer = FrameDifferencer(timeProvider = { currentTime })
+        differencer.reset()
+
+        val width = 320
+        val height = 320
+        val buffer = ByteBuffer.allocateDirect(width * height * 4)
+
+        // Drain burst frames (BURST_FRAMES_ON_RESET = 10)
+        for (i in 0 until FrameDifferencer.BURST_FRAMES_ON_RESET) {
+            differencer.hasScreenChanged(buffer, width, height, width * 4, 4)
+        }
+
+        // Frame with identical buffer (0% difference)
+        currentTime += 50 // less than heartbeat
+        val changed = differencer.hasScreenChanged(buffer, width, height, width * 4, 4)
+        assertFalse("Static frame must not be marked changed", changed)
+        assertEquals(0f, differencer.lastChangeRatio, 0.001f)
+        assertTrue(differencer.isSceneStatic(0.02f))
+        assertFalse(differencer.isSignificantMotion(0.05f))
+
+        // Modify entire buffer to simulate significant motion (fast scroll)
+        buffer.rewind()
+        for (i in 0 until (width * height * 4)) {
+            buffer.put(255.toByte())
+        }
+        buffer.rewind()
+
+        currentTime += 50
+        val motionChanged = differencer.hasScreenChanged(buffer, width, height, width * 4, 4)
+        assertTrue("Motion frame must be marked changed", motionChanged)
+        assertTrue("Change ratio must be significant", differencer.lastChangeRatio > 0.05f)
+        assertTrue(differencer.isSignificantMotion(0.05f))
+        assertFalse(differencer.isSceneStatic(0.02f))
     }
 }

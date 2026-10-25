@@ -72,6 +72,7 @@ class ScreenAiProjectionService : Service() {
     private var lastAlertTimeMs: Long = 0L
     private var lastDiagnosticLogMs: Long = 0L
     private var lastHalalifyIdleLogMs: Long = 0L
+    private var lastOverlayRenderTimeMs: Long = 0L
 
     companion object {
         private const val TAG = "ScreenAiProjectionSvc"
@@ -157,7 +158,12 @@ class ScreenAiProjectionService : Service() {
 
         contextualWatcher = ContextualGatingWatcher(
             applicationContext,
-            onStateChanged = { _, _ -> frameDifferencer.reset() }
+            onStateChanged = { isTarget, _ ->
+                frameDifferencer.reset()
+                if (!isTarget && ::blurOverlayManager.isInitialized) {
+                    blurOverlayManager.dismissFast()
+                }
+            }
         )
         contextualWatcher.start()
 
@@ -355,11 +361,14 @@ class ScreenAiProjectionService : Service() {
                     lastDiagnosticLogMs = now
                     val fgPkg = contextualWatcher.currentForegroundPackage
                     val isTarget = contextualWatcher.isTargetAppForeground
-                    Log.i(TAG, "👁️ [ScreenAi Scan Active] Pkg: $fgPkg (Target: $isTarget) | FPS: ${"%.1f".format(currentFps)}")
+                    Log.i(TAG, "[ScreenAi Scan Active] Pkg: $fgPkg (Target: $isTarget) | FPS: ${"%.1f".format(currentFps)}")
                 }
 
-                // صمام الأمان: إهمال فوري للإطار إذا كان المستخدم في تطبيق آمن
+                // صمام الأمان: إهمال فوري للإطار وإزالة البلور فوراً إذا انتقل المستخدم لتطبيق آمن
                 if (!contextualWatcher.isTargetAppForeground) {
+                    if (::blurOverlayManager.isInitialized && blurOverlayManager.hasActiveRegions) {
+                        blurOverlayManager.dismissFast()
+                    }
                     return@setOnImageAvailableListener
                 }
 
@@ -377,6 +386,10 @@ class ScreenAiProjectionService : Service() {
                         rowStride = plane.rowStride,
                         pixelStride = plane.pixelStride
                     )) {
+                    // الشاشة ساكنة تماماً: تثبيت البلور الحالي إن وجد ومنع أي وميض أو سقوط
+                    if (::blurOverlayManager.isInitialized && blurOverlayManager.hasActiveRegions && !blurOverlayManager.isPendingClear) {
+                        blurOverlayManager.retainActiveRegions()
+                    }
                     return@setOnImageAvailableListener
                 }
 
@@ -392,6 +405,7 @@ class ScreenAiProjectionService : Service() {
                     val screenHeight = displayMetrics.heightPixels
 
                     if (femaleDetections.isNotEmpty()) {
+                        lastOverlayRenderTimeMs = SystemClock.elapsedRealtime()
                         val femaleBoxes = femaleDetections.map { it.boundingBox }
                         blurOverlayManager.updateRegionsMapped(
                             rawRegions = femaleBoxes,
@@ -400,7 +414,7 @@ class ScreenAiProjectionService : Service() {
                             sourceWidth = 1,
                             sourceHeight = 1
                         )
-                        Log.i(TAG, "👁️ [Halalify Shield] Active | Female Detections: ${femaleDetections.size} | Top Conf: ${"%.1f".format((femaleDetections.maxOfOrNull { it.confidence } ?: 0f) * 100)}% | Latency: ${halalifyLatency}ms | Boxes: ${femaleBoxes.joinToString { "[${"%.2f".format(it.left)}, ${"%.2f".format(it.top)}, ${"%.2f".format(it.right)}, ${"%.2f".format(it.bottom)}]" }}")
+                        Log.i(TAG, "[Halalify Shield] Active | Female Detections: ${femaleDetections.size} | Top Conf: ${"%.1f".format((femaleDetections.maxOfOrNull { it.confidence } ?: 0f) * 100)}% | Latency: ${halalifyLatency}ms | Boxes: ${femaleBoxes.joinToString { "[${"%.2f".format(it.left)}, ${"%.2f".format(it.top)}, ${"%.2f".format(it.right)}, ${"%.2f".format(it.bottom)}]" }}")
 
                         // الشرط الأول الإلزامي: ربط الاستدعاء المشروط (Gated Execution)
                         // لا يتم تمرير الإطار إلى NudeNetDetector إلا إذا اكتشف Halalify وجود شبهة جسد أو أنثى على الشاشة لتوفير طاقة المعالج ومنع السخونة
@@ -409,12 +423,22 @@ class ScreenAiProjectionService : Service() {
                             handleNudeNetResult(nudeResult)
                         }
                     } else {
-                        blurOverlayManager.updateRegions(emptyList())
+                        // لم يتم رصد أي أنثى في الإطار الجديد
                         val nowMs = SystemClock.elapsedRealtime()
+                        val isOverlayRecentlyRendered = ::blurOverlayManager.isInitialized &&
+                                (nowMs - lastOverlayRenderTimeMs < blurOverlayManager.persistenceMs)
+
+                        if (frameDifferencer.isSignificantMotion()) {
+                            blurOverlayManager.dismissFast()
+                        } else if (frameDifferencer.isSceneStatic(0.02f) && isOverlayRecentlyRendered) {
+                            blurOverlayManager.retainActiveRegions()
+                        } else {
+                            blurOverlayManager.updateRegions(emptyList())
+                        }
                         if (nowMs - lastHalalifyIdleLogMs >= 2000L) {
                             lastHalalifyIdleLogMs = nowMs
                             val rawConfPercent = (halalifyDetector.lastMaxRawFemaleConfidence * 100).toInt()
-                            Log.i(TAG, "👁️ [Halalify Shield] Idle | Female Detections: 0 | Max Raw Conf: $rawConfPercent% | Latency: ${halalifyLatency}ms")
+                            Log.i(TAG, "[Halalify Shield] Idle | Female Detections: 0 | Max Raw Conf: $rawConfPercent% | Latency: ${halalifyLatency}ms")
                         }
                     }
                 }
@@ -552,7 +576,7 @@ class ScreenAiProjectionService : Service() {
             Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
         }
 
-        Log.w(TAG, "🚨 HARD PORN ALERT TRIGGERED: $message")
+        Log.w(TAG, "[ALERT] HARD PORN ALERT TRIGGERED: $message")
     }
 
     private fun triggerSoftPornAlertThrottled(label: String, confidence: Float) {
@@ -573,7 +597,7 @@ class ScreenAiProjectionService : Service() {
             Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
         }
 
-        Log.w(TAG, "⚠️ SOFT PORN ALERT TRIGGERED: $message")
+        Log.w(TAG, "[ALERT] SOFT PORN ALERT TRIGGERED: $message")
     }
 
     private fun triggerDoubleHapticPulse() {

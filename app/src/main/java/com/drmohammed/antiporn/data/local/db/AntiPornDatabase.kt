@@ -316,6 +316,23 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
         }
     }
 
+    @Synchronized
+    fun updatePartnerDisplayName(id: String, newName: String): Int {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(COL_PARTNER_NAME, newName)
+            put(COL_PARTNER_LAST_SYNC_AT, System.currentTimeMillis())
+        }
+        return try {
+            val rows = db.update(TABLE_PARTNERS, values, "$COL_PARTNER_ID = ?", arrayOf(id))
+            Log.d(TAG, "Updated partner $id name to '$newName' in SQLite, affected rows: $rows")
+            rows
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating partner $id name in SQLite", e)
+            throw e
+        }
+    }
+
     private fun cursorToPartner(cursor: Cursor): PartnerEntity {
         return PartnerEntity(
             id = cursor.getString(cursor.getColumnIndexOrThrow(COL_PARTNER_ID)),

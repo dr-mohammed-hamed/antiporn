@@ -73,7 +73,20 @@ class ScreenBlurOverlayManager(
     var isClosed: Boolean = false
         private set
 
+    @Volatile
+    var isStaticLatch: Boolean = false
+        private set
+
+    @Volatile
+    var isPendingClear: Boolean = false
+        private set
+
     private val clearRunnable = Runnable {
+        if (isStaticLatch) {
+            // أثناء القفل الثابت للمشهد الساكن، لا نسمح بإلغاء التعتيم
+            return@Runnable
+        }
+        isPendingClear = false
         synchronized(lock) {
             activeRegions.clear()
         }
@@ -265,9 +278,24 @@ class ScreenBlurOverlayManager(
         }
 
         if (validRegions.isEmpty()) {
-            // قائمة فارغة: لا نمسح الصناديق فوراً، بل ننتظر انتهاء مؤقت الثبات 400ms
+            // قائمة فارغة (مثل حركة طفيفة أو خلو الإطار من الأهداف):
+            // فك القفل الثباتي وجدولة مؤقت الإزالة (persistenceMs) لمنع تعليق المربع (Ghost Box)
+            isStaticLatch = false
+            synchronized(lock) {
+                if (activeRegions.isNotEmpty()) {
+                    isPendingClear = true
+                    overlayScheduler.removeCallbacks(clearRunnable)
+                    overlayScheduler.postDelayed(clearRunnable, persistenceMs)
+                } else {
+                    isPendingClear = false
+                }
+            }
             return
         }
+
+        // إعادة ضبط القفل الثباتي وحالة الإزالة المعلقة عند استلام تحديث جديد حتى تتمكن آلية التثبيت من إدارته
+        isStaticLatch = false
+        isPendingClear = false
 
         val smoothedRegions = ArrayList<RectF>(validRegions.size)
 
@@ -321,18 +349,43 @@ class ScreenBlurOverlayManager(
 
         // تحديث الرسم في الـ View
         overlayView?.updateRegions(activeRegions)
-        logI(TAG, "🛡️ Shield rendered on screen: ${activeRegions.size} region(s) -> ${activeRegions.joinToString { "[L:${it.left.toInt()} T:${it.top.toInt()} R:${it.right.toInt()} B:${it.bottom.toInt()}]" }}")
+        logI(TAG, "[Shield] Rendered on screen: ${activeRegions.size} region(s) -> ${activeRegions.joinToString { "[L:${it.left.toInt()} T:${it.top.toInt()} R:${it.right.toInt()} B:${it.bottom.toInt()}]" }}")
+    }
+
+    /**
+     * تثبيت دائم للصناديق النشطة حالياً لمنع سقوطها أو وميضها طالما أن الشاشة ساكنة.
+     * يلغي مؤقت الحذف ويقفل الحالة (Static Latch) للحفاظ على الدرع البصري بنسبة 100%.
+     */
+    fun retainActiveRegions() {
+        if (isClosed || isPendingClear || isStaticLatch) return
+        isStaticLatch = true
+        postToMainThread {
+            overlayScheduler.removeCallbacks(clearRunnable)
+        }
+    }
+
+    /**
+     * مسح فوري وسريع (<50ms) للصناديق النشطة عند اكتشاف مغادرة المحتوى بالتمرير السريع.
+     * يمنع تعليق المربع الأسود فوق المحتوى البريء (Ghost Box).
+     */
+    fun dismissFast() {
+        if (isClosed) return
+        isStaticLatch = false
+        isPendingClear = false
+        clearImmediate()
     }
 
     /**
      * مسح فوري لجميع صناديق التعتيم دون انتظار المؤقت.
      */
     fun clearImmediate() {
+        isStaticLatch = false
+        isPendingClear = false
+        synchronized(lock) {
+            activeRegions.clear()
+        }
         postToMainThread {
             overlayScheduler.removeCallbacks(clearRunnable)
-            synchronized(lock) {
-                activeRegions.clear()
-            }
             overlayView?.clearRegions()
         }
     }
@@ -498,11 +551,13 @@ class ScreenBlurOverlayManager(
     fun destroy() {
         if (isClosed) return
         isClosed = true
+        isStaticLatch = false
+        isPendingClear = false
+        synchronized(lock) {
+            activeRegions.clear()
+        }
         postToMainThread {
             overlayScheduler.removeCallbacks(clearRunnable)
-            synchronized(lock) {
-                activeRegions.clear()
-            }
             detachOverlay()
         }
     }
@@ -524,6 +579,7 @@ class ScreenBlurOverlayManager(
 
     @VisibleForTesting
     internal fun triggerPersistenceExpiryForTesting() {
+        isStaticLatch = false
         clearRunnable.run()
     }
 }

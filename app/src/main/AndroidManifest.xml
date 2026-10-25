@@ -1,9 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -134,6 +135,24 @@
             android:label="@string/title_guardian_control" />
         <activity
             android:name=".ui.accountability.RemoteAppManagerActivity"
+            android:exported="false" />
+        <!-- Device Owner In-App Provisioning -->
+        <activity
+            android:name=".provisioning.ui.ProvisioningWizardActivity"
+            android:exported="false"
+            android:label="@string/provisioning_wizard_title" />
+
+        <service
+            android:name=".provisioning.service.AdbPairingNotificationService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Device Owner local pairing and setup" />
+        </service>
+
+        <receiver
+            android:name=".provisioning.receiver.PairingCodeReceiver"
             android:exported="false" />
     </application>
 

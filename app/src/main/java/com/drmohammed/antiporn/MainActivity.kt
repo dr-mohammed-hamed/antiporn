@@ -29,6 +29,7 @@ import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
 import com.drmohammed.antiporn.curfew.NapController
+import com.drmohammed.antiporn.provisioning.ui.ProvisioningWizardActivity
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
 import com.drmohammed.antiporn.ui.ProtectionUiState
@@ -236,6 +237,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        viewBinder.cardAdbHelp.setOnClickListener {
+            startActivity(Intent(this, ProvisioningWizardActivity::class.java))
+        }
+
         viewBinder.btnOpenAccountabilityHub.setOnClickListener {
             startActivity(Intent(this, com.drmohammed.antiporn.ui.accountability.AccountabilityHubActivity::class.java))
         }

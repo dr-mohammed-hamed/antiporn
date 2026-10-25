@@ -1,4 +1,17 @@
 <resources>
+    <string name="app_name">ISMAH</string>
+    <string name="header_title">ISMAH</string>
+    <string name="header_title_unified">ISMAH | عِصمة</string>
+    <string name="header_ayah_quran"><![CDATA[﴿ وَلَقَدْ رَاوَدتُّهُ عَن نَّفْسِهِ <font color="#FFA834"><b>فَاسْتَعْصَمَ</b></font> ﴾]]></string>
+    <string name="header_ayah_ref">Surah Yusuf: 32</string>
+    <string name="header_subtitle">Encrypted Shield with Device Owner Authority</string>
+    <string name="card_nextdns_title">Family Content Filter &amp; Security (DNS)</string>
+    <string name="card_nextdns_default">Family Filter Server (Enforced &amp; Locked)</string>
+    <string name="card_nextdns_locked">Device DNS settings are locked and tamper-proof.</string>
+    <string name="watchdog_notification_title">ISMAH Protection Active</string>
+    <string name="watchdog_notification_desc">DNS and network monitoring running in background</string>
+    <string name="admin_disable_warning">Security Warning: ISMAH protection cannot be disabled to prevent bypass!</string>
+    <string name="curfew_vpn_session_name">ISMAH Curfew Blackhole</string>
     <string name="toast_app_suspended_by_guardian">This app has been suspended pending guardian approval</string>
     <string name="guardian_curfew_master_switch_title">Enable Scheduled Night Curfew</string>
     <string name="guardian_curfew_master_switch_desc">Enable or completely turn off automated night curfew on ward device</string>
@@ -24,16 +37,71 @@
     <string name="btn_save_app_manager_changes">Save Changes</string>
     <string name="toast_app_manager_saved">App policies successfully saved</string>
     <string name="toast_app_manager_save_failed">Failed to save app policies</string>
-    <string name="ai_alert_hard_porn">🚨 Critical Warning: Explicit pornographic content detected! (%1$d%%)</string>
-    <string name="ai_alert_soft_porn">⚠️ Alert: Inappropriate content / partial nudity detected: %1$s (%2$d%%)</string>
+    <string name="ai_alert_hard_porn">Critical Warning: Explicit pornographic content detected! (%1$d%%)</string>
+    <string name="ai_alert_soft_porn">Alert: Inappropriate content / partial nudity detected: %1$s (%2$d%%)</string>
 
     <!-- Unsaved Changes & Dialog Clarifications -->
-    <string name="dialog_unsaved_changes_title">Unsaved Changes ⚠️</string>
+    <string name="dialog_unsaved_changes_title">Unsaved Changes</string>
     <string name="dialog_unsaved_changes_msg">You have unsaved changes. Do you want to discard them and exit or keep editing?</string>
     <string name="btn_discard_changes">Discard &amp; Exit</string>
     <string name="btn_keep_editing">Keep Editing</string>
     <string name="dialog_add_as_ward_desc">You will control their curfew schedule, manage their apps, and approve new installs.</string>
     <string name="dialog_add_as_guardian_desc">They will have supervisory authority over your device, curfew, and apps.</string>
     <string name="remote_app_manager_curfew_disabled_hint">Unavailable because app is frozen 24/7</string>
+    <string name="title_accountability_hub">Control &amp; Supervision Center</string>
+    <string name="subtitle_accountability_hub">Supervised devices and protection management</string>
+    <string name="btn_add_partner">Add Device to Supervise</string>
+    <string name="dialog_add_partner_title">Add Device to Supervise</string>
+    <string name="dialog_add_partner_code_hint">Pairing code (6 chars)</string>
+    <string name="dialog_btn_connect">Connect &amp; Supervise</string>
+    <string name="btn_open_accountability_hub">Control &amp; Supervision Center</string>
+    <string name="status_device_supervised_compact">Device is bound to a single verified guardian</string>
+    <string name="dialog_add_ward_hint">Enter device pairing code to supervise and manage its protection:</string>
+    <string name="my_display_name_label">My Display Name:</string>
+    <string name="dialog_edit_my_name_title">Edit Your Display Name</string>
+    <string name="dialog_edit_my_name_hint">Enter your name (e.g. John, Dad...)</string>
+    <string name="dialog_edit_ward_name_title">Edit Ward Device Name</string>
+    <string name="dialog_edit_ward_name_hint">Enter a custom alias (e.g. Omar phone)</string>
+    <string name="toast_name_saved">Name updated successfully</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_edit">Edit</string>
     <string name="btn_back">Back</string>
+
+    <!-- In-App Provisioning Wizard Strings -->
+    <string name="provisioning_wizard_title">Maximum Protection Setup Wizard</string>
+    <string name="provisioning_wizard_subtitle">Self-activate Device Owner permission without a PC with minimal friction</string>
+    <string name="provisioning_step1_title">Step 1: Account Audit (Android Requirement)</string>
+    <string name="provisioning_step1_ready">Device is ready for pairing (No active accounts)</string>
+    <string name="provisioning_step1_accounts_found">Found %1$d active accounts that must be temporarily removed to set Device Owner.</string>
+    <string name="provisioning_btn_open_accounts">Open Accounts Settings for Temporary Removal</string>
+    <string name="provisioning_step2_title">Step 2: Enable Wireless Debugging</string>
+    <string name="provisioning_step2_desc">1. Tap button below to open Developer Options.\n2. Enable "Wireless Debugging".\n3. Tap "Pair device with pairing code".</string>
+    <string name="provisioning_btn_open_dev_options">Open Developer Options</string>
+    <string name="provisioning_step3_title">Step 3: Enter 6-digit Pairing Code</string>
+    <string name="provisioning_radar_waiting">Radar searching for wireless pairing signal...</string>
+    <string name="provisioning_radar_port_found">Captured port automatically (%1$d)</string>
+    <string name="provisioning_input_hint">Enter 6-digit code here</string>
+    <string name="provisioning_btn_pair_and_activate">Confirm &amp; Activate Maximum Protection</string>
+    <string name="provisioning_notification_hint">Smart Tip: You can enter the code directly from the notification drawer without leaving Settings!</string>
+    <string name="provisioning_shizuku_title">Shizuku Fast Track (One Tap)</string>
+    <string name="provisioning_shizuku_desc">Shizuku was detected running on this device! You can activate with one tap without codes.</string>
+    <string name="provisioning_btn_shizuku_activate">Instant Activation via Shizuku</string>
+    <string name="provisioning_shizuku_requesting">Requesting Shizuku permission and activating Device Owner...</string>
+    <string name="provisioning_otg_title">Facing issues or no Wi-Fi?</string>
+    <string name="provisioning_otg_desc">Connect your phone to another phone via charger cable (Type-C to Type-C) to activate with one click from your friend\'s phone without Wi-Fi or PC.</string>
+    <string name="provisioning_radar_active_title">Device Owner Pairing Radar Active</string>
+    <string name="provisioning_radar_active_desc">Waiting for "Pair device with pairing code" screen in Developer Options...</string>
+    <string name="provisioning_prompt_title">Enter Device Owner Pairing Code</string>
+    <string name="provisioning_prompt_desc">Port captured (%1$d). Enter the 6 digits shown on screen:</string>
+    <string name="provisioning_input_label">Enter 6-digit code</string>
+    <string name="provisioning_action_submit">Submit &amp; Activate</string>
+    <string name="provisioning_channel_name">Device Owner Setup Wizard</string>
+    <string name="provisioning_channel_desc">Interactive notifications for Android wireless pairing</string>
+    <string name="provisioning_in_progress_title">Activating Device Owner...</string>
+    <string name="provisioning_in_progress_desc">Applying encryption keys and granting Device Owner privileges.</string>
+    <string name="provisioning_success_title">Maximum Protection Activated!</string>
+    <string name="provisioning_success_desc">AntiPorn is now Device Owner. You can safely re-add your accounts.</string>
+    <string name="provisioning_failed_title">Failed to activate Device Owner</string>
+    <string name="toast_provisioning_success">Congratulations! Device Owner permission activated successfully</string>
+    <string name="toast_provisioning_failed">Pairing failed: %1$s</string>
 </resources>
