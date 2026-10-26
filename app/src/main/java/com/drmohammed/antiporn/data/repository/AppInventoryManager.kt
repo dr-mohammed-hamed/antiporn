@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
@@ -28,6 +29,7 @@ class AppInventoryManager private constructor(context: Context) {
 
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    @Volatile private var lastSyncElapsedRealtime: Long = 0L
 
     /**
      * Scans installed applications on the device, filtering out core system applications,
@@ -132,9 +134,17 @@ class AppInventoryManager private constructor(context: Context) {
 
     /**
      * Uploads the full installed applications inventory to Firestore under `/inventories/{wardUid}`.
+     * Enforces a 15-minute throttle between calls unless [force] is true.
      */
-    suspend fun syncInventoryToCloud() = withContext(Dispatchers.IO) {
+    suspend fun syncInventoryToCloud(force: Boolean = false) = withContext(Dispatchers.IO) {
         try {
+            val now = System.currentTimeMillis()
+            val elapsedNow = SystemClock.elapsedRealtime()
+            if (!force && (elapsedNow - lastSyncElapsedRealtime < MIN_SYNC_INTERVAL_MS)) {
+                Log.d(TAG, "Skipping inventory sync: throttled (last sync ${(elapsedNow - lastSyncElapsedRealtime) / 1000}s ago)")
+                return@withContext
+            }
+
             val uid = AccountabilityRepository.getInstance(appContext).getCachedUid()
             if (uid.isBlank()) {
                 Log.w(TAG, "Cannot sync inventory: Cached ward UID is blank")
@@ -144,12 +154,13 @@ class AppInventoryManager private constructor(context: Context) {
             val apps = getInstalledApps(appContext)
             val data = mapOf(
                 "wardUid" to uid,
-                "updatedAt" to System.currentTimeMillis(),
+                "updatedAt" to now,
                 "apps" to apps.map { it.toMap() }
             )
 
             val firestore = FirebaseFirestore.getInstance()
             firestore.collection("inventories").document(uid).set(data).await()
+            lastSyncElapsedRealtime = elapsedNow
             Log.i(TAG, "Successfully synced ${apps.size} installed apps to cloud inventory for ward $uid")
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing app inventory to Firestore", e)
@@ -159,10 +170,10 @@ class AppInventoryManager private constructor(context: Context) {
     /**
      * Triggers asynchronous cloud synchronization of the device application inventory.
      */
-    fun syncInventoryToCloudAsync() {
+    fun syncInventoryToCloudAsync(force: Boolean = false) {
         scope.launch {
             try {
-                syncInventoryToCloud()
+                syncInventoryToCloud(force)
             } catch (e: Exception) {
                 Log.e(TAG, "Background sync inventory execution failed", e)
             }
@@ -171,6 +182,7 @@ class AppInventoryManager private constructor(context: Context) {
 
     companion object {
         private const val TAG = "AntiPorn_AppInventory"
+        private const val MIN_SYNC_INTERVAL_MS = 15 * 60 * 1000L // 15 minutes throttle
 
         @Volatile
         private var instance: AppInventoryManager? = null

@@ -12,12 +12,15 @@ import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import com.drmohammed.antiporn.curfew.CurfewAppResolver
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
+import com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher
 import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
 import com.drmohammed.antiporn.data.local.db.entity.PendingApprovalEntity
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,38 +41,50 @@ class ApprovalRepository private constructor(context: Context) {
 
     /**
      * Intercepts a newly installed package:
-     * Freezes it in 0ms via DevicePolicyManager, records it locally, and submits a cloud approval ticket.
+     * Freezes it in 0ms via DevicePolicyManager, records it locally, and asynchronously submits a cloud approval ticket.
      */
     fun freezeAndSubmitApproval(packageName: String) {
-        val isImmune = packageName == appContext.packageName ||
-            AppPolicyRegistry.getImmunePackages().contains(packageName) ||
-            AppPolicyRegistry.getSystemCriticalPackages().contains(packageName) ||
-            AppPolicyRegistry.isImmune(packageName)
-
-        if (isImmune) {
-            Log.i(TAG, "Package $packageName is immune/self. Skipping freeze and approval submission.")
+        if (CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)) {
+            Log.i(TAG, "Package $packageName is immune/self/system. Skipping freeze and approval submission.")
             return
         }
 
-        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
+        scope.launch {
+            freezeAndSubmitApprovalSync(packageName)
+        }
+    }
+
+    /**
+     * Immediately freezes a newly installed package in 0ms locally via DevicePolicyManager,
+     * writes the record to SQLite, and synchronizes the active Zero-Trust foreground watcher.
+     * Operates completely offline in < 5ms without any network dependency.
+     */
+    fun freezeAndSubmitApprovalLocal(packageName: String): Boolean {
+        if (com.drmohammed.antiporn.curfew.CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)) {
+            Log.i(TAG, "IRON GUARD: Package $packageName is critical system / launcher / dialer / keyboard / immune. Skipping freeze.")
+            return false
+        }
+
+        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
+            ?: return false
         val admin = ComponentName(appContext, AdminReceiver::class.java)
 
         if (!dpm.isDeviceOwnerApp(appContext.packageName)) {
             Log.w(TAG, "Cannot freeze $packageName: Not Device Owner")
-            return
+            return false
         }
 
         // 1. Instant 0ms suspension
-        try {
-            suspendWithGuardianMessage(
-                dpm = dpm,
-                admin = admin,
-                packageName = packageName,
-                message = appContext.getString(R.string.toast_app_suspended_by_guardian)
-            )
+        val suspended = suspendWithGuardianMessage(
+            dpm = dpm,
+            admin = admin,
+            packageName = packageName,
+            message = appContext.getString(R.string.toast_app_suspended_by_guardian)
+        )
+        if (suspended) {
             Log.i(TAG, "Instant 0ms freeze applied to package: $packageName")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed instant freeze for $packageName", e)
+        } else {
+            Log.w(TAG, "Instant freeze reported failure or partial failure for $packageName")
         }
 
         // 2. Resolve human-readable application label
@@ -92,9 +107,45 @@ class ApprovalRepository private constructor(context: Context) {
         // 3. Save locally in SQLite
         database.savePendingApproval(approvalEntity)
 
-        // 4. Push to Cloud Firestore for Guardian review
-        scope.launch {
-            uploadSingleApproval(approvalEntity)
+        // 4. Update Zero-Trust active foreground watcher immediately
+        ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+
+        return true
+    }
+
+    suspend fun freezeAndSubmitApprovalSync(packageName: String): Boolean = withContext(Dispatchers.IO) {
+        val localSuccess = freezeAndSubmitApprovalLocal(packageName)
+        if (!localSuccess) return@withContext false
+
+        val entity = database.getPendingApprovals().find { it.packageName == packageName }
+            ?: return@withContext false
+
+        // ANR-protected cloud upload with 3500ms timeout
+        val uploadSuccess = kotlinx.coroutines.withTimeoutOrNull(3500L) {
+            uploadSingleApprovalSync(entity)
+        } ?: false
+
+        Log.i(TAG, "freezeAndSubmitApprovalSync completed for $packageName (uploaded=$uploadSuccess)")
+        uploadSuccess
+    }
+
+    /**
+     * Blocking wrapper for [freezeAndSubmitApprovalSync] with strict 3500ms ANR timeout.
+     */
+    fun freezeAndSubmitApprovalBlocking(packageName: String): Boolean {
+        val localSuccess = freezeAndSubmitApprovalLocal(packageName)
+        if (!localSuccess) return false
+
+        return kotlinx.coroutines.runBlocking {
+            kotlinx.coroutines.withTimeoutOrNull(3500L) {
+                try {
+                    syncPendingApprovalsToCloud()
+                    true
+                } catch (e: Exception) {
+                    Log.w(TAG, "Cloud sync in freezeAndSubmitApprovalBlocking timed out or failed: ${e.message}")
+                    false
+                }
+            } ?: false
         }
     }
 
@@ -107,16 +158,26 @@ class ApprovalRepository private constructor(context: Context) {
             if (unsynced.isEmpty()) return@withContext
             Log.i(TAG, "Syncing ${unsynced.size} unsynced pending approvals to cloud")
             for (approval in unsynced) {
-                uploadSingleApproval(approval)
+                uploadSingleApprovalSync(approval)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in syncPendingApprovalsToCloud", e)
         }
     }
 
-    private suspend fun uploadSingleApproval(approval: PendingApprovalEntity) {
+    /**
+     * Synchronously uploads a single approval ticket to `/policies/$uid/approvals/${approval.packageName}`.
+     * Returns true if successful, false otherwise.
+     */
+    suspend fun uploadSingleApprovalSync(approval: PendingApprovalEntity): Boolean = withContext(Dispatchers.IO) {
         try {
-            val uid = AccountabilityRepository.getInstance(appContext).getCachedUid()
+            val uid = FirebaseAuth.getInstance().currentUser?.uid
+                ?: AccountabilityRepository.getInstance(appContext).getCachedUid()
+            if (uid.isBlank()) {
+                Log.w(TAG, "Cannot upload approval for ${approval.packageName}: UID is blank")
+                return@withContext false
+            }
+
             val firestore = FirebaseFirestore.getInstance()
             val data = mapOf(
                 "packageName" to approval.packageName,
@@ -125,12 +186,24 @@ class ApprovalRepository private constructor(context: Context) {
                 "status" to approval.status,
                 "requestedAt" to approval.requestedAt
             )
-            firestore.collection("approvals").document("${uid}_${approval.packageName}").set(data).await()
+            firestore.collection("policies")
+                .document(uid)
+                .collection("approvals")
+                .document(approval.packageName)
+                .set(data)
+                .await()
+
             database.markApprovalCloudSynced(approval.packageName, true)
-            Log.i(TAG, "Uploaded approval ticket to cloud for ${approval.packageName} with UID $uid")
+            Log.i(TAG, "Uploaded approval ticket to cloud for ${approval.packageName} under /policies/$uid/approvals")
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Error uploading approval ticket to Firestore for ${approval.packageName}", e)
+            false
         }
+    }
+
+    suspend fun uploadSingleApproval(approval: PendingApprovalEntity): Boolean {
+        return uploadSingleApprovalSync(approval)
     }
 
     /**
@@ -144,6 +217,7 @@ class ApprovalRepository private constructor(context: Context) {
         if (AppSuspensionShield.isBlacklisted(packageName)) {
             Log.w(TAG, "Security Alert: Cannot unsuspend $packageName - permanently blacklisted!")
             database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_REJECTED, "SECURITY_GUARD")
+            ZeroTrustForegroundWatcher.syncWatcherState(appContext)
             return
         }
 
@@ -151,6 +225,7 @@ class ApprovalRepository private constructor(context: Context) {
         if (policy.customBlacklistPackages.contains(packageName)) {
             Log.w(TAG, "Security Alert: Cannot unsuspend $packageName - in custom blacklist!")
             database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_REJECTED, "CUSTOM_BLACKLIST")
+            ZeroTrustForegroundWatcher.syncWatcherState(appContext)
             return
         }
 
@@ -166,15 +241,56 @@ class ApprovalRepository private constructor(context: Context) {
         if (isBlockActive && !isWhitelisted) {
             Log.i(TAG, "Package $packageName approved by $decidedBy, but kept suspended until curfew wakeup")
             database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
+            ZeroTrustForegroundWatcher.syncWatcherState(appContext)
             return
         }
 
         try {
-            dpm.setPackagesSuspended(admin, arrayOf(packageName), false)
-            database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
-            Log.i(TAG, "Unfrozen and approved package: $packageName")
+            val failed: Array<String>? = try {
+                dpm.setPackagesSuspended(admin, arrayOf(packageName), false)
+            } catch (e: Exception) {
+                Log.w(TAG, "Exception calling setPackagesSuspended(false) for $packageName", e)
+                null
+            }
+
+            if (failed?.contains(packageName) == true) {
+                val isInstalled = try {
+                    appContext.packageManager.getPackageInfo(packageName, 0)
+                    true
+                } catch (e: PackageManager.NameNotFoundException) {
+                    false
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error checking package info for $packageName", e)
+                    false
+                }
+
+                if (!isInstalled) {
+                    Log.i(TAG, "Package $packageName is uninstalled; marking pending approval as approved/resolved")
+                    database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
+                    ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+                } else {
+                    Log.e(TAG, "Failed unfreezing package $packageName: DPM returned failure for package")
+                }
+            } else {
+                database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
+                Log.i(TAG, "Unfrozen and approved package: $packageName")
+                ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed unfreezing package $packageName", e)
+        }
+    }
+
+    /**
+     * Cleans up pending approval when a package is uninstalled or removed.
+     */
+    fun removePendingApproval(packageName: String) {
+        try {
+            database.deletePendingApproval(packageName)
+            ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+            Log.i(TAG, "Removed pending approval for package: $packageName")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed removing pending approval for package $packageName", e)
         }
     }
 
@@ -185,20 +301,23 @@ class ApprovalRepository private constructor(context: Context) {
         try {
             database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_REJECTED, decidedBy)
             Log.i(TAG, "Recorded rejection for package: $packageName by $decidedBy")
+            ZeroTrustForegroundWatcher.syncWatcherState(appContext)
         } catch (e: Exception) {
             Log.e(TAG, "Failed recording rejection for package $packageName", e)
         }
     }
 
     /**
-     * Starts listening to Firestore for real-time approvals and rejections for this ward device.
+     * Starts listening to Firestore for real-time approvals and rejections for this ward device
+     * under `/policies/$wardUid/approvals`.
      */
     fun startApprovalsSync(wardUid: String) {
         approvalsListener?.remove()
         try {
             val firestore = FirebaseFirestore.getInstance()
-            approvalsListener = firestore.collection("approvals")
-                .whereEqualTo("wardUid", wardUid)
+            approvalsListener = firestore.collection("policies")
+                .document(wardUid)
+                .collection("approvals")
                 .addSnapshotListener { snapshots, error ->
                     if (error != null) {
                         Log.w(TAG, "Error listening for approval updates: ${error.message}")
@@ -208,7 +327,7 @@ class ApprovalRepository private constructor(context: Context) {
                         scope.launch {
                             try {
                                 for (doc in snapshots.documents) {
-                                    val packageName = doc.getString("packageName") ?: continue
+                                    val packageName = doc.getString("packageName") ?: doc.id
                                     val status = doc.getString("status") ?: continue
                                     val decidedBy = doc.getString("decidedBy")
                                     val pendingList = getLocalPendingApprovals()
@@ -232,7 +351,7 @@ class ApprovalRepository private constructor(context: Context) {
                         }
                     }
                 }
-            Log.i(TAG, "Started approvals sync for ward $wardUid")
+            Log.i(TAG, "Started approvals sync for ward $wardUid on /policies/$wardUid/approvals")
             scope.launch {
                 syncPendingApprovalsToCloud()
             }
@@ -242,7 +361,21 @@ class ApprovalRepository private constructor(context: Context) {
     }
 
     /**
+     * Safely detaches the Firestore approvals snapshot listener on teardown.
+     */
+    fun stopApprovalsSync() {
+        approvalsListener?.remove()
+        approvalsListener = null
+        Log.i(TAG, "Stopped approvals sync listener")
+    }
+
+    /**
      * Submits an approval or rejection from a Guardian to a Ward.
+     * Updates the approval subcollection document `/policies/$wardUid/approvals/$packageName`
+     * and simultaneously bumps the parent policy document `/policies/$wardUid` with:
+     * `version = FieldValue.increment(1)` and `"updatedAt" = System.currentTimeMillis()`.
+     * This dual-channel update guarantees that the ward's active PolicyRepository listener
+     * is immediately triggered and wakes up to reconcile the system.
      */
     suspend fun resolveWardApproval(
         wardUid: String,
@@ -252,18 +385,37 @@ class ApprovalRepository private constructor(context: Context) {
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             val firestore = FirebaseFirestore.getInstance()
-            val docRef = firestore.collection("approvals").document("${wardUid}_${packageName}")
             val newStatus = if (approve) "APPROVED" else "REJECTED"
-            val updates = mapOf(
+            val now = System.currentTimeMillis()
+
+            val batch = firestore.batch()
+
+            // Channel 1: Update the approval subcollection document /policies/$wardUid/approvals/$packageName
+            val approvalDocRef = firestore.collection("policies")
+                .document(wardUid)
+                .collection("approvals")
+                .document(packageName)
+
+            val approvalUpdates = mapOf(
                 "status" to newStatus,
                 "decidedBy" to guardianName,
-                "decidedAt" to System.currentTimeMillis()
+                "decidedAt" to now
             )
-            docRef.update(updates).await()
-            Log.i(TAG, "Resolved ward approval for $packageName: $newStatus")
+            batch.set(approvalDocRef, approvalUpdates, SetOptions.merge())
+
+            // Channel 2: Simultaneously bump parent policy document /policies/$wardUid
+            val policyDocRef = firestore.collection("policies").document(wardUid)
+            val policyUpdates = mapOf(
+                "version" to FieldValue.increment(1),
+                "updatedAt" to now
+            )
+            batch.set(policyDocRef, policyUpdates, SetOptions.merge())
+
+            batch.commit().await()
+            Log.i(TAG, "Resolved ward approval for $packageName: $newStatus with dual-channel policy bump (ward: $wardUid)")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed resolving ward approval", e)
+            Log.e(TAG, "Failed resolving ward approval for $packageName", e)
             false
         }
     }
@@ -275,7 +427,11 @@ class ApprovalRepository private constructor(context: Context) {
         admin: ComponentName,
         packageName: String,
         message: String
-    ) {
+    ): Boolean {
+        if (com.drmohammed.antiporn.curfew.CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)) {
+            Log.w(TAG, "IRON GUARD: Strictly refusing to suspend critical system package: $packageName")
+            return false
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
                 val builderClass = Class.forName("android.content.pm.SuspendDialogInfo\$Builder")
@@ -294,14 +450,40 @@ class ApprovalRepository private constructor(context: Context) {
                     android.os.PersistableBundle::class.java,
                     Class.forName("android.content.pm.SuspendDialogInfo")
                 )
-                suspendMethod.invoke(dpm, admin, arrayOf(packageName), true, null, null, dialogInfo)
-                Log.i(TAG, "Applied Zero-Trust suspension with custom SuspendDialogInfo for $packageName")
-                return
+                val rawResult = suspendMethod.invoke(dpm, admin, arrayOf(packageName), true, null, null, dialogInfo)
+                val failedPkgs = (rawResult as? Array<*>)?.filterIsInstance<String>() ?: emptyList()
+                if (failedPkgs.contains(packageName)) {
+                    Log.w(TAG, "Reflection setPackagesSuspended returned failed package for $packageName: $failedPkgs. Attempting standard fallback.")
+                } else {
+                    Log.i(TAG, "Applied Zero-Trust suspension with custom SuspendDialogInfo for $packageName")
+                    return true
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "Reflection for SuspendDialogInfo failed, falling back to standard suspension", e)
             }
         }
-        dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
+
+        return try {
+            val failedPkgs: Array<String>? = try {
+                dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
+            } catch (e: Exception) {
+                Log.w(TAG, "Exception invoking standard setPackagesSuspended for $packageName", e)
+                null
+            }
+            if (failedPkgs?.contains(packageName) == true) {
+                Log.e(TAG, "Standard setPackagesSuspended failed for $packageName (failed packages: ${failedPkgs.joinToString()})")
+                false
+            } else if (failedPkgs != null) {
+                Log.i(TAG, "Applied Zero-Trust standard suspension for $packageName")
+                true
+            } else {
+                Log.w(TAG, "Standard setPackagesSuspended returned null for $packageName")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception during standard setPackagesSuspended for $packageName", e)
+            false
+        }
     }
 
     companion object {

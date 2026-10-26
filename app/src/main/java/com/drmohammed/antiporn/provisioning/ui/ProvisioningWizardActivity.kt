@@ -31,6 +31,7 @@ import com.drmohammed.antiporn.provisioning.receiver.PairingCodeReceiver
 import com.drmohammed.antiporn.provisioning.service.AdbPairingNotificationService
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -47,6 +48,7 @@ class ProvisioningWizardActivity : AppCompatActivity() {
     private lateinit var tvAccountsList: TextView
     private lateinit var btnOpenAccounts: MaterialButton
 
+    private lateinit var tvStep2Desc: TextView
     private lateinit var btnOpenDevOptions: MaterialButton
 
     private lateinit var tvRadarStatus: TextView
@@ -156,6 +158,7 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         tvAccountsList = findViewById(R.id.tvAccountsList)
         btnOpenAccounts = findViewById(R.id.btnOpenAccounts)
 
+        tvStep2Desc = findViewById(R.id.tvStep2Desc)
         btnOpenDevOptions = findViewById(R.id.btnOpenDevOptions)
 
         tvRadarStatus = findViewById(R.id.tvRadarStatus)
@@ -176,33 +179,42 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         }
 
         btnOpenDevOptions.setOnClickListener {
+            if (!isDevOptionsEnabled()) {
+                showEnableDevOptionsDialog()
+                return@setOnClickListener
+            }
+
             // Priority 1: Direct jump to Wireless Debugging sub-screen (Android 12+ QS Tile route)
-            try {
-                val directIntent = Intent("android.service.quicksettings.action.QS_TILE_PREFERENCES").apply {
-                    putExtra(
-                        Intent.EXTRA_COMPONENT_NAME,
-                        ComponentName("com.android.settings", "com.android.settings.development.qstile.DevelopmentTiles\$WirelessDebugging")
-                    )
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                startActivity(directIntent)
-            } catch (e: Exception) {
-                Log.w(TAG, "Direct jump to Wireless Debugging failed, falling back to Development Settings: ${e.message}")
-                // Priority 2: Standard Developer Options (starts at top of page)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 try {
-                    startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                    val directIntent = Intent("android.service.quicksettings.action.QS_TILE_PREFERENCES").apply {
+                        putExtra(
+                            Intent.EXTRA_COMPONENT_NAME,
+                            ComponentName("com.android.settings", "com.android.settings.development.qstile.DevelopmentTiles\$WirelessDebugging")
+                        )
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(directIntent)
+                    return@setOnClickListener
+                } catch (e: Exception) {
+                    Log.w(TAG, "Direct jump to Wireless Debugging failed, falling back to Development Settings: ${e.message}")
+                }
+            }
+
+            // Priority 2: Standard Developer Options (starts at top of page)
+            try {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                })
+            } catch (ex: Exception) {
+                Log.w(TAG, "Failed opening development settings directly, opening general settings", ex)
+                // Priority 3: General Settings fallback
+                try {
+                    startActivity(Intent(Settings.ACTION_SETTINGS).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK
                     })
-                } catch (ex: Exception) {
-                    Log.w(TAG, "Failed opening development settings directly, opening general settings", ex)
-                    // Priority 3: General Settings fallback
-                    try {
-                        startActivity(Intent(Settings.ACTION_SETTINGS).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        })
-                    } catch (finalEx: Exception) {
-                        Toast.makeText(this, R.string.toast_open_settings_failed, Toast.LENGTH_SHORT).show()
-                    }
+                } catch (finalEx: Exception) {
+                    Toast.makeText(this, R.string.toast_open_settings_failed, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -307,6 +319,7 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         }
 
         checkAccountsStatus()
+        checkDevOptionsStatus()
         checkShizukuStatus()
     }
 
@@ -349,6 +362,48 @@ class ProvisioningWizardActivity : AppCompatActivity() {
             cardStep1.strokeColor = ContextCompat.getColor(this, R.color.status_orange)
         }
         validateInputs()
+    }
+
+    private fun isDevOptionsEnabled(): Boolean {
+        return try {
+            Settings.Global.getInt(contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun checkDevOptionsStatus() {
+        if (isDevOptionsEnabled()) {
+            btnOpenDevOptions.setText(R.string.provisioning_btn_open_dev_options)
+            tvStep2Desc.setText(R.string.provisioning_step2_desc)
+        } else {
+            btnOpenDevOptions.setText(R.string.provisioning_btn_enable_dev_options)
+            tvStep2Desc.setText(R.string.provisioning_step2_desc_disabled)
+        }
+    }
+
+    private fun showEnableDevOptionsDialog() {
+        if (isFinishing || isDestroyed) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_enable_dev_title)
+            .setMessage(R.string.dialog_enable_dev_desc)
+            .setPositiveButton(R.string.dialog_enable_dev_btn_open) { _, _ ->
+                try {
+                    startActivity(Intent(Settings.ACTION_DEVICE_INFO_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    })
+                } catch (e: Exception) {
+                    try {
+                        startActivity(Intent(Settings.ACTION_SETTINGS).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        })
+                    } catch (ex: Exception) {
+                        Toast.makeText(this, R.string.toast_open_settings_failed, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.btn_back, null)
+            .show()
     }
 
     private fun checkShizukuStatus() {

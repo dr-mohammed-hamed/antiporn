@@ -498,4 +498,17 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
             throw e
         }
     }
+
+    @Synchronized
+    fun deletePendingApproval(packageName: String): Int {
+        val db = writableDatabase
+        return try {
+            val rows = db.delete(TABLE_PENDING_APPROVALS, "$COL_APPROVAL_PKG = ?", arrayOf(packageName))
+            Log.d(TAG, "Deleted pending approval for $packageName from SQLite, affected rows: $rows")
+            rows
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting pending approval from SQLite", e)
+            0
+        }
+    }
 }

@@ -3,6 +3,7 @@ package com.drmohammed.antiporn.ui.accountability
 import android.graphics.Color
 import android.graphics.Typeface
 import android.util.Log
+import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -31,6 +32,7 @@ class GuardianApprovalsViewBinder(
     fun renderPendingApprovals(items: List<Pair<String, String>>) {
         layoutPendingApps.removeAllViews()
         if (items.isEmpty()) {
+            (tvNoPendingApps.parent as? ViewGroup)?.removeView(tvNoPendingApps)
             layoutPendingApps.addView(tvNoPendingApps)
             return
         }
@@ -86,7 +88,7 @@ class GuardianApprovalsViewBinder(
                 textSize = 12f
                 cornerRadius = (6 * resources.displayMetrics.density).toInt()
                 setOnClickListener {
-                    resolveApproval(pkg, approve = true, approveBtn = approveBtn, rejectBtn = rejectBtn)
+                    resolveApproval(pkg, approve = true, card = card, approveBtn = approveBtn, rejectBtn = rejectBtn)
                 }
             }
             btnRow.addView(approveBtn)
@@ -98,7 +100,7 @@ class GuardianApprovalsViewBinder(
                 strokeWidth = 0
                 setBackgroundColor(Color.TRANSPARENT)
                 setOnClickListener {
-                    resolveApproval(pkg, approve = false, approveBtn = approveBtn, rejectBtn = rejectBtn)
+                    resolveApproval(pkg, approve = false, card = card, approveBtn = approveBtn, rejectBtn = rejectBtn)
                 }
             }
             btnRow.addView(rejectBtn)
@@ -124,6 +126,7 @@ class GuardianApprovalsViewBinder(
     private fun resolveApproval(
         packageName: String,
         approve: Boolean,
+        card: MaterialCardView? = null,
         approveBtn: MaterialButton? = null,
         rejectBtn: MaterialButton? = null
     ) {
@@ -136,7 +139,10 @@ class GuardianApprovalsViewBinder(
         rejectBtn?.isEnabled = false
 
         activity.lifecycleScope.launch {
-            if (activity.isFinishing || activity.isDestroyed) return@launch
+            if (activity.isFinishing || activity.isDestroyed) {
+                processingPackages.remove(packageName)
+                return@launch
+            }
             try {
                 val approvalRepo = ApprovalRepository.getInstance(activity.applicationContext)
                 val guardianName = activity.getString(R.string.guardian_default_name)
@@ -148,6 +154,13 @@ class GuardianApprovalsViewBinder(
                         if (approve) activity.getString(R.string.toast_approval_granted) else activity.getString(R.string.toast_approval_rejected),
                         Toast.LENGTH_SHORT
                     ).show()
+                    card?.let {
+                        layoutPendingApps.removeView(it)
+                        if (layoutPendingApps.childCount == 0) {
+                            (tvNoPendingApps.parent as? ViewGroup)?.removeView(tvNoPendingApps)
+                            layoutPendingApps.addView(tvNoPendingApps)
+                        }
+                    }
                     onReloadRequested()
                 } else {
                     approveBtn?.isEnabled = true

@@ -494,9 +494,15 @@
 
     <string name="provisioning_step2_title">الخطوة 2: تشغيل تصحيح الأخطاء اللاسلكي</string>
 
-    <string name="provisioning_step2_desc">1. اضغط على الزر أدناه لفتح خيارات المطور.\n2. فعّل خيار "تصحيح الأخطاء اللاسلكي" (Wireless Debugging).\n3. اضغط على "إقران الجهاز برمز إقران".</string>
+    <string name="provisioning_step2_desc">1. اضغط على الزر أدناه للانتقال المباشر لتصحيح الأخطاء اللاسلكي.\n2. فعّل خيار "تصحيح الأخطاء اللاسلكي" (Wireless Debugging).\n3. اضغط على "إقران الجهاز برمز إقران".</string>
+    <string name="provisioning_step2_desc_disabled">خيارات المطور غير مفعلة على هاتفك بعد. اضغط أدناه لفتح شاشة "حول الهاتف" والنقر 7 مرات على "رقم الإصدار".</string>
 
-    <string name="provisioning_btn_open_dev_options">فتح خيارات المطور</string>
+    <string name="provisioning_btn_open_dev_options">فتح تصحيح الأخطاء اللاسلكي</string>
+    <string name="provisioning_btn_enable_dev_options">تفعيل خيارات المطور (7 نقرات)</string>
+
+    <string name="dialog_enable_dev_title">كيفية تفعيل خيارات المطور (5 ثوانٍ)</string>
+    <string name="dialog_enable_dev_desc">1. سنفتح لك شاشة "حول الهاتف" (About Phone).\n2. انقر 7 مرات متتالية وسريعة على "رقم الإصدار" (Build Number).\n3. أدخل رمز قفل الشاشة عند طلبه.\n4. بعد ظهور رسالة "أنت الآن مطور"، عُد للتطبيق بنقرة رجوع.</string>
+    <string name="dialog_enable_dev_btn_open">الانتقال إلى "حول الهاتف" الآن</string>
 
     <string name="provisioning_step3_title">الخطوة 3: إدخال رمز الاقتران (6 أرقام)</string>
 

@@ -29,6 +29,7 @@ import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -71,7 +72,9 @@ class RemoteAppManagerActivity : AppCompatActivity() {
     private var initialProtectedApps = emptySet<String>()
 
     private lateinit var adapter: RemoteAppsAdapter
+    @Volatile
     private var isSaving = false
+    private var inventoryListener: ListenerRegistration? = null
 
     private val backPressedCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
@@ -164,6 +167,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {}
         })
 
+        tvEmptyState.setOnClickListener { loadData() }
         btnSaveAppManagerChanges.setOnClickListener {
             saveChanges()
         }
@@ -284,7 +288,9 @@ class RemoteAppManagerActivity : AppCompatActivity() {
 
             withContext(Dispatchers.Main) {
                 if (isFinishing || isDestroyed) return@withContext
-                progressBar.visibility = View.GONE
+                if (!isSaving) {
+                    progressBar.visibility = View.GONE
+                }
                 updateSaveButtonState()
                 if (sortedList.isEmpty()) {
                     tvEmptyState.visibility = View.VISIBLE
@@ -294,6 +300,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                     rvAppsList.visibility = View.VISIBLE
                     adapter.submitList(sortedList)
                 }
+                attachRealtimeInventoryListener(firestore)
             }
         }
     }
@@ -361,6 +368,72 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         }
     }
 
+    private fun attachRealtimeInventoryListener(firestore: FirebaseFirestore) {
+        inventoryListener?.remove()
+        inventoryListener = firestore.collection("inventories").document(wardId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(TAG, "Real-time inventory listener error: ${error.message}")
+                    return@addSnapshotListener
+                }
+                if (snapshot != null && snapshot.exists() && snapshot.data != null) {
+                    processAndSubmitInventory(snapshot)
+                }
+            }
+    }
+
+    private fun processAndSubmitInventory(inventoryDoc: DocumentSnapshot) {
+        @Suppress("UNCHECKED_CAST")
+        val rawApps = (inventoryDoc.get("apps") as? List<*>) ?: emptyList<Any?>()
+        @Suppress("UNCHECKED_CAST")
+        val parsedApps = rawApps.mapNotNull { raw ->
+            (raw as? Map<String, Any?>)?.let { InstalledAppDto.fromMap(it) }
+        }.filter { it.packageName.isNotBlank() }.toMutableList()
+
+        val existingPackages = parsedApps.map { it.packageName }.toSet()
+        val extraPackages = (customBlacklistPackages + customCurfewWhitelistPackages + protectedAppPackages)
+            .filter { !existingPackages.contains(it) }
+
+        for (orphan in extraPackages) {
+            parsedApps.add(
+                InstalledAppDto(
+                    packageName = orphan,
+                    appName = orphan,
+                    isSuspended = customBlacklistPackages.contains(orphan),
+                    isCurfewWhitelisted = customCurfewWhitelistPackages.contains(orphan),
+                    isProtected = protectedAppPackages.contains(orphan)
+                )
+            )
+        }
+
+        val sortedList = parsedApps.sortedWith(
+            compareBy({ it.appName.lowercase() }, { it.packageName })
+        )
+
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            if (!isSaving) {
+                progressBar.visibility = View.GONE
+            }
+            updateSaveButtonState()
+            if (sortedList.isEmpty()) {
+                tvEmptyState.visibility = View.VISIBLE
+                rvAppsList.visibility = View.GONE
+            } else {
+                tvEmptyState.visibility = View.GONE
+                rvAppsList.visibility = View.VISIBLE
+                val activeQuery = etSearch.text?.toString().orEmpty()
+                adapter.submitList(sortedList, activeQuery)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        inventoryListener?.remove()
+        inventoryListener = null
+        super.onDestroy()
+    }
+
     companion object {
         private const val TAG = "AntiPorn_RemoteAppMgr"
         const val EXTRA_WARD_ID = "extra_ward_id"
@@ -384,9 +457,16 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         private var allApps: List<InstalledAppDto> = emptyList()
         private var displayedApps: List<InstalledAppDto> = emptyList()
 
-        fun submitList(apps: List<InstalledAppDto>) {
+        fun submitList(apps: List<InstalledAppDto>, currentQuery: String = "") {
             allApps = apps
-            displayedApps = apps
+            val q = currentQuery.trim().lowercase()
+            displayedApps = if (q.isEmpty()) {
+                allApps
+            } else {
+                allApps.filter {
+                    it.appName.lowercase().contains(q) || it.packageName.lowercase().contains(q)
+                }
+            }
             notifyDataSetChanged()
             onFilterUpdated(displayedApps.isEmpty())
         }

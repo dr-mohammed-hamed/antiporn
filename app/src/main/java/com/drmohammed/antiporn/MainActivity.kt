@@ -29,6 +29,7 @@ import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
 import com.drmohammed.antiporn.curfew.NapController
+import com.drmohammed.antiporn.data.repository.AppInventoryManager
 import com.drmohammed.antiporn.provisioning.ui.ProvisioningWizardActivity
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
@@ -156,6 +157,7 @@ class MainActivity : AppCompatActivity() {
         refreshUi(isEnforcing = false)
         aiCardBinder.updateUi()
         try { viewBinder.updateNapCountdown(NapController.remainingMs(this)) } catch (e: Exception) { Log.w(TAG, "Error updating nap countdown on resume: ${e.message}") }
+        AppInventoryManager.getInstance(this).syncInventoryToCloudAsync()
         uiHandler.post(uiTickerRunnable)
     }
 

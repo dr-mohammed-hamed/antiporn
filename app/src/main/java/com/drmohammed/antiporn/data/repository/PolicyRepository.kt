@@ -12,6 +12,7 @@ import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import com.drmohammed.antiporn.curfew.CurfewAppResolver
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
+import com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher
 import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
 import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
 import com.drmohammed.antiporn.shields.AppSuspensionShield
@@ -172,6 +173,7 @@ class PolicyRepository private constructor(context: Context) {
                                         if (wasSupervised && !isNowSupervised) {
                                             Log.i(TAG, "Supervision revocation detected from cloud snapshot! Restoring standalone mode...")
                                             AccountabilityRepository.getInstance(appContext).onSupervisionRevokedLocally()
+                                            ApprovalRepository.getInstance(appContext).stopApprovalsSync()
                                         } else if (isNowSupervised && !cloudPolicy.guardianUid.isNullOrBlank()) {
                                             Log.i(TAG, "Guardian detected from cloud snapshot: ${cloudPolicy.guardianName} (${cloudPolicy.guardianUid})")
                                             val partner = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity(
@@ -237,8 +239,9 @@ class PolicyRepository private constructor(context: Context) {
 
                     // 24/7 Custom App Freezing (bundle.customBlacklistPackages)
                     val currentBlacklist = bundle.customBlacklistPackages
+                    val criticalPackages = com.drmohammed.antiporn.curfew.CurfewAppResolver.resolveCoreSystemCriticalPackages(appContext)
                     val packagesToSuspend = currentBlacklist.filter {
-                        it != appContext.packageName && !AppPolicyRegistry.isImmune(it)
+                        !criticalPackages.contains(it) && !AppPolicyRegistry.isImmune(it)
                     }.toTypedArray()
                     if (packagesToSuspend.isNotEmpty()) {
                         try {
@@ -297,7 +300,10 @@ class PolicyRepository private constructor(context: Context) {
                     }
                 }
 
-                // 4. Trigger inventory sync to cloud directly in coroutine
+                // 4. Synchronize Zero-Trust active foreground watcher state
+                ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+
+                // 5. Trigger inventory sync to cloud directly in coroutine
                 AppInventoryManager.getInstance(appContext).syncInventoryToCloud()
 
                 Log.i(TAG, "Successfully applied policy bundle v${bundle.version} to system engines")

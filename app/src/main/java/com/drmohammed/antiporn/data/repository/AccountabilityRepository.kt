@@ -101,6 +101,7 @@ class AccountabilityRepository private constructor(context: Context) {
             )
             firestore.collection("pairings").document(code).set(pairingDoc).await()
             Log.i(TAG, "Successfully registered pairing code $code for UID $uid (name: $deviceName)")
+            AppInventoryManager.getInstance(appContext).syncInventoryToCloudAsync()
         } catch (e: Exception) {
             Log.e(TAG, "Error publishing pairing code to Firestore", e)
         }

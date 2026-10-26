@@ -32,6 +32,7 @@ import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -106,6 +107,7 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var approvalsViewBinder: GuardianApprovalsViewBinder
     private var hasLoadedInitialPolicy = false
     private var lastEditNameClickTime = 0L
+    private var approvalsListener: ListenerRegistration? = null
 
     private val appManagerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -161,6 +163,7 @@ class GuardianControlActivity : AppCompatActivity() {
 
         initViews()
         setupListeners()
+        listenForPendingApprovals()
     }
 
     override fun onResume() {
@@ -444,6 +447,7 @@ class GuardianControlActivity : AppCompatActivity() {
             btnRetryLoadPolicy.isEnabled = false
             loadWardPolicy()
             loadPendingApprovals()
+            listenForPendingApprovals()
         }
     }
 
@@ -455,6 +459,9 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun loadWardPolicy() {
+        if (approvalsListener == null) {
+            listenForPendingApprovals()
+        }
         setInputsEnabled(false)
         lifecycleScope.launch(Dispatchers.IO) {
             if (isFinishing || isDestroyed) return@launch
@@ -571,15 +578,15 @@ class GuardianControlActivity : AppCompatActivity() {
             if (isFinishing || isDestroyed) return@launch
             try {
                 val firestore = FirebaseFirestore.getInstance()
-                val snapshot = firestore.collection("approvals")
-                    .whereEqualTo("wardUid", wardId)
+                val snapshot = firestore.collection("policies").document(wardId)
+                    .collection("approvals")
                     .whereEqualTo("status", "PENDING")
                     .get()
                     .await()
 
                 val pendingList = mutableListOf<Pair<String, String>>()
                 for (doc in snapshot.documents) {
-                    val pkg = doc.getString("packageName") ?: ""
+                    val pkg = doc.getString("packageName") ?: doc.id
                     val appName = doc.getString("appName") ?: pkg
                     if (pkg.isNotBlank()) {
                         pendingList.add(pkg to appName)
@@ -600,6 +607,37 @@ class GuardianControlActivity : AppCompatActivity() {
                     Toast.makeText(this@GuardianControlActivity, R.string.error_loading_pending_apps, Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    private fun listenForPendingApprovals() {
+        if (wardId.isBlank()) return
+        approvalsListener?.remove()
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+            approvalsListener = firestore.collection("policies").document(wardId)
+                .collection("approvals")
+                .whereEqualTo("status", "PENDING")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        Log.w(TAG, "Error in real-time approvals listener for ward $wardId", error)
+                        return@addSnapshotListener
+                    }
+                    if (isFinishing || isDestroyed) return@addSnapshotListener
+                    if (snapshot != null) {
+                        val pendingList = mutableListOf<Pair<String, String>>()
+                        for (doc in snapshot.documents) {
+                            val pkg = doc.getString("packageName") ?: doc.id
+                            val appName = doc.getString("appName") ?: pkg
+                            if (pkg.isNotBlank()) {
+                                pendingList.add(pkg to appName)
+                            }
+                        }
+                        approvalsViewBinder.renderPendingApprovals(pendingList)
+                    }
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to attach real-time approvals listener for ward $wardId", e)
         }
     }
 
@@ -782,6 +820,12 @@ class GuardianControlActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.dialog_btn_cancel, null)
             .show()
+    }
+
+    override fun onDestroy() {
+        approvalsListener?.remove()
+        approvalsListener = null
+        super.onDestroy()
     }
 
     companion object {

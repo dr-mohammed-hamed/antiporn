@@ -21,3 +21,13 @@ repomix-output*
 app/google-services.json
 google-services.json
 *.jpg
+
+# Release Keystores & Credentials
+*.jks
+*.keystore
+key.properties
+app/keystore/*.jks
+app/keystore/*.bin
+
+# Assets & Heavy Backups
+app/src/main/assets_backup/

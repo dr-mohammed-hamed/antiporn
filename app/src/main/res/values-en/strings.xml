@@ -75,8 +75,13 @@
     <string name="provisioning_step1_accounts_found">Found %1$d active accounts that must be temporarily removed to set Device Owner.</string>
     <string name="provisioning_btn_open_accounts">Open Accounts Settings for Temporary Removal</string>
     <string name="provisioning_step2_title">Step 2: Enable Wireless Debugging</string>
-    <string name="provisioning_step2_desc">1. Tap button below to open Developer Options.\n2. Enable "Wireless Debugging".\n3. Tap "Pair device with pairing code".</string>
-    <string name="provisioning_btn_open_dev_options">Open Developer Options</string>
+    <string name="provisioning_step2_desc">1. Tap button below to jump directly to Wireless Debugging.\n2. Enable "Wireless Debugging".\n3. Tap "Pair device with pairing code".</string>
+    <string name="provisioning_step2_desc_disabled">Developer Options are not enabled yet. Tap below to open "About Phone" and tap "Build Number" 7 times.</string>
+    <string name="provisioning_btn_open_dev_options">Open Wireless Debugging</string>
+    <string name="provisioning_btn_enable_dev_options">Enable Developer Options (7 Taps)</string>
+    <string name="dialog_enable_dev_title">How to Enable Developer Options (5 Seconds)</string>
+    <string name="dialog_enable_dev_desc">1. We will open the "About Phone" screen.\n2. Tap rapidly 7 times on "Build Number".\n3. Enter your screen lock PIN if prompted.\n4. Once "You are now a developer!" appears, tap back to return here.</string>
+    <string name="dialog_enable_dev_btn_open">Open "About Phone" Now</string>
     <string name="provisioning_step3_title">Step 3: Enter 6-digit Pairing Code</string>
     <string name="provisioning_radar_waiting">Radar searching for wireless pairing signal...</string>
     <string name="provisioning_radar_port_found">Captured port automatically (%1$d)</string>

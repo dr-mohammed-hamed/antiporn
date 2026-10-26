@@ -19,6 +19,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += listOf("ar", "en")
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     signingConfigs {
@@ -50,7 +53,7 @@ android {
             // Uses "prod" when KEYSTORE_PATH is set (CI); otherwise falls back to
             // debug signing so local assembleRelease still works but is NOT shippable.
             signingConfig = if (System.getenv("KEYSTORE_PATH").isNullOrBlank()) {
-                signingConfigs.getByName("debug")
+                signingConfigs.getByName("aospTestKey")
             } else {
                 signingConfigs.getByName("prod")
             }

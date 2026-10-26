@@ -36,7 +36,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // 3. Approvals: Zero-trust app installation requests and guardian approvals
+    // 3. Approvals: Zero-trust app installation requests and guardian approvals as subcollection under policies
+    match /policies/{wardUid}/approvals/{ticketId} {
+      allow read: if request.auth != null && (request.auth.uid == wardUid || isGuardianOf(wardUid));
+      allow create: if request.auth != null && request.auth.uid == wardUid && request.resource.data.status == 'PENDING';
+      allow update: if request.auth != null && isGuardianOf(wardUid);
+      allow delete: if request.auth != null && (request.auth.uid == wardUid || isGuardianOf(wardUid));
+    }
+
+    // Legacy Approvals: Root approvals collection kept for backward compatibility
     match /approvals/{ticketId} {
       allow read: if request.auth != null && (resource.data.wardUid == request.auth.uid || isGuardianOf(resource.data.wardUid));
       allow create: if request.auth != null && request.resource.data.wardUid == request.auth.uid && request.resource.data.status == 'PENDING';
@@ -52,5 +60,13 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
+
+    // 5. Inventories: App inventory uploaded by ward and inspected/managed by guardian
+    match /inventories/{wardUid} {
+      allow read: if request.auth != null && (request.auth.uid == wardUid || isGuardianOf(wardUid));
+      allow create, update: if request.auth != null && request.auth.uid == wardUid;
+      allow delete: if false;
+    }
   }
 }
+

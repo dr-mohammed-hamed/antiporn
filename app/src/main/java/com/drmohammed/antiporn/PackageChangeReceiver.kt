@@ -6,11 +6,15 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.util.Log
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
+import com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher
 import com.drmohammed.antiporn.data.repository.AppInventoryManager
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.shields.AppSuspensionShield
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 
@@ -24,6 +28,7 @@ class PackageChangeReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "AntiPorn_PkgReceiver"
         private val bgExecutor = Executors.newSingleThreadExecutor()
+        private val receiverScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
@@ -49,16 +54,13 @@ class PackageChangeReceiver : BroadcastReceiver() {
 
                                 val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
                                 if (policy.lockNewInstallsUntilApproved && !isReplacing && !isAlreadyApproved) {
-                                    val isImmune = packageName == appContext.packageName ||
-                                        AppPolicyRegistry.getImmunePackages().contains(packageName) ||
-                                        AppPolicyRegistry.getSystemCriticalPackages().contains(packageName) ||
-                                        AppPolicyRegistry.isImmune(packageName)
+                                    val isImmune = com.drmohammed.antiporn.curfew.CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)
 
                                     if (isImmune) {
-                                        Log.i(TAG, "New install $packageName is immune or core system framework. Skipping freeze.")
+                                        Log.i(TAG, "New install $packageName is critical system component, launcher, dialer, or keyboard. Skipping freeze.")
                                     } else {
                                         Log.i(TAG, "Strict Zero-Trust active: Freezing new install $packageName in 0ms and submitting approval ticket")
-                                        approvalRepo.freezeAndSubmitApproval(packageName)
+                                        approvalRepo.freezeAndSubmitApprovalLocal(packageName)
                                     }
                                 } else {
                                     Log.i(TAG, "Package $packageName added/updated (replacing=$isReplacing, alreadyApproved=$isAlreadyApproved). Evaluating curfew status...")
@@ -66,9 +68,21 @@ class PackageChangeReceiver : BroadcastReceiver() {
                                 }
                             }
 
-                            // Trigger blocking inventory sync to cloud to guarantee process is kept alive until completion
-                            runBlocking {
-                                AppInventoryManager.getInstance(appContext).syncInventoryToCloud()
+                            // Active foreground monitoring sync for newly blocked or pending package
+                            ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+
+                            // Dispatch cloud synchronization asynchronously without blocking BroadcastReceiver
+                            receiverScope.launch {
+                                try {
+                                    ApprovalRepository.getInstance(appContext).syncPendingApprovalsToCloud()
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "Async approval cloud sync failed for $packageName: ${e.message}")
+                                }
+                                try {
+                                    AppInventoryManager.getInstance(appContext).syncInventoryToCloud(force = true)
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "Async inventory sync failed for $packageName: ${e.message}")
+                                }
                             }
 
                         } catch (e: Exception) {
@@ -93,11 +107,20 @@ class PackageChangeReceiver : BroadcastReceiver() {
                 try {
                     bgExecutor.execute {
                         try {
-                            runBlocking {
-                                AppInventoryManager.getInstance(appContext).syncInventoryToCloud()
+                            // Clean up pending approval so uninstalled package doesn't leave zombie approvals
+                            ApprovalRepository.getInstance(appContext).removePendingApproval(packageName)
+                            ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+
+                            // Dispatch cloud inventory sync asynchronously without blocking BroadcastReceiver
+                            receiverScope.launch {
+                                try {
+                                    AppInventoryManager.getInstance(appContext).syncInventoryToCloud(force = true)
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "Async inventory sync failed on package removed: $packageName: ${e.message}")
+                                }
                             }
                         } catch (e: Exception) {
-                            Log.e(TAG, "Error syncing inventory on package removed: $packageName", e)
+                            Log.e(TAG, "Error handling package removed: $packageName", e)
                         } finally {
                             pendingResult.finish()
                         }
