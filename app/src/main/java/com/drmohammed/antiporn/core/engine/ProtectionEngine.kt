@@ -113,10 +113,10 @@ object ProtectionEngine {
             )
 
         val admin = getAdminComponent(context)
-        val isDeviceOwner = dpm.isDeviceOwnerApp(context.packageName)
+        val isDeviceOwner = isDeviceOwner(context)
 
         if (!isDeviceOwner) {
-            Log.w(TAG, "App is not Device Owner. Cannot apply shields.")
+            Log.w(TAG, "App is not Device/Profile Owner. Cannot apply shields.")
             return listOf(
                 ShieldResult(
                     shieldId = "engine",
@@ -164,7 +164,7 @@ object ProtectionEngine {
             ?: return shields.associate { it.id to ShieldStatus.Disabled(context.getString(R.string.toast_dpm_missing)) }
 
         val admin = getAdminComponent(context)
-        val isDeviceOwner = dpm.isDeviceOwnerApp(context.packageName)
+        val isDeviceOwner = isDeviceOwner(context)
 
         if (!isDeviceOwner) {
             return shields.associate { it.id to ShieldStatus.Disabled(context.getString(R.string.card_device_owner_inactive)) }
@@ -184,11 +184,12 @@ object ProtectionEngine {
     }
 
     /**
-     * Checks if the app is currently the active Device Owner.
+     * Checks if the app is currently the active Device Owner or Profile Owner.
      */
     fun isDeviceOwner(context: Context): Boolean {
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return false
-        return dpm.isDeviceOwnerApp(context.packageName)
+        val pkg = context.packageName
+        return dpm.isDeviceOwnerApp(pkg) || dpm.isProfileOwnerApp(pkg)
     }
 
     /**

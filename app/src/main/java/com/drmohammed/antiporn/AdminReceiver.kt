@@ -11,6 +11,7 @@ class AdminReceiver : DeviceAdminReceiver() {
     companion object {
         private const val TAG = "AntiPorn_AdminReceiver"
         const val ACTION_ENFORCE_POLICIES = "com.drmohammed.antiporn.ENFORCE_POLICIES"
+
         private val bgExecutor = Executors.newSingleThreadExecutor()
     }
 

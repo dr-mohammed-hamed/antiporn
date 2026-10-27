@@ -3,6 +3,7 @@ package com.drmohammed.antiporn.data.repository
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
 import android.os.UserManager
 import android.util.Log
 import com.drmohammed.antiporn.AdminReceiver
@@ -18,6 +19,7 @@ import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.BrowserShield
 import com.drmohammed.antiporn.shields.DnsShield
+import java.util.TimeZone
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -224,16 +226,39 @@ class PolicyRepository private constructor(context: Context) {
     fun applyPolicyToSystem(bundle: DevicePolicyBundle, previousPolicy: DevicePolicyBundle = _currentPolicyFlow.value) {
         repositoryScope.launch {
             try {
-                // 1. Reschedule curfew alarms
+                val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return@launch
+                val isDeviceOwner = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)
+                val isDo = dpm.isDeviceOwnerApp(appContext.packageName)
+                val admin = if (isDeviceOwner) ComponentName(appContext, AdminReceiver::class.java) else null
+
+                // 1. Dynamic Timezone Configuration (Must run before scheduling alarms and syncing curfew state - Requires DO)
+                if (isDo && admin != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && bundle.timeZoneId.isNotBlank()) {
+                    val validTz = if (com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(bundle.timeZoneId)) {
+                        bundle.timeZoneId
+                    } else {
+                        com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
+                    }
+                    try {
+                        TimeZone.setDefault(null)
+                        val currentTz = TimeZone.getDefault()
+                        if (currentTz.id != validTz) {
+                            dpm.setTimeZone(admin, validTz)
+                            TimeZone.setDefault(null)
+                            Log.i(TAG, "Applied dynamic timezone update to: $validTz")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed setting timezone ${bundle.timeZoneId} via DPM", e)
+                    }
+                }
+
+                // 2. Reschedule curfew alarms (using the newly updated timezone)
                 CurfewScheduler.scheduleNextAlarms(appContext)
 
-                // 2. Synchronize curfew enforcer with new timings and parameters
+                // 3. Synchronize curfew enforcer with new timings and parameters
                 CurfewEnforcer.syncBlockState(appContext)
 
-                // 3. Apply browser & DNS restrictions, custom blacklist suspension, and protected apps
-                val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-                if (dpm != null && dpm.isDeviceOwnerApp(appContext.packageName)) {
-                    val admin = ComponentName(appContext, AdminReceiver::class.java)
+                // 4. Apply browser & DNS restrictions, custom blacklist suspension, and protected apps
+                if (isDeviceOwner && admin != null) {
                     BrowserShield.applyBrowserRestrictions(dpm, admin, bundle.isIncognitoBlocked)
                     DnsShield.apply(appContext, dpm, admin)
 

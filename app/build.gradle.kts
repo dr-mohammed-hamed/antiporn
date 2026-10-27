@@ -2,6 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.google.services)
 }
+import java.util.Properties
+import java.io.FileInputStream
+
 
 
 android {
@@ -20,12 +23,24 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += listOf("ar", "en")
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            abiFilters += listOf("arm64-v8a")
         }
     }
 
     signingConfigs {
-        // Local/dev key only. MUST NOT sign public releases — AOSP test keys are public.
+        // Local/dev key: load rotated key from keystore/key.properties if present, fallback to AOSP testkey.
+        val keyPropsFile = file("keystore/key.properties")
+        if (keyPropsFile.exists()) {
+            val keyProps = Properties().apply {
+                FileInputStream(keyPropsFile).use { load(it) }
+            }
+            create("rotatedDevKey") {
+                storeFile = file("keystore/${keyProps.getProperty("storeFile", "antiporn-release.jks")}")
+                storePassword = keyProps.getProperty("storePassword")
+                keyAlias = keyProps.getProperty("keyAlias")
+                keyPassword = keyProps.getProperty("keyPassword")
+            }
+        }
         create("aospTestKey") {
             storeFile = file("keystore/testkey.p12")
             storePassword = "android"
@@ -47,13 +62,13 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("aospTestKey")
+            signingConfig = signingConfigs.findByName("rotatedDevKey") ?: signingConfigs.getByName("aospTestKey")
         }
         release {
             // Uses "prod" when KEYSTORE_PATH is set (CI); otherwise falls back to
-            // debug signing so local assembleRelease still works but is NOT shippable.
+            // active dev signing so local assembleRelease still works but is NOT shippable.
             signingConfig = if (System.getenv("KEYSTORE_PATH").isNullOrBlank()) {
-                signingConfigs.getByName("aospTestKey")
+                signingConfigs.findByName("rotatedDevKey") ?: signingConfigs.getByName("aospTestKey")
             } else {
                 signingConfigs.getByName("prod")
             }
@@ -81,6 +96,9 @@ android {
     }
 
     packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "/META-INF/LICENSE.md"

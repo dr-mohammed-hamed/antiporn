@@ -15,6 +15,7 @@ import java.nio.channels.FileChannel
  * محرك الاستدلال المبني على مكتبة TensorFlow Lite
  * يشغل نموذج YOLO11-Nano المخصص لحفظ العورات بحجم ذاكرة مسبق الحجز ودعم لمسرع العتاد
  */
+@Deprecated("Experimental detector - model asset archived in devolopment/models_archive to optimize release APK size")
 class TfLiteModestyDetector(
     private val modelAssetPath: String = "modesty_unified_320_int8.tflite",
     private val postProcessor: ModestyPostProcessor = ModestyPostProcessor()

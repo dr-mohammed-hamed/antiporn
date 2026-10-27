@@ -10,9 +10,11 @@ import android.util.Log
 import android.provider.Settings
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
+import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.curfew.CurfewConfig
+import com.drmohammed.antiporn.data.repository.PolicyRepository
 import java.util.TimeZone
 
 /**
@@ -32,7 +34,7 @@ object SystemTamperShield : ProtectionShield {
     override val titleResId: Int = R.string.card_system_tamper_title
 
     override fun apply(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldResult {
-        if (!dpm.isDeviceOwnerApp(context.packageName)) {
+        if (!ProtectionEngine.isDeviceOwner(context)) {
             return ShieldResult(
                 shieldId = id,
                 success = false,
@@ -41,36 +43,49 @@ object SystemTamperShield : ProtectionShield {
         }
 
         return try {
-            // 1. Block Safe Mode to prevent booting into Safe Mode to disable protection
-            dpm.addUserRestriction(admin, UserManager.DISALLOW_SAFE_BOOT)
+            val isDo = dpm.isDeviceOwnerApp(context.packageName)
 
-            // 2. Block Factory Reset from device settings
-            dpm.addUserRestriction(admin, UserManager.DISALLOW_FACTORY_RESET)
-
-            // 3. Block Multi-User & Guest creation (common bypass route on Realme/ColorOS/Xiaomi)
-            dpm.addUserRestriction(admin, UserManager.DISALLOW_ADD_USER)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                dpm.addUserRestriction(admin, UserManager.DISALLOW_USER_SWITCH)
+            // 1. Block Safe Mode (Requires DO)
+            if (isDo) {
+                try { dpm.addUserRestriction(admin, UserManager.DISALLOW_SAFE_BOOT) } catch (e: Exception) { Log.w(TAG, "Safe boot block: ${e.message}") }
             }
 
-            // 4. Prevent uninstalling the protection app from device UI
+            // 2. Block Factory Reset (Requires DO)
+            if (isDo) {
+                try { dpm.addUserRestriction(admin, UserManager.DISALLOW_FACTORY_RESET) } catch (e: Exception) { Log.w(TAG, "Factory reset block: ${e.message}") }
+            }
+
+            // 3. Block Multi-User & Guest creation (Works for DO and PO)
+            try { dpm.addUserRestriction(admin, UserManager.DISALLOW_ADD_USER) } catch (e: Exception) { Log.w(TAG, "Add user block: ${e.message}") }
+            if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                try { dpm.addUserRestriction(admin, UserManager.DISALLOW_USER_SWITCH) } catch (e: Exception) { Log.w(TAG, "User switch block: ${e.message}") }
+            }
+
+            // 4. Prevent uninstalling the protection app from device UI (Works for DO and PO)
             try {
                 dpm.setUninstallBlocked(admin, context.packageName, true)
+                Log.i(TAG, "setUninstallBlocked=true successfully applied for ${context.packageName}")
             } catch (e: Exception) {
                 Log.w(TAG, "Could not set uninstall blocked", e)
             }
 
-            // 5. Block Date & Time tampering (Prevents bypassing curfew by changing clock)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
+            // 5. Block Date & Time tampering (Requires DO)
+            if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                try { dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME) } catch (e: Exception) { Log.w(TAG, "Date time block: ${e.message}") }
             }
 
-            // 6. Enforce Makkah Al-Mukarramah timezone (Asia/Riyadh - GMT+3)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            // 6. Enforce persistent timezone (configured or default Makkah Al-Mukarramah)
+            val targetTzId = CurfewConfig.getTargetTimeZoneId(context)
+
+            if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 try {
-                    dpm.setTimeZone(admin, CurfewConfig.MAKKAH_TIMEZONE_ID)
                     TimeZone.setDefault(null) // Invalidate JVM cached default timezone
-                    Log.i(TAG, "Enforced Makkah timezone: ${CurfewConfig.MAKKAH_TIMEZONE_ID}")
+                    val currentTz = TimeZone.getDefault()
+                    if (currentTz.id != targetTzId) {
+                        dpm.setTimeZone(admin, targetTzId)
+                        TimeZone.setDefault(null) // Invalidate JVM cached default timezone
+                        Log.i(TAG, "Enforced timezone via DPM: $targetTzId")
+                    }
                 } catch (e: Exception) {
                     Log.w(TAG, "Could not set persistent timezone via DPM", e)
                 }
@@ -131,7 +146,7 @@ object SystemTamperShield : ProtectionShield {
     }
 
     override fun checkStatus(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldStatus {
-        if (!dpm.isDeviceOwnerApp(context.packageName)) {
+        if (!ProtectionEngine.isDeviceOwner(context)) {
             return ShieldStatus.Disabled(context.getString(R.string.card_device_owner_inactive))
         }
 
@@ -152,15 +167,24 @@ object SystemTamperShield : ProtectionShield {
                 false
             }
 
+            val targetTzId = CurfewConfig.getTargetTimeZoneId(context)
+            val targetTz = TimeZone.getTimeZone(targetTzId)
+            TimeZone.setDefault(null) // Invalidate JVM cached default timezone to query fresh OS status
             val currentTz = TimeZone.getDefault()
-            val isMakkahTz = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                currentTz.id == CurfewConfig.MAKKAH_TIMEZONE_ID || currentTz.rawOffset == 3 * 3600 * 1000
+            val isTargetTz = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                currentTz.id == targetTzId || currentTz.hasSameRules(targetTz) ||
+                    currentTz.getOffset(System.currentTimeMillis()) == targetTz.getOffset(System.currentTimeMillis())
             } else {
                 true // API < 28 cannot set system timezone via DPM
             }
 
-            val isFullyProtected = isSafeBootBlocked && isFactoryResetBlocked && isAddUserBlocked &&
-                    isUninstallBlocked && isDateTimeBlocked && isMakkahTz
+            val isDo = dpm.isDeviceOwnerApp(context.packageName)
+            val isFullyProtected = if (isDo) {
+                isSafeBootBlocked && isFactoryResetBlocked && isAddUserBlocked &&
+                        isUninstallBlocked && isDateTimeBlocked && isTargetTz
+            } else {
+                isUninstallBlocked
+            }
 
             if (isFullyProtected) {
                 ShieldStatus.Active(context.getString(R.string.card_system_tamper_active))

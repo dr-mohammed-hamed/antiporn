@@ -6,6 +6,7 @@ import android.content.Context
 import android.util.Log
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
+import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.curfew.CurfewConfig
@@ -24,7 +25,7 @@ object CurfewShield : ProtectionShield {
     override val titleResId: Int = R.string.card_curfew_title
 
     override fun apply(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldResult {
-        if (!dpm.isDeviceOwnerApp(context.packageName)) {
+        if (!ProtectionEngine.isDeviceOwner(context)) {
             return ShieldResult(
                 shieldId = id,
                 success = false,
@@ -49,7 +50,7 @@ object CurfewShield : ProtectionShield {
     }
 
     override fun checkStatus(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldStatus {
-        if (!dpm.isDeviceOwnerApp(context.packageName)) {
+        if (!ProtectionEngine.isDeviceOwner(context)) {
             return ShieldStatus.Disabled(context.getString(R.string.card_device_owner_inactive))
         }
 

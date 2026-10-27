@@ -45,7 +45,7 @@ object CurfewEnforcer {
         return isMinuteInWindow(minuteOfDay, startMinute, endMinute)
     }
 
-    fun isCurfewActive(context: Context, calendar: Calendar = CurfewConfig.getCurfewCalendar()): Boolean {
+    fun isCurfewActive(context: Context, calendar: Calendar = CurfewConfig.getCurfewCalendar(context)): Boolean {
         if (!CurfewConfig.isCurfewEnabled(context)) return false
 
         val minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
@@ -177,12 +177,12 @@ object CurfewEnforcer {
      * Guaranteed invariant: Cannot release curfew if current time is inside night curfew window.
      */
     @Synchronized
-    fun enforce(context: Context, activate: Boolean, calendar: Calendar = CurfewConfig.getCurfewCalendar()): Boolean {
+    fun enforce(context: Context, activate: Boolean, calendar: Calendar = CurfewConfig.getCurfewCalendar(context)): Boolean {
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return false
         val admin = ComponentName(context, AdminReceiver::class.java)
 
-        if (!dpm.isDeviceOwnerApp(context.packageName)) {
-            Log.w(TAG, "Cannot enforce curfew: Not Device Owner")
+        if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(context)) {
+            Log.w(TAG, "Cannot enforce curfew: Not Device/Profile Owner")
             return false
         }
 
@@ -490,7 +490,7 @@ object CurfewEnforcer {
 
         val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
         val admin = ComponentName(appContext, AdminReceiver::class.java)
-        if (!dpm.isDeviceOwnerApp(appContext.packageName)) return
+        if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) return
 
         try {
             dpm.setPackagesSuspended(admin, arrayOf(packageName), true)

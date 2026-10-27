@@ -336,6 +336,38 @@ class CurfewTest {
         assertEquals(0, bundle.weekendCurfewStartMinute)
         assertEquals(7, bundle.weekendCurfewEndHour)
         assertEquals(0, bundle.weekendCurfewEndMinute)
+        assertEquals(CurfewConfig.MAKKAH_TIMEZONE_ID, bundle.timeZoneId)
         assertTrue(bundle.protectedAppPackages.isEmpty())
+    }
+
+    @Test
+    fun testCurfewCalendar_dynamicTimezones() {
+        val cairoCal = Calendar.getInstance(TimeZone.getTimeZone("Africa/Cairo")).apply {
+            set(Calendar.HOUR_OF_DAY, 21)
+            set(Calendar.MINUTE, 0)
+        }
+        assertTrue("21:00 in Cairo calendar should be active in curfew", CurfewEnforcer.isCurfewActive(cairoCal))
+
+        val cairoDayCal = Calendar.getInstance(TimeZone.getTimeZone("Africa/Cairo")).apply {
+            set(Calendar.HOUR_OF_DAY, 14)
+            set(Calendar.MINUTE, 0)
+        }
+        assertFalse("14:00 in Cairo calendar should NOT be active in curfew", CurfewEnforcer.isCurfewActive(cairoDayCal))
+    }
+
+    @Test
+    fun testCurfewScheduler_dynamicTimezones() {
+        val cairoTz = TimeZone.getTimeZone("Africa/Cairo")
+        val cairoCal = Calendar.getInstance(cairoTz).apply {
+            set(Calendar.HOUR_OF_DAY, 10)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val nextOccurrence = CurfewScheduler.getNextOccurrence(20, 0, cairoCal)
+        assertEquals(cairoTz.id, nextOccurrence.timeZone.id)
+        assertEquals(20, nextOccurrence.get(Calendar.HOUR_OF_DAY))
+        assertEquals(0, nextOccurrence.get(Calendar.MINUTE))
+        assertTrue(nextOccurrence.timeInMillis > cairoCal.timeInMillis)
     }
 }

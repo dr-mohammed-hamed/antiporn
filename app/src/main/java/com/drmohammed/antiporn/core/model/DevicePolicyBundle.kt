@@ -29,6 +29,7 @@ data class DevicePolicyBundle(
     val guardianUid: String? = null,
     val guardianName: String? = null,
     val isSupervised: Boolean = false,
+    val timeZoneId: String = com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID,
     val version: Long = 1L,
     val updatedAt: Long = System.currentTimeMillis()
 ) {
@@ -54,6 +55,7 @@ data class DevicePolicyBundle(
             "protectedAppPackages" to protectedAppPackages.toList(),
             "dnsHost" to dnsHost,
             "isSupervised" to isSupervised,
+            "timeZoneId" to timeZoneId,
             "version" to version,
             "updatedAt" to updatedAt
         )
@@ -95,6 +97,7 @@ data class DevicePolicyBundle(
         if (guardianUid != null) json.put("guardianUid", guardianUid)
         if (guardianName != null) json.put("guardianName", guardianName)
         json.put("isSupervised", isSupervised)
+        json.put("timeZoneId", timeZoneId)
         json.put("version", version)
         json.put("updatedAt", updatedAt)
         return json.toString()
@@ -109,8 +112,17 @@ data class DevicePolicyBundle(
             dnsHost = ADGUARD_FAMILY_DNS_HOST,
             guardianUid = null,
             guardianName = null,
-            isSupervised = false
+            isSupervised = false,
+            timeZoneId = com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
         )
+
+        fun reconcileLegacyV1(policy: DevicePolicyBundle): DevicePolicyBundle {
+            return if (policy.timeZoneId.isBlank()) {
+                policy.copy(timeZoneId = com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID)
+            } else {
+                policy
+            }
+        }
 
         @Suppress("UNCHECKED_CAST")
         fun fromMap(map: Map<String, Any?>): DevicePolicyBundle {
@@ -138,6 +150,7 @@ data class DevicePolicyBundle(
             val gUid = (map["guardianUid"] as? String)?.takeIf { it.isNotBlank() }
             val gName = (map["guardianName"] as? String)?.takeIf { it.isNotBlank() }
             val supervised = (map["isSupervised"] as? Boolean) ?: (!gUid.isNullOrBlank())
+            val timeZoneId = (map["timeZoneId"] as? String)?.takeIf { it.isNotBlank() } ?: com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
 
             val version = (map["version"] as? Number)?.toLong() ?: 1L
             val updatedAt = (map["updatedAt"] as? Number)?.toLong() ?: 0L
@@ -164,6 +177,7 @@ data class DevicePolicyBundle(
                 guardianUid = gUid,
                 guardianName = gName,
                 isSupervised = supervised,
+                timeZoneId = timeZoneId,
                 version = version,
                 updatedAt = updatedAt
             )
@@ -200,6 +214,7 @@ data class DevicePolicyBundle(
                 val gUid = json.optString("guardianUid", "").takeIf { it.isNotBlank() }
                 val gName = json.optString("guardianName", "").takeIf { it.isNotBlank() }
                 val supervised = json.optBoolean("isSupervised", !gUid.isNullOrBlank())
+                val timeZoneId = json.optString("timeZoneId", com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID).ifBlank { com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID }
 
                 DevicePolicyBundle(
                     curfewStartHour = json.optInt("curfewStartHour", com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR).coerceIn(0, 23),
@@ -223,6 +238,7 @@ data class DevicePolicyBundle(
                     guardianUid = gUid,
                     guardianName = gName,
                     isSupervised = supervised,
+                    timeZoneId = timeZoneId,
                     version = json.optLong("version", 1L),
                     updatedAt = json.optLong("updatedAt", System.currentTimeMillis())
                 )

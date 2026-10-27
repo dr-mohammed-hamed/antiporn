@@ -191,7 +191,7 @@ class MainActivity : AppCompatActivity() {
         try {
             val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? android.app.admin.DevicePolicyManager ?: return
             val admin = ComponentName(this, AdminReceiver::class.java)
-            if (dpm.isDeviceOwnerApp(packageName)) {
+            if (ProtectionEngine.isDeviceOwner(this)) {
                 dpm.setPermissionGrantState(
                     admin,
                     packageName,

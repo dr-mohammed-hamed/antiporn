@@ -432,6 +432,15 @@
 
     <string name="btn_change_weekend_end_time">تغيير</string>
 
+    <string name="guardian_timezone_title">المنطقة الزمنية وتوقيت الهاتف</string>
+    <string name="guardian_timezone_subtitle">تعديل المنطقة الزمنية للسفر أو التوقيت الصيفي</string>
+    <string name="guardian_timezone_dropdown_label">المنطقة الزمنية والمدينة الإسلامية الأقرب</string>
+    <string name="guardian_timezone_info">يتم ضبط توقيت الهاتف عبر المنطقة الزمنية الرسمية مع إبقاء مزامنة الوقت الدقيق للشبكة (NTP) لحماية شهادات الأمان واستقرار الإنترنت.</string>
+    <string name="guardian_timezone_preview_format">الوقت المقدر الآن في هاتف المكفول: %s</string>
+    <string name="guardian_timezone_badge_format">%1$s (%2$s)</string>
+    <string name="guardian_timezone_preview_time_format">%1$s (%2$s)</string>
+    <string name="btn_reset_to_makkah">استعادة توقيت مكة المكرمة (الافتراضي)</string>
+
     <string name="guardian_instant_internet_kill_title">قطع الإنترنت اللحظي (24/7)</string>
 
     <string name="guardian_instant_internet_kill_desc">قطع بيانات الإنترنت فوراً عن هاتف الصديق في أي وقت طوال اليوم بنقرة واحدة</string>
@@ -484,9 +493,20 @@
 
     <string name="provisioning_wizard_subtitle">تفعيل صلاحية المالك (Device Owner) ذاتياً بدون كمبيوتر بأقل احتكاك</string>
 
+    <!-- Stepper Navigation -->
+    <string name="stepper_number_1">1</string>
+    <string name="stepper_number_2">2</string>
+    <string name="stepper_number_3">3</string>
+    <string name="stepper_step_1">1. الحسابات</string>
+    <string name="stepper_step_2">2. اللاسلكي</string>
+    <string name="stepper_step_3">3. الاقتران</string>
+
     <string name="provisioning_step1_title">الخطوة 1: فحص الحسابات (إلزامي لأندرويد)</string>
 
     <string name="provisioning_step1_ready">الجهاز جاهز للاقتران بنجاح (لا توجد حسابات مسجلة)</string>
+    <string name="provisioning_step1_success_title">الحسابات جاهزة ومطابقة للمواصفات</string>
+    <string name="provisioning_step1_success_desc">لا توجد حسابات مسجلة تمنع التفعيل. يمكنك الانتقال للخطوة التالية.</string>
+    <string name="provisioning_step1_warning_reassurance">ملاحظة أمان: حساباتك وصورك محفوظة في السحابة وستعيد ربطها فور انتهاء التفعيل.</string>
 
     <string name="provisioning_step1_accounts_found">يوجد %1$d حسابات مسجلة يجب حذفها مؤقتاً لتفعيل صلاحية المالك.</string>
 
@@ -515,6 +535,8 @@
     <string name="provisioning_btn_pair_and_activate">تأكيد وتفعيل الحماية القصوى</string>
 
     <string name="provisioning_notification_hint">نصيحة ذكية: يمكنك إدخال الرمز مباشرة من شريط الإشعارات العلوي دون مغادرة شاشة الإعدادات!</string>
+    <string name="provisioning_tip_notification_title">نصيحة لتوفير الوقت</string>
+    <string name="provisioning_tip_notification_body">يمكنك كتابة الرمز مباشرة من شريط الإشعارات العلوي دون مغادرة شاشة الإعدادات!</string>
 
     <string name="provisioning_shizuku_title">مسار Shizuku السريع (نقرة واحدة)</string>
 

@@ -13,6 +13,7 @@ import android.util.Log
 import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
+import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
@@ -277,8 +278,8 @@ object AppSuspensionShield : ProtectionShield {
             return
         }
         val admin = ComponentName(appContext, AdminReceiver::class.java)
-        if (!dpm.isDeviceOwnerApp(appContext.packageName)) {
-            Log.w(TAG, "Cannot freeze $packageName: App is not Device Owner")
+        if (!ProtectionEngine.isDeviceOwner(appContext)) {
+            Log.w(TAG, "Cannot freeze $packageName: App is not Device/Profile Owner")
             return
         }
         Log.i(TAG, "Freezing and uninstalling blacklisted app on install: $packageName")
@@ -293,8 +294,8 @@ object AppSuspensionShield : ProtectionShield {
         val appContext = context.applicationContext
         val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
         val admin = ComponentName(appContext, AdminReceiver::class.java)
-        if (!dpm.isDeviceOwnerApp(appContext.packageName)) {
-            Log.w(TAG, "enforceBlacklistFast skipped: not Device Owner")
+        if (!ProtectionEngine.isDeviceOwner(appContext)) {
+            Log.w(TAG, "enforceBlacklistFast skipped: not Device/Profile Owner")
             return
         }
 
@@ -317,7 +318,7 @@ object AppSuspensionShield : ProtectionShield {
     }
 
     override fun apply(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldResult {
-        if (!dpm.isDeviceOwnerApp(context.packageName)) {
+        if (!ProtectionEngine.isDeviceOwner(context)) {
             return ShieldResult(id, false, context.getString(R.string.toast_not_device_owner))
         }
 
@@ -340,7 +341,7 @@ object AppSuspensionShield : ProtectionShield {
     }
 
     override fun checkStatus(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldStatus {
-        if (!dpm.isDeviceOwnerApp(context.packageName)) {
+        if (!ProtectionEngine.isDeviceOwner(context)) {
             return ShieldStatus.Disabled(context.getString(R.string.card_device_owner_inactive))
         }
 

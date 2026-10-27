@@ -39,7 +39,7 @@ class AppInventoryManager private constructor(context: Context) {
         val pm = context.packageManager
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
         val admin = ComponentName(context, AdminReceiver::class.java)
-        val isDeviceOwner = dpm != null && dpm.isDeviceOwnerApp(context.packageName)
+        val isDeviceOwner = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(context)
 
         val policy = try {
             PolicyRepository.getInstance(context).getCurrentPolicy()

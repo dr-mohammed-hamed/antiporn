@@ -30,6 +30,7 @@ class DevicePolicyBundleTest {
         assertTrue(policy.customCurfewWhitelistPackages.isEmpty())
         assertTrue(policy.protectedAppPackages.isEmpty())
         assertEquals(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST, policy.dnsHost)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, policy.timeZoneId)
         assertEquals(1L, policy.version)
     }
 
@@ -54,6 +55,7 @@ class DevicePolicyBundleTest {
             customCurfewWhitelistPackages = setOf("com.work.app1"),
             protectedAppPackages = setOf("com.vital.app1", "com.vital.app2"),
             dnsHost = "custom.dns.nextdns.io",
+            timeZoneId = "Africa/Cairo",
             version = 42L,
             updatedAt = 1790000000000L
         )
@@ -79,6 +81,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
         assertEquals(original.dnsHost, restored.dnsHost)
+        assertEquals(original.timeZoneId, restored.timeZoneId)
         assertEquals(original.version, restored.version)
         assertEquals(original.updatedAt, restored.updatedAt)
     }
@@ -104,6 +107,7 @@ class DevicePolicyBundleTest {
             customCurfewWhitelistPackages = setOf("pkg.b"),
             protectedAppPackages = setOf("pkg.c"),
             dnsHost = "custom.dns.nextdns.io",
+            timeZoneId = "Asia/Dubai",
             version = 5L,
             updatedAt = 123456789L
         )
@@ -129,7 +133,32 @@ class DevicePolicyBundleTest {
         assertEquals(original.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
         assertEquals(original.dnsHost, restored.dnsHost)
+        assertEquals(original.timeZoneId, restored.timeZoneId)
         assertEquals(original.version, restored.version)
         assertEquals(original.updatedAt, restored.updatedAt)
+    }
+
+    @Test
+    fun testLegacyPolicyWithoutTimeZone_fallsBackToMakkah() {
+        val legacyJson = """
+            {
+                "curfewStartHour": 20,
+                "curfewStartMinute": 0,
+                "version": 1
+            }
+        """.trimIndent()
+        val parsed = DevicePolicyBundle.fromJson(legacyJson)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, parsed.timeZoneId)
+
+        val legacyMap = mapOf<String, Any?>(
+            "curfewStartHour" to 20,
+            "curfewStartMinute" to 0
+        )
+        val fromMap = DevicePolicyBundle.fromMap(legacyMap)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, fromMap.timeZoneId)
+
+        val emptyTzPolicy = DevicePolicyBundle(timeZoneId = "")
+        val reconciled = DevicePolicyBundle.reconcileLegacyV1(emptyTzPolicy)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, reconciled.timeZoneId)
     }
 }

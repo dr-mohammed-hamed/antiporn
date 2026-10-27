@@ -69,8 +69,8 @@ class ApprovalRepository private constructor(context: Context) {
             ?: return false
         val admin = ComponentName(appContext, AdminReceiver::class.java)
 
-        if (!dpm.isDeviceOwnerApp(appContext.packageName)) {
-            Log.w(TAG, "Cannot freeze $packageName: Not Device Owner")
+        if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) {
+            Log.w(TAG, "Cannot freeze $packageName: Not Device/Profile Owner")
             return false
         }
 
@@ -232,7 +232,7 @@ class ApprovalRepository private constructor(context: Context) {
         val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
         val admin = ComponentName(appContext, AdminReceiver::class.java)
 
-        if (!dpm.isDeviceOwnerApp(appContext.packageName)) return
+        if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) return
 
         val isBlockActive = CurfewEnforcer.isEffectiveBlockActive(appContext)
         val isWhitelisted = CurfewConfig.STATIC_WHITELIST.contains(packageName) ||

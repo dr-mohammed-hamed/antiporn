@@ -51,7 +51,7 @@ object CurfewScheduler {
      * Calculates the next calendar occurrence for curfew start, dynamically evaluating
      * day-specific and weekend-specific schedules across upcoming days.
      */
-    fun getNextCurfewStart(context: Context, now: Calendar = CurfewConfig.getCurfewCalendar()): Calendar {
+    fun getNextCurfewStart(context: Context, now: Calendar = CurfewConfig.getCurfewCalendar(context)): Calendar {
         for (dayOffset in 0..7) {
             val candidate = (now.clone() as Calendar).apply {
                 add(Calendar.DAY_OF_YEAR, dayOffset)
@@ -73,7 +73,7 @@ object CurfewScheduler {
      * Calculates the next calendar occurrence for curfew end, dynamically evaluating
      * day-specific and weekend-specific schedules across upcoming days.
      */
-    fun getNextCurfewEnd(context: Context, now: Calendar = CurfewConfig.getCurfewCalendar()): Calendar {
+    fun getNextCurfewEnd(context: Context, now: Calendar = CurfewConfig.getCurfewCalendar(context)): Calendar {
         for (dayOffset in 0..7) {
             val candidate = (now.clone() as Calendar).apply {
                 add(Calendar.DAY_OF_YEAR, dayOffset)
@@ -120,7 +120,7 @@ object CurfewScheduler {
 
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
-        val now = CurfewConfig.getCurfewCalendar()
+        val now = CurfewConfig.getCurfewCalendar(context)
         val nextStart = getNextCurfewStart(context, now)
         val nextEnd = getNextCurfewEnd(context, now)
 

@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.util.Log
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
+import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
@@ -124,7 +125,7 @@ object BrowserShield : ProtectionShield {
     }
 
     override fun apply(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldResult {
-        if (!dpm.isDeviceOwnerApp(context.packageName)) {
+        if (!ProtectionEngine.isDeviceOwner(context)) {
             return ShieldResult(
                 shieldId = id,
                 success = false,
@@ -157,7 +158,7 @@ object BrowserShield : ProtectionShield {
     }
 
     override fun checkStatus(context: Context, dpm: DevicePolicyManager, admin: ComponentName): ShieldStatus {
-        if (!dpm.isDeviceOwnerApp(context.packageName)) {
+        if (!ProtectionEngine.isDeviceOwner(context)) {
             return ShieldStatus.Disabled(context.getString(R.string.card_device_owner_inactive))
         }
 

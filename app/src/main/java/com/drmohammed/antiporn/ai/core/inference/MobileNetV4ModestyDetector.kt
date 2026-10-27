@@ -21,6 +21,7 @@ import java.nio.channels.FileChannel
  * - يطبق نفس واجهة [IModestyDetector] ليبقى التبديل مع YOLO بسطر واحد.
  * - عند الاشتباه يُنتج كشفاً واحداً بإطار كامل (مصنف صورة لا كاشف صناديق).
  */
+@Deprecated("Experimental detector - model asset archived in devolopment/models_archive to optimize release APK size")
 class MobileNetV4ModestyDetector(
     private val modelAssetPath: String = DEFAULT_MODEL_ASSET,
     private val decoder: MobileNetOutputDecoder = MobileNetOutputDecoder()

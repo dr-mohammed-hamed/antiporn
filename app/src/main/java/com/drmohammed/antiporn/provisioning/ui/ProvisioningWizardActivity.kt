@@ -11,6 +11,8 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.view.View
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -31,6 +33,7 @@ import com.drmohammed.antiporn.provisioning.receiver.PairingCodeReceiver
 import com.drmohammed.antiporn.provisioning.service.AdbPairingNotificationService
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Dispatchers
@@ -43,18 +46,46 @@ import kotlinx.coroutines.withContext
  */
 class ProvisioningWizardActivity : AppCompatActivity() {
 
+    // Stepper Views
+    private lateinit var step1Circle: FrameLayout
+    private lateinit var step1Number: TextView
+    private lateinit var step1Check: ImageView
+    private lateinit var step1Label: TextView
+    private lateinit var stepperLine1: View
+
+    private lateinit var step2Circle: FrameLayout
+    private lateinit var step2Number: TextView
+    private lateinit var step2Check: ImageView
+    private lateinit var step2Label: TextView
+    private lateinit var stepperLine2: View
+
+    private lateinit var step3Circle: FrameLayout
+    private lateinit var step3Number: TextView
+    private lateinit var step3Check: ImageView
+    private lateinit var step3Label: TextView
+
+    // Step 1 Views
     private lateinit var cardStep1: MaterialCardView
+    private lateinit var layoutStep1Success: View
+    private lateinit var layoutStep1Action: View
     private lateinit var tvStep1Status: TextView
     private lateinit var tvAccountsList: TextView
     private lateinit var btnOpenAccounts: MaterialButton
 
+    // Step 2 Views
+    private lateinit var cardStep2: MaterialCardView
     private lateinit var tvStep2Desc: TextView
     private lateinit var btnOpenDevOptions: MaterialButton
 
+    // Step 3 Views
+    private lateinit var cardStep3: MaterialCardView
+    private lateinit var layoutRadarPill: View
+    private lateinit var ivRadarIcon: ImageView
     private lateinit var tvRadarStatus: TextView
     private lateinit var etPairingCode: TextInputEditText
     private lateinit var btnPairAndActivate: MaterialButton
 
+    // Shizuku Views
     private lateinit var cardShizuku: MaterialCardView
     private lateinit var btnShizukuActivate: MaterialButton
 
@@ -146,6 +177,8 @@ class ProvisioningWizardActivity : AppCompatActivity() {
     }
 
     private fun focusOnAccountsCard() {
+        layoutStep1Success.visibility = View.GONE
+        layoutStep1Action.visibility = View.VISIBLE
         cardStep1.post {
             val scrollView = findViewById<android.widget.ScrollView>(R.id.scrollWizard)
             scrollView?.smoothScrollTo(0, cardStep1.top)
@@ -153,18 +186,46 @@ class ProvisioningWizardActivity : AppCompatActivity() {
     }
 
     private fun bindViews() {
+        // Stepper
+        step1Circle = findViewById(R.id.step1Circle)
+        step1Number = findViewById(R.id.step1Number)
+        step1Check = findViewById(R.id.step1Check)
+        step1Label = findViewById(R.id.step1Label)
+        stepperLine1 = findViewById(R.id.stepperLine1)
+
+        step2Circle = findViewById(R.id.step2Circle)
+        step2Number = findViewById(R.id.step2Number)
+        step2Check = findViewById(R.id.step2Check)
+        step2Label = findViewById(R.id.step2Label)
+        stepperLine2 = findViewById(R.id.stepperLine2)
+
+        step3Circle = findViewById(R.id.step3Circle)
+        step3Number = findViewById(R.id.step3Number)
+        step3Check = findViewById(R.id.step3Check)
+        step3Label = findViewById(R.id.step3Label)
+
+        // Step 1
         cardStep1 = findViewById(R.id.cardStep1)
+        layoutStep1Success = findViewById(R.id.layoutStep1Success)
+        layoutStep1Action = findViewById(R.id.layoutStep1Action)
         tvStep1Status = findViewById(R.id.tvStep1Status)
         tvAccountsList = findViewById(R.id.tvAccountsList)
         btnOpenAccounts = findViewById(R.id.btnOpenAccounts)
 
+        // Step 2
+        cardStep2 = findViewById(R.id.cardStep2)
         tvStep2Desc = findViewById(R.id.tvStep2Desc)
         btnOpenDevOptions = findViewById(R.id.btnOpenDevOptions)
 
+        // Step 3
+        cardStep3 = findViewById(R.id.cardStep3)
+        layoutRadarPill = findViewById(R.id.layoutRadarPill)
+        ivRadarIcon = findViewById(R.id.ivRadarIcon)
         tvRadarStatus = findViewById(R.id.tvRadarStatus)
         etPairingCode = findViewById(R.id.etPairingCode)
         btnPairAndActivate = findViewById(R.id.btnPairAndActivate)
 
+        // Shizuku
         cardShizuku = findViewById(R.id.cardShizuku)
         btnShizukuActivate = findViewById(R.id.btnShizukuActivate)
 
@@ -321,6 +382,10 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         checkAccountsStatus()
         checkDevOptionsStatus()
         checkShizukuStatus()
+
+        if (intent?.getBooleanExtra(EXTRA_FOCUS_ACCOUNTS, false) == true) {
+            focusOnAccountsCard()
+        }
     }
 
     override fun onStop() {
@@ -349,18 +414,20 @@ class ProvisioningWizardActivity : AppCompatActivity() {
 
     private fun checkAccountsStatus() {
         val accounts = AccountAuditor.getActiveAccounts(this)
-        if (accounts.isEmpty()) {
+        val accountsReady = accounts.isEmpty()
+        if (accountsReady) {
             tvStep1Status.setText(R.string.provisioning_step1_ready)
             tvStep1Status.setTextColor(ContextCompat.getColor(this, R.color.status_green))
             tvAccountsList.visibility = View.GONE
-            cardStep1.strokeColor = ContextCompat.getColor(this, R.color.status_green)
         } else {
             tvStep1Status.text = getString(R.string.provisioning_step1_accounts_found, accounts.size)
             tvStep1Status.setTextColor(ContextCompat.getColor(this, R.color.status_orange))
             tvAccountsList.text = AccountAuditor.getAccountSummaryList(this).joinToString("\n• ", prefix = "• ")
             tvAccountsList.visibility = View.VISIBLE
-            cardStep1.strokeColor = ContextCompat.getColor(this, R.color.status_orange)
         }
+        val devOptionsEnabled = isDevOptionsEnabled()
+        val portsDiscovered = discoveredPairingPort > 0
+        updateStepperUi(accountsReady, devOptionsEnabled, portsDiscovered)
         validateInputs()
     }
 
@@ -373,13 +440,17 @@ class ProvisioningWizardActivity : AppCompatActivity() {
     }
 
     private fun checkDevOptionsStatus() {
-        if (isDevOptionsEnabled()) {
+        val devEnabled = isDevOptionsEnabled()
+        if (devEnabled) {
             btnOpenDevOptions.setText(R.string.provisioning_btn_open_dev_options)
             tvStep2Desc.setText(R.string.provisioning_step2_desc)
         } else {
             btnOpenDevOptions.setText(R.string.provisioning_btn_enable_dev_options)
             tvStep2Desc.setText(R.string.provisioning_step2_desc_disabled)
         }
+        val accountsReady = AccountAuditor.isReadyForProvisioning(this)
+        val portsDiscovered = discoveredPairingPort > 0
+        updateStepperUi(accountsReady, devEnabled, portsDiscovered)
     }
 
     private fun showEnableDevOptionsDialog() {
@@ -421,14 +492,105 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateStepperUi(
+        accountsReady: Boolean,
+        devOptionsEnabled: Boolean,
+        portsDiscovered: Boolean
+    ) {
+        val colorOnSurface = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurface, ContextCompat.getColor(this, R.color.md_theme_light_onSurface))
+        val colorOnSurfaceVariant = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant, ContextCompat.getColor(this, R.color.md_theme_light_onSurfaceVariant))
+        val colorOutlineVariant = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutlineVariant, ContextCompat.getColor(this, R.color.md_theme_light_outlineVariant))
+        val colorPrimary = MaterialColors.getColor(this, androidx.appcompat.R.attr.colorPrimary, ContextCompat.getColor(this, R.color.md_theme_light_primary))
+
+        // Step 1 (Accounts)
+        if (accountsReady) {
+            layoutStep1Success.visibility = View.VISIBLE
+            layoutStep1Action.visibility = View.GONE
+            cardStep1.strokeColor = ContextCompat.getColor(this, R.color.status_green)
+
+            step1Circle.setBackgroundResource(R.drawable.bg_stepper_circle_done)
+            step1Number.visibility = View.GONE
+            step1Check.visibility = View.VISIBLE
+            step1Label.setTextColor(ContextCompat.getColor(this, R.color.status_green))
+
+            stepperLine1.setBackgroundColor(ContextCompat.getColor(this, R.color.status_green))
+        } else {
+            layoutStep1Success.visibility = View.GONE
+            layoutStep1Action.visibility = View.VISIBLE
+            cardStep1.strokeColor = ContextCompat.getColor(this, R.color.status_orange)
+
+            step1Circle.setBackgroundResource(R.drawable.bg_stepper_circle_active)
+            step1Number.visibility = View.VISIBLE
+            step1Number.setTextColor(ContextCompat.getColor(this, R.color.white))
+            step1Check.visibility = View.GONE
+            step1Label.setTextColor(colorOnSurface)
+
+            stepperLine1.setBackgroundColor(colorOutlineVariant)
+        }
+
+        // Step 2 (Wireless)
+        if (portsDiscovered) {
+            step2Circle.setBackgroundResource(R.drawable.bg_stepper_circle_done)
+            step2Number.visibility = View.GONE
+            step2Check.visibility = View.VISIBLE
+            step2Label.setTextColor(ContextCompat.getColor(this, R.color.status_green))
+
+            stepperLine2.setBackgroundColor(ContextCompat.getColor(this, R.color.status_green))
+            cardStep2.strokeColor = ContextCompat.getColor(this, R.color.status_green)
+        } else if (accountsReady) {
+            step2Circle.setBackgroundResource(R.drawable.bg_stepper_circle_active)
+            step2Number.visibility = View.VISIBLE
+            step2Number.setTextColor(ContextCompat.getColor(this, R.color.white))
+            step2Check.visibility = View.GONE
+            step2Label.setTextColor(colorPrimary)
+
+            stepperLine2.setBackgroundColor(colorOutlineVariant)
+            cardStep2.strokeColor = colorPrimary
+        } else {
+            step2Circle.setBackgroundResource(R.drawable.bg_stepper_circle_inactive)
+            step2Number.visibility = View.VISIBLE
+            step2Number.setTextColor(colorOnSurfaceVariant)
+            step2Check.visibility = View.GONE
+            step2Label.setTextColor(colorOnSurfaceVariant)
+
+            stepperLine2.setBackgroundColor(colorOutlineVariant)
+            cardStep2.strokeColor = colorOutlineVariant
+        }
+
+        // Step 3 (Pairing)
+        if (portsDiscovered) {
+            step3Circle.setBackgroundResource(R.drawable.bg_stepper_circle_active)
+            step3Number.visibility = View.VISIBLE
+            step3Number.setTextColor(ContextCompat.getColor(this, R.color.white))
+            step3Check.visibility = View.GONE
+            step3Label.setTextColor(ContextCompat.getColor(this, R.color.status_green))
+
+            cardStep3.strokeColor = ContextCompat.getColor(this, R.color.status_green)
+        } else {
+            step3Circle.setBackgroundResource(R.drawable.bg_stepper_circle_inactive)
+            step3Number.visibility = View.VISIBLE
+            step3Number.setTextColor(colorOnSurfaceVariant)
+            step3Check.visibility = View.GONE
+            step3Label.setTextColor(colorOnSurfaceVariant)
+
+            cardStep3.strokeColor = colorOutlineVariant
+        }
+    }
+
     private fun updateRadarUi() {
         if (discoveredPairingPort > 0) {
             tvRadarStatus.text = getString(R.string.provisioning_radar_port_found, discoveredPairingPort)
             tvRadarStatus.setTextColor(ContextCompat.getColor(this, R.color.status_green))
+            ivRadarIcon.setColorFilter(ContextCompat.getColor(this, R.color.status_green))
         } else {
             tvRadarStatus.setText(R.string.provisioning_radar_waiting)
             tvRadarStatus.setTextColor(ContextCompat.getColor(this, R.color.status_orange))
+            ivRadarIcon.setColorFilter(ContextCompat.getColor(this, R.color.status_orange))
         }
+        val accountsReady = AccountAuditor.isReadyForProvisioning(this)
+        val devOptionsEnabled = isDevOptionsEnabled()
+        val portsDiscovered = discoveredPairingPort > 0
+        updateStepperUi(accountsReady, devOptionsEnabled, portsDiscovered)
         validateInputs()
     }
 

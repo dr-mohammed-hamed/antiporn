@@ -22,6 +22,15 @@
     <string name="guardian_weekend_curfew_end_label">Weekend curfew end</string>
     <string name="btn_change_weekend_start_time">Change</string>
     <string name="btn_change_weekend_end_time">Change</string>
+    <string name="guardian_timezone_title">Timezone &amp; Phone Time</string>
+    <string name="guardian_timezone_subtitle">Adjust timezone for travel or daylight saving</string>
+    <string name="guardian_timezone_dropdown_label">Timezone &amp; Nearest Islamic City</string>
+    <string name="guardian_timezone_info">The phone\'s time is adjusted via the official timezone while keeping accurate network time (NTP) synchronization to protect security certificates and internet stability.</string>
+    <string name="guardian_timezone_preview_format">Estimated current time on chargee\'s phone: %s</string>
+    <string name="guardian_timezone_badge_format">%1$s (%2$s)</string>
+    <string name="guardian_timezone_preview_time_format">%1$s (%2$s)</string>
+    <string name="btn_reset_to_makkah">Reset to Makkah Time (Default)</string>
+
     <string name="guardian_instant_internet_kill_title">Instant Internet Kill (24/7)</string>
     <string name="guardian_instant_internet_kill_desc">Instantly cut all internet data on ward device at any time 24/7 with 1 click</string>
     <string name="guardian_mode_vpn_blackhole_desc">Automatically cut internet during night curfew hours only</string>
@@ -70,8 +79,19 @@
     <!-- In-App Provisioning Wizard Strings -->
     <string name="provisioning_wizard_title">Maximum Protection Setup Wizard</string>
     <string name="provisioning_wizard_subtitle">Self-activate Device Owner permission without a PC with minimal friction</string>
+
+    <!-- Stepper Navigation -->
+    <string name="stepper_number_1">1</string>
+    <string name="stepper_number_2">2</string>
+    <string name="stepper_number_3">3</string>
+    <string name="stepper_step_1">1. Accounts</string>
+    <string name="stepper_step_2">2. Wireless</string>
+    <string name="stepper_step_3">3. Pairing</string>
     <string name="provisioning_step1_title">Step 1: Account Audit (Android Requirement)</string>
     <string name="provisioning_step1_ready">Device is ready for pairing (No active accounts)</string>
+    <string name="provisioning_step1_success_title">Accounts verified and ready</string>
+    <string name="provisioning_step1_success_desc">Zero active accounts detected. Ready to proceed to the next step.</string>
+    <string name="provisioning_step1_warning_reassurance">Security note: Your cloud data is safe and you can re-add accounts immediately after setup.</string>
     <string name="provisioning_step1_accounts_found">Found %1$d active accounts that must be temporarily removed to set Device Owner.</string>
     <string name="provisioning_btn_open_accounts">Open Accounts Settings for Temporary Removal</string>
     <string name="provisioning_step2_title">Step 2: Enable Wireless Debugging</string>
@@ -88,6 +108,8 @@
     <string name="provisioning_input_hint">Enter 6-digit code here</string>
     <string name="provisioning_btn_pair_and_activate">Confirm &amp; Activate Maximum Protection</string>
     <string name="provisioning_notification_hint">Smart Tip: You can enter the code directly from the notification drawer without leaving Settings!</string>
+    <string name="provisioning_tip_notification_title">Time-saving Pro Tip</string>
+    <string name="provisioning_tip_notification_body">You can enter the pairing code directly from the top notification without leaving Settings!</string>
     <string name="provisioning_shizuku_title">Shizuku Fast Track (One Tap)</string>
     <string name="provisioning_shizuku_desc">Shizuku was detected running on this device! You can activate with one tap without codes.</string>
     <string name="provisioning_btn_shizuku_activate">Instant Activation via Shizuku</string>

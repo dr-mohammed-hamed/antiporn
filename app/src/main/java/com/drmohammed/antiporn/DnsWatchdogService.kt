@@ -338,12 +338,16 @@ class DnsWatchdogService : Service() {
             Log.d(TAG, "Could not read Settings.Global directly", e)
         }
 
-        // Verify Makkah Timezone (Asia/Riyadh, GMT+3) and Network Auto Time directly
+        // Verify Target Timezone and Network Auto Time directly
         try {
+            val targetTzId = CurfewConfig.getTargetTimeZoneId(this)
+            val targetTz = TimeZone.getTimeZone(targetTzId)
+            TimeZone.setDefault(null)
             val currentTz = TimeZone.getDefault()
-            val isMakkahTz = currentTz.id == CurfewConfig.MAKKAH_TIMEZONE_ID || currentTz.rawOffset == 3 * 3600 * 1000
-            if (!isMakkahTz) {
-                Log.w(TAG, "Timezone mismatch detected in watchdog: current=${currentTz.id}, expected=${CurfewConfig.MAKKAH_TIMEZONE_ID}")
+            val isTargetTz = currentTz.id == targetTzId || currentTz.hasSameRules(targetTz) ||
+                currentTz.getOffset(System.currentTimeMillis()) == targetTz.getOffset(System.currentTimeMillis())
+            if (!isTargetTz) {
+                Log.w(TAG, "Timezone mismatch detected in watchdog: current=${currentTz.id}, expected=$targetTzId")
                 needsEnforce = true
             }
 

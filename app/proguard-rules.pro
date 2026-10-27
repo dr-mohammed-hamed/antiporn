@@ -13,3 +13,7 @@
 -keep class com.drmohammed.antiporn.ai.core.** { *; }
 -keep class org.tensorflow.lite.** { *; }
 -dontwarn org.tensorflow.lite.**
+
+# ONNX Runtime preservation for minified release
+-keep class ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**

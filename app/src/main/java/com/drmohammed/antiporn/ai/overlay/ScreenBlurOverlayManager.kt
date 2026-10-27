@@ -438,7 +438,7 @@ class ScreenBlurOverlayManager(
         try {
             val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? android.app.admin.DevicePolicyManager ?: return
             val admin = android.content.ComponentName(context, "com.drmohammed.antiporn.AdminReceiver")
-            if (dpm.isDeviceOwnerApp(context.packageName)) {
+            if (com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(context)) {
                 dpm.setPermissionGrantState(
                     admin,
                     context.packageName,

@@ -10,12 +10,22 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ArrayAdapter
+import android.widget.ImageView
+import com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry
+import com.drmohammed.antiporn.curfew.CurfewConfig
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
@@ -70,6 +80,19 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var btnChangeWeekendStartTime: MaterialButton
     private lateinit var btnChangeWeekendEndTime: MaterialButton
 
+    // Timezone controls
+    private lateinit var cardTimezoneControl: MaterialCardView
+    private lateinit var layoutTimezoneHeader: View
+    private lateinit var tvTimezoneTitle: TextView
+    private lateinit var tvTimezoneSubtitle: TextView
+    private lateinit var tvTimezoneBadge: TextView
+    private lateinit var ivTimezoneExpand: ImageView
+    private lateinit var layoutTimezoneContent: LinearLayout
+    private lateinit var tilTimezonePicker: TextInputLayout
+    private lateinit var actvTimezonePicker: MaterialAutoCompleteTextView
+    private lateinit var tvTimezonePreview: TextView
+    private lateinit var btnResetToMakkah: MaterialButton
+
     // Enforcement & Security controls
     private lateinit var switchVpnBlackhole: MaterialSwitch
     private lateinit var switchInstantInternetKill: MaterialSwitch
@@ -103,6 +126,7 @@ class GuardianControlActivity : AppCompatActivity() {
     private var selectedWeekendStartMinute = 30
     private var selectedWeekendEndHour = 7
     private var selectedWeekendEndMinute = 0
+    private var selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
 
     private lateinit var approvalsViewBinder: GuardianApprovalsViewBinder
     private var hasLoadedInitialPolicy = false
@@ -204,6 +228,23 @@ class GuardianControlActivity : AppCompatActivity() {
         btnChangeWeekendStartTime = findViewById(R.id.btnChangeWeekendStartTime)
         btnChangeWeekendEndTime = findViewById(R.id.btnChangeWeekendEndTime)
 
+        // Timezone controls
+        cardTimezoneControl = findViewById(R.id.cardTimezoneControl)
+        layoutTimezoneHeader = findViewById(R.id.layoutTimezoneHeader)
+        tvTimezoneTitle = findViewById(R.id.tvTimezoneTitle)
+        tvTimezoneSubtitle = findViewById(R.id.tvTimezoneSubtitle)
+        tvTimezoneBadge = findViewById(R.id.tvTimezoneBadge)
+        ivTimezoneExpand = findViewById(R.id.ivTimezoneExpand)
+        layoutTimezoneContent = findViewById(R.id.layoutTimezoneContent)
+        tilTimezonePicker = findViewById(R.id.tilTimezonePicker)
+        actvTimezonePicker = findViewById(R.id.actvTimezonePicker)
+        tvTimezonePreview = findViewById(R.id.tvTimezonePreview)
+        btnResetToMakkah = findViewById(R.id.btnResetToMakkah)
+
+        val timezoneOptions = IslamicTimeZoneRegistry.getAllOptions()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, timezoneOptions)
+        actvTimezonePicker.setAdapter(adapter)
+
         // Enforcement & Zero Trust
         switchVpnBlackhole = findViewById(R.id.switchVpnBlackhole)
         switchInstantInternetKill = findViewById(R.id.switchInstantInternetKill)
@@ -253,6 +294,9 @@ class GuardianControlActivity : AppCompatActivity() {
         btnPresetCloudflare.isEnabled = enabled
         btnPresetNextDns.isEnabled = enabled
         btnRetryLoadPolicy.isEnabled = enabled
+        tilTimezonePicker.isEnabled = enabled
+        actvTimezonePicker.isEnabled = enabled
+        btnResetToMakkah.isEnabled = enabled
         updateSaveButtonState()
     }
 
@@ -280,7 +324,8 @@ class GuardianControlActivity : AppCompatActivity() {
                 switchInstantInternetKill.isChecked != snapshot.isInstantInternetKillEnabled ||
                 switchIncognitoBlocked.isChecked != snapshot.isIncognitoBlocked ||
                 switchLockNewInstalls.isChecked != snapshot.lockNewInstallsUntilApproved ||
-                getCleanDnsHost() != snapshot.dnsHost
+                getCleanDnsHost() != snapshot.dnsHost ||
+                selectedTimeZoneId != snapshot.timeZoneId
     }
 
     private fun updateSaveButtonState() {
@@ -390,6 +435,34 @@ class GuardianControlActivity : AppCompatActivity() {
             picker.show(supportFragmentManager, "weekend_end_time_picker")
         }
 
+        layoutTimezoneHeader.setOnClickListener {
+            val isExpanded = layoutTimezoneContent.isVisible
+            if (isExpanded) {
+                layoutTimezoneContent.visibility = View.GONE
+                ivTimezoneExpand.animate().rotation(0f).setDuration(200).start()
+            } else {
+                layoutTimezoneContent.visibility = View.VISIBLE
+                ivTimezoneExpand.animate().rotation(180f).setDuration(200).start()
+            }
+        }
+
+        actvTimezonePicker.setOnItemClickListener { parent, _, position, _ ->
+            val option = parent.getItemAtPosition(position) as? IslamicTimeZoneRegistry.TimeZoneOption
+            if (option != null && option.id != selectedTimeZoneId) {
+                selectedTimeZoneId = option.id
+                updateTimezoneViews()
+                updateSaveButtonState()
+            }
+        }
+
+        btnResetToMakkah.setOnClickListener {
+            if (selectedTimeZoneId != CurfewConfig.MAKKAH_TIMEZONE_ID) {
+                selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
+                updateTimezoneViews()
+                updateSaveButtonState()
+            }
+        }
+
         val switchListener = { _: View, _: Boolean -> updateSaveButtonState() }
         switchCurfewMaster.setOnCheckedChangeListener(switchListener)
         switchWeekendCurfew.setOnCheckedChangeListener(switchListener)
@@ -458,6 +531,57 @@ class GuardianControlActivity : AppCompatActivity() {
         tvWeekendEndTime.text = getString(R.string.guardian_curfew_time_format, selectedWeekendEndHour, selectedWeekendEndMinute)
     }
 
+    private fun updateTimezoneViews() {
+        val option = IslamicTimeZoneRegistry.findByIanaId(selectedTimeZoneId)
+        val cityName = option.majorCities.split("/").firstOrNull()?.trim() ?: option.majorCities
+        tvTimezoneBadge.text = getString(R.string.guardian_timezone_badge_format, option.gmtOffsetLabel, cityName)
+        actvTimezonePicker.setText(option.displayText, false)
+
+        try {
+            val tz = TimeZone.getTimeZone(option.ianaTimeZoneId)
+            val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault()).apply {
+                timeZone = tz
+            }
+            val formattedTime = sdf.format(Date())
+            val timeWithOffset = getString(R.string.guardian_timezone_preview_time_format, formattedTime, option.gmtOffsetLabel)
+            tvTimezonePreview.text = getString(
+                R.string.guardian_timezone_preview_format,
+                timeWithOffset
+            )
+        } catch (e: Exception) {
+            tvTimezonePreview.text = getString(
+                R.string.guardian_timezone_preview_format,
+                option.gmtOffsetLabel
+            )
+        }
+    }
+
+    private fun populateUiFromPolicy(policy: DevicePolicyBundle) {
+        selectedStartHour = policy.curfewStartHour
+        selectedStartMinute = policy.curfewStartMinute
+        selectedEndHour = policy.curfewEndHour
+        selectedEndMinute = policy.curfewEndMinute
+
+        selectedWeekendStartHour = policy.weekendCurfewStartHour
+        selectedWeekendStartMinute = policy.weekendCurfewStartMinute
+        selectedWeekendEndHour = policy.weekendCurfewEndHour
+        selectedWeekendEndMinute = policy.weekendCurfewEndMinute
+
+        selectedTimeZoneId = policy.timeZoneId
+
+        updateTimingLabels()
+        updateTimezoneViews()
+
+        switchCurfewMaster.isChecked = policy.isCurfewEnabled
+        switchWeekendCurfew.isChecked = policy.isWeekendCurfewEnabled
+        switchVpnBlackhole.isChecked = policy.isVpnBlackholeEnabled
+        switchInstantInternetKill.isChecked = policy.isInstantInternetKillEnabled
+        switchIncognitoBlocked.isChecked = policy.isIncognitoBlocked
+        switchLockNewInstalls.isChecked = policy.lockNewInstallsUntilApproved
+        etDnsHost.setText(policy.dnsHost)
+        tilDnsHost.error = null
+    }
+
     private fun loadWardPolicy() {
         if (approvalsListener == null) {
             listenForPendingApprovals()
@@ -488,27 +612,9 @@ class GuardianControlActivity : AppCompatActivity() {
                     currentPolicy = DevicePolicyBundle.defaultPolicy()
                 }
 
-                selectedStartHour = currentPolicy.curfewStartHour
-                selectedStartMinute = currentPolicy.curfewStartMinute
-                selectedEndHour = currentPolicy.curfewEndHour
-                selectedEndMinute = currentPolicy.curfewEndMinute
-
-                selectedWeekendStartHour = currentPolicy.weekendCurfewStartHour
-                selectedWeekendStartMinute = currentPolicy.weekendCurfewStartMinute
-                selectedWeekendEndHour = currentPolicy.weekendCurfewEndHour
-                selectedWeekendEndMinute = currentPolicy.weekendCurfewEndMinute
-
                 withContext(Dispatchers.Main) {
                     if (isFinishing || isDestroyed) return@withContext
-                    updateTimingLabels()
-                    switchCurfewMaster.isChecked = currentPolicy.isCurfewEnabled
-                    switchWeekendCurfew.isChecked = currentPolicy.isWeekendCurfewEnabled
-                    switchVpnBlackhole.isChecked = currentPolicy.isVpnBlackholeEnabled
-                    switchInstantInternetKill.isChecked = currentPolicy.isInstantInternetKillEnabled
-                    switchIncognitoBlocked.isChecked = currentPolicy.isIncognitoBlocked
-                    switchLockNewInstalls.isChecked = currentPolicy.lockNewInstallsUntilApproved
-                    etDnsHost.setText(currentPolicy.dnsHost)
-                    tilDnsHost.error = null
+                    populateUiFromPolicy(currentPolicy)
                     cardOfflineBanner.visibility = if (isOffline) View.VISIBLE else View.GONE
                     btnRetryLoadPolicy.isEnabled = true
 
@@ -527,7 +633,8 @@ class GuardianControlActivity : AppCompatActivity() {
                         isInstantInternetKillEnabled = switchInstantInternetKill.isChecked,
                         isIncognitoBlocked = switchIncognitoBlocked.isChecked,
                         lockNewInstallsUntilApproved = switchLockNewInstalls.isChecked,
-                        dnsHost = getCleanDnsHost()
+                        dnsHost = getCleanDnsHost(),
+                        timeZoneId = selectedTimeZoneId
                     )
                     setInputsEnabled(true)
                 }
@@ -537,15 +644,7 @@ class GuardianControlActivity : AppCompatActivity() {
                 Log.e(TAG, "Error loading ward policy for $wardId", e)
                 withContext(Dispatchers.Main) {
                     if (isFinishing || isDestroyed) return@withContext
-                    updateTimingLabels()
-                    switchCurfewMaster.isChecked = currentPolicy.isCurfewEnabled
-                    switchWeekendCurfew.isChecked = currentPolicy.isWeekendCurfewEnabled
-                    switchVpnBlackhole.isChecked = currentPolicy.isVpnBlackholeEnabled
-                    switchInstantInternetKill.isChecked = currentPolicy.isInstantInternetKillEnabled
-                    switchIncognitoBlocked.isChecked = currentPolicy.isIncognitoBlocked
-                    switchLockNewInstalls.isChecked = currentPolicy.lockNewInstallsUntilApproved
-                    etDnsHost.setText(currentPolicy.dnsHost)
-                    tilDnsHost.error = null
+                    populateUiFromPolicy(currentPolicy)
                     cardOfflineBanner.visibility = View.VISIBLE
                     btnRetryLoadPolicy.isEnabled = true
 
@@ -564,7 +663,8 @@ class GuardianControlActivity : AppCompatActivity() {
                         isInstantInternetKillEnabled = switchInstantInternetKill.isChecked,
                         isIncognitoBlocked = switchIncognitoBlocked.isChecked,
                         lockNewInstallsUntilApproved = switchLockNewInstalls.isChecked,
-                        dnsHost = getCleanDnsHost()
+                        dnsHost = getCleanDnsHost(),
+                        timeZoneId = selectedTimeZoneId
                     )
                     setInputsEnabled(true)
                     Toast.makeText(this@GuardianControlActivity, R.string.toast_load_policy_failed, Toast.LENGTH_LONG).show()
@@ -751,6 +851,7 @@ class GuardianControlActivity : AppCompatActivity() {
                     isIncognitoBlocked = switchIncognitoBlocked.isChecked,
                     lockNewInstallsUntilApproved = switchLockNewInstalls.isChecked,
                     dnsHost = rawDns,
+                    timeZoneId = selectedTimeZoneId,
                     version = latestPolicy.version + 1,
                     updatedAt = System.currentTimeMillis()
                 )
