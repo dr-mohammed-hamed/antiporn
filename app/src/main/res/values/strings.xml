@@ -643,4 +643,9 @@
     <string name="error_breakout_not_ready">لم تنتهِ مهلة الـ 24 ساعة بعد</string>
     <string name="error_switch_account_while_supervised">لا يمكن التبديل إلى حساب Google مسجل مسبقاً أثناء خضوع الجهاز للإشراف حمايةً لرابط الإشراف</string>
 
+    <!-- Enterprise Provisioning (OOBE QR Code) -->
+    <string name="provisioning_setup_title">تهيئة حماية عِصمة</string>
+    <string name="provisioning_setup_subtitle">جاري تفعيل دروع الحماية المؤسسية وتأمين النظام&#8230;</string>
+    <string name="provisioning_setup_notice">الرجاء الانتظار، لا تقم بإغلاق الهاتف أثناء التهيئة الأولية.</string>
+
 </resources>

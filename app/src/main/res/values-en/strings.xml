@@ -213,4 +213,9 @@
     <string name="dialog_revoke_ward_title">Revoke Supervision &amp; Release Protection</string>
     <string name="error_ward_already_has_guardian">This device is already linked to another supervisor and cannot be paired!</string>
     <string name="btn_manage_ward">Manage Protection</string>
+    <!-- Enterprise Provisioning (OOBE QR Code) -->
+    <string name="provisioning_setup_title">Setting up ISMAH Protection</string>
+    <string name="provisioning_setup_subtitle">Enforcing enterprise security shields and securing the device&#8230;</string>
+    <string name="provisioning_setup_notice">Please wait, do not turn off the device during initial setup.</string>
+
 </resources>

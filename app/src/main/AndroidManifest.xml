@@ -32,7 +32,7 @@
         android:theme="@style/Theme.Antiporn">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".MainActivity" android:launchMode="singleTask"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -57,6 +57,24 @@
 
             </intent-filter>
         </receiver>
+
+        <!-- Android Enterprise Provisioning Handlers (Android 12+ / API 31+) -->
+        <activity
+            android:name=".provisioning.ui.EnterpriseProvisioningActivity"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:theme="@style/Theme.Antiporn"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density|fontScale|locale|layoutDirection"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.app.action.GET_PROVISIONING_MODE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <receiver
             android:name=".PackageChangeReceiver"
