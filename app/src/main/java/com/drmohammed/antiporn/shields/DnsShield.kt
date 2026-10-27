@@ -72,7 +72,20 @@ object DnsShield : ProtectionShield {
                     Log.d(TAG, "Private DNS already set to $targetHost via DPM, skipping redundant write")
                 }
             } else {
-                Log.i(TAG, "Running under Profile Owner: DPM global private DNS requires DO; relying on system settings & restrictions.")
+                Log.i(TAG, "Running under Profile Owner: applying DNS via Settings.Global with WRITE_SECURE_SETTINGS")
+                try {
+                    val globalMode = android.provider.Settings.Global.getString(context.contentResolver, "private_dns_mode")
+                    val globalHost = android.provider.Settings.Global.getString(context.contentResolver, "private_dns_specifier")
+                    if (globalMode != "hostname" || globalHost != targetHost) {
+                        android.provider.Settings.Global.putString(context.contentResolver, "private_dns_mode", "hostname")
+                        android.provider.Settings.Global.putString(context.contentResolver, "private_dns_specifier", targetHost)
+                        Log.i(TAG, "Enforced private DNS via Settings.Global to $targetHost")
+                    }
+                    dnsSetResult = DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not write Settings.Global for private DNS under Profile Owner", e)
+                    dnsSetResult = DevicePolicyManager.PRIVATE_DNS_SET_ERROR_FAILURE_SETTING
+                }
             }
 
             // Lock Private DNS and network reset (Check-Before-Write)

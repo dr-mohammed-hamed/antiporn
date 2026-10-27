@@ -27,6 +27,11 @@ import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
 import java.util.TimeZone
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class DnsWatchdogService : Service() {
 
@@ -37,6 +42,7 @@ class DnsWatchdogService : Service() {
         private const val DEBOUNCE_DELAY_MS = 500L
         private const val SCREEN_DEBOUNCE_DELAY_MS = 500L
         private const val HEARTBEAT_INTERVAL_MS = 60_000L
+        private const val CLOUD_HEARTBEAT_INTERVAL_MS = 12 * 3600 * 1000L
 
         @Volatile
         var isRunning: Boolean = false
@@ -61,6 +67,7 @@ class DnsWatchdogService : Service() {
     }
 
     private val bgExecutor = Executors.newSingleThreadExecutor()
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val debounceHandler = Handler(Looper.getMainLooper())
     private val checkRunnable = Runnable {
@@ -73,12 +80,28 @@ class DnsWatchdogService : Service() {
         checkAndEnforceProtection()
     }
 
+    private var lastCloudHeartbeatElapsed = 0L
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
             Log.d(TAG, "Layer 3 - Periodic heartbeat (60s): cleaning stray apps & verifying shields")
             AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
             checkAndEnforceProtection()
+
+            val nowRealtime = android.os.SystemClock.elapsedRealtime()
+            if (nowRealtime - lastCloudHeartbeatElapsed >= CLOUD_HEARTBEAT_INTERVAL_MS || lastCloudHeartbeatElapsed == 0L) {
+                serviceScope.launch {
+                    try {
+                        val res = com.drmohammed.antiporn.data.repository.AccountabilityRepository.getInstance(applicationContext).updateHeartbeat()
+                        if (res.isSuccess) {
+                            lastCloudHeartbeatElapsed = nowRealtime
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Watchdog cloud heartbeat update error: ${e.message}")
+                    }
+                }
+            }
+
             heartbeatHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
         }
     }
@@ -159,6 +182,7 @@ class DnsWatchdogService : Service() {
         unregisterScreenReceiver()
         CurfewForegroundWatcher.stop()
         networkWatchdog.unregister()
+        serviceScope.cancel()
         try {
             bgExecutor.shutdown()
         } catch (e: Exception) {

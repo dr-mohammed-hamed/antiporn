@@ -65,6 +65,10 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var cardOfflineBanner: MaterialCardView
     private lateinit var tvOfflineStatus: TextView
     private lateinit var btnRetryLoadPolicy: MaterialButton
+    private lateinit var cardBreakoutAlertBanner: MaterialCardView
+    private lateinit var tvBreakoutAlertTitle: TextView
+    private lateinit var tvBreakoutAlertMsg: TextView
+    private lateinit var btnRejectBreakout: MaterialButton
 
     // Curfew controls
     private lateinit var switchCurfewMaster: MaterialSwitch
@@ -131,6 +135,7 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var approvalsViewBinder: GuardianApprovalsViewBinder
     private var hasLoadedInitialPolicy = false
     private var lastEditNameClickTime = 0L
+    private var lastRejectBreakoutClickTime = 0L
     private var approvalsListener: ListenerRegistration? = null
 
     private val appManagerLauncher = registerForActivityResult(
@@ -213,6 +218,10 @@ class GuardianControlActivity : AppCompatActivity() {
         cardOfflineBanner = findViewById(R.id.cardOfflineBanner)
         tvOfflineStatus = findViewById(R.id.tvOfflineStatus)
         btnRetryLoadPolicy = findViewById(R.id.btnRetryLoadPolicy)
+        cardBreakoutAlertBanner = findViewById(R.id.cardBreakoutAlertBanner)
+        tvBreakoutAlertTitle = findViewById(R.id.tvBreakoutAlertTitle)
+        tvBreakoutAlertMsg = findViewById(R.id.tvBreakoutAlertMsg)
+        btnRejectBreakout = findViewById(R.id.btnRejectBreakout)
 
         // Master Curfew & Weekday
         switchCurfewMaster = findViewById(R.id.switchCurfewMaster)
@@ -359,6 +368,36 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        btnRejectBreakout.setOnClickListener {
+            if (isFinishing || isDestroyed) return@setOnClickListener
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastRejectBreakoutClickTime < 1000L) return@setOnClickListener
+            lastRejectBreakoutClickTime = now
+            btnRejectBreakout.isEnabled = false
+            lifecycleScope.launch {
+                try {
+                    val result = com.drmohammed.antiporn.data.repository.AccountabilityRepository.getInstance(applicationContext).rejectEmergencyBreakout(wardId)
+                    if (isFinishing || isDestroyed) return@launch
+                    result.fold(
+                        onSuccess = {
+                            Toast.makeText(this@GuardianControlActivity, R.string.toast_breakout_rejected, Toast.LENGTH_SHORT).show()
+                            cardBreakoutAlertBanner.visibility = View.GONE
+                        },
+                        onFailure = { err ->
+                            Toast.makeText(this@GuardianControlActivity, err.localizedMessage ?: getString(R.string.error_unknown), Toast.LENGTH_LONG).show()
+                        }
+                    )
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    Log.e(TAG, "Error rejecting breakout", e)
+                } finally {
+                    if (!isFinishing && !isDestroyed) {
+                        btnRejectBreakout.isEnabled = true
+                    }
+                }
+            }
+        }
+
         btnChangeStartTime.setOnClickListener {
             if (isFinishing || isDestroyed) return@setOnClickListener
             if (supportFragmentManager.findFragmentByTag("start_time_picker") != null) return@setOnClickListener
@@ -580,6 +619,17 @@ class GuardianControlActivity : AppCompatActivity() {
         switchLockNewInstalls.isChecked = policy.lockNewInstallsUntilApproved
         etDnsHost.setText(policy.dnsHost)
         tilDnsHost.error = null
+
+        if (policy.breakoutStatus == DevicePolicyBundle.BREAKOUT_STATUS_PENDING && policy.breakoutUnlockAt != null) {
+            cardBreakoutAlertBanner.visibility = View.VISIBLE
+            val remainingMs = (policy.breakoutUnlockAt - System.currentTimeMillis()).coerceAtLeast(0L)
+            val hours = remainingMs / (1000 * 3600)
+            val mins = (remainingMs % (1000 * 3600)) / (1000 * 60)
+            val timeStr = String.format(Locale.US, "%02d:%02d", hours, mins)
+            tvBreakoutAlertMsg.text = getString(R.string.guardian_breakout_alert_msg, wardName, timeStr)
+        } else {
+            cardBreakoutAlertBanner.visibility = View.GONE
+        }
     }
 
     private fun loadWardPolicy() {

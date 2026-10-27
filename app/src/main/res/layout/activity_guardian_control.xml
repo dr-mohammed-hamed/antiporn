@@ -72,7 +72,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:visibility="gone"
-            app:cardBackgroundColor="@color/status_orange_bg"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
             app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
             app:strokeColor="@color/status_orange"
@@ -104,6 +104,56 @@
                     android:textColor="@color/status_orange"
                     android:textSize="13sp"
                     android:textStyle="bold" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Emergency Breakout Pending Veto Banner -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardBreakoutAlertBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorErrorContainer"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorError"
+            app:strokeWidth="1.2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tvBreakoutAlertTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/guardian_breakout_alert_title"
+                    android:textColor="?attr/colorOnErrorContainer"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvBreakoutAlertMsg"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="?attr/colorOnErrorContainer"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnRejectBreakout"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="10dp"
+                    android:backgroundTint="?attr/colorError"
+                    android:text="@string/btn_reject_breakout"
+                    android:textColor="?attr/colorOnError"
+                    android:textSize="12sp"
+                    app:cornerRadius="10dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

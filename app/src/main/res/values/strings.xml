@@ -606,5 +606,41 @@
     <string name="dns_probe_error_broken">الخادم لا يستجيب لاستعلامات الإنترنت الأساسية</string>
     <string name="dns_probe_error_broken_detail">الخادم متصل ولكنه عاجز عن حل نطاقات الإنترنت الأساسية (%1$s). يرجى مراجعة إعدادات الخادم.</string>
 
+    <!-- Google Identity & Account Security -->
+    <string name="default_web_client_id" translatable="false">221894351636-j95hinbtur9gobe0ukdtrjdfgakkotjb.apps.googleusercontent.com</string>
+    <string name="error_google_client_id_missing">معرف عميل Google غير مهيأ في الإعدادات</string>
+    <string name="title_account_security">أمان الحساب واستعادة الهوية</string>
+    <string name="account_secured_google">الحساب مؤمن بحساب Google:</string>
+    <string name="account_unsecured_warning">الحساب غير مؤمن: قد تفقد بياناتك وإشرافك عند حذف التطبيق أو الفورمات</string>
+    <string name="btn_secure_with_google">تأمين الحساب عبر Google</string>
+    <string name="toast_account_secured_success">تم تأمين الحساب وربطه بـ Google بنجاح</string>
+    <string name="toast_account_secured_failed">فشل تأمين الحساب: %s</string>
+
+    <!-- Heartbeat & Activity Status -->
+    <string name="status_online_recently">متصل مؤخراً</string>
+    <string name="status_offline_hours">آخر ظهور: منذ %d ساعة</string>
+    <string name="status_offline_days">آخر ظهور: منذ %d يوم</string>
+
+    <!-- 24h Emergency Breakout -->
+    <string name="btn_request_emergency_breakout">طلب فك ارتباط اضطراري (مهلة 24 ساعة)</string>
+    <string name="dialog_breakout_title">طلب فك الارتباط الاضطراري</string>
+    <string name="dialog_breakout_msg" formatted="false">في حال فقدان هاتف المشرف أو تلفه، يمكنك بدء مهلة أمان مدتها 24 ساعة.\n\nتظل جميع قيود الحماية فعالة بنسبة 100% خلال المهلة، ويُخطر المشرف بالطلب.\n\nإذا لم يرفض المشرف الطلب خلال 24 ساعة، سيتم تحرير الجهاز تلقائياً.</string>
+    <string name="dialog_breakout_confirm">بدء مهلة الـ 24 ساعة</string>
+    <string name="breakout_pending_title">طلب فك الارتباط قيد الانتظار</string>
+    <string name="breakout_pending_time_remaining">الوقت المتبقي: %s</string>
+    <string name="btn_cancel_breakout">إلغاء طلب فك الارتباط</string>
+    <string name="btn_complete_breakout">إتمام تحرير الجهاز الآن</string>
+    <string name="toast_breakout_requested">تم إرسال طلب فك الارتباط وبدء مهلة الـ 24 ساعة</string>
+    <string name="toast_breakout_cancelled">تم إلغاء طلب فك الارتباط</string>
+    <string name="toast_breakout_completed">تم تحرير الجهاز وفك الإشراف بنجاح</string>
+
+    <!-- Guardian Breakout Veto Banner -->
+    <string name="guardian_breakout_alert_title">تنبيه: طلب فك ارتباط معلق</string>
+    <string name="guardian_breakout_alert_msg">طلب %1$s فك الارتباط الاضطراري (متبقي %2$s). إذا لم ترفض الطلب سيتم تحرير جهازه.</string>
+    <string name="btn_reject_breakout">رفض وإلغاء الطلب</string>
+    <string name="toast_breakout_rejected">تم رفض طلب فك الارتباط وإبقاء الإشراف</string>
+    <string name="error_breakout_already_pending">يوجد طلب فك ارتباط اضطراري قيد الانتظار بالفعل</string>
+    <string name="error_breakout_not_ready">لم تنتهِ مهلة الـ 24 ساعة بعد</string>
+    <string name="error_switch_account_while_supervised">لا يمكن التبديل إلى حساب Google مسجل مسبقاً أثناء خضوع الجهاز للإشراف حمايةً لرابط الإشراف</string>
 
 </resources>

@@ -30,6 +30,10 @@ data class DevicePolicyBundle(
     val guardianName: String? = null,
     val isSupervised: Boolean = false,
     val timeZoneId: String = com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID,
+    val lastHeartbeat: Long = 0L,
+    val breakoutStatus: String? = null,
+    val breakoutRequestedAt: Long? = null,
+    val breakoutUnlockAt: Long? = null,
     val version: Long = 1L,
     val updatedAt: Long = System.currentTimeMillis()
 ) {
@@ -56,6 +60,10 @@ data class DevicePolicyBundle(
             "dnsHost" to dnsHost,
             "isSupervised" to isSupervised,
             "timeZoneId" to timeZoneId,
+            "lastHeartbeat" to lastHeartbeat,
+            "breakoutStatus" to breakoutStatus,
+            "breakoutRequestedAt" to breakoutRequestedAt,
+            "breakoutUnlockAt" to breakoutUnlockAt,
             "version" to version,
             "updatedAt" to updatedAt
         )
@@ -98,6 +106,10 @@ data class DevicePolicyBundle(
         if (guardianName != null) json.put("guardianName", guardianName)
         json.put("isSupervised", isSupervised)
         json.put("timeZoneId", timeZoneId)
+        json.put("lastHeartbeat", lastHeartbeat)
+        if (breakoutStatus != null) json.put("breakoutStatus", breakoutStatus)
+        if (breakoutRequestedAt != null) json.put("breakoutRequestedAt", breakoutRequestedAt)
+        if (breakoutUnlockAt != null) json.put("breakoutUnlockAt", breakoutUnlockAt)
         json.put("version", version)
         json.put("updatedAt", updatedAt)
         return json.toString()
@@ -107,6 +119,12 @@ data class DevicePolicyBundle(
         const val ADGUARD_FAMILY_DNS_HOST = "family.adguard-dns.com"
         const val CLOUDFLARE_FAMILY_DNS_HOST = "family.cloudflare-dns.com"
         const val LEGACY_DEFAULT_NEXTDNS_HOST = "family.cloudflare-dns.com"
+
+        const val BREAKOUT_STATUS_PENDING = "PENDING"
+        const val BREAKOUT_STATUS_REJECTED = "REJECTED"
+        const val BREAKOUT_STATUS_CANCELLED = "CANCELLED"
+        const val BREAKOUT_STATUS_COMPLETED = "COMPLETED"
+        const val BREAKOUT_GRACE_PERIOD_MS = 24L * 60L * 60L * 1000L // 24 Hours
 
         fun defaultPolicy(): DevicePolicyBundle = DevicePolicyBundle(
             dnsHost = ADGUARD_FAMILY_DNS_HOST,
@@ -151,6 +169,10 @@ data class DevicePolicyBundle(
             val gName = (map["guardianName"] as? String)?.takeIf { it.isNotBlank() }
             val supervised = (map["isSupervised"] as? Boolean) ?: (!gUid.isNullOrBlank())
             val timeZoneId = (map["timeZoneId"] as? String)?.takeIf { it.isNotBlank() } ?: com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
+            val lastHeartbeat = (map["lastHeartbeat"] as? Number)?.toLong() ?: 0L
+            val breakoutStatus = (map["breakoutStatus"] as? String)?.takeIf { it.isNotBlank() }
+            val breakoutRequestedAt = (map["breakoutRequestedAt"] as? Number)?.toLong()
+            val breakoutUnlockAt = (map["breakoutUnlockAt"] as? Number)?.toLong()
 
             val version = (map["version"] as? Number)?.toLong() ?: 1L
             val updatedAt = (map["updatedAt"] as? Number)?.toLong() ?: 0L
@@ -178,6 +200,10 @@ data class DevicePolicyBundle(
                 guardianName = gName,
                 isSupervised = supervised,
                 timeZoneId = timeZoneId,
+                lastHeartbeat = lastHeartbeat,
+                breakoutStatus = breakoutStatus,
+                breakoutRequestedAt = breakoutRequestedAt,
+                breakoutUnlockAt = breakoutUnlockAt,
                 version = version,
                 updatedAt = updatedAt
             )
@@ -215,6 +241,10 @@ data class DevicePolicyBundle(
                 val gName = json.optString("guardianName", "").takeIf { it.isNotBlank() }
                 val supervised = json.optBoolean("isSupervised", !gUid.isNullOrBlank())
                 val timeZoneId = json.optString("timeZoneId", com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID).ifBlank { com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID }
+                val lastHeartbeat = json.optLong("lastHeartbeat", 0L)
+                val breakoutStatus = json.optString("breakoutStatus", "").takeIf { it.isNotBlank() }
+                val breakoutRequestedAt = if (json.has("breakoutRequestedAt") && !json.isNull("breakoutRequestedAt")) json.optLong("breakoutRequestedAt") else null
+                val breakoutUnlockAt = if (json.has("breakoutUnlockAt") && !json.isNull("breakoutUnlockAt")) json.optLong("breakoutUnlockAt") else null
 
                 DevicePolicyBundle(
                     curfewStartHour = json.optInt("curfewStartHour", com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR).coerceIn(0, 23),
@@ -239,6 +269,10 @@ data class DevicePolicyBundle(
                     guardianName = gName,
                     isSupervised = supervised,
                     timeZoneId = timeZoneId,
+                    lastHeartbeat = lastHeartbeat,
+                    breakoutStatus = breakoutStatus,
+                    breakoutRequestedAt = breakoutRequestedAt,
+                    breakoutUnlockAt = breakoutUnlockAt,
                     version = json.optLong("version", 1L),
                     updatedAt = json.optLong("updatedAt", System.currentTimeMillis())
                 )

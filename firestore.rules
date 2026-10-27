@@ -2,6 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper to verify if the caller is the legitimate owner
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
     // Strict Single-Guardian check: only the verified guardian registered on the ward's policy document
     function isGuardianOf(wardUid) {
       return request.auth != null &&
@@ -20,18 +25,44 @@ service cloud.firestore {
       allow delete: if request.auth != null && (resource.data.ownerUid == request.auth.uid || isGuardianOf(resource.data.ownerUid));
     }
 
-    // 2. Policies: Unified protection policies with strict single-guardian lock
+    // 2. Policies: Unified protection policies with strict single-guardian lock, heartbeat & 24h emergency breakout
     match /policies/{wardUid} {
-      allow read: if request.auth != null && (request.auth.uid == wardUid || isGuardianOf(wardUid));
-      allow create: if request.auth != null && (request.auth.uid == wardUid || request.resource.data.get('guardianUid', null) == request.auth.uid);
+      allow read: if isOwner(wardUid) || isGuardianOf(wardUid);
+      allow create: if isOwner(wardUid) || (request.auth != null && request.resource.data.get('guardianUid', null) == request.auth.uid);
       allow update: if request.auth != null && (
-        // Case 1: Currently supervised -> ONLY the registered guardian can update or revoke
+        // Case 1: Guardian updates or revokes
         (resource.data.get('guardianUid', null) != null && resource.data.get('guardianUid', null) == request.auth.uid) ||
-        // Case 2: Currently unsupervised -> Ward can update standalone, OR new guardian can claim guardianship
+        // Case 2: Currently unsupervised -> Ward updates standalone OR new guardian claims guardianship
         (resource.data.get('guardianUid', null) == null && (
-          (request.auth.uid == wardUid && request.resource.data.get('guardianUid', null) == null) ||
+          (isOwner(wardUid) && request.resource.data.get('guardianUid', null) == null) ||
           (request.resource.data.get('guardianUid', null) == request.auth.uid)
-        ))
+        )) ||
+        // Case 3: Ward updates heartbeat while supervised
+        (resource.data.get('guardianUid', null) != null && isOwner(wardUid) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastHeartbeat'])) ||
+        // Case 4: Ward initiates or cancels 24h emergency breakout while supervised (protection stays intact)
+        (resource.data.get('guardianUid', null) != null && isOwner(wardUid) &&
+          request.resource.data.get('guardianUid', null) == resource.data.get('guardianUid', null) &&
+          request.resource.data.get('isSupervised', null) == resource.data.get('isSupervised', null) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['breakoutStatus', 'breakoutRequestedAt', 'breakoutUnlockAt', 'updatedAt']) &&
+          (
+            // Subcase 4a: Initiating breakout -> Must enforce minimum 24 hours (with 15-minute clock drift tolerance)
+            (request.resource.data.get('breakoutStatus', null) == 'PENDING' &&
+             request.resource.data.get('breakoutUnlockAt', 0) >= request.time.toMillis() + 85500000 &&
+             request.resource.data.get('breakoutRequestedAt', 0) <= request.time.toMillis() + 900000) ||
+            // Subcase 4b: Cancelling breakout
+            (request.resource.data.get('breakoutStatus', null) == 'CANCELLED' &&
+             request.resource.data.get('breakoutUnlockAt', null) == null)
+          )
+        ) ||
+        // Case 5: Ward executes emergency breakout AFTER 24h grace period has legitimately passed on server clock
+        (resource.data.get('guardianUid', null) != null && isOwner(wardUid) &&
+          resource.data.get('breakoutStatus', null) == 'PENDING' &&
+          resource.data.get('breakoutUnlockAt', 0) > 0 &&
+          request.time.toMillis() >= resource.data.get('breakoutUnlockAt', 0) &&
+          request.resource.data.get('guardianUid', null) == null &&
+          request.resource.data.get('isSupervised', false) == false &&
+          request.resource.data.get('breakoutStatus', null) == 'COMPLETED')
       );
       allow delete: if false;
     }
@@ -54,10 +85,10 @@ service cloud.firestore {
 
     // 4. Users: Tokens and partner relationships
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
 
       match /{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
     }
 

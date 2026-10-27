@@ -73,6 +73,14 @@ class AccountabilityRepository private constructor(context: Context) {
     }
 
     /**
+     * Synchronously checks whether this device is currently under active guardian supervision.
+     */
+    fun isSupervised(): Boolean {
+        val policy = database.getDevicePolicy()?.toBundle()
+        return policy?.isSupervised == true
+    }
+
+    /**
      * Gets or generates the device's persistent 6-character pairing code.
      * If the device is currently supervised, returns LOCKED and hides code from cloud discovery.
      */
@@ -282,6 +290,12 @@ class AccountabilityRepository private constructor(context: Context) {
         try {
             // 1. Delete all guardian records locally
             val guardians = database.getPartnersByRole(PartnerEntity.ROLE_GUARDIAN)
+            val currentCode = prefs.getString(KEY_MY_PAIRING_CODE, null)
+            if (guardians.isEmpty() && !currentCode.isNullOrBlank() && currentCode != CODE_LOCKED) {
+                Log.d(TAG, "Local supervision already revoked and fresh pairing code exists, skipping redundant cycle")
+                return@withContext
+            }
+
             for (guardian in guardians) {
                 database.deletePartner(guardian.id)
             }
@@ -323,6 +337,102 @@ class AccountabilityRepository private constructor(context: Context) {
      */
     suspend fun getAllPartners(): List<PartnerEntity> = withContext(Dispatchers.IO) {
         database.getAllPartners()
+    }
+
+    /**
+     * Synchronizes all partner relationships from Firestore into the local SQLite database.
+     * Restores supervised wards and guardians automatically when switching devices or reinstalling.
+     * Also migrates any local partners to cloud under current authenticated UID if needed.
+     */
+    suspend fun syncPartnersFromCloud(): Result<List<PartnerEntity>> = withContext(Dispatchers.IO) {
+        try {
+            val myUid = getOrCreateCurrentUid()
+            if (myUid.startsWith("dev_") && auth.currentUser == null) {
+                Log.d(TAG, "Unauthenticated device UID ($myUid), skipping cloud partner restore")
+                return@withContext Result.success(database.getAllPartners())
+            }
+
+            Log.i(TAG, "Initiating cloud partners restore for UID: $myUid...")
+
+            // 1. Fetch all partners registered under /users/{myUid}/partners
+            val cloudPartnersSnapshot = firestore.collection("users").document(myUid)
+                .collection("partners").get().await()
+
+            for (doc in cloudPartnersSnapshot.documents) {
+                val partnerUid = doc.getString("partnerUid") ?: doc.id
+                val partnerName = doc.getString("partnerName") ?: "Partner"
+                val role = doc.getString("role") ?: PartnerEntity.ROLE_WARD
+                val pairingCode = doc.getString("pairingCode") ?: CODE_LOCKED
+                val pairedAt = doc.getLong("pairedAt") ?: System.currentTimeMillis()
+
+                val partnerEntity = PartnerEntity(
+                    id = partnerUid,
+                    pairingCode = pairingCode,
+                    displayName = partnerName,
+                    role = role,
+                    status = PartnerEntity.STATUS_ACTIVE,
+                    createdAt = pairedAt,
+                    lastSyncAt = System.currentTimeMillis()
+                )
+                database.savePartner(partnerEntity)
+                Log.d(TAG, "Restored cloud partner to SQLite: $partnerName ($partnerUid, role=$role)")
+            }
+
+            // 2. Self-heal Guardian from /policies/{myUid} if supervised
+            try {
+                val myPolicyDoc = firestore.collection("policies").document(myUid).get().await()
+                if (myPolicyDoc.exists()) {
+                    val isSupervised = myPolicyDoc.getBoolean("isSupervised") ?: false
+                    val guardianUid = myPolicyDoc.getString("guardianUid")
+                    val guardianName = myPolicyDoc.getString("guardianName")
+                    if (isSupervised && !guardianUid.isNullOrBlank()) {
+                        val guardian = PartnerEntity(
+                            id = guardianUid,
+                            pairingCode = CODE_LOCKED,
+                            displayName = guardianName ?: appContext.getString(R.string.guardian_default_name),
+                            role = PartnerEntity.ROLE_GUARDIAN,
+                            status = PartnerEntity.STATUS_ACTIVE,
+                            createdAt = myPolicyDoc.getLong("updatedAt") ?: System.currentTimeMillis(),
+                            lastSyncAt = System.currentTimeMillis()
+                        )
+                        database.savePartner(guardian)
+                        Log.i(TAG, "Restored Guardian from cloud policy: ${guardian.displayName} ($guardianUid)")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Non-critical: Failed to verify guardian from /policies/$myUid: ${e.message}")
+            }
+
+            // 3. Migrate any local partners to cloud /users/{myUid}/partners if missing from cloud
+            val localPartners = database.getAllPartners()
+            for (local in localPartners) {
+                if (cloudPartnersSnapshot.documents.none { it.id == local.id }) {
+                    try {
+                        val relationData = mapOf(
+                            "partnerUid" to local.id,
+                            "partnerName" to local.displayName,
+                            "role" to local.role,
+                            "pairingCode" to local.pairingCode,
+                            "pairedAt" to local.createdAt
+                        )
+                        firestore.collection("users").document(myUid)
+                            .collection("partners").document(local.id)
+                            .set(relationData, com.google.firebase.firestore.SetOptions.merge())
+                            .await()
+                        Log.i(TAG, "Migrated local partner ${local.displayName} (${local.id}) to cloud /users/$myUid/partners")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed migrating local partner ${local.id} to cloud: ${e.message}")
+                    }
+                }
+            }
+
+            val finalPartners = database.getAllPartners()
+            Log.i(TAG, "Cloud partners sync completed successfully: ${finalPartners.size} total partners in SQLite")
+            Result.success(finalPartners)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error syncing partners from cloud", e)
+            Result.failure(e)
+        }
     }
 
     suspend fun getGuardians(): List<PartnerEntity> = withContext(Dispatchers.IO) {
@@ -482,6 +592,159 @@ class AccountabilityRepository private constructor(context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Error renaming partner $partnerId", e)
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Updates the device's heartbeat timestamp in Firestore /policies/{myUid}.
+     * Lightweight operation invoked periodically or on app foreground.
+     */
+    suspend fun updateHeartbeat(): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val myUid = getOrCreateCurrentUid()
+            val now = System.currentTimeMillis()
+            firestore.collection("policies").document(myUid)
+                .set(mapOf("lastHeartbeat" to now), com.google.firebase.firestore.SetOptions.merge())
+                .await()
+            Log.d(TAG, "Heartbeat updated successfully at $now")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.w(TAG, "Non-critical heartbeat update failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Initiates a 24-hour Emergency Breakout request for a supervised ward device.
+     * All protection policies remain 100% active during the 24-hour grace period.
+     */
+    suspend fun requestEmergencyBreakout(): Result<Long> = withContext(Dispatchers.IO) {
+        try {
+            val myUid = getOrCreateCurrentUid()
+            val docRef = firestore.collection("policies").document(myUid)
+            val snapshot = docRef.get(com.google.firebase.firestore.Source.SERVER).await()
+            if (!snapshot.exists()) {
+                return@withContext Result.failure(IllegalStateException("Policy document does not exist"))
+            }
+
+            val currentStatus = snapshot.getString("breakoutStatus")
+            if (currentStatus == DevicePolicyBundle.BREAKOUT_STATUS_PENDING) {
+                return@withContext Result.failure(IllegalStateException(appContext.getString(R.string.error_breakout_already_pending)))
+            }
+
+            val now = System.currentTimeMillis()
+            val unlockAt = now + DevicePolicyBundle.BREAKOUT_GRACE_PERIOD_MS
+            val updates = mapOf(
+                "breakoutStatus" to DevicePolicyBundle.BREAKOUT_STATUS_PENDING,
+                "breakoutRequestedAt" to now,
+                "breakoutUnlockAt" to unlockAt,
+                "updatedAt" to now
+            )
+            docRef.update(updates).await()
+            Log.i(TAG, "Emergency breakout requested. Unlock time set to $unlockAt")
+            Result.success(unlockAt)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error requesting emergency breakout", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Cancels an active emergency breakout request by the ward.
+     */
+    suspend fun cancelEmergencyBreakout(): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val myUid = getOrCreateCurrentUid()
+            val docRef = firestore.collection("policies").document(myUid)
+            val updates = mapOf(
+                "breakoutStatus" to DevicePolicyBundle.BREAKOUT_STATUS_CANCELLED,
+                "breakoutRequestedAt" to null,
+                "breakoutUnlockAt" to null,
+                "updatedAt" to System.currentTimeMillis()
+            )
+            docRef.update(updates).await()
+            Log.i(TAG, "Emergency breakout request cancelled by ward")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error cancelling emergency breakout", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Rejects an emergency breakout request by the Guardian.
+     */
+    suspend fun rejectEmergencyBreakout(wardUid: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val docRef = firestore.collection("policies").document(wardUid)
+            val updates = mapOf(
+                "breakoutStatus" to DevicePolicyBundle.BREAKOUT_STATUS_REJECTED,
+                "breakoutRequestedAt" to null,
+                "breakoutUnlockAt" to null,
+                "updatedAt" to System.currentTimeMillis()
+            )
+            docRef.update(updates).await()
+            Log.i(TAG, "Guardian rejected emergency breakout for ward $wardUid")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error rejecting emergency breakout for ward $wardUid", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Executes the final emergency breakout release after 24 hours have elapsed.
+     */
+    suspend fun executeEmergencyBreakout(): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val myUid = getOrCreateCurrentUid()
+            val docRef = firestore.collection("policies").document(myUid)
+            val snapshot = docRef.get(com.google.firebase.firestore.Source.SERVER).await()
+            if (!snapshot.exists()) {
+                return@withContext Result.failure(IllegalStateException("Policy document does not exist"))
+            }
+
+            val status = snapshot.getString("breakoutStatus")
+            val unlockAt = snapshot.getLong("breakoutUnlockAt") ?: 0L
+            val now = System.currentTimeMillis()
+            if (status != DevicePolicyBundle.BREAKOUT_STATUS_PENDING || now < unlockAt) {
+                return@withContext Result.failure(IllegalStateException(appContext.getString(R.string.error_breakout_not_ready)))
+            }
+
+            val currentVersion = snapshot.getLong("version") ?: 1L
+            val safeDefault = DevicePolicyBundle.defaultPolicy().copy(
+                guardianUid = null,
+                guardianName = null,
+                isSupervised = false,
+                breakoutStatus = DevicePolicyBundle.BREAKOUT_STATUS_COMPLETED,
+                breakoutRequestedAt = null,
+                breakoutUnlockAt = null,
+                version = currentVersion + 1,
+                updatedAt = now
+            )
+            docRef.set(safeDefault.toMap()).await()
+            PolicyRepository.getInstance(appContext).updateLocalPolicyAndEnforce(safeDefault)
+            onSupervisionRevokedLocally()
+            Log.i(TAG, "Successfully executed emergency breakout after 24 hours")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error executing emergency breakout", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Reads the live policy of a ward to inspect heartbeat and breakout status.
+     */
+    suspend fun fetchWardPolicy(wardUid: String): DevicePolicyBundle? = withContext(Dispatchers.IO) {
+        try {
+            val snapshot = firestore.collection("policies").document(wardUid).get().await()
+            if (snapshot.exists() && snapshot.data != null) {
+                DevicePolicyBundle.fromMap(snapshot.data!!)
+            } else null
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed fetching ward policy for $wardUid: ${e.message}")
+            null
         }
     }
 

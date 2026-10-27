@@ -56,6 +56,10 @@ class DevicePolicyBundleTest {
             protectedAppPackages = setOf("com.vital.app1", "com.vital.app2"),
             dnsHost = "custom.dns.nextdns.io",
             timeZoneId = "Africa/Cairo",
+            lastHeartbeat = 1790000050000L,
+            breakoutStatus = DevicePolicyBundle.BREAKOUT_STATUS_PENDING,
+            breakoutRequestedAt = 1790000000000L,
+            breakoutUnlockAt = 1790086400000L,
             version = 42L,
             updatedAt = 1790000000000L
         )
@@ -82,6 +86,10 @@ class DevicePolicyBundleTest {
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
         assertEquals(original.dnsHost, restored.dnsHost)
         assertEquals(original.timeZoneId, restored.timeZoneId)
+        assertEquals(original.lastHeartbeat, restored.lastHeartbeat)
+        assertEquals(original.breakoutStatus, restored.breakoutStatus)
+        assertEquals(original.breakoutRequestedAt, restored.breakoutRequestedAt)
+        assertEquals(original.breakoutUnlockAt, restored.breakoutUnlockAt)
         assertEquals(original.version, restored.version)
         assertEquals(original.updatedAt, restored.updatedAt)
     }
@@ -108,6 +116,10 @@ class DevicePolicyBundleTest {
             protectedAppPackages = setOf("pkg.c"),
             dnsHost = "custom.dns.nextdns.io",
             timeZoneId = "Asia/Dubai",
+            lastHeartbeat = 1234567890L,
+            breakoutStatus = DevicePolicyBundle.BREAKOUT_STATUS_COMPLETED,
+            breakoutRequestedAt = 1234560000L,
+            breakoutUnlockAt = 1234567800L,
             version = 5L,
             updatedAt = 123456789L
         )
@@ -134,6 +146,10 @@ class DevicePolicyBundleTest {
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
         assertEquals(original.dnsHost, restored.dnsHost)
         assertEquals(original.timeZoneId, restored.timeZoneId)
+        assertEquals(original.lastHeartbeat, restored.lastHeartbeat)
+        assertEquals(original.breakoutStatus, restored.breakoutStatus)
+        assertEquals(original.breakoutRequestedAt, restored.breakoutRequestedAt)
+        assertEquals(original.breakoutUnlockAt, restored.breakoutUnlockAt)
         assertEquals(original.version, restored.version)
         assertEquals(original.updatedAt, restored.updatedAt)
     }

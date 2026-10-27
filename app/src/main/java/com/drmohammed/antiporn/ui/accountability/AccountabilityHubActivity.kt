@@ -21,26 +21,48 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.cloud.auth.GoogleAuthManager
+import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
+import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 /**
  * Main Accountability Hub activity allowing users to view their unique pairing code,
- * view protected wards, view protecting guardians, and pair with new accountability partners.
+ * view protected wards, view protecting guardians, secure their cloud account with Google,
+ * and manage 24-hour emergency unpair grace periods.
  */
 class AccountabilityHubActivity : AppCompatActivity() {
 
     private lateinit var accountabilityRepo: AccountabilityRepository
+    private lateinit var googleAuthManager: GoogleAuthManager
 
+    // Account Security Views
+    private lateinit var cardAccountSecurity: MaterialCardView
+    private lateinit var tvAccountSecurityStatus: TextView
+    private lateinit var btnSecureAccount: MaterialButton
+
+    // Supervision & Emergency Breakout Views
     private lateinit var cardSupervisedBanner: MaterialCardView
+    private lateinit var cardEmergencyBreakout: MaterialCardView
+    private lateinit var tvBreakoutCountdown: TextView
+    private lateinit var btnCancelBreakout: MaterialButton
+    private lateinit var btnCompleteBreakout: MaterialButton
+    private lateinit var btnInitiateBreakout: MaterialButton
+
+    // Profile & Pairing Code Views
     private lateinit var cardMyPairingCode: MaterialCardView
     private lateinit var tvMyDisplayName: TextView
     private lateinit var btnEditMyName: MaterialButton
@@ -52,9 +74,14 @@ class AccountabilityHubActivity : AppCompatActivity() {
     private lateinit var layoutGuardiansList: LinearLayout
     private lateinit var tvEmptyGuardians: TextView
 
+    private var breakoutCountdownJob: Job? = null
     private var lastAddPartnerClickTime = 0L
     private var lastManageClickTime = 0L
     private var lastEditNameClickTime = 0L
+    private var lastBreakoutClickTime = 0L
+    private var lastSecureAccountClickTime = 0L
+    private var lastCancelBreakoutClickTime = 0L
+    private var lastCompleteBreakoutClickTime = 0L
     private var isPairingInProgress = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,9 +105,11 @@ class AccountabilityHubActivity : AppCompatActivity() {
         }
 
         accountabilityRepo = AccountabilityRepository.getInstance(applicationContext)
+        googleAuthManager = GoogleAuthManager.getInstance(applicationContext)
 
         initViews()
         setupListeners()
+        updateAccountSecurityState()
         loadPairingCode()
         observePolicyChanges()
     }
@@ -88,17 +117,22 @@ class AccountabilityHubActivity : AppCompatActivity() {
     private fun observePolicyChanges() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(applicationContext)
+                PolicyRepository.getInstance(applicationContext)
                     .currentPolicyFlow.collect { policy ->
                         if (isFinishing || isDestroyed) return@collect
                         if (policy.isSupervised) {
                             cardSupervisedBanner.visibility = View.VISIBLE
                             cardMyPairingCode.visibility = View.GONE
+                            renderBreakoutState(policy)
                         } else {
                             cardSupervisedBanner.visibility = View.GONE
+                            cardEmergencyBreakout.visibility = View.GONE
+                            btnInitiateBreakout.visibility = View.GONE
+                            breakoutCountdownJob?.cancel()
                             cardMyPairingCode.visibility = View.VISIBLE
                             loadPairingCode()
                         }
+                        updateAccountSecurityState()
                         loadPartners()
                     }
             }
@@ -108,11 +142,38 @@ class AccountabilityHubActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (isFinishing || isDestroyed) return
+        val policy = PolicyRepository.getInstance(applicationContext).currentPolicyFlow.value
+        if (policy.isSupervised && breakoutCountdownJob == null) {
+            renderBreakoutState(policy)
+        }
+        updateAccountSecurityState()
         loadPartners()
     }
 
+    override fun onStop() {
+        super.onStop()
+        breakoutCountdownJob?.cancel()
+        breakoutCountdownJob = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        breakoutCountdownJob?.cancel()
+        breakoutCountdownJob = null
+    }
+
     private fun initViews() {
+        cardAccountSecurity = findViewById(R.id.cardAccountSecurity)
+        tvAccountSecurityStatus = findViewById(R.id.tvAccountSecurityStatus)
+        btnSecureAccount = findViewById(R.id.btnSecureAccount)
+
         cardSupervisedBanner = findViewById(R.id.cardSupervisedBanner)
+        cardEmergencyBreakout = findViewById(R.id.cardEmergencyBreakout)
+        tvBreakoutCountdown = findViewById(R.id.tvBreakoutCountdown)
+        btnCancelBreakout = findViewById(R.id.btnCancelBreakout)
+        btnCompleteBreakout = findViewById(R.id.btnCompleteBreakout)
+        btnInitiateBreakout = findViewById(R.id.btnInitiateBreakout)
+
         cardMyPairingCode = findViewById(R.id.cardMyPairingCode)
         tvMyDisplayName = findViewById(R.id.tvMyDisplayName)
         btnEditMyName = findViewById(R.id.btnEditMyName)
@@ -127,6 +188,37 @@ class AccountabilityHubActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        btnSecureAccount.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastSecureAccountClickTime < 1000L) return@setOnClickListener
+            lastSecureAccountClickTime = now
+            btnSecureAccount.isEnabled = false
+            handleGoogleSecurityLinking()
+        }
+
+        btnInitiateBreakout.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastBreakoutClickTime < 1000L) return@setOnClickListener
+            lastBreakoutClickTime = now
+            showEmergencyBreakoutDialog()
+        }
+
+        btnCancelBreakout.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastCancelBreakoutClickTime < 1000L) return@setOnClickListener
+            lastCancelBreakoutClickTime = now
+            btnCancelBreakout.isEnabled = false
+            handleCancelBreakout()
+        }
+
+        btnCompleteBreakout.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastCompleteBreakoutClickTime < 1000L) return@setOnClickListener
+            lastCompleteBreakoutClickTime = now
+            btnCompleteBreakout.isEnabled = false
+            handleCompleteBreakout()
+        }
+
         btnCopyCode.setOnClickListener {
             val code = tvMyPairingCode.text.toString()
             if (code.isNotBlank()) {
@@ -152,11 +244,166 @@ class AccountabilityHubActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateAccountSecurityState() {
+        if (isFinishing || isDestroyed) return
+        val isLinked = googleAuthManager.isLinkedWithGoogle()
+        if (isLinked) {
+            val email = googleAuthManager.getLinkedEmail() ?: ""
+            tvAccountSecurityStatus.text = getString(R.string.account_secured_google) + " " + email
+            btnSecureAccount.text = getString(R.string.account_secured_google)
+            btnSecureAccount.isEnabled = false
+        } else {
+            tvAccountSecurityStatus.text = getString(R.string.account_unsecured_warning)
+            btnSecureAccount.text = getString(R.string.btn_secure_with_google)
+            btnSecureAccount.isEnabled = true
+        }
+    }
+
+    private fun handleGoogleSecurityLinking() {
+        lifecycleScope.launch {
+            if (isFinishing || isDestroyed) return@launch
+            try {
+                btnSecureAccount.isEnabled = false
+                val result = googleAuthManager.signInOrLinkWithGoogle(this@AccountabilityHubActivity)
+                if (isFinishing || isDestroyed) return@launch
+                result.fold(
+                    onSuccess = { user ->
+                        Toast.makeText(this@AccountabilityHubActivity, R.string.toast_account_secured_success, Toast.LENGTH_SHORT).show()
+                        updateAccountSecurityState()
+                        loadPairingCode()
+                        loadPartners()
+                    },
+                    onFailure = { err ->
+                        if (err !is androidx.credentials.exceptions.GetCredentialCancellationException) {
+                            Toast.makeText(this@AccountabilityHubActivity, getString(R.string.toast_account_secured_failed, err.localizedMessage ?: ""), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                )
+            } finally {
+                if (!isFinishing && !isDestroyed) {
+                    updateAccountSecurityState()
+                }
+            }
+        }
+    }
+
+    private fun renderBreakoutState(policy: DevicePolicyBundle) {
+        breakoutCountdownJob?.cancel()
+        if (policy.breakoutStatus == DevicePolicyBundle.BREAKOUT_STATUS_PENDING && policy.breakoutUnlockAt != null) {
+            cardEmergencyBreakout.visibility = View.VISIBLE
+            btnInitiateBreakout.visibility = View.GONE
+
+            breakoutCountdownJob = lifecycleScope.launch {
+                while (isActive) {
+                    val remainingMs = (policy.breakoutUnlockAt - System.currentTimeMillis()).coerceAtLeast(0L)
+                    val hours = remainingMs / (1000 * 3600)
+                    val mins = (remainingMs % (1000 * 3600)) / (1000 * 60)
+                    val secs = (remainingMs % (1000 * 60)) / 1000
+                    val formatted = String.format(Locale.US, "%02d:%02d:%02d", hours, mins, secs)
+                    tvBreakoutCountdown.text = getString(R.string.breakout_pending_time_remaining, formatted)
+
+                    if (remainingMs <= 0L) {
+                        btnCompleteBreakout.visibility = View.VISIBLE
+                        break
+                    } else {
+                        btnCompleteBreakout.visibility = View.GONE
+                    }
+                    delay(1000L)
+                }
+            }
+        } else {
+            cardEmergencyBreakout.visibility = View.GONE
+            btnInitiateBreakout.visibility = View.VISIBLE
+        }
+    }
+
+    private fun showEmergencyBreakoutDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_breakout_title)
+            .setMessage(R.string.dialog_breakout_msg)
+            .setPositiveButton(R.string.dialog_breakout_confirm) { dialog, _ ->
+                dialog.dismiss()
+                lifecycleScope.launch {
+                    if (isFinishing || isDestroyed) return@launch
+                    try {
+                        btnInitiateBreakout.isEnabled = false
+                        val result = accountabilityRepo.requestEmergencyBreakout()
+                        if (isFinishing || isDestroyed) return@launch
+                        result.fold(
+                            onSuccess = {
+                                Toast.makeText(this@AccountabilityHubActivity, R.string.toast_breakout_requested, Toast.LENGTH_SHORT).show()
+                            },
+                            onFailure = { err ->
+                                Toast.makeText(this@AccountabilityHubActivity, err.localizedMessage ?: getString(R.string.error_unknown), Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        Log.e(TAG, "Error requesting breakout", e)
+                    } finally {
+                        if (!isFinishing && !isDestroyed) {
+                            btnInitiateBreakout.isEnabled = true
+                        }
+                    }
+                }
+            }
+            .setNegativeButton(R.string.dialog_btn_cancel, null)
+            .show()
+    }
+
+    private fun handleCancelBreakout() {
+        lifecycleScope.launch {
+            if (isFinishing || isDestroyed) return@launch
+            try {
+                btnCancelBreakout.isEnabled = false
+                val result = accountabilityRepo.cancelEmergencyBreakout()
+                if (isFinishing || isDestroyed) return@launch
+                result.fold(
+                    onSuccess = {
+                        Toast.makeText(this@AccountabilityHubActivity, R.string.toast_breakout_cancelled, Toast.LENGTH_SHORT).show()
+                    },
+                    onFailure = { err ->
+                        Toast.makeText(this@AccountabilityHubActivity, err.localizedMessage ?: getString(R.string.error_unknown), Toast.LENGTH_LONG).show()
+                    }
+                )
+            } finally {
+                if (!isFinishing && !isDestroyed) {
+                    btnCancelBreakout.isEnabled = true
+                }
+            }
+        }
+    }
+
+    private fun handleCompleteBreakout() {
+        lifecycleScope.launch {
+            if (isFinishing || isDestroyed) return@launch
+            try {
+                btnCompleteBreakout.isEnabled = false
+                val result = accountabilityRepo.executeEmergencyBreakout()
+                if (isFinishing || isDestroyed) return@launch
+                result.fold(
+                    onSuccess = {
+                        Toast.makeText(this@AccountabilityHubActivity, R.string.toast_breakout_completed, Toast.LENGTH_SHORT).show()
+                        loadPairingCode()
+                        loadPartners()
+                    },
+                    onFailure = { err ->
+                        Toast.makeText(this@AccountabilityHubActivity, err.localizedMessage ?: getString(R.string.error_unknown), Toast.LENGTH_LONG).show()
+                    }
+                )
+            } finally {
+                if (!isFinishing && !isDestroyed) {
+                    btnCompleteBreakout.isEnabled = true
+                }
+            }
+        }
+    }
+
     private fun loadPairingCode() {
         lifecycleScope.launch {
             if (isFinishing || isDestroyed) return@launch
             try {
-                val currentPolicy = com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+                val currentPolicy = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
                 if (currentPolicy.isSupervised) {
                     cardSupervisedBanner.visibility = View.VISIBLE
                     cardMyPairingCode.visibility = View.GONE
@@ -186,13 +433,24 @@ class AccountabilityHubActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             if (isFinishing || isDestroyed) return@launch
             try {
-                val wards = accountabilityRepo.getWards()
-                val guardians = accountabilityRepo.getGuardians()
+                var wards = accountabilityRepo.getWards()
+                var guardians = accountabilityRepo.getGuardians()
 
                 withContext(Dispatchers.Main) {
                     if (isFinishing || isDestroyed) return@withContext
                     renderWards(wards)
                     renderGuardians(guardians)
+                }
+
+                val syncResult = accountabilityRepo.syncPartnersFromCloud().getOrNull()
+                if (syncResult != null) {
+                    wards = accountabilityRepo.getWards()
+                    guardians = accountabilityRepo.getGuardians()
+                    withContext(Dispatchers.Main) {
+                        if (isFinishing || isDestroyed) return@withContext
+                        renderWards(wards)
+                        renderGuardians(guardians)
+                    }
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
@@ -342,6 +600,40 @@ class AccountabilityHubActivity : AppCompatActivity() {
         }
         container.addView(codeView)
 
+        // Live Heartbeat & Breakout status pill for Wards
+        val statusPill = TextView(this).apply {
+            textSize = 11f
+            setPadding(0, (2 * resources.displayMetrics.density).toInt(), 0, 0)
+            visibility = View.GONE
+        }
+        container.addView(statusPill)
+
+        if (isWard) {
+            lifecycleScope.launch {
+                val wardPolicy = accountabilityRepo.fetchWardPolicy(partner.id)
+                Log.i(TAG, "Ward ${partner.displayName} (${partner.id}) policy: isSupervised=${wardPolicy?.isSupervised}, heartbeat=${wardPolicy?.lastHeartbeat}")
+                if (isFinishing || isDestroyed || wardPolicy == null) return@launch
+                statusPill.visibility = View.VISIBLE
+                if (wardPolicy.breakoutStatus == DevicePolicyBundle.BREAKOUT_STATUS_PENDING) {
+                    statusPill.text = getString(R.string.guardian_breakout_alert_title)
+                    statusPill.setTextColor(MaterialColors.getColor(this@AccountabilityHubActivity, androidx.appcompat.R.attr.colorError, getColor(R.color.status_orange)))
+                } else if (wardPolicy.lastHeartbeat > 0L) {
+                    val diff = System.currentTimeMillis() - wardPolicy.lastHeartbeat
+                    if (diff < 24 * 3600 * 1000L) {
+                        statusPill.text = getString(R.string.status_online_recently)
+                        statusPill.setTextColor(getColor(R.color.status_green))
+                    } else {
+                        val days = (diff / (24 * 3600 * 1000L)).toInt().coerceAtLeast(1)
+                        statusPill.text = getString(R.string.status_offline_days, days)
+                        statusPill.setTextColor(MaterialColors.getColor(this@AccountabilityHubActivity, com.google.android.material.R.attr.colorOutline, android.graphics.Color.GRAY))
+                    }
+                } else {
+                    statusPill.text = getString(R.string.guardian_status_active)
+                    statusPill.setTextColor(getColor(R.color.status_green))
+                }
+            }
+        }
+
         if (isWard) {
             val btnRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -464,6 +756,10 @@ class AccountabilityHubActivity : AppCompatActivity() {
                     onSuccess = {
                         Toast.makeText(this@AccountabilityHubActivity, R.string.toast_partner_added, Toast.LENGTH_LONG).show()
                         loadPartners()
+                        loadPairingCode()
+                        if (!googleAuthManager.isLinkedWithGoogle()) {
+                            promptAccountSecurityAfterPairing()
+                        }
                     },
                     onFailure = { err ->
                         Toast.makeText(
@@ -482,6 +778,19 @@ class AccountabilityHubActivity : AppCompatActivity() {
                 isPairingInProgress = false
             }
         }
+    }
+
+    private fun promptAccountSecurityAfterPairing() {
+        if (isFinishing || isDestroyed) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.title_account_security)
+            .setMessage(R.string.account_unsecured_warning)
+            .setPositiveButton(R.string.btn_secure_with_google) { dialog, _ ->
+                dialog.dismiss()
+                handleGoogleSecurityLinking()
+            }
+            .setNegativeButton(R.string.dialog_btn_cancel, null)
+            .show()
     }
 
     private fun showEditMyNameDialog() {
@@ -510,10 +819,10 @@ class AccountabilityHubActivity : AppCompatActivity() {
                         val result = accountabilityRepo.setMyDisplayName(newName)
                         if (isFinishing || isDestroyed) return@launch
                         result.onSuccess {
-                            tvMyDisplayName.text = accountabilityRepo.getMyDisplayName()
+                            tvMyDisplayName.text = newName
                             Toast.makeText(this@AccountabilityHubActivity, R.string.toast_name_saved, Toast.LENGTH_SHORT).show()
                         }.onFailure { e ->
-                            Log.e(TAG, "Failed to save my display name", e)
+                            Log.e(TAG, "Failed to update display name", e)
                             Toast.makeText(this@AccountabilityHubActivity, getString(R.string.toast_partner_failed, e.localizedMessage), Toast.LENGTH_LONG).show()
                         }
                     }

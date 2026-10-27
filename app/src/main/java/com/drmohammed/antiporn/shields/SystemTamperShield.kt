@@ -57,8 +57,19 @@ object SystemTamperShield : ProtectionShield {
 
             // 3. Block Multi-User & Guest creation (Works for DO and PO)
             try { dpm.addUserRestriction(admin, UserManager.DISALLOW_ADD_USER) } catch (e: Exception) { Log.w(TAG, "Add user block: ${e.message}") }
-            if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 try { dpm.addUserRestriction(admin, UserManager.DISALLOW_USER_SWITCH) } catch (e: Exception) { Log.w(TAG, "User switch block: ${e.message}") }
+            }
+            // Supplementary direct user switcher deactivation via Settings.Global (Check-Before-Write)
+            try {
+                if (Settings.Global.getInt(context.contentResolver, "user_switcher_enabled", 1) != 0) {
+                    Settings.Global.putInt(context.contentResolver, "user_switcher_enabled", 0)
+                }
+                if (Settings.Global.getInt(context.contentResolver, "guest_user_enabled", 1) != 0) {
+                    Settings.Global.putInt(context.contentResolver, "guest_user_enabled", 0)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "User switcher global settings disable: ${e.message}")
             }
 
             // 4. Prevent uninstalling the protection app from device UI (Works for DO and PO)
@@ -108,12 +119,21 @@ object SystemTamperShield : ProtectionShield {
                 }
             }
 
-            // Supplementary direct Settings.Global configuration via DevicePolicyManager
+            // Supplementary direct Settings.Global configuration via DevicePolicyManager or ContentResolver (Check-Before-Write)
             try {
-                dpm.setGlobalSetting(admin, Settings.Global.AUTO_TIME, "1")
-                dpm.setGlobalSetting(admin, Settings.Global.AUTO_TIME_ZONE, "0")
+                if (isDo) {
+                    dpm.setGlobalSetting(admin, Settings.Global.AUTO_TIME, "1")
+                    dpm.setGlobalSetting(admin, Settings.Global.AUTO_TIME_ZONE, "0")
+                } else {
+                    if (Settings.Global.getInt(context.contentResolver, Settings.Global.AUTO_TIME, 0) != 1) {
+                        Settings.Global.putInt(context.contentResolver, Settings.Global.AUTO_TIME, 1)
+                    }
+                    if (Settings.Global.getInt(context.contentResolver, Settings.Global.AUTO_TIME_ZONE, 1) != 0) {
+                        Settings.Global.putInt(context.contentResolver, Settings.Global.AUTO_TIME_ZONE, 0)
+                    }
+                }
             } catch (e: Exception) {
-                Log.w(TAG, "Could not write Global auto time settings via DPM", e)
+                Log.w(TAG, "Could not write Global auto time settings", e)
             }
 
             // 8. Auto-grant notification permission on Android 13+ (API 33+) for the watchdog FGS

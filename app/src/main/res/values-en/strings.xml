@@ -145,4 +145,72 @@
     <string name="dns_probe_error_broken">The DNS server fails basic internet resolution</string>
     <string name="dns_probe_error_broken_detail">The server connected but failed to resolve standard internet domains (%1$s). Please check your DNS server configuration.</string>
 
+    <!-- Google Identity & Account Security -->
+    <string name="default_web_client_id" translatable="false">221894351636-j95hinbtur9gobe0ukdtrjdfgakkotjb.apps.googleusercontent.com</string>
+    <string name="error_google_client_id_missing">Google Web Client ID is not configured</string>
+    <string name="title_account_security">Account Security &amp; Identity</string>
+    <string name="account_secured_google">Account secured with Google:</string>
+    <string name="account_unsecured_warning">Account unsecured: Data and supervision may be lost on app uninstall or reset</string>
+    <string name="btn_secure_with_google">Secure Account with Google</string>
+    <string name="toast_account_secured_success">Account secured and linked to Google successfully</string>
+    <string name="toast_account_secured_failed">Failed to secure account: %s</string>
+
+    <!-- Heartbeat & Activity Status -->
+    <string name="status_online_recently">Online recently</string>
+    <string name="status_offline_hours">Last seen: %d hours ago</string>
+    <string name="status_offline_days">Last seen: %d days ago</string>
+
+    <!-- 24h Emergency Breakout -->
+    <string name="btn_request_emergency_breakout">Emergency Unpair (24h Grace Period)</string>
+    <string name="dialog_breakout_title">Emergency Unpair Request</string>
+    <string name="dialog_breakout_msg" formatted="false">If your guardian\'s device is lost or damaged, you can begin a 24-hour emergency unpair grace period.\n\nAll protection policies remain 100% active during the countdown, and your guardian is notified.\n\nIf not vetoed within 24 hours, your device is released automatically.</string>
+    <string name="dialog_breakout_confirm">Start 24-Hour Grace Period</string>
+    <string name="breakout_pending_title">Emergency Unpair Pending</string>
+    <string name="breakout_pending_time_remaining">Time remaining: %s</string>
+    <string name="btn_cancel_breakout">Cancel Unpair Request</string>
+    <string name="btn_complete_breakout">Complete Device Release Now</string>
+    <string name="toast_breakout_requested">Emergency unpair initiated with 24-hour grace period</string>
+    <string name="toast_breakout_cancelled">Emergency unpair request cancelled</string>
+    <string name="toast_breakout_completed">Device released and supervision revoked successfully</string>
+
+    <!-- Guardian Breakout Veto Banner -->
+    <string name="guardian_breakout_alert_title">Alert: Pending Unpair Request</string>
+    <string name="guardian_breakout_alert_msg">%1$s requested an emergency unpair (%2$s remaining). Unless you reject, supervision will be revoked.</string>
+    <string name="btn_reject_breakout">Reject &amp; Keep Supervision</string>
+    <string name="toast_breakout_rejected">Emergency unpair request rejected; supervision maintained</string>
+    <string name="error_breakout_already_pending">An emergency unpair countdown is already active</string>
+    <string name="error_breakout_not_ready">The 24-hour grace period has not yet elapsed</string>
+    <string name="error_switch_account_while_supervised">Cannot switch to an existing Google account while supervised to prevent breaking your active guardian link</string>
+
+    <!-- Accountability & Supervision Translations -->
+    <string name="status_ward_badge">Supervised</string>
+    <string name="toast_partner_failed">Failed to link partner: %1$s</string>
+    <string name="toast_supervision_revoked">Supervision revoked successfully and device released</string>
+    <string name="toast_partner_added">Partner linked successfully!</string>
+    <string name="guardian_default_name">Guardian</string>
+    <string name="error_unknown">Unknown error</string>
+    <string name="btn_delete_partner">Delete</string>
+    <string name="partner_pairing_code_label">Pairing Code: %1$s</string>
+    <string name="dialog_revoke_ward_msg">Are you sure you want to revoke supervision for %1$s? Their device will be fully released, policies reset to safe defaults, and a new pairing code generated.</string>
+    <string name="partner_default_name">Accountability Partner</string>
+    <string name="guardian_curfew_time_format">%1$02d:%2$02d</string>
+    <string name="guardian_curfew_start_label">Curfew start time</string>
+    <string name="guardian_curfew_end_label">Curfew end time</string>
+    <string name="toast_policy_push_failed">Failed to push policy to cloud</string>
+    <string name="error_cannot_pair_self">You cannot pair with your own device code!</string>
+    <string name="toast_policy_saved">New policy successfully pushed to friend\'s device</string>
+    <string name="error_loading_pending_apps">Failed to load pending approval requests. Check internet connection.</string>
+    <string name="error_already_supervised">Your device is already linked to an active supervisor!</string>
+    <string name="error_invalid_dns_host">Please enter a valid DNS server host (e.g., family.adguard-dns.com)</string>
+    <string name="error_pairing_code_not_found">Pairing code not found or invalid</string>
+    <string name="toast_load_policy_failed">Failed to load current protection policy. Please check internet connection.</string>
+    <string name="guardian_control_ward_name">Managing Protection: %1$s</string>
+    <string name="guardian_status_active">Active &amp; verified guardian</string>
+    <string name="dialog_btn_cancel">Cancel</string>
+    <string name="toast_code_copied">Pairing code copied to clipboard</string>
+    <string name="error_pairing_code_incomplete">Pairing code data is incomplete</string>
+    <string name="toast_partner_delete_failed">Failed to delete partner: %1$s</string>
+    <string name="dialog_revoke_ward_title">Revoke Supervision &amp; Release Protection</string>
+    <string name="error_ward_already_has_guardian">This device is already linked to another supervisor and cannot be paired!</string>
+    <string name="btn_manage_ward">Manage Protection</string>
 </resources>

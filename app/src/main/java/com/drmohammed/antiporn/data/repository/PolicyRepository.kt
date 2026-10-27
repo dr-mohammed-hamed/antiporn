@@ -131,6 +131,9 @@ class PolicyRepository private constructor(context: Context) {
                             com.drmohammed.antiporn.cloud.fcm.AntiPornFirebaseMessagingService.syncPersistedToken(appContext, uid)
                             attachPolicyListener(uid)
                             ApprovalRepository.getInstance(appContext).startApprovalsSync(uid)
+                            repositoryScope.launch {
+                                AccountabilityRepository.getInstance(appContext).syncPartnersFromCloud()
+                            }
                         }
                     }
                     .addOnFailureListener { e ->
@@ -144,6 +147,9 @@ class PolicyRepository private constructor(context: Context) {
                 com.drmohammed.antiporn.cloud.fcm.AntiPornFirebaseMessagingService.syncPersistedToken(appContext, user.uid)
                 attachPolicyListener(user.uid)
                 ApprovalRepository.getInstance(appContext).startApprovalsSync(user.uid)
+                repositoryScope.launch {
+                    AccountabilityRepository.getInstance(appContext).syncPartnersFromCloud()
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error initiating Firestore sync; continuing with offline local SQLite policy", e)
@@ -152,6 +158,13 @@ class PolicyRepository private constructor(context: Context) {
 
     private fun attachPolicyListener(uid: String) {
         firestoreListener?.remove()
+        repositoryScope.launch {
+            try {
+                AccountabilityRepository.getInstance(appContext).updateHeartbeat()
+            } catch (e: Exception) {
+                Log.w(TAG, "Heartbeat error: ${e.message}")
+            }
+        }
         try {
             val firestore = FirebaseFirestore.getInstance()
             firestoreListener = firestore.collection("policies").document(uid)
@@ -167,8 +180,9 @@ class PolicyRepository private constructor(context: Context) {
                                 try {
                                     val cloudPolicy = DevicePolicyBundle.fromMap(data)
                                     val current = _currentPolicyFlow.value
-                                    if (cloudPolicy.version > current.version || (cloudPolicy.version == current.version && cloudPolicy.updatedAt > current.updatedAt)) {
-                                        Log.i(TAG, "Received newer policy from cloud (v${cloudPolicy.version})")
+                                    val statusChanged = cloudPolicy.breakoutStatus != current.breakoutStatus
+                                    if (cloudPolicy.version > current.version || (cloudPolicy.version == current.version && cloudPolicy.updatedAt > current.updatedAt) || statusChanged) {
+                                        Log.i(TAG, "Received policy update from cloud (v${cloudPolicy.version}, breakout=${cloudPolicy.breakoutStatus})")
                                         val wasSupervised = current.isSupervised
                                         val isNowSupervised = cloudPolicy.isSupervised
 
@@ -209,7 +223,8 @@ class PolicyRepository private constructor(context: Context) {
      */
     fun updateLocalPolicyAndEnforce(bundle: DevicePolicyBundle) {
         val current = _currentPolicyFlow.value
-        if (bundle.version < current.version || (bundle.version == current.version && bundle.updatedAt < current.updatedAt)) {
+        val isBreakoutStatusChange = bundle.breakoutStatus != current.breakoutStatus
+        if (!isBreakoutStatusChange && (bundle.version < current.version || (bundle.version == current.version && bundle.updatedAt < current.updatedAt))) {
             Log.w(TAG, "Monotonic guard: rejected stale/out-of-order policy v${bundle.version}@${bundle.updatedAt} (current is v${current.version}@${current.updatedAt})")
             return
         }
