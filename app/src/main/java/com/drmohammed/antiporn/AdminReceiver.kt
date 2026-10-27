@@ -24,6 +24,22 @@ class AdminReceiver : DeviceAdminReceiver() {
         super.onProfileProvisioningComplete(context, intent)
         Log.i(TAG, "Profile provisioning complete. Enforcing NextDNS and security policies...")
         enforcePoliciesAsync(context)
+
+        // Bootstrap MainActivity as a fallback strictly for legacy Android versions (Android 11 and below)
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
+            val appContext = context.applicationContext
+            try {
+                val launchIntent = appContext.packageManager?.getLaunchIntentForPackage(appContext.packageName)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                } ?: Intent(appContext, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+                appContext.startActivity(launchIntent)
+                Log.i(TAG, "Dispatched MainActivity launch intent from AdminReceiver fallback.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to launch MainActivity in onProfileProvisioningComplete", e)
+            }
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {

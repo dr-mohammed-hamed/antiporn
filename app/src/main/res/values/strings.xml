@@ -585,4 +585,9 @@
     <string name="dns_probe_error_broken_detail">الخادم متصل ولكنه عاجز عن حل نطاقات الإنترنت الأساسية (%1$s). يرجى مراجعة إعدادات الخادم.</string>
 
 
+    <!-- Enterprise Provisioning (OOBE QR Code) -->
+    <string name="provisioning_setup_title">تهيئة حماية عِصمة</string>
+    <string name="provisioning_setup_subtitle">جاري تفعيل دروع الحماية المؤسسية وتأمين النظام&#8230;</string>
+    <string name="provisioning_setup_notice">الرجاء الانتظار، لا تقم بإغلاق الهاتف أثناء التهيئة الأولية.</string>
+
 </resources>

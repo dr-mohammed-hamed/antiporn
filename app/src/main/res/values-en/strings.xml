@@ -123,4 +123,9 @@
     <string name="dns_probe_error_broken">The DNS server fails basic internet resolution</string>
     <string name="dns_probe_error_broken_detail">The server connected but failed to resolve standard internet domains (%1$s). Please check your DNS server configuration.</string>
 
+    <!-- Enterprise Provisioning (OOBE QR Code) -->
+    <string name="provisioning_setup_title">Setting up ISMAH Protection</string>
+    <string name="provisioning_setup_subtitle">Enforcing enterprise security shields and securing the device&#8230;</string>
+    <string name="provisioning_setup_notice">Please wait, do not turn off the device during initial setup.</string>
+
 </resources>
