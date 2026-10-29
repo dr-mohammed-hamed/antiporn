@@ -8,6 +8,8 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -67,6 +69,24 @@ object ActiveShieldsBottomSheet {
         val inflater = LayoutInflater.from(context)
         val sheetView = inflater.inflate(R.layout.bottom_sheet_active_shields, null)
         dialog.setContentView(sheetView)
+
+        val baseBottomPadding = sheetView.paddingBottom
+        val baseLeftPadding = sheetView.paddingLeft
+        val baseRightPadding = sheetView.paddingRight
+        val baseTopPadding = sheetView.paddingTop
+
+        ViewCompat.setOnApplyWindowInsetsListener(sheetView) { view, windowInsets ->
+            val insets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.navigationBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            view.setPadding(
+                baseLeftPadding + insets.left,
+                baseTopPadding,
+                baseRightPadding + insets.right,
+                baseBottomPadding + insets.bottom
+            )
+            windowInsets
+        }
 
         val container = sheetView.findViewById<LinearLayout>(R.id.layoutShieldsContainer)
         val emptyState = sheetView.findViewById<LinearLayout>(R.id.layoutEmptyState)

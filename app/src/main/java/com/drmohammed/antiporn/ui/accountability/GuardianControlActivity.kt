@@ -166,6 +166,12 @@ class GuardianControlActivity : AppCompatActivity() {
         setContentView(R.layout.activity_guardian_control)
 
         findViewById<View>(R.id.layoutRootGuardianControl)?.let { rootView ->
+            val innerBottomBar = findViewById<View>(R.id.layoutBottomBarGuardianInner)
+            val baseBottomPadding = innerBottomBar?.paddingBottom ?: 0
+            val baseLeftPadding = innerBottomBar?.paddingLeft ?: 0
+            val baseRightPadding = innerBottomBar?.paddingRight ?: 0
+            val baseTopPadding = innerBottomBar?.paddingTop ?: 0
+
             ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, windowInsets ->
                 val insets = windowInsets.getInsets(
                     WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime()
@@ -176,8 +182,11 @@ class GuardianControlActivity : AppCompatActivity() {
                     insets.right,
                     0
                 )
-                findViewById<View>(R.id.cardBottomBarGuardian)?.setPadding(
-                    0, 0, 0, insets.bottom
+                innerBottomBar?.setPadding(
+                    baseLeftPadding,
+                    baseTopPadding,
+                    baseRightPadding,
+                    baseBottomPadding + insets.bottom
                 )
                 windowInsets
             }

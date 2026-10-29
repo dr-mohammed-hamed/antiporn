@@ -10,9 +10,12 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
+import android.view.View
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.net.toUri
 import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.MainActivity
@@ -48,6 +51,23 @@ class EnterpriseProvisioningActivity : AppCompatActivity() {
             DevicePolicyManager.ACTION_ADMIN_POLICY_COMPLIANCE -> {
                 enableEdgeToEdge()
                 setContentView(R.layout.activity_enterprise_provisioning)
+
+                findViewById<View>(R.id.layoutRootEnterpriseProvisioning)?.let { rootView ->
+                    val basePadding = (24 * resources.displayMetrics.density).toInt()
+                    ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, windowInsets ->
+                        val insets = windowInsets.getInsets(
+                            WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+                        )
+                        view.setPadding(
+                            basePadding + insets.left,
+                            basePadding + insets.top,
+                            basePadding + insets.right,
+                            basePadding + insets.bottom
+                        )
+                        windowInsets
+                    }
+                }
+
                 // Protect provisioning flow against accidental back press dismissal
                 onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
                     override fun handleOnBackPressed() {
