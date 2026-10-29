@@ -15,10 +15,10 @@ param(
     [string]$ApkPath = "app\build\outputs\apk\release\app-release.apk",
 
     [Parameter(Mandatory = $false)]
-    [string]$KeystorePath = "app\keystore\antiporn-release.jks",
+    [string]$KeystorePath = "app\keystore\testkey.p12",
 
     [Parameter(Mandatory = $false)]
-    [string]$KeystorePassword = "REDACTED_KEYSTORE_PASSWORD",
+    [string]$KeystorePassword = "android",
 
     [Parameter(Mandatory = $false)]
     [string]$DownloadUrl = "https://example.com/downloads/antiporn-release.apk",

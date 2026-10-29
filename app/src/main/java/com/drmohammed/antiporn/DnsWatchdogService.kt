@@ -43,6 +43,7 @@ class DnsWatchdogService : Service() {
         private const val SCREEN_DEBOUNCE_DELAY_MS = 500L
         private const val HEARTBEAT_INTERVAL_MS = 60_000L
         private const val CLOUD_HEARTBEAT_INTERVAL_MS = 12 * 3600 * 1000L
+        private const val OTA_UPDATE_CHECK_INTERVAL_MS = 12 * 3600 * 1000L
 
         @Volatile
         var isRunning: Boolean = false
@@ -81,6 +82,7 @@ class DnsWatchdogService : Service() {
     }
 
     private var lastCloudHeartbeatElapsed = 0L
+    private var lastOtaCheckElapsed = 0L
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
@@ -98,6 +100,18 @@ class DnsWatchdogService : Service() {
                         }
                     } catch (e: Exception) {
                         Log.w(TAG, "Watchdog cloud heartbeat update error: ${e.message}")
+                    }
+                }
+            }
+
+            if (nowRealtime - lastOtaCheckElapsed >= OTA_UPDATE_CHECK_INTERVAL_MS || lastOtaCheckElapsed == 0L) {
+                serviceScope.launch {
+                    try {
+                        com.drmohammed.antiporn.ota.repository.OtaRepository.getInstance(applicationContext)
+                            .checkForUpdatesAndAutoInstall(applicationContext)
+                        lastOtaCheckElapsed = android.os.SystemClock.elapsedRealtime()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Watchdog periodic OTA update error: ${e.message}")
                     }
                 }
             }

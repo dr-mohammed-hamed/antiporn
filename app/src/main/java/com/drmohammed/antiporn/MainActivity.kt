@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -33,6 +34,12 @@ import com.drmohammed.antiporn.data.repository.AppInventoryManager
 import com.drmohammed.antiporn.provisioning.ui.ProvisioningWizardActivity
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
+import android.content.pm.PackageManager
+import androidx.core.content.pm.PackageInfoCompat
+import androidx.lifecycle.lifecycleScope
+import com.drmohammed.antiporn.ota.model.OtaUpdateState
+import com.drmohammed.antiporn.ota.repository.OtaRepository
+import kotlinx.coroutines.launch
 import com.drmohammed.antiporn.ui.ProtectionUiState
 import com.drmohammed.antiporn.ui.binder.MainViewBinder
 
@@ -238,7 +245,66 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun getCurrentAppVersion(): Pair<String, Long> {
+        return try {
+            val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0)
+            }
+            val code = PackageInfoCompat.getLongVersionCode(packageInfo)
+            val name = packageInfo.versionName ?: "1.0"
+            Pair(name, code)
+        } catch (e: Exception) {
+            Pair("1.0", 1L)
+        }
+    }
+
     private fun setupListeners() {
+        val (verName, verCode) = getCurrentAppVersion()
+        val otaRepo = OtaRepository.getInstance(applicationContext)
+
+        viewBinder.bindOtaState(otaRepo.updateState.value, verName, verCode)
+
+        lifecycleScope.launch {
+            otaRepo.updateState.collect { state ->
+                if (!isFinishing && !isDestroyed) {
+                    viewBinder.bindOtaState(state, verName, verCode)
+                }
+            }
+        }
+
+        viewBinder.btnCheckUpdate.setOnClickListener {
+            when (val currentState = otaRepo.updateState.value) {
+                is OtaUpdateState.UpdateAvailable -> {
+                    val info = currentState.info
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.card_ota_title)
+                        .setMessage(
+                            getString(R.string.ota_update_available, info.versionName) +
+                            (if (!info.releaseNotes.isNullOrBlank()) "\n\n${info.releaseNotes}\n" else "") +
+                            "\n\n" + getString(R.string.ota_dialog_prompt)
+                        )
+                        .setPositiveButton(R.string.btn_download_update) { _, _ ->
+                            lifecycleScope.launch {
+                                otaRepo.downloadAndInstall(applicationContext, info, showNotification = true)
+                            }
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
+                }
+                is OtaUpdateState.Downloading, is OtaUpdateState.Verifying, is OtaUpdateState.Installing, is OtaUpdateState.Checking -> {
+                    // In-progress, ignore duplicate clicks
+                }
+                else -> {
+                    lifecycleScope.launch {
+                        otaRepo.checkForUpdates(applicationContext)
+                    }
+                }
+            }
+        }
+
         viewBinder.cardAdbHelp.setOnClickListener {
             startActivity(Intent(this, ProvisioningWizardActivity::class.java))
         }
@@ -285,7 +351,7 @@ class MainActivity : AppCompatActivity() {
                 refreshUi(isEnforcing = false)
                 return@setOnClickListener
             }
-            AlertDialog.Builder(this)
+            MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.dialog_nap_confirm_title)
                 .setMessage(R.string.dialog_nap_confirm_msg)
                 .setPositiveButton(android.R.string.ok) { dialog, _ ->

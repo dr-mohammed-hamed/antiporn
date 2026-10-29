@@ -1,10 +1,10 @@
 <resources>
-    <string name="app_name">عصمة</string>
+    <string name="app_name">حصن</string>
 
-    <string name="header_title">عِصمة</string>
-    <string name="header_title_unified">عِصمة | ISMAH</string>
-    <string name="header_ayah_quran"><![CDATA[﴿ وَلَقَدْ رَاوَدتُّهُ عَن نَّفْسِهِ <font color="#FFA834"><b>فَاسْتَعْصَمَ</b></font> ﴾]]></string>
-    <string name="header_ayah_ref">سورة يوسف: ٣٢</string>
+    <string name="header_title">حِصن</string>
+    <string name="header_title_unified">حِصْن | HISN</string>
+    <string name="header_ayah_quran">حِصْنُ الْمُسْلِمِ الرَّقْمِيُّ</string>
+    <string name="header_ayah_ref"></string>
 
     <string name="header_subtitle">درع الحماية المشفر بصلاحية Device Owner</string>
 
@@ -644,8 +644,31 @@
     <string name="error_switch_account_while_supervised">لا يمكن التبديل إلى حساب Google مسجل مسبقاً أثناء خضوع الجهاز للإشراف حمايةً لرابط الإشراف</string>
 
     <!-- Enterprise Provisioning (OOBE QR Code) -->
-    <string name="provisioning_setup_title">تهيئة حماية عِصمة</string>
+    <string name="provisioning_setup_title">تهيئة حماية حِصن</string>
     <string name="provisioning_setup_subtitle">جاري تفعيل دروع الحماية المؤسسية وتأمين النظام&#8230;</string>
     <string name="provisioning_setup_notice">الرجاء الانتظار، لا تقم بإغلاق الهاتف أثناء التهيئة الأولية.</string>
 
+    <!-- OTA Auto-Update & Maintenance -->
+    <string name="card_ota_title">تحديثات النظام</string>
+    <string name="card_ota_current_version">الإصدار الحالي: %1$s (%2$d)</string>
+    <string name="btn_check_update">التحقق من وجود تحديثات</string>
+    <string name="btn_checking_update">جارٍ التحقق&#8230;</string>
+    <string name="btn_download_update">تثبيت التحديث الآن</string>
+    <string name="ota_up_to_date">أنت تستخدم أحدث إصدار</string>
+    <string name="ota_update_available">يتوفر إصدار جديد (%1$s)</string>
+    <string name="ota_downloading">جارٍ تنزيل التحديث (%1$d%%)</string>
+    <string name="ota_installing">جارٍ تثبيت التحديث&#8230;</string>
+    <string name="ota_verifying">جارٍ التحقق من سلامة الحزمة&#8230;</string>
+    <string name="btn_verifying_update">جارٍ الفحص&#8230;</string>
+    <string name="ota_dialog_prompt">هل ترغب في تنزيل وتثبيت التحديث الآن؟</string>
+    <string name="ota_notification_channel_name">تحديثات النظام</string>
+    <string name="ota_notification_channel_desc">إشعارات تحديثات تطبيق الحصن</string>
+    <string name="ota_notification_title">تحديث الحصن (%1$s)</string>
+    <string name="ota_notification_downloading_indeterminate">جارٍ تنزيل التحديث&#8230;</string>
+    <string name="ota_notification_installing">جارٍ تثبيت تحديث الحصن (%1$s)&#8230;</string>
+    <string name="ota_notification_success">تم تحديث تطبيق الحصن إلى الإصدار %1$s بنجاح</string>
+    <string name="ota_error_install_failed">فشل تثبيت التحديث: %1$s</string>
+    <string name="ota_error_check_failed">فشل التحقق من وجود تحديثات: %1$s</string>
+    <string name="ota_error_corrupted_package">حزمة التحديث تالفة أو غير صالحة</string>
+    <string name="ota_error_unexpected">خطأ أثناء تثبيت التحديث: %1$s</string>
 </resources>

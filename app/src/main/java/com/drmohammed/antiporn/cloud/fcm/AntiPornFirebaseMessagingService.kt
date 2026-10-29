@@ -73,6 +73,18 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
                 }
             }
 
+            ACTION_OTA_CHECK_UPDATE, ACTION_TRIGGER_OTA_UPDATE -> {
+                Log.i(TAG, "Processing OTA update trigger ($action) from FCM")
+                serviceScope.launch {
+                    try {
+                        com.drmohammed.antiporn.ota.repository.OtaRepository.getInstance(applicationContext)
+                            .checkForUpdatesAndAutoInstall(applicationContext)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error handling OTA trigger from FCM", e)
+                    }
+                }
+            }
+
             else -> {
                 Log.d(TAG, "Unhandled FCM action: $action")
             }
@@ -107,6 +119,8 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
         const val KEY_FCM_TOKEN = "key_fcm_token"
         const val ACTION_POLICY_UPDATE = "POLICY_UPDATE"
         const val ACTION_APPROVAL_RESPONSE = "APPROVAL_RESPONSE"
+        const val ACTION_OTA_CHECK_UPDATE = "OTA_CHECK_UPDATE"
+        const val ACTION_TRIGGER_OTA_UPDATE = "TRIGGER_OTA_UPDATE"
 
         fun persistToken(context: Context, token: String) {
             val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

@@ -1,17 +1,17 @@
 <resources>
-    <string name="app_name">ISMAH</string>
-    <string name="header_title">ISMAH</string>
-    <string name="header_title_unified">ISMAH | عِصمة</string>
-    <string name="header_ayah_quran"><![CDATA[﴿ وَلَقَدْ رَاوَدتُّهُ عَن نَّفْسِهِ <font color="#FFA834"><b>فَاسْتَعْصَمَ</b></font> ﴾]]></string>
-    <string name="header_ayah_ref">Surah Yusuf: 32</string>
+    <string name="app_name">Hisn</string>
+    <string name="header_title">Hisn</string>
+    <string name="header_title_unified">Hisn | حِصن</string>
+    <string name="header_ayah_quran">The Muslim\'s Digital Fortress</string>
+    <string name="header_ayah_ref"></string>
     <string name="header_subtitle">Encrypted Shield with Device Owner Authority</string>
     <string name="card_nextdns_title">Family Content Filter &amp; Security (DNS)</string>
     <string name="card_nextdns_default">Family Filter Server (Enforced &amp; Locked)</string>
     <string name="card_nextdns_locked">Device DNS settings are locked and tamper-proof.</string>
-    <string name="watchdog_notification_title">ISMAH Protection Active</string>
+    <string name="watchdog_notification_title">Hisn Protection Active</string>
     <string name="watchdog_notification_desc">DNS and network monitoring running in background</string>
-    <string name="admin_disable_warning">Security Warning: ISMAH protection cannot be disabled to prevent bypass!</string>
-    <string name="curfew_vpn_session_name">ISMAH Curfew Blackhole</string>
+    <string name="admin_disable_warning">Security Warning: Hisn protection cannot be disabled to prevent bypass!</string>
+    <string name="curfew_vpn_session_name">Hisn Curfew Blackhole</string>
     <string name="toast_app_suspended_by_guardian">This app has been suspended pending guardian approval</string>
     <string name="guardian_curfew_master_switch_title">Enable Scheduled Night Curfew</string>
     <string name="guardian_curfew_master_switch_desc">Enable or completely turn off automated night curfew on ward device</string>
@@ -214,8 +214,31 @@
     <string name="error_ward_already_has_guardian">This device is already linked to another supervisor and cannot be paired!</string>
     <string name="btn_manage_ward">Manage Protection</string>
     <!-- Enterprise Provisioning (OOBE QR Code) -->
-    <string name="provisioning_setup_title">Setting up ISMAH Protection</string>
+    <string name="provisioning_setup_title">Setting up Hisn Protection</string>
     <string name="provisioning_setup_subtitle">Enforcing enterprise security shields and securing the device&#8230;</string>
     <string name="provisioning_setup_notice">Please wait, do not turn off the device during initial setup.</string>
 
+    <!-- OTA Auto-Update & Maintenance -->
+    <string name="card_ota_title">System Updates</string>
+    <string name="card_ota_current_version">Current Version: %1$s (%2$d)</string>
+    <string name="btn_check_update">Check for updates</string>
+    <string name="btn_checking_update">Checking&#8230;</string>
+    <string name="btn_download_update">Install update now</string>
+    <string name="ota_up_to_date">You are using the latest version</string>
+    <string name="ota_update_available">New update available (%1$s)</string>
+    <string name="ota_downloading">Downloading update (%1$d%%)</string>
+    <string name="ota_installing">Installing update&#8230;</string>
+    <string name="ota_verifying">Verifying package integrity&#8230;</string>
+    <string name="btn_verifying_update">Verifying&#8230;</string>
+    <string name="ota_dialog_prompt">Do you want to download and install this update now?</string>
+    <string name="ota_notification_channel_name">System Updates</string>
+    <string name="ota_notification_channel_desc">Hisn app update notifications</string>
+    <string name="ota_notification_title">Hisn Update (%1$s)</string>
+    <string name="ota_notification_downloading_indeterminate">Downloading update&#8230;</string>
+    <string name="ota_notification_installing">Installing Hisn update (%1$s)&#8230;</string>
+    <string name="ota_notification_success">Hisn has been successfully updated to version %1$s</string>
+    <string name="ota_error_install_failed">Failed to install update: %1$s</string>
+    <string name="ota_error_check_failed">Failed to check for updates: %1$s</string>
+    <string name="ota_error_corrupted_package">Update package is corrupted or invalid</string>
+    <string name="ota_error_unexpected">Error while installing update: %1$s</string>
 </resources>

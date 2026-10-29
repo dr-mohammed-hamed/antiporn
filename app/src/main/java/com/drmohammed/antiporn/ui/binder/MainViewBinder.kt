@@ -16,9 +16,11 @@ import com.drmohammed.antiporn.shields.CurfewShield
 import com.drmohammed.antiporn.shields.DnsShield
 import com.drmohammed.antiporn.shields.SystemTamperShield
 import com.drmohammed.antiporn.shields.VpnShield
+import com.drmohammed.antiporn.ota.model.OtaUpdateState
 import com.drmohammed.antiporn.ui.ProtectionUiState
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.progressindicator.LinearProgressIndicator
 
 /**
  * Encapsulates view binding, styling, and status presentation for the dashboard.
@@ -60,6 +62,12 @@ class MainViewBinder(rootView: View) {
     val btnOpenAccountabilityHub: MaterialButton = rootView.findViewById(R.id.btnOpenAccountabilityHub)
     val btnEnforceNow: MaterialButton = rootView.findViewById(R.id.btnEnforceNow)
     private val tvHeaderAyah: TextView? = rootView.findViewById(R.id.tvHeaderAyah)
+
+    val cardOtaUpdate: MaterialCardView = rootView.findViewById(R.id.cardOtaUpdate)
+    val tvOtaVersion: TextView = rootView.findViewById(R.id.tvOtaVersion)
+    val tvOtaStatus: TextView = rootView.findViewById(R.id.tvOtaStatus)
+    val pbOtaProgress: LinearProgressIndicator = rootView.findViewById(R.id.pbOtaProgress)
+    val btnCheckUpdate: MaterialButton = rootView.findViewById(R.id.btnCheckUpdate)
 
     init {
         tvHeaderAyah?.let {
@@ -318,6 +326,94 @@ class MainViewBinder(rootView: View) {
             tvCurfewStatus.text = context.getString(R.string.card_curfew_inactive_desc)
             tvCurfewStatus.setTextColor(orangeColor)
             tvCurfewSubtext.text = context.getString(R.string.card_curfew_subtext)
+        }
+    }
+
+    /**
+     * Binds the OTA update status to the update card views.
+     */
+    fun bindOtaState(state: OtaUpdateState, currentVersionName: String, currentVersionCode: Long) {
+        tvOtaVersion.text = context.getString(R.string.card_ota_current_version, currentVersionName, currentVersionCode)
+
+        when (state) {
+            is OtaUpdateState.Idle -> {
+                tvOtaStatus.text = ""
+                tvOtaStatus.visibility = View.GONE
+                pbOtaProgress.visibility = View.GONE
+                btnCheckUpdate.isEnabled = true
+                btnCheckUpdate.setText(R.string.btn_check_update)
+            }
+            is OtaUpdateState.Checking -> {
+                tvOtaStatus.text = context.getString(R.string.btn_checking_update)
+                tvOtaStatus.visibility = View.VISIBLE
+                pbOtaProgress.visibility = View.VISIBLE
+                pbOtaProgress.isIndeterminate = true
+                btnCheckUpdate.isEnabled = false
+                btnCheckUpdate.setText(R.string.btn_checking_update)
+            }
+            is OtaUpdateState.NoUpdateAvailable -> {
+                tvOtaStatus.text = context.getString(R.string.ota_up_to_date)
+                tvOtaStatus.visibility = View.VISIBLE
+                pbOtaProgress.visibility = View.GONE
+                btnCheckUpdate.isEnabled = true
+                btnCheckUpdate.setText(R.string.btn_check_update)
+            }
+            is OtaUpdateState.UpdateAvailable -> {
+                tvOtaStatus.text = context.getString(R.string.ota_update_available, state.info.versionName)
+                tvOtaStatus.visibility = View.VISIBLE
+                pbOtaProgress.visibility = View.GONE
+                btnCheckUpdate.isEnabled = true
+                btnCheckUpdate.setText(R.string.btn_download_update)
+            }
+            is OtaUpdateState.Downloading -> {
+                val percent = state.progressPercent
+                val statusText = if (percent >= 0) {
+                    context.getString(R.string.ota_downloading, percent)
+                } else {
+                    context.getString(R.string.btn_checking_update)
+                }
+                tvOtaStatus.text = statusText
+                tvOtaStatus.visibility = View.VISIBLE
+                pbOtaProgress.visibility = View.VISIBLE
+                if (percent >= 0) {
+                    pbOtaProgress.isIndeterminate = false
+                    pbOtaProgress.progress = percent
+                } else {
+                    pbOtaProgress.isIndeterminate = true
+                }
+                btnCheckUpdate.isEnabled = false
+                btnCheckUpdate.text = statusText
+            }
+            is OtaUpdateState.Verifying -> {
+                tvOtaStatus.text = context.getString(R.string.ota_verifying)
+                tvOtaStatus.visibility = View.VISIBLE
+                pbOtaProgress.visibility = View.VISIBLE
+                pbOtaProgress.isIndeterminate = true
+                btnCheckUpdate.isEnabled = false
+                btnCheckUpdate.text = context.getString(R.string.btn_verifying_update)
+            }
+            is OtaUpdateState.ReadyToInstall -> {
+                tvOtaStatus.text = context.getString(R.string.ota_installing)
+                tvOtaStatus.visibility = View.VISIBLE
+                pbOtaProgress.visibility = View.GONE
+                btnCheckUpdate.isEnabled = true
+                btnCheckUpdate.setText(R.string.btn_download_update)
+            }
+            is OtaUpdateState.Installing -> {
+                tvOtaStatus.text = context.getString(R.string.ota_installing)
+                tvOtaStatus.visibility = View.VISIBLE
+                pbOtaProgress.visibility = View.VISIBLE
+                pbOtaProgress.isIndeterminate = true
+                btnCheckUpdate.isEnabled = false
+                btnCheckUpdate.setText(R.string.ota_installing)
+            }
+            is OtaUpdateState.Error -> {
+                tvOtaStatus.text = state.message
+                tvOtaStatus.visibility = View.VISIBLE
+                pbOtaProgress.visibility = View.GONE
+                btnCheckUpdate.isEnabled = true
+                btnCheckUpdate.setText(R.string.btn_check_update)
+            }
         }
     }
 }
