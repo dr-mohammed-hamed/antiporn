@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">حصن</string>
+    <string name="splash_title">حِصْن</string>
+    <string name="splash_subtitle">درع الحماية الذاتي</string>
 
     <string name="header_title">حِصن</string>
     <string name="header_title_unified">حِصْن | HISN</string>
@@ -82,9 +84,9 @@
 
     <string name="toast_error_applying">خطأ أثناء تطبيق السياسات: %1$s</string>
 
-    <string name="watchdog_notification_title">حماية AntiPorn نشطة</string>
+    <string name="watchdog_notification_title">تطبيق حصن نشط.</string>
 
-    <string name="watchdog_notification_desc">مراقبة الـ DNS والشبكة تعمل في الخلفية</string>
+    <string name="watchdog_notification_desc">تطبيق حصن نشط.</string>
 
     <string name="admin_disable_warning">تحذير أمني: لا يمكن تعطيل حماية AntiPorn لمنع الالتفاف على المحتوى المحظور!</string>
 
@@ -673,4 +675,33 @@
     <string name="ota_error_check_failed">فشل التحقق من وجود تحديثات: %1$s</string>
     <string name="ota_error_corrupted_package">حزمة التحديث تالفة أو غير صالحة</string>
     <string name="ota_error_unexpected">خطأ أثناء تثبيت التحديث: %1$s</string>
+
+    <!-- Active Shields BottomSheet & UI Redesign -->
+    <string name="header_active_shields_pill">الدروع النشطة</string>
+    <string name="bottom_sheet_shields_title">دروع الحماية النشطة</string>
+    <string name="bottom_sheet_shields_subtitle">الحماية المطبقة على النظام لحجب المحتوى المحظور ومنع التجاوز</string>
+    <string name="bottom_sheet_shields_count">%1$d دروع نشطة</string>
+    <string name="bottom_sheet_empty_title">لا توجد دروع نشطة حالياً</string>
+    <string name="bottom_sheet_empty_desc">يحتاج التطبيق لصلاحية مسؤول الجهاز (Device Owner) لتفعيل منظومة الدروع المقفولة.</string>
+    <string name="btn_close">إغلاق</string>
+
+    <string name="shield_active_badge">نشط ومفعل</string>
+    <string name="shield_active_do_title">درع الصلاحية الكاملة (Device Owner)</string>
+    <string name="shield_active_do_desc">صلاحية إدارة الجهاز نشطة وتتحكم بالنظام بالكامل لمنع الإلغاء أو التجاوز.</string>
+    <string name="shield_active_dns_title">درع AntiPorn DNS النشط</string>
+    <string name="shield_active_dns_desc">خادم DNS مشفر (%1$s) مفروض ومقفل لمنع المواقع الإباحية.</string>
+    <string name="shield_active_curfew_title">درع الحصن الليلي</string>
+    <string name="shield_active_curfew_desc">مفعل لحظر تطبيقات الترفيه وعزل الإنترنت في ساعات النوم (20:00 - 07:00).</string>
+    <string name="shield_active_browser_title">درع قفل التصفح المتخفي والبحث الآمن</string>
+    <string name="shield_active_browser_desc">معطل تماماً على جميع المتصفحات مع فرض Google SafeSearch الصارم.</string>
+    <string name="shield_active_time_title">درع منع تغيير الوقت والتلاعب</string>
+    <string name="shield_active_time_desc">مقفول بالكامل ومربوط بتوقيت مكة المكرمة ومنع تغيير إعدادات الوقت والتاريخ.</string>
+    <string name="shield_active_freeze_title">درع تجميد التطبيقات الجديدة</string>
+    <string name="shield_active_freeze_desc">تجميد وحظر فوري لأي تطبيق يتم تثبيته حتى مراجعته والموافقة عليه.</string>
+    <string name="shield_active_vpn_title">درع حظر شبكات الـ VPN</string>
+    <string name="shield_active_vpn_desc">منع إنشاء أو تهيئة أي اتصال VPN لتجاوز منظومة الحظر المفروضة.</string>
+
+    <!-- Dedicated Nap Card -->
+    <string name="card_nap_title">وضع القيلولة المؤقت</string>
+    <string name="card_nap_subtext">إيقاف مؤقت لتطبيقات الترفيه خلال النهار لتجديد التركيز والإنتاجية.</string>
 </resources>

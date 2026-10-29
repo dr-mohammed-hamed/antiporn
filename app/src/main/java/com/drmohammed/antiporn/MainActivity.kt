@@ -13,6 +13,8 @@ import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.drmohammed.antiporn.ui.splash.SplashAnimationController
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -38,6 +40,8 @@ import android.content.pm.PackageManager
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.lifecycleScope
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
+import com.drmohammed.antiporn.ota.model.OtaVersionInfo
+import kotlinx.coroutines.delay
 import com.drmohammed.antiporn.ota.repository.OtaRepository
 import kotlinx.coroutines.launch
 import com.drmohammed.antiporn.ui.ProtectionUiState
@@ -51,9 +55,11 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var viewBinder: MainViewBinder
     private lateinit var aiCardBinder: AiControlCardViewBinder
+    private var splashController: SplashAnimationController? = null
     private val uiHandler = Handler(Looper.getMainLooper())
     private var lastAiToggleMs = 0L
     private var lastNapTapMs = 0L
+    private var hasShownOtaPrompt = false
 
     private val aiRefreshRunnable = Runnable {
         if (!isFinishing && !isDestroyed) {
@@ -103,6 +109,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -127,6 +134,9 @@ class MainActivity : AppCompatActivity() {
             handleAiShieldToggle()
         }
         setupListeners()
+        splashController = SplashAnimationController(this).apply {
+            showIfColdBoot()
+        }
     }
 
     override fun onStart() {
@@ -172,11 +182,15 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         uiHandler.removeCallbacks(uiTickerRunnable)
         uiHandler.removeCallbacks(aiRefreshRunnable)
+        splashController?.cancel()
+        splashController = null
     }
 
     override fun onDestroy() {
         uiHandler.removeCallbacks(uiTickerRunnable)
         uiHandler.removeCallbacks(aiRefreshRunnable)
+        splashController?.cancel()
+        splashController = null
         super.onDestroy()
     }
 
@@ -245,6 +259,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showOtaUpdateDialog(info: OtaVersionInfo, otaRepo: OtaRepository) {
+        if (isFinishing || isDestroyed) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.card_ota_title)
+            .setMessage(
+                getString(R.string.ota_update_available, info.versionName) +
+                (if (!info.releaseNotes.isNullOrBlank()) "\n\n${info.releaseNotes}\n" else "") +
+                "\n\n" + getString(R.string.ota_dialog_prompt)
+            )
+            .setPositiveButton(R.string.btn_download_update) { _, _ ->
+                lifecycleScope.launch {
+                    otaRepo.downloadAndInstall(applicationContext, info, showNotification = true)
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun getCurrentAppVersion(): Pair<String, Long> {
         return try {
             val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -271,28 +303,26 @@ class MainActivity : AppCompatActivity() {
             otaRepo.updateState.collect { state ->
                 if (!isFinishing && !isDestroyed) {
                     viewBinder.bindOtaState(state, verName, verCode)
+                    if (state is OtaUpdateState.UpdateAvailable && !hasShownOtaPrompt) {
+                        hasShownOtaPrompt = true
+                        showOtaUpdateDialog(state.info, otaRepo)
+                    }
                 }
+            }
+        }
+
+        // Automatic background OTA check on launch
+        lifecycleScope.launch {
+            delay(1200L)
+            if (!isFinishing && !isDestroyed) {
+                otaRepo.checkForUpdates(applicationContext)
             }
         }
 
         viewBinder.btnCheckUpdate.setOnClickListener {
             when (val currentState = otaRepo.updateState.value) {
                 is OtaUpdateState.UpdateAvailable -> {
-                    val info = currentState.info
-                    MaterialAlertDialogBuilder(this)
-                        .setTitle(R.string.card_ota_title)
-                        .setMessage(
-                            getString(R.string.ota_update_available, info.versionName) +
-                            (if (!info.releaseNotes.isNullOrBlank()) "\n\n${info.releaseNotes}\n" else "") +
-                            "\n\n" + getString(R.string.ota_dialog_prompt)
-                        )
-                        .setPositiveButton(R.string.btn_download_update) { _, _ ->
-                            lifecycleScope.launch {
-                                otaRepo.downloadAndInstall(applicationContext, info, showNotification = true)
-                            }
-                        }
-                        .setNegativeButton(android.R.string.cancel, null)
-                        .show()
+                    showOtaUpdateDialog(currentState.info, otaRepo)
                 }
                 is OtaUpdateState.Downloading, is OtaUpdateState.Verifying, is OtaUpdateState.Installing, is OtaUpdateState.Checking -> {
                     // In-progress, ignore duplicate clicks

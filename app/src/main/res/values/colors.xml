@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Splash Screen Identity Colors -->
+    <color name="splash_bg_dark">#FF0A1A33</color>
+    <color name="splash_emerald_bright">#FF1CD076</color>
+    <color name="splash_emerald_glow">#4D1CD076</color>
+    <color name="splash_subtitle">#B3E2E8F0</color>
+
     <!-- Brand Identity & Recovery Hero Shield Semantic Tokens (Immutable - immune to dynamic color overwrite) -->
     <color name="shield_hero_bg">#FF11161F</color>
     <color name="shield_hero_stroke">#3326E07F</color>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/splashOverlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/splash_bg_dark"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Center Content: Glow + Shield + Typography -->
+    <LinearLayout
+        android:id="@+id/splashContentGroup"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <!-- Shield Container with Glowing Background Ring -->
+        <FrameLayout
+            android:layout_width="260dp"
+            android:layout_height="260dp">
+
+            <!-- Emerald Aura Glow Pulse -->
+            <ImageView
+                android:id="@+id/ivSplashGlow"
+                android:layout_width="260dp"
+                android:layout_height="260dp"
+                android:layout_gravity="center"
+                android:scaleType="fitCenter"
+                android:src="@drawable/bg_splash_emerald_glow"
+                android:alpha="0.8" />
+
+            <!-- Hisn Shield Emblem -->
+            <ImageView
+                android:id="@+id/ivSplashShield"
+                android:layout_width="150dp"
+                android:layout_height="190dp"
+                android:layout_gravity="center"
+                android:adjustViewBounds="true"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_hisn_shield_emblem"
+                android:contentDescription="@string/app_name" />
+        </FrameLayout>
+
+        <!-- Brand Name: حِصْن -->
+        <TextView
+            android:id="@+id/tvSplashTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:fontFamily="@font/tajawal"
+            android:text="@string/splash_title"
+            android:textColor="#FFFFFFFF"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04" />
+
+        <!-- Subtitle: درع الحماية الذاتي -->
+        <TextView
+            android:id="@+id/tvSplashSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:fontFamily="@font/tajawal"
+            android:text="@string/splash_subtitle"
+            android:textColor="@color/splash_subtitle"
+            android:textSize="15sp"
+            android:letterSpacing="0.03" />
+
+    </LinearLayout>
+
+</FrameLayout>
+

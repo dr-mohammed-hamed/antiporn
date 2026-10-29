@@ -224,7 +224,6 @@ class DnsWatchdogService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(channelTitle)
-            .setContentText(channelDesc)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)

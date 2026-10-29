@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">Hisn</string>
+    <string name="splash_title">Hisn | حِصْن</string>
+    <string name="splash_subtitle">Self-Protection Digital Fortress</string>
     <string name="header_title">Hisn</string>
     <string name="header_title_unified">Hisn | حِصن</string>
     <string name="header_ayah_quran">The Muslim\'s Digital Fortress</string>
@@ -8,8 +10,8 @@
     <string name="card_nextdns_title">Family Content Filter &amp; Security (DNS)</string>
     <string name="card_nextdns_default">Family Filter Server (Enforced &amp; Locked)</string>
     <string name="card_nextdns_locked">Device DNS settings are locked and tamper-proof.</string>
-    <string name="watchdog_notification_title">Hisn Protection Active</string>
-    <string name="watchdog_notification_desc">DNS and network monitoring running in background</string>
+    <string name="watchdog_notification_title">Hisn app is active.</string>
+    <string name="watchdog_notification_desc">Hisn app is active.</string>
     <string name="admin_disable_warning">Security Warning: Hisn protection cannot be disabled to prevent bypass!</string>
     <string name="curfew_vpn_session_name">Hisn Curfew Blackhole</string>
     <string name="toast_app_suspended_by_guardian">This app has been suspended pending guardian approval</string>
@@ -244,4 +246,33 @@
     <string name="ota_error_check_failed">Failed to check for updates: %1$s</string>
     <string name="ota_error_corrupted_package">Update package is corrupted or invalid</string>
     <string name="ota_error_unexpected">Error while installing update: %1$s</string>
+
+    <!-- Active Shields BottomSheet & UI Redesign -->
+    <string name="header_active_shields_pill">Active Shields</string>
+    <string name="bottom_sheet_shields_title">Active Security Shields</string>
+    <string name="bottom_sheet_shields_subtitle">Active system-level enforcement blocking restricted content and tampering</string>
+    <string name="bottom_sheet_shields_count">%1$d Active Shields</string>
+    <string name="bottom_sheet_empty_title">No Active Shields</string>
+    <string name="bottom_sheet_empty_desc">Device Owner privileges are required to activate enforced security shields.</string>
+    <string name="btn_close">Close</string>
+
+    <string name="shield_active_badge">Active &amp; Enforced</string>
+    <string name="shield_active_do_title">Full Privilege Shield (Device Owner)</string>
+    <string name="shield_active_do_desc">Device administration privilege active, preventing bypassing or uninstallation.</string>
+    <string name="shield_active_dns_title">AntiPorn DNS Shield Active</string>
+    <string name="shield_active_dns_desc">Encrypted DNS (%1$s) enforced, blocking adult websites.</string>
+    <string name="shield_active_curfew_title">Night Curfew Shield</string>
+    <string name="shield_active_curfew_desc">Active to suspend entertainment apps and isolate network during night hours (20:00 - 07:00).</string>
+    <string name="shield_active_browser_title">Incognito Lock &amp; SafeSearch Shield</string>
+    <string name="shield_active_browser_desc">Disabled across all browsers with strict Google SafeSearch enforced.</string>
+    <string name="shield_active_time_title">Time Tamper Prevention Shield</string>
+    <string name="shield_active_time_desc">Locked completely, synced to Makkah timezone with time/date settings frozen.</string>
+    <string name="shield_active_freeze_title">New App Freeze Shield</string>
+    <string name="shield_active_freeze_desc">Instant freezing and restriction of any new install until supervisor approval.</string>
+    <string name="shield_active_vpn_title">VPN Restriction Shield</string>
+    <string name="shield_active_vpn_desc">Prevents establishing or configuring bypass VPN connections.</string>
+
+    <!-- Dedicated Nap Card -->
+    <string name="card_nap_title">Temporary Nap Mode</string>
+    <string name="card_nap_subtext">Temporary pause on entertainment apps during daylight hours to restore focus.</string>
 </resources>

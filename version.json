@@ -1,11 +1,11 @@
 {
-  "versionCode": 1,
-  "versionName": "1.0",
+  "versionCode": 2,
+  "versionName": "1.1",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 28901750,
+  "fileSizeBytes": 29067817,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "Official AntiPorn Production Release with dual AI (Halalify v2 + NudeNet v3) and Device Owner Provisioning",
+  "releaseNotes": "تحديث شامل للواجهة الرئيسية (تفريغ وتجميل الواجهة، نافذة الدروع المنبثقة التفاعلية Material 3 Bottom Sheet مع فرز صارم للدروع النشطة، بطاقة مخصصة لوضع القيلولة المؤقت)",
   "releaseDate": "2026-10-29"
 }

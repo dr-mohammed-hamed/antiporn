@@ -33,4 +33,11 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <!-- Splash Screen Starting Theme (Night mode - consistent deep navy identity) -->
+    <style name="Theme.Antiporn.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_bg_dark</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_hisn_splash_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.Antiporn</item>
+    </style>
 </resources>
