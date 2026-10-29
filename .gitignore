@@ -31,3 +31,7 @@ app/keystore/*.bin
 
 # Assets & Heavy Backups
 app/src/main/assets_backup/
+
+# Cloudflare Wrangler Cache
+.wrangler/
+
