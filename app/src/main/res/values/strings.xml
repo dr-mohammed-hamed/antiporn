@@ -96,7 +96,7 @@
 
     <string name="card_system_tamper_pending">حماية النظام وتثبيت التوقيت بحاجة للتطبيق</string>
 
-    <string name="card_system_tamper_subtext">منع التلاعب بالوقت، تثبيت توقيت مكة، حظر الوضع الآمن وإعادة ضبط المصنع ومنع إلغاء التثبيت</string>
+    <string name="card_system_tamper_subtext">حظر الوضع الآمن، وإعادة ضبط المصنع، ومنع إلغاء التثبيت (وقفل الوقت في حال تفعيله من المشرف)</string>
 
     <string name="shield_dns_success">تم فرض خادم NextDNS وحظر تغيير الإعدادات بنجاح</string>
 
@@ -432,6 +432,8 @@
 
     <string name="btn_change_weekend_end_time">تغيير</string>
 
+    <string name="guardian_date_time_lock_title">التحكم في وقت وتاريخ الهاتف</string>
+    <string name="guardian_date_time_lock_desc">قفل تعديل الوقت والتاريخ على هاتف المكفول لمنع التلاعب بساعات الحظر</string>
     <string name="guardian_timezone_title">المنطقة الزمنية وتوقيت الهاتف</string>
     <string name="guardian_timezone_subtitle">تعديل المنطقة الزمنية للسفر أو التوقيت الصيفي</string>
     <string name="guardian_timezone_dropdown_label">المنطقة الزمنية والمدينة الإسلامية الأقرب</string>

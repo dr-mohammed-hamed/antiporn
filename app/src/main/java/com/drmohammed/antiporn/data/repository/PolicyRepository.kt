@@ -246,23 +246,73 @@ class PolicyRepository private constructor(context: Context) {
                 val isDo = dpm.isDeviceOwnerApp(appContext.packageName)
                 val admin = if (isDeviceOwner) ComponentName(appContext, AdminReceiver::class.java) else null
 
-                // 1. Dynamic Timezone Configuration (Must run before scheduling alarms and syncing curfew state - Requires DO)
-                if (isDo && admin != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && bundle.timeZoneId.isNotBlank()) {
-                    val validTz = if (com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(bundle.timeZoneId)) {
-                        bundle.timeZoneId
-                    } else {
-                        com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
-                    }
-                    try {
-                        TimeZone.setDefault(null)
-                        val currentTz = TimeZone.getDefault()
-                        if (currentTz.id != validTz) {
-                            dpm.setTimeZone(admin, validTz)
-                            TimeZone.setDefault(null)
-                            Log.i(TAG, "Applied dynamic timezone update to: $validTz")
+                // 1. Dynamic Date & Time Protection / Timezone Configuration (Requires DO)
+                if (isDo && admin != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    if (bundle.isDateTimeLocked) {
+                        try {
+                            dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
+                            Log.i(TAG, "Enforced DISALLOW_CONFIG_DATE_TIME restriction from policy bundle")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed applying DISALLOW_CONFIG_DATE_TIME: ${e.message}")
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed setting timezone ${bundle.timeZoneId} via DPM", e)
+
+                        if (bundle.timeZoneId.isNotBlank()) {
+                            val validTz = if (com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(bundle.timeZoneId)) {
+                                bundle.timeZoneId
+                            } else {
+                                com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
+                            }
+                            try {
+                                TimeZone.setDefault(null)
+                                val currentTz = TimeZone.getDefault()
+                                if (currentTz.id != validTz) {
+                                    dpm.setTimeZone(admin, validTz)
+                                    TimeZone.setDefault(null)
+                                    Log.i(TAG, "Applied dynamic timezone update to: $validTz")
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed setting timezone ${bundle.timeZoneId} via DPM", e)
+                            }
+                        }
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            try {
+                                dpm.setAutoTimeZoneEnabled(admin, false)
+                                dpm.setAutoTimeEnabled(admin, true)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed setting auto time/timezone on Android 11+: ${e.message}")
+                            }
+                        } else {
+                            try {
+                                @Suppress("DEPRECATION")
+                                dpm.setAutoTimeRequired(admin, true)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed setting auto time required: ${e.message}")
+                            }
+                        }
+                    } else {
+                        // Time lock is not enabled: Clear restrictions and restore default auto-time state
+                        try {
+                            dpm.clearUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
+                            Log.i(TAG, "Cleared DISALLOW_CONFIG_DATE_TIME restriction from policy bundle")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed clearing DISALLOW_CONFIG_DATE_TIME: ${e.message}")
+                        }
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            try {
+                                dpm.setAutoTimeZoneEnabled(admin, true)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed restoring auto timezone on Android 11+: ${e.message}")
+                            }
+                        } else {
+                            try {
+                                @Suppress("DEPRECATION")
+                                dpm.setAutoTimeRequired(admin, false)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed clearing auto time required: ${e.message}")
+                            }
+                        }
                     }
                 }
 

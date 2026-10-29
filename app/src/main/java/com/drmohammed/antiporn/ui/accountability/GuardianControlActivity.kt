@@ -84,6 +84,9 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var btnChangeWeekendStartTime: MaterialButton
     private lateinit var btnChangeWeekendEndTime: MaterialButton
 
+    // Date & Time Lock control
+    private lateinit var switchLockDateTime: MaterialSwitch
+
     // Timezone controls
     private lateinit var cardTimezoneControl: MaterialCardView
     private lateinit var layoutTimezoneHeader: View
@@ -237,6 +240,9 @@ class GuardianControlActivity : AppCompatActivity() {
         btnChangeWeekendStartTime = findViewById(R.id.btnChangeWeekendStartTime)
         btnChangeWeekendEndTime = findViewById(R.id.btnChangeWeekendEndTime)
 
+        // Date & Time Lock control
+        switchLockDateTime = findViewById(R.id.switchLockDateTime)
+
         // Timezone controls
         cardTimezoneControl = findViewById(R.id.cardTimezoneControl)
         layoutTimezoneHeader = findViewById(R.id.layoutTimezoneHeader)
@@ -297,6 +303,7 @@ class GuardianControlActivity : AppCompatActivity() {
         switchInstantInternetKill.isEnabled = enabled
         switchIncognitoBlocked.isEnabled = enabled
         switchLockNewInstalls.isEnabled = enabled
+        switchLockDateTime.isEnabled = enabled
         btnOpenAppManager.isEnabled = enabled
         etDnsHost.isEnabled = enabled
         btnPresetAdguard.isEnabled = enabled
@@ -333,6 +340,7 @@ class GuardianControlActivity : AppCompatActivity() {
                 switchInstantInternetKill.isChecked != snapshot.isInstantInternetKillEnabled ||
                 switchIncognitoBlocked.isChecked != snapshot.isIncognitoBlocked ||
                 switchLockNewInstalls.isChecked != snapshot.lockNewInstallsUntilApproved ||
+                switchLockDateTime.isChecked != snapshot.isDateTimeLocked ||
                 getCleanDnsHost() != snapshot.dnsHost ||
                 selectedTimeZoneId != snapshot.timeZoneId
     }
@@ -509,6 +517,10 @@ class GuardianControlActivity : AppCompatActivity() {
         switchInstantInternetKill.setOnCheckedChangeListener(switchListener)
         switchIncognitoBlocked.setOnCheckedChangeListener(switchListener)
         switchLockNewInstalls.setOnCheckedChangeListener(switchListener)
+        switchLockDateTime.setOnCheckedChangeListener { _, isChecked ->
+            cardTimezoneControl.isVisible = isChecked
+            updateSaveButtonState()
+        }
 
         etDnsHost.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -617,6 +629,8 @@ class GuardianControlActivity : AppCompatActivity() {
         switchInstantInternetKill.isChecked = policy.isInstantInternetKillEnabled
         switchIncognitoBlocked.isChecked = policy.isIncognitoBlocked
         switchLockNewInstalls.isChecked = policy.lockNewInstallsUntilApproved
+        switchLockDateTime.isChecked = policy.isDateTimeLocked
+        cardTimezoneControl.isVisible = policy.isDateTimeLocked
         etDnsHost.setText(policy.dnsHost)
         tilDnsHost.error = null
 
@@ -900,6 +914,7 @@ class GuardianControlActivity : AppCompatActivity() {
                     isVpnBlackholeEnabled = switchVpnBlackhole.isChecked,
                     isIncognitoBlocked = switchIncognitoBlocked.isChecked,
                     lockNewInstallsUntilApproved = switchLockNewInstalls.isChecked,
+                    isDateTimeLocked = switchLockDateTime.isChecked,
                     dnsHost = rawDns,
                     timeZoneId = selectedTimeZoneId,
                     version = latestPolicy.version + 1,

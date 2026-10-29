@@ -29,6 +29,7 @@ class DevicePolicyBundleTest {
         assertTrue(policy.customBlacklistPackages.isEmpty())
         assertTrue(policy.customCurfewWhitelistPackages.isEmpty())
         assertTrue(policy.protectedAppPackages.isEmpty())
+        assertFalse(policy.isDateTimeLocked)
         assertEquals(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST, policy.dnsHost)
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, policy.timeZoneId)
         assertEquals(1L, policy.version)
@@ -51,6 +52,7 @@ class DevicePolicyBundleTest {
             isVpnBlackholeEnabled = true,
             isIncognitoBlocked = true,
             lockNewInstallsUntilApproved = true,
+            isDateTimeLocked = true,
             customBlacklistPackages = setOf("com.bad.app1", "com.bad.app2"),
             customCurfewWhitelistPackages = setOf("com.work.app1"),
             protectedAppPackages = setOf("com.vital.app1", "com.vital.app2"),
@@ -81,6 +83,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.isVpnBlackholeEnabled, restored.isVpnBlackholeEnabled)
         assertEquals(original.isIncognitoBlocked, restored.isIncognitoBlocked)
         assertEquals(original.lockNewInstallsUntilApproved, restored.lockNewInstallsUntilApproved)
+        assertEquals(original.isDateTimeLocked, restored.isDateTimeLocked)
         assertEquals(original.customBlacklistPackages, restored.customBlacklistPackages)
         assertEquals(original.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
@@ -111,6 +114,7 @@ class DevicePolicyBundleTest {
             isVpnBlackholeEnabled = false,
             isIncognitoBlocked = false,
             lockNewInstallsUntilApproved = true,
+            isDateTimeLocked = true,
             customBlacklistPackages = setOf("pkg.a"),
             customCurfewWhitelistPackages = setOf("pkg.b"),
             protectedAppPackages = setOf("pkg.c"),
@@ -141,6 +145,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.isVpnBlackholeEnabled, restored.isVpnBlackholeEnabled)
         assertEquals(original.isIncognitoBlocked, restored.isIncognitoBlocked)
         assertEquals(original.lockNewInstallsUntilApproved, restored.lockNewInstallsUntilApproved)
+        assertEquals(original.isDateTimeLocked, restored.isDateTimeLocked)
         assertEquals(original.customBlacklistPackages, restored.customBlacklistPackages)
         assertEquals(original.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
@@ -165,6 +170,7 @@ class DevicePolicyBundleTest {
         """.trimIndent()
         val parsed = DevicePolicyBundle.fromJson(legacyJson)
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, parsed.timeZoneId)
+        assertFalse(parsed.isDateTimeLocked)
 
         val legacyMap = mapOf<String, Any?>(
             "curfewStartHour" to 20,
@@ -172,6 +178,7 @@ class DevicePolicyBundleTest {
         )
         val fromMap = DevicePolicyBundle.fromMap(legacyMap)
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, fromMap.timeZoneId)
+        assertFalse(fromMap.isDateTimeLocked)
 
         val emptyTzPolicy = DevicePolicyBundle(timeZoneId = "")
         val reconciled = DevicePolicyBundle.reconcileLegacyV1(emptyTzPolicy)

@@ -376,27 +376,36 @@ class DnsWatchdogService : Service() {
             Log.d(TAG, "Could not read Settings.Global directly", e)
         }
 
-        // Verify Target Timezone and Network Auto Time directly
-        try {
-            val targetTzId = CurfewConfig.getTargetTimeZoneId(this)
-            val targetTz = TimeZone.getTimeZone(targetTzId)
-            TimeZone.setDefault(null)
-            val currentTz = TimeZone.getDefault()
-            val isTargetTz = currentTz.id == targetTzId || currentTz.hasSameRules(targetTz) ||
-                currentTz.getOffset(System.currentTimeMillis()) == targetTz.getOffset(System.currentTimeMillis())
-            if (!isTargetTz) {
-                Log.w(TAG, "Timezone mismatch detected in watchdog: current=${currentTz.id}, expected=$targetTzId")
-                needsEnforce = true
-            }
+        // Verify Target Timezone and Network Auto Time directly (only if time lock is active in policy)
+        val isTimeLocked = try {
+            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(this)
+                .getCurrentPolicy().isDateTimeLocked
+        } catch (_: Exception) {
+            false
+        }
 
-            val autoTime = Settings.Global.getInt(contentResolver, Settings.Global.AUTO_TIME, 1)
-            val autoTimeZone = Settings.Global.getInt(contentResolver, Settings.Global.AUTO_TIME_ZONE, 0)
-            if (autoTime != 1 || autoTimeZone != 0) {
-                Log.w(TAG, "Auto time settings mismatch in watchdog: autoTime=$autoTime, autoTimeZone=$autoTimeZone")
-                needsEnforce = true
+        if (isTimeLocked) {
+            try {
+                val targetTzId = CurfewConfig.getTargetTimeZoneId(this)
+                val targetTz = TimeZone.getTimeZone(targetTzId)
+                TimeZone.setDefault(null)
+                val currentTz = TimeZone.getDefault()
+                val isTargetTz = currentTz.id == targetTzId || currentTz.hasSameRules(targetTz) ||
+                    currentTz.getOffset(System.currentTimeMillis()) == targetTz.getOffset(System.currentTimeMillis())
+                if (!isTargetTz) {
+                    Log.w(TAG, "Timezone mismatch detected in watchdog: current=${currentTz.id}, expected=$targetTzId")
+                    needsEnforce = true
+                }
+
+                val autoTime = Settings.Global.getInt(contentResolver, Settings.Global.AUTO_TIME, 1)
+                val autoTimeZone = Settings.Global.getInt(contentResolver, Settings.Global.AUTO_TIME_ZONE, 0)
+                if (autoTime != 1 || autoTimeZone != 0) {
+                    Log.w(TAG, "Auto time settings mismatch in watchdog: autoTime=$autoTime, autoTimeZone=$autoTimeZone")
+                    needsEnforce = true
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not verify Timezone or Auto Time directly in watchdog", e)
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not verify Timezone or Auto Time directly in watchdog", e)
         }
 
         // Live self-healing curfew/nap block synchronization during active periods

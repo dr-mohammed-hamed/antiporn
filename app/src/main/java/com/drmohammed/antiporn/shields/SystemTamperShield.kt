@@ -80,60 +80,92 @@ object SystemTamperShield : ProtectionShield {
                 Log.w(TAG, "Could not set uninstall blocked", e)
             }
 
-            // 5. Block Date & Time tampering (Requires DO)
-            if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                try { dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME) } catch (e: Exception) { Log.w(TAG, "Date time block: ${e.message}") }
+            // 5. Block Date & Time tampering (Requires DO and isDateTimeLocked policy enabled by supervisor)
+            val isDateTimeLocked = try {
+                com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isDateTimeLocked
+            } catch (_: Exception) {
+                false
             }
 
-            // 6. Enforce persistent timezone (configured or default Makkah Al-Mukarramah)
-            val targetTzId = CurfewConfig.getTargetTimeZoneId(context)
+            if (isDateTimeLocked) {
+                if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    try { dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME) } catch (e: Exception) { Log.w(TAG, "Date time block: ${e.message}") }
+                }
 
-            if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                try {
-                    TimeZone.setDefault(null) // Invalidate JVM cached default timezone
-                    val currentTz = TimeZone.getDefault()
-                    if (currentTz.id != targetTzId) {
-                        dpm.setTimeZone(admin, targetTzId)
+                // 6. Enforce persistent timezone (configured or default Makkah Al-Mukarramah)
+                val targetTzId = CurfewConfig.getTargetTimeZoneId(context)
+
+                if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    try {
                         TimeZone.setDefault(null) // Invalidate JVM cached default timezone
-                        Log.i(TAG, "Enforced timezone via DPM: $targetTzId")
+                        val currentTz = TimeZone.getDefault()
+                        if (currentTz.id != targetTzId) {
+                            dpm.setTimeZone(admin, targetTzId)
+                            TimeZone.setDefault(null) // Invalidate JVM cached default timezone
+                            Log.i(TAG, "Enforced timezone via DPM: $targetTzId")
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not set persistent timezone via DPM", e)
+                    }
+                }
+
+                // 7. Enforce atomic network time sync (NTP) while keeping timezone locked to Makkah
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    try {
+                        dpm.setAutoTimeZoneEnabled(admin, false) // Prevent cell towers overriding Makkah timezone
+                        dpm.setAutoTimeEnabled(admin, true)       // Keep seconds/minutes strictly synced with network
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not configure auto time/timezone on Android 11+", e)
+                    }
+                } else {
+                    try {
+                        @Suppress("DEPRECATION")
+                        dpm.setAutoTimeRequired(admin, true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not set auto time required", e)
+                    }
+                }
+
+                // Supplementary direct Settings.Global configuration via DevicePolicyManager or ContentResolver (Check-Before-Write)
+                try {
+                    if (isDo) {
+                        dpm.setGlobalSetting(admin, Settings.Global.AUTO_TIME, "1")
+                        dpm.setGlobalSetting(admin, Settings.Global.AUTO_TIME_ZONE, "0")
+                    } else {
+                        if (Settings.Global.getInt(context.contentResolver, Settings.Global.AUTO_TIME, 0) != 1) {
+                            Settings.Global.putInt(context.contentResolver, Settings.Global.AUTO_TIME, 1)
+                        }
+                        if (Settings.Global.getInt(context.contentResolver, Settings.Global.AUTO_TIME_ZONE, 1) != 0) {
+                            Settings.Global.putInt(context.contentResolver, Settings.Global.AUTO_TIME_ZONE, 0)
+                        }
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Could not set persistent timezone via DPM", e)
-                }
-            }
-
-            // 7. Enforce atomic network time sync (NTP) while keeping timezone locked to Makkah
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                try {
-                    dpm.setAutoTimeZoneEnabled(admin, false) // Prevent cell towers overriding Makkah timezone
-                    dpm.setAutoTimeEnabled(admin, true)       // Keep seconds/minutes strictly synced with network
-                } catch (e: Exception) {
-                    Log.w(TAG, "Could not configure auto time/timezone on Android 11+", e)
+                    Log.w(TAG, "Could not write Global auto time settings", e)
                 }
             } else {
-                try {
-                    @Suppress("DEPRECATION")
-                    dpm.setAutoTimeRequired(admin, true)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Could not set auto time required", e)
-                }
-            }
-
-            // Supplementary direct Settings.Global configuration via DevicePolicyManager or ContentResolver (Check-Before-Write)
-            try {
-                if (isDo) {
-                    dpm.setGlobalSetting(admin, Settings.Global.AUTO_TIME, "1")
-                    dpm.setGlobalSetting(admin, Settings.Global.AUTO_TIME_ZONE, "0")
-                } else {
-                    if (Settings.Global.getInt(context.contentResolver, Settings.Global.AUTO_TIME, 0) != 1) {
-                        Settings.Global.putInt(context.contentResolver, Settings.Global.AUTO_TIME, 1)
-                    }
-                    if (Settings.Global.getInt(context.contentResolver, Settings.Global.AUTO_TIME_ZONE, 1) != 0) {
-                        Settings.Global.putInt(context.contentResolver, Settings.Global.AUTO_TIME_ZONE, 0)
+                // Time lock is NOT enabled by supervisor: Lift user restriction and allow user manual/auto time
+                if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    try {
+                        dpm.clearUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
+                        Log.i(TAG, "Cleared DISALLOW_CONFIG_DATE_TIME restriction (time lock is not active)")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not clear date time block: ${e.message}")
                     }
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not write Global auto time settings", e)
+                if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    try {
+                        dpm.setAutoTimeZoneEnabled(admin, true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not restore auto timezone setting: ${e.message}")
+                    }
+                } else if (isDo) {
+                    try {
+                        @Suppress("DEPRECATION")
+                        dpm.setAutoTimeRequired(admin, false)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not clear auto time required: ${e.message}")
+                    }
+                }
             }
 
             // 8. Auto-grant notification permission on Android 13+ (API 33+) for the watchdog FGS
@@ -198,10 +230,20 @@ object SystemTamperShield : ProtectionShield {
                 true // API < 28 cannot set system timezone via DPM
             }
 
+            val isDateTimeLocked = try {
+                com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isDateTimeLocked
+            } catch (_: Exception) {
+                false
+            }
+
             val isDo = dpm.isDeviceOwnerApp(context.packageName)
             val isFullyProtected = if (isDo) {
-                isSafeBootBlocked && isFactoryResetBlocked && isAddUserBlocked &&
-                        isUninstallBlocked && isDateTimeBlocked && isTargetTz
+                val baseProtected = isSafeBootBlocked && isFactoryResetBlocked && isAddUserBlocked && isUninstallBlocked
+                if (isDateTimeLocked) {
+                    baseProtected && isDateTimeBlocked && isTargetTz
+                } else {
+                    baseProtected
+                }
             } else {
                 isUninstallBlocked
             }

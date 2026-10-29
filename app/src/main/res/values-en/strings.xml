@@ -22,6 +22,9 @@
     <string name="guardian_weekend_curfew_end_label">Weekend curfew end</string>
     <string name="btn_change_weekend_start_time">Change</string>
     <string name="btn_change_weekend_end_time">Change</string>
+    <string name="card_system_tamper_subtext">Block safe boot, factory reset, prevent uninstall (and lock time if enabled by guardian)</string>
+    <string name="guardian_date_time_lock_title">Phone Date &amp; Time Control</string>
+    <string name="guardian_date_time_lock_desc">Lock date and time settings to prevent tampering with curfew hours</string>
     <string name="guardian_timezone_title">Timezone &amp; Phone Time</string>
     <string name="guardian_timezone_subtitle">Adjust timezone for travel or daylight saving</string>
     <string name="guardian_timezone_dropdown_label">Timezone &amp; Nearest Islamic City</string>
