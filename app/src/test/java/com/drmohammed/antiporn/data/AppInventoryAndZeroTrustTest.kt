@@ -109,4 +109,18 @@ class AppInventoryAndZeroTrustTest {
         assertEquals(bundle.protectedAppPackages, restored.protectedAppPackages)
         assertEquals(bundle.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
     }
+
+    @Test
+    fun testPendingApprovalEntity_fallbackHiddenIsTreatedAsPending() {
+        val pendingEntity = com.drmohammed.antiporn.data.local.db.entity.PendingApprovalEntity(
+            packageName = "com.uncooperative.app",
+            appName = "Uncooperative App",
+            status = com.drmohammed.antiporn.data.local.db.entity.PendingApprovalEntity.STATUS_FALLBACK_HIDDEN
+        )
+
+        assertTrue(pendingEntity.isPending)
+        assertTrue(pendingEntity.isFallbackHidden)
+        assertFalse(pendingEntity.isApproved)
+        assertFalse(pendingEntity.isRejected)
+    }
 }

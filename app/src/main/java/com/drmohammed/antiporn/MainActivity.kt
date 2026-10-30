@@ -96,12 +96,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val packageChangeReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            refreshUi(isEnforcing = false)
-        }
-    }
-
     private val uninstallStatusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             refreshUi(isEnforcing = false)
@@ -141,17 +135,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        val pkgFilter = IntentFilter().apply {
-            addAction(Intent.ACTION_PACKAGE_ADDED)
-            addAction(Intent.ACTION_PACKAGE_REMOVED)
-            addDataScheme("package")
-        }
-        // CRITICAL(C1): targetSdk=36 requires explicit exported flag on API 33+.
-        // System PACKAGE_* broadcasts are still delivered to NOT_EXPORTED receivers.
-        ContextCompat.registerReceiver(
-            this, packageChangeReceiver, pkgFilter, ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-
         val statusFilter = IntentFilter(AppSuspensionShield.ACTION_UNINSTALL_STATUS)
         ContextCompat.registerReceiver(this, uninstallStatusReceiver, statusFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
@@ -170,6 +153,8 @@ class MainActivity : AppCompatActivity() {
             if (!ProtectionEngine.isSystemFullyProtected(this)) {
                 triggerEnforcement(showToast = false)
             }
+            com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).ensureInitialBaselineSeededAsync()
+            com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).reconcileUnapprovedInstalledAppsAsync()
         }
         refreshUi(isEnforcing = false)
         aiCardBinder.updateUi()
@@ -196,11 +181,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        try {
-            unregisterReceiver(packageChangeReceiver)
-        } catch (e: Exception) {
-            Log.d(TAG, "Package receiver not registered or already unregistered: ${e.message}")
-        }
         try {
             unregisterReceiver(uninstallStatusReceiver)
         } catch (e: Exception) {

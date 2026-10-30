@@ -16,6 +16,9 @@ room = "2.6.1"
 adbKt = "v1.0.13"
 credentials = "1.3.0"
 googleid = "1.1.1"
+zxing = "3.5.3"
+camerax = "1.4.1"
+mlkitBarcode = "17.3.0"
 
 [libraries]
 adb-kt = { group = "com.github.rhythmcache", name = "adb-kt", version.ref = "adbKt" }
@@ -38,6 +41,11 @@ androidx-room-runtime = { group = "androidx.room", name = "room-runtime", versio
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
 androidx-credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
