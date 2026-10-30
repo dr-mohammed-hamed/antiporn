@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/scrollSettings"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToPadding="false"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="36dp">
+
+        <!-- Screen Title -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/tajawal"
+            android:text="@string/nav_settings"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/settings_category_general"
+            android:textColor="?attr/colorOutline"
+            android:textSize="13sp" />
+
+        <!-- Card: Classic List Preference Container -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:divider="?android:attr/listDivider"
+                android:orientation="vertical"
+                android:showDividers="middle">
+
+                <!-- 1. AI Content Inspection Preference Item -->
+                <LinearLayout
+                    android:id="@+id/layoutAiPreference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="14dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_shield_icon_circle">
+
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@null"
+                                android:src="@drawable/ic_ai_shield" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/tajawal"
+                                android:text="@string/settings_ai_title"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvAiStatusSubtext"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/settings_ai_desc"
+                                android:textColor="?attr/colorOutline"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <!-- Toggle Switch -->
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switchAiShield"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp" />
+                    </LinearLayout>
+
+                    <!-- AI Metrics / Status indicator -->
+                    <TextView
+                        android:id="@+id/tvAiMetrics"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="54dp"
+                        android:layout_marginTop="4dp"
+                        android:fontFamily="monospace"
+                        android:text="@string/ai_no_detections_yet"
+                        android:textColor="?attr/colorOutline"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- 2. OTA Updates Preference Item -->
+                <LinearLayout
+                    android:id="@+id/layoutOtaPreference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="14dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_shield_icon_circle">
+
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@null"
+                                android:src="@drawable/ic_system_update" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/tajawal"
+                                android:text="@string/settings_ota_title"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvOtaVersion"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textColor="?attr/colorOutline"
+                                android:textSize="12sp"
+                                tools:text="الإصدار الحالي: 1.1 (2)" />
+
+                            <TextView
+                                android:id="@+id/tvOtaStatus"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textColor="?attr/colorOutline"
+                                android:textSize="12sp"
+                                android:visibility="gone" />
+                        </LinearLayout>
+
+                        <!-- Check / Update Button -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnCheckUpdate"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="@string/btn_check_update"
+                            android:textSize="12sp"
+                            app:cornerRadius="10dp" />
+                    </LinearLayout>
+
+                    <!-- Download / Verify Progress Indicator -->
+                    <com.google.android.material.progressindicator.LinearProgressIndicator
+                        android:id="@+id/pbOtaProgress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="54dp"
+                        android:layout_marginTop="8dp"
+                        android:visibility="gone"
+                        app:indicatorColor="?attr/colorPrimary"
+                        app:trackColor="?attr/colorSurfaceVariant"
+                        app:trackCornerRadius="4dp" />
+                </LinearLayout>
+
+                <!-- 3. Google Account Preference Item -->
+                <LinearLayout
+                    android:id="@+id/layoutGoogleAccountPreference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="14dp">
+
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_shield_icon_circle">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_person" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/tajawal"
+                            android:text="@string/settings_google_title"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvGoogleAccountStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/settings_google_unlinked"
+                            android:textColor="?attr/colorOutline"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <!-- Google Action Button -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnLinkGoogle"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/btn_secure_with_google"
+                        android:textSize="12sp"
+                        app:cornerRadius="10dp" />
+                </LinearLayout>
+
+                <!-- 4. Device Owner System Status Item -->
+                <LinearLayout
+                    android:id="@+id/layoutDeviceOwnerPreference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:baselineAligned="false"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="14dp">
+
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_shield_icon_circle">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_shield_device_owner" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/tajawal"
+                            android:text="@string/card_device_owner_title"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvDeviceOwnerStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/card_device_owner_active"
+                            android:textColor="@color/shield_emerald_radiant"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

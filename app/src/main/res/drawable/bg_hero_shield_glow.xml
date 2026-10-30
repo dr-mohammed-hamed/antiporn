@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/shield_emerald_soft_bg">
+    <item android:id="@android:id/mask">
+        <shape android:shape="oval">
+            <solid android:color="@android:color/white" />
+        </shape>
+    </item>
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <gradient
+                        android:type="radial"
+                        android:gradientRadius="64dp"
+                        android:startColor="#4026E07F"
+                        android:centerColor="#1A26E07F"
+                        android:endColor="#00141A23" />
+                </shape>
+            </item>
+            <item
+                android:bottom="3dp"
+                android:left="3dp"
+                android:right="3dp"
+                android:top="3dp">
+                <shape android:shape="oval">
+                    <solid android:color="@color/shield_hero_bg" />
+                    <stroke
+                        android:width="1.5dp"
+                        android:color="@color/shield_hero_stroke" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</ripple>

@@ -760,4 +760,32 @@
     <string name="gate_open_title">الوصول المباشر</string>
     <string name="gate_access_denied">تم رفض الوصول إلى لوحة التحكم</string>
     <string name="btn_manage_my_device">إدارة جهازي</string>
+
+    <!-- Modern Redesign & Navigation Tokens -->
+    <string name="nav_home">الرئيسية</string>
+    <string name="nav_self_control">الذاتي</string>
+    <string name="nav_accountability">الإشراف</string>
+    <string name="nav_settings">الإعدادات</string>
+
+    <!-- Home Tab Hero & Status -->
+    <string name="home_shield_active">الدرع نشط</string>
+    <string name="home_shield_inactive">الحماية متوقفة</string>
+    <string name="home_shield_tap_hint">اضغط لعرض كافة الدروع الفعالة</string>
+    <string name="btn_hero_nap_start">أخذ قيلولة (ساعة)</string>
+    <string name="btn_hero_nap_active">قيلولة نشطة (%s)</string>
+    <string name="btn_hero_nap_extend">+60 دقيقة تمديد</string>
+
+    <!-- Settings Tab Strings -->
+    <string name="settings_category_general">الإعدادات العامة</string>
+    <string name="settings_ai_title">فحص الشاشة بالذكاء الاصطناعي</string>
+    <string name="settings_ai_desc">كشف وتعتيم المحتوى الحساس فوراً على شاشة الجهاز دون إرسال أي بيانات للخارج</string>
+    <string name="settings_ota_title">تحديثات التطبيق</string>
+    <string name="settings_ota_desc">التحقق من وجود إصدارات جديدة لنظام الحصن</string>
+    <string name="settings_google_title">ربط الحساب السحابي</string>
+    <string name="settings_google_desc">ربط الحساب بجوجل لمزامنة الإشراف واستعادة الحماية بعد الفورمات</string>
+    <string name="settings_google_linked">مرتبط: %s</string>
+    <string name="settings_google_unlinked">غير مرتبط بجوجل</string>
+    <string name="ai_metrics_full_format">%1$s | %2$s\n%3$s</string>
+    <string name="ai_metrics_simple_format">%1$s | %2$s</string>
+    <string name="account_secured_google_email">الحساب مؤمن بحساب Google: %s</string>
 </resources>

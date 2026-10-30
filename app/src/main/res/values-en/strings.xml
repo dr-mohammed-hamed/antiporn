@@ -310,4 +310,32 @@
     <!-- Dedicated Nap Card -->
     <string name="card_nap_title">Temporary Nap Mode</string>
     <string name="card_nap_subtext">Temporary pause on entertainment apps during daylight hours to restore focus.</string>
+
+    <!-- Modern Redesign & Navigation Tokens -->
+    <string name="nav_home">Home</string>
+    <string name="nav_self_control">Self Control</string>
+    <string name="nav_accountability">Supervision</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Home Tab Hero & Status -->
+    <string name="home_shield_active">Shield Active</string>
+    <string name="home_shield_inactive">Shield Inactive</string>
+    <string name="home_shield_tap_hint">Tap to view active shields</string>
+    <string name="btn_hero_nap_start">Take 1-Hour Nap</string>
+    <string name="btn_hero_nap_active">Nap Active (%s)</string>
+    <string name="btn_hero_nap_extend">+60m Extend</string>
+
+    <!-- Settings Tab Strings -->
+    <string name="settings_category_general">General Settings</string>
+    <string name="settings_ai_title">Screen AI Inspection</string>
+    <string name="settings_ai_desc">Detect and blur sensitive content in real-time on device</string>
+    <string name="settings_ota_title">App Updates</string>
+    <string name="settings_ota_desc">Check for new Hisn updates</string>
+    <string name="settings_google_title">Google Account</string>
+    <string name="settings_google_desc">Link Google account to sync supervision and restore protection</string>
+    <string name="settings_google_linked">Linked: %s</string>
+    <string name="settings_google_unlinked">Not linked to Google</string>
+    <string name="ai_metrics_full_format">%1$s | %2$s\n%3$s</string>
+    <string name="ai_metrics_simple_format">%1$s | %2$s</string>
+    <string name="account_secured_google_email">Account secured with Google: %s</string>
 </resources>
