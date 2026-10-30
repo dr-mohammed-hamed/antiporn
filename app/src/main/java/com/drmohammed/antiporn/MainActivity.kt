@@ -120,6 +120,7 @@ class MainActivity : AppCompatActivity(),
                 }
                 uiHandler.postDelayed(this, 1000L)
             }
+
         }
     }
 
@@ -283,6 +284,8 @@ class MainActivity : AppCompatActivity(),
             if (!ProtectionEngine.isSystemFullyProtected(this)) {
                 triggerEnforcement(showToast = false)
             }
+            com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).ensureInitialBaselineSeededAsync()
+            com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).reconcileUnapprovedInstalledAppsAsync()
         }
         refreshUi(isEnforcing = false)
         settingsFragment.updateAllStates()

@@ -788,4 +788,50 @@
     <string name="ai_metrics_full_format">%1$s | %2$s\n%3$s</string>
     <string name="ai_metrics_simple_format">%1$s | %2$s</string>
     <string name="account_secured_google_email">الحساب مؤمن بحساب Google: %s</string>
+    <!-- Self Control QR Barrier & Export -->
+    <string name="qr_scanner_title">مسح رمز الـ QR لتأكيد الحفظ</string>
+    <string name="qr_scanner_subtitle">وجّه الكاميرا نحو رمز الـ QR المطبوع أو على الهاتف الآخر</string>
+    <string name="qr_scan_aim_camera">وجّه الكاميرا نحو رمز الـ QR...</string>
+    <string name="qr_scan_success">تم التحقق من الرمز بنجاح!</string>
+    <string name="qr_scan_invalid">الرمز غير مطابق لهذا الهاتف</string>
+    <string name="qr_scan_camera_permission_required">يلزم منح إذن الكاميرا لمسح رمز الـ QR</string>
+    <string name="qr_scan_camera_permission_grant">منح الإذن</string>
+    <string name="qr_torch_on">تشغيل الفلاش</string>
+    <string name="qr_torch_off">إطفاء الفلاش</string>
+    <string name="qr_emergency_bypass_title">طلب تجاوز الطوارئ</string>
+    <string name="qr_emergency_bypass_active_format">طلب الطوارئ قيد الانتظار: متبقي %s</string>
+    <string name="qr_emergency_bypass_ready">انتهت فترة الانتظار! انقر للمتابعة</string>
+    <string name="qr_emergency_bypass_action">طلب فتح طوارئ (تأخير %d ساعة)</string>
+    <string name="qr_emergency_confirm_title">تأكيد طلب فتح الطوارئ</string>
+    <string name="qr_emergency_confirm_message">سيتم بدء عد تنازلي لمدة %d ساعة قبل السماح بتعديل الإعدادات بدون رمز QR. هل تريد المتابعة؟</string>
+    <string name="qr_emergency_cancel">إلغاء طلب الطوارئ</string>
+    <string name="qr_emergency_time_hours_minutes">%1$d س %2$d د</string>
+    <string name="qr_emergency_time_minutes">%1$d دقيقة</string>
+    <string name="qr_export_dialog_title">رمز حماية لوحة التحكم الذاتي</string>
+    <string name="qr_export_dialog_subtitle">احفظ هذا الرمز في مكان بعيد عن متناولك (اطبعه أو أرسله لهاتف آخر) ثم احذفه من هذا الهاتف لتأخير الاندفاعية.</string>
+    <string name="qr_export_warning">تنبيه: الاحتفاظ بالصورة على هذا الهاتف يُلغي فائدة تأخير الاندفاعية!</string>
+    <string name="qr_export_share">مشاركة</string>
+    <string name="qr_export_print">طباعة</string>
+    <string name="qr_export_save">حفظ كصورة</string>
+    <string name="qr_export_close">إغلاق</string>
+    <string name="qr_export_save_success">تم حفظ الصورة في معرض الصور بنجاح</string>
+    <string name="qr_export_share_chooser">مشاركة رمز الحماية عبر...</string>
+    <string name="qr_export_share_text">رمز حماية لوحة التحكم الذاتي - تطبيق حِصن. احتفظ به بأمان.</string>
+    <string name="qr_export_share_error">تعذر مشاركة الرمز: %s</string>
+    <string name="qr_export_print_not_supported">الطباعة غير مدعومة على هذا الجهاز</string>
+    <string name="qr_export_print_error">تعذر تشغيل خدمة الطباعة</string>
+    <string name="qr_export_save_error_gallery">تعذر حفظ الصورة في المعرض</string>
+    <string name="qr_export_save_error">تعذر حفظ الصورة: %s</string>
+
+    <!-- Self Control QR Lock UI -->
+    <string name="self_control_qr_card_title">درع تأخير الاندفاعية (رمز الـ QR)</string>
+    <string name="self_control_qr_card_subtitle">منع التعديل اللحظي للدروع</string>
+    <string name="self_control_qr_switch_title">تفعيل قفل الـ QR لتأكيد الحفظ</string>
+    <string name="self_control_qr_switch_desc">عند التفعيل، لن يُسمح بحفظ أو تطبيق أي تعديلات في هذه اللوحة إلا بعد مسح رمز الـ QR الفعلي بكاميرا الهاتف لتأخير الاندفاعية.</string>
+    <string name="self_control_qr_btn_show">عرض ومشاركة رمز الـ QR</string>
+    <string name="self_control_qr_btn_regenerate">إعادة إنشاء رمز جديد</string>
+    <string name="self_control_qr_disabled_toast">تم إيقاف قفل الـ QR</string>
+    <string name="self_control_qr_regenerate_confirm_title">إعادة إنشاء رمز QR جديد</string>
+    <string name="self_control_qr_regenerate_confirm_message">هل تريد إعادة إنشاء رمز QR جديد؟ سيصبح الرمز القديم غير صالح.</string>
+    <string name="self_control_qr_btn_regenerate_confirm">إعادة إنشاء</string>
 </resources>

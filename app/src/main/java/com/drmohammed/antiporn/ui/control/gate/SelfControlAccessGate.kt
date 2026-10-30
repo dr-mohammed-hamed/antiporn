@@ -47,7 +47,11 @@ object OpenAccessGate : SelfControlAccessGate {
     }
 
     override fun requestAccess(activity: Activity, onGranted: () -> Unit) {
-        onGranted.invoke()
+        if (canAccess(activity)) {
+            onGranted.invoke()
+        } else {
+            android.widget.Toast.makeText(activity, R.string.gate_access_denied, android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 }
 

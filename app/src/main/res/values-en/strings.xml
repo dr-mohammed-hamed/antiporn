@@ -338,4 +338,50 @@
     <string name="ai_metrics_full_format">%1$s | %2$s\n%3$s</string>
     <string name="ai_metrics_simple_format">%1$s | %2$s</string>
     <string name="account_secured_google_email">Account secured with Google: %s</string>
+    <!-- Self Control QR Barrier & Export -->
+    <string name="qr_scanner_title">Scan QR Code to Confirm</string>
+    <string name="qr_scanner_subtitle">Point your camera at the printed QR code or on another device</string>
+    <string name="qr_scan_aim_camera">Point camera at QR code...</string>
+    <string name="qr_scan_success">Code verified successfully!</string>
+    <string name="qr_scan_invalid">Invalid code for this device</string>
+    <string name="qr_scan_camera_permission_required">Camera permission is required to scan QR code</string>
+    <string name="qr_scan_camera_permission_grant">Grant Permission</string>
+    <string name="qr_torch_on">Turn Flash On</string>
+    <string name="qr_torch_off">Turn Flash Off</string>
+    <string name="qr_emergency_bypass_title">Emergency Delay Bypass</string>
+    <string name="qr_emergency_bypass_active_format">Emergency request active: %s remaining</string>
+    <string name="qr_emergency_bypass_ready">Delay elapsed! Tap to proceed</string>
+    <string name="qr_emergency_bypass_action">Request Emergency Unlock (%d-hr delay)</string>
+    <string name="qr_emergency_confirm_title">Confirm Emergency Unlock Request</string>
+    <string name="qr_emergency_confirm_message">A %d-hour waiting period will begin before settings can be changed without a QR code. Do you want to proceed?</string>
+    <string name="qr_emergency_cancel">Cancel Emergency Request</string>
+    <string name="qr_emergency_time_hours_minutes">%1$d h %2$d m</string>
+    <string name="qr_emergency_time_minutes">%1$d min</string>
+    <string name="qr_export_dialog_title">Self-Control Lock Code</string>
+    <string name="qr_export_dialog_subtitle">Store this code away from reach (print it or send to another device) then delete it from this device to delay impulses.</string>
+    <string name="qr_export_warning">Warning: Keeping this image on this device defeats impulse delay!</string>
+    <string name="qr_export_share">Share</string>
+    <string name="qr_export_print">Print</string>
+    <string name="qr_export_save">Save Image</string>
+    <string name="qr_export_close">Close</string>
+    <string name="qr_export_save_success">Image saved to gallery successfully</string>
+    <string name="qr_export_share_chooser">Share Lock QR Code via...</string>
+    <string name="qr_export_share_text">AntiPorn Self-Control Lock Code. Keep it safe and secure.</string>
+    <string name="qr_export_share_error">Failed to share code: %s</string>
+    <string name="qr_export_print_not_supported">Printing is not supported on this device</string>
+    <string name="qr_export_print_error">Failed to start print service</string>
+    <string name="qr_export_save_error_gallery">Failed to save image to gallery</string>
+    <string name="qr_export_save_error">Failed to save image: %s</string>
+
+    <!-- Self Control QR Lock UI -->
+    <string name="self_control_qr_card_title">Impulse Delay Shield (QR Code)</string>
+    <string name="self_control_qr_card_subtitle">Prevents impulsive policy modifications</string>
+    <string name="self_control_qr_switch_title">Enable QR lock to confirm changes</string>
+    <string name="self_control_qr_switch_desc">When enabled, saving changes requires scanning the physical QR code with your camera to enforce delay against impulsivity.</string>
+    <string name="self_control_qr_btn_show">View &amp; Share QR Code</string>
+    <string name="self_control_qr_btn_regenerate">Regenerate New Code</string>
+    <string name="self_control_qr_disabled_toast">QR lock has been disabled</string>
+    <string name="self_control_qr_regenerate_confirm_title">Regenerate QR Code</string>
+    <string name="self_control_qr_regenerate_confirm_message">Are you sure you want to regenerate the QR code? The previous code will become invalid.</string>
+    <string name="self_control_qr_btn_regenerate_confirm">Regenerate</string>
 </resources>

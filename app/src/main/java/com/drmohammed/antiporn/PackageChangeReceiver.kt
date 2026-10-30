@@ -61,33 +61,33 @@ object PackageChangeHandler {
         }
         handledAddEvents[packageName] = now
 
-        Log.i(TAG, "📥 [PACKAGE_ADDED] New package detected: $packageName (source: $source, isReplacing: $isReplacing)")
+        Log.w(TAG, "📥📥📥 [PACKAGE_ADDED] New package detected: $packageName (source: $source, isReplacing: $isReplacing)")
 
         val appContext = context.applicationContext
         try {
             bgExecutor.execute {
                 try {
                     if (AppSuspensionShield.isBlacklisted(packageName)) {
-                        Log.i(TAG, "🚫 [BLACKLIST_DETECTED] Package $packageName is permanently blacklisted. Enforcing instant freeze & silent uninstall...")
+                        Log.w(TAG, "🚫 [BLACKLIST_DETECTED] Package $packageName is permanently blacklisted. Enforcing instant freeze & silent uninstall...")
                         AppSuspensionShield.handlePackageAdded(appContext, packageName)
                     } else {
                         val approvalRepo = ApprovalRepository.getInstance(appContext)
                         val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any { it.packageName == packageName && it.isApproved }
                         val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
 
-                        Log.i(TAG, "🔍 [ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved")
+                        Log.w(TAG, "🔍 [ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved")
 
                         if (policy.lockNewInstallsUntilApproved && !isReplacing && !isAlreadyApproved) {
                             val isImmune = CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)
                             if (isImmune) {
-                                Log.i(TAG, "🛡️ [IMMUNE_SKIP] Package $packageName is critical system component, launcher, dialer, or keyboard. Skipping freeze.")
+                                Log.w(TAG, "🛡️ [IMMUNE_SKIP] Package $packageName is critical system component, launcher, dialer, or keyboard. Skipping freeze.")
                             } else {
-                                Log.i(TAG, "❄️ [ZERO_TRUST_FREEZE] Strict Zero-Trust active: Freezing new install $packageName in 0ms and submitting approval ticket")
+                                Log.w(TAG, "❄️❄️❄️ [ZERO_TRUST_FREEZE] Strict Zero-Trust active: Freezing new install $packageName in 0ms and submitting approval ticket")
                                 val frozen = approvalRepo.freezeAndSubmitApprovalLocal(packageName)
-                                Log.i(TAG, "❄️ [FREEZE_STATUS] Result of local freeze for $packageName: $frozen")
+                                Log.w(TAG, "❄️❄️❄️ [FREEZE_STATUS] Result of local freeze for $packageName: $frozen")
                             }
                         } else {
-                            Log.i(TAG, "⚖️ [CURFEW_EVAL] Package $packageName not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")
+                            Log.w(TAG, "⚖️ [CURFEW_EVAL] Package $packageName not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")
                             CurfewEnforcer.handlePackageAdded(appContext, packageName)
                         }
                     }
@@ -114,7 +114,7 @@ object PackageChangeHandler {
                     onComplete?.invoke()
                 }
             }
-        } catch (e: RejectedExecutionException) {
+        } catch (e: Throwable) {
             Log.e(TAG, "❌ [REJECTED] Executor rejected task for package $packageName", e)
             onComplete?.invoke()
         }
@@ -163,7 +163,7 @@ object PackageChangeHandler {
                     onComplete?.invoke()
                 }
             }
-        } catch (e: RejectedExecutionException) {
+        } catch (e: Throwable) {
             Log.e(TAG, "❌ [REJECTED] Executor rejected task on package removed: $packageName", e)
             onComplete?.invoke()
         }
@@ -186,7 +186,8 @@ class PackageChangeReceiver : BroadcastReceiver() {
         val data = intent.data
         val packageName = data?.schemeSpecificPart
 
-        Log.i(TAG, "⚡ [STATIC_RECEIVER] onReceive: action=$action | package=$packageName")
+        val isDeviceOwner = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(context)
+        Log.w(TAG, "⚡⚡⚡ [STATIC_RECEIVER] onReceive: action=$action | package=$packageName | isDeviceOwner=$isDeviceOwner")
 
         when (action) {
             Intent.ACTION_PACKAGE_ADDED -> {

@@ -136,6 +136,14 @@ dependencies {
     // Wireless ADB & Device Owner Provisioning
     implementation(libs.adb.kt)
 
+    // QR Code Generation & Scanning (CameraX + ML Kit) & Printing
+    implementation(libs.zxing.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.barcode.scanning)
+    implementation("androidx.print:print:1.0.0")
+
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.androidx.junit)
