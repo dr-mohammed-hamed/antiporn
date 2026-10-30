@@ -10,6 +10,7 @@ import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
+import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.CurfewAppResolver
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
@@ -416,6 +417,40 @@ class PolicyRepository private constructor(context: Context) {
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed pushing policy update to ward $wardUid", e)
+            false
+        }
+    }
+
+    /**
+     * Saves updated policy bundle directly for the local device, enforcing immediately
+     * in SQLite and system engines (DPM), with asynchronous background cloud sync to Firestore.
+     */
+    suspend fun saveAndEnforceSelfPolicy(bundle: DevicePolicyBundle): Boolean {
+        return try {
+            val current = _currentPolicyFlow.value
+            val updated = bundle.copy(
+                version = current.version + 1,
+                updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
+            )
+            updateLocalPolicyAndEnforce(updated)
+
+            // Asynchronously sync to cloud document if a synchronized UID exists
+            val myUid = AccountabilityRepository.getInstance(appContext).getCachedUid()
+            if (myUid.isNotBlank()) {
+                repositoryScope.launch {
+                    try {
+                        FirebaseFirestore.getInstance().collection("policies").document(myUid)
+                            .set(updated.toMap())
+                            .await()
+                        Log.i(TAG, "Successfully synced self-control policy update to cloud ($myUid)")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Self-control policy cloud sync deferred (offline or error): ${e.message}")
+                    }
+                }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in saveAndEnforceSelfPolicy", e)
             false
         }
     }

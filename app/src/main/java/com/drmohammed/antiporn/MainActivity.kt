@@ -343,6 +343,24 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, com.drmohammed.antiporn.ui.accountability.AccountabilityHubActivity::class.java))
         }
 
+        var lastSelfControlClickTime = 0L
+        viewBinder.btnOpenSelfControl.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastSelfControlClickTime < 800L) return@setOnClickListener
+            lastSelfControlClickTime = now
+
+            val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
+            if (gate.canAccess(this)) {
+                startActivity(Intent(this, com.drmohammed.antiporn.ui.control.SelfControlActivity::class.java))
+            } else {
+                gate.requestAccess(this) {
+                    if (!isFinishing && !isDestroyed) {
+                        startActivity(Intent(this, com.drmohammed.antiporn.ui.control.SelfControlActivity::class.java))
+                    }
+                }
+            }
+        }
+
         viewBinder.btnEnforceNow.setOnClickListener {
             triggerEnforcement(showToast = true)
         }

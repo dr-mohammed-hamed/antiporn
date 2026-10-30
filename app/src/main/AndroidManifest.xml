@@ -22,6 +22,14 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
+    <!-- Package visibility queries for Android 11+ (API 30+) -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".AntiPornApplication"
         android:allowBackup="true"
@@ -83,6 +91,7 @@
 
         <receiver
             android:name=".PackageChangeReceiver"
+            android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.PACKAGE_ADDED" />
@@ -168,6 +177,12 @@
             android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize"
             android:label="@string/title_guardian_control" />
+        <activity
+            android:name=".ui.control.SelfControlActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
+            android:label="@string/title_self_control" />
         <activity
             android:name=".ui.accountability.RemoteAppManagerActivity"
             android:exported="false" />

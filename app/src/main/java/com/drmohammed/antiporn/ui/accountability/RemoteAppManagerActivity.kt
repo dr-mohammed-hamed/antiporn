@@ -51,6 +51,7 @@ import kotlinx.coroutines.withContext
  */
 class RemoteAppManagerActivity : AppCompatActivity() {
 
+    private var isLocalMode = false
     private lateinit var wardId: String
     private lateinit var wardName: String
 
@@ -119,10 +120,11 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             }
         }
 
+        isLocalMode = intent.getBooleanExtra(EXTRA_IS_LOCAL, false)
         wardId = intent.getStringExtra(EXTRA_WARD_ID) ?: ""
         wardName = intent.getStringExtra(EXTRA_WARD_NAME) ?: getString(R.string.status_ward_badge)
 
-        if (wardId.isBlank()) {
+        if (!isLocalMode && wardId.isBlank()) {
             finish()
             return
         }
@@ -141,7 +143,11 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         }
 
         tvWardName = findViewById(R.id.tvWardName)
-        tvWardName.text = getString(R.string.guardian_control_ward_name, wardName)
+        tvWardName.text = if (isLocalMode) {
+            getString(R.string.self_control_local_app_manager_title)
+        } else {
+            getString(R.string.guardian_control_ward_name, wardName)
+        }
 
         etSearch = findViewById(R.id.etSearch)
         progressBar = findViewById(R.id.progressBar)
@@ -217,6 +223,46 @@ class RemoteAppManagerActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             if (isFinishing || isDestroyed) return@launch
+
+            if (isLocalMode) {
+                val policy = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+                currentPolicy = policy
+
+                customBlacklistPackages.clear()
+                customBlacklistPackages.addAll(policy.customBlacklistPackages)
+
+                customCurfewWhitelistPackages.clear()
+                customCurfewWhitelistPackages.addAll(policy.customCurfewWhitelistPackages)
+
+                protectedAppPackages.clear()
+                protectedAppPackages.addAll(policy.protectedAppPackages)
+
+                initialBlacklist = customBlacklistPackages.toSet()
+                initialCurfewWhitelist = customCurfewWhitelistPackages.toSet()
+                initialProtectedApps = protectedAppPackages.toSet()
+
+                val localApps = com.drmohammed.antiporn.data.repository.AppInventoryManager.getInstance(applicationContext).getInstalledApps()
+                val sortedList = localApps.sortedWith(
+                    compareBy({ it.appName.lowercase() }, { it.packageName })
+                )
+
+                withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
+                    if (!isSaving) {
+                        progressBar.visibility = View.GONE
+                    }
+                    updateSaveButtonState()
+                    if (sortedList.isEmpty()) {
+                        tvEmptyState.visibility = View.VISIBLE
+                        rvAppsList.visibility = View.GONE
+                    } else {
+                        tvEmptyState.visibility = View.GONE
+                        rvAppsList.visibility = View.VISIBLE
+                        adapter.submitList(sortedList)
+                    }
+                }
+                return@launch
+            }
 
             val firestore = FirebaseFirestore.getInstance()
 
@@ -325,13 +371,17 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             customCurfewWhitelistPackages = customCurfewWhitelistPackages.toSet(),
             protectedAppPackages = protectedAppPackages.toSet(),
             version = currentPolicy.version + 1,
-            updatedAt = System.currentTimeMillis()
+            updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(applicationContext)
         )
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val policyRepo = PolicyRepository.getInstance(applicationContext)
-                val success = policyRepo.pushPolicyToWard(wardId, updatedPolicy)
+                val success = if (isLocalMode) {
+                    policyRepo.saveAndEnforceSelfPolicy(updatedPolicy)
+                } else {
+                    policyRepo.pushPolicyToWard(wardId, updatedPolicy)
+                }
                 withContext(Dispatchers.Main) {
                     if (isFinishing || isDestroyed) return@withContext
                     progressBar.visibility = View.GONE
@@ -447,6 +497,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         private const val TAG = "AntiPorn_RemoteAppMgr"
         const val EXTRA_WARD_ID = "extra_ward_id"
         const val EXTRA_WARD_NAME = "extra_ward_name"
+        const val EXTRA_IS_LOCAL = "extra_is_local"
     }
 
     /**

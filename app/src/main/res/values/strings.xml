@@ -735,4 +735,29 @@
     <!-- Dedicated Nap Card -->
     <string name="card_nap_title">وضع القيلولة المؤقت</string>
     <string name="card_nap_subtext">إيقاف مؤقت لتطبيقات الترفيه خلال النهار لتجديد التركيز والإنتاجية.</string>
+
+    <!-- Self-Control Panel & Pluggable Gates -->
+    <string name="title_self_control">لوحة التحكم الذاتي</string>
+    <string name="card_self_control_title">لوحة التحكم والحماية الذاتية</string>
+    <string name="card_self_control_subtext">إدارة سياسات الحصن، مواعيد الحظر، تجميد التطبيقات، والموافقات محلياً.</string>
+    <string name="btn_open_self_control">فتح لوحة التحكم</string>
+    <string name="self_control_subtitle">التحكم المباشر في دروع وسياسات هذا الهاتف</string>
+    <string name="self_control_curfew_master_desc">تشغيل أو إيقاف الحظر الليلي التلقائي بالكامل على هذا الهاتف</string>
+    <string name="self_control_curfew_weekday_title">جدولة الحظر الليلي اليومي</string>
+    <string name="self_control_curfew_weekday_desc">تحديد ساعات النوم المعتادة لحظر الترفيه وعزل الشبكة</string>
+    <string name="self_control_pending_apps_title">التطبيقات المعلقة للموافقة</string>
+    <string name="self_control_pending_apps_desc">تطبيقات جديدة تم تجميدها فور تثبيتها وتنتظر الموافقة أو الرفض</string>
+    <string name="self_control_no_pending_apps">لا توجد تطبيقات معلقة بانتظار الموافقة حالياً</string>
+    <string name="self_control_local_app_manager_title">مدير التطبيقات المحلي</string>
+    <string name="self_control_local_app_manager_desc">تجميد تطبيقات محددة 24/7 أو استثناؤها ليلاً أو حمايتها من الحذف</string>
+    <string name="btn_open_local_app_manager">فتح مدير التطبيقات</string>
+    <string name="self_control_dns_section_title">مزود الـ DNS المشفر</string>
+    <string name="self_control_dns_section_desc">اختيار خادم حجب المواقع والإعلانات عبر بروتوكول DNS over TLS (DoT)</string>
+    <string name="self_control_security_switches_title">إعدادات الأمان المتقدمة</string>
+    <string name="self_control_security_switches_desc">التحكم في التصفح الخفي وقفل التثبيت والقطع اللحظي للإنترنت</string>
+    <string name="toast_self_policy_saved">تم تطبيق وحفظ سياسات الحماية بنجاح</string>
+    <string name="toast_self_policy_save_failed">تعذر حفظ السياسات، يرجى إعادة المحاولة</string>
+    <string name="gate_open_title">الوصول المباشر</string>
+    <string name="gate_access_denied">تم رفض الوصول إلى لوحة التحكم</string>
+    <string name="btn_manage_my_device">إدارة جهازي</string>
 </resources>

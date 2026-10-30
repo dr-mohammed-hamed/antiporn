@@ -129,22 +129,25 @@ class DnsWatchdogService : Service() {
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent == null) return
-            val action = intent.action
-            if (action == Intent.ACTION_PACKAGE_ADDED) {
-                val packageName = intent.data?.schemeSpecificPart ?: return
-                if (AppSuspensionShield.isBlacklisted(packageName)) {
-                    Log.i(TAG, "Layer 1 - Dynamic package receiver detected blacklisted package: $packageName")
-                    try {
-                        bgExecutor.execute {
-                            try {
-                                AppSuspensionShield.handlePackageAdded(applicationContext, packageName)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Error handling added package $packageName in watchdog", e)
-                            }
-                        }
-                    } catch (e: java.util.concurrent.RejectedExecutionException) {
-                        Log.w(TAG, "Watchdog bgExecutor rejected task during shutdown for $packageName", e)
-                    }
+            val action = intent.action ?: return
+            val packageName = intent.data?.schemeSpecificPart ?: return
+            Log.i(TAG, "⚡ [DYNAMIC_WATCHDOG_RECEIVER] onReceive: action=$action | package=$packageName")
+            when (action) {
+                Intent.ACTION_PACKAGE_ADDED -> {
+                    val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+                    PackageChangeHandler.handlePackageAdded(
+                        context = applicationContext,
+                        packageName = packageName,
+                        isReplacing = isReplacing,
+                        source = "Dynamic_Watchdog"
+                    )
+                }
+                Intent.ACTION_PACKAGE_REMOVED -> {
+                    PackageChangeHandler.handlePackageRemoved(
+                        context = applicationContext,
+                        packageName = packageName,
+                        source = "Dynamic_Watchdog"
+                    )
                 }
             }
         }
@@ -297,10 +300,15 @@ class DnsWatchdogService : Service() {
                 addAction(Intent.ACTION_PACKAGE_REMOVED)
                 addDataScheme("package")
             }
-            // CRITICAL(C1): explicit NOT_EXPORTED required for targetSdk=36 / API 33+.
-            ContextCompat.registerReceiver(this, packageReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+            // CRITICAL: System broadcasts like ACTION_PACKAGE_ADDED require RECEIVER_EXPORTED on API 33+.
+            val exportFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.RECEIVER_EXPORTED
+            } else {
+                0
+            }
+            ContextCompat.registerReceiver(this, packageReceiver, filter, exportFlag)
             isPackageReceiverRegistered = true
-            Log.i(TAG, "Layer 1 - Dynamic package BroadcastReceiver registered successfully")
+            Log.i(TAG, "Layer 1 - Dynamic package BroadcastReceiver registered successfully (exportFlag=$exportFlag)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to register dynamic package receiver", e)
         }

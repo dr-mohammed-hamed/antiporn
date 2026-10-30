@@ -82,9 +82,22 @@ class ApprovalRepository private constructor(context: Context) {
             message = appContext.getString(R.string.toast_app_suspended_by_guardian)
         )
         if (suspended) {
-            Log.i(TAG, "Instant 0ms freeze applied to package: $packageName")
+            Log.i(TAG, "❄️ [FREEZE_SUCCESS] Instant 0ms freeze applied to package: $packageName")
+            // Show alert toast on main thread
+            try {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    try {
+                        val alertMsg = appContext.getString(R.string.toast_app_suspended_by_guardian)
+                        android.widget.Toast.makeText(appContext, alertMsg, android.widget.Toast.LENGTH_LONG).show()
+                    } catch (te: Exception) {
+                        Log.w(TAG, "Failed showing toast alert: ${te.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error posting toast to main looper: ${e.message}")
+            }
         } else {
-            Log.w(TAG, "Instant freeze reported failure or partial failure for $packageName")
+            Log.w(TAG, "⚠️ [FREEZE_PARTIAL] Instant freeze reported failure or partial failure for $packageName")
         }
 
         // 2. Resolve human-readable application label
@@ -242,6 +255,7 @@ class ApprovalRepository private constructor(context: Context) {
             Log.i(TAG, "Package $packageName approved by $decidedBy, but kept suspended until curfew wakeup")
             database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
             ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+            syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
             return
         }
 
@@ -268,6 +282,7 @@ class ApprovalRepository private constructor(context: Context) {
                     Log.i(TAG, "Package $packageName is uninstalled; marking pending approval as approved/resolved")
                     database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
                     ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+                    syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
                 } else {
                     Log.e(TAG, "Failed unfreezing package $packageName: DPM returned failure for package")
                 }
@@ -275,6 +290,7 @@ class ApprovalRepository private constructor(context: Context) {
                 database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
                 Log.i(TAG, "Unfrozen and approved package: $packageName")
                 ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+                syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed unfreezing package $packageName", e)
@@ -288,6 +304,7 @@ class ApprovalRepository private constructor(context: Context) {
         try {
             database.deletePendingApproval(packageName)
             ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+            deleteApprovalFromCloud(packageName)
             Log.i(TAG, "Removed pending approval for package: $packageName")
         } catch (e: Exception) {
             Log.e(TAG, "Failed removing pending approval for package $packageName", e)
@@ -302,8 +319,51 @@ class ApprovalRepository private constructor(context: Context) {
             database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_REJECTED, decidedBy)
             Log.i(TAG, "Recorded rejection for package: $packageName by $decidedBy")
             ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+            syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_REJECTED, decidedBy)
         } catch (e: Exception) {
             Log.e(TAG, "Failed recording rejection for package $packageName", e)
+        }
+    }
+
+    private fun syncApprovalDecisionToCloud(packageName: String, status: String, decidedBy: String?) {
+        val myUid = AccountabilityRepository.getInstance(appContext).getCachedUid()
+        if (myUid.isBlank()) return
+        scope.launch {
+            try {
+                val firestore = FirebaseFirestore.getInstance()
+                val data = mapOf(
+                    "status" to status,
+                    "decidedBy" to (decidedBy ?: "SELF"),
+                    "decidedAt" to com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)
+                )
+                firestore.collection("policies")
+                    .document(myUid)
+                    .collection("approvals")
+                    .document(packageName)
+                    .set(data, SetOptions.merge())
+                    .await()
+                Log.i(TAG, "Synced approval decision for $packageName ($status) to cloud ($myUid)")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed syncing approval decision for $packageName to cloud: ${e.message}")
+            }
+        }
+    }
+
+    private fun deleteApprovalFromCloud(packageName: String) {
+        val myUid = AccountabilityRepository.getInstance(appContext).getCachedUid()
+        if (myUid.isBlank()) return
+        scope.launch {
+            try {
+                FirebaseFirestore.getInstance().collection("policies")
+                    .document(myUid)
+                    .collection("approvals")
+                    .document(packageName)
+                    .delete()
+                    .await()
+                Log.i(TAG, "Deleted cloud approval document for $packageName ($myUid)")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed deleting cloud approval document for $packageName: ${e.message}")
+            }
         }
     }
 

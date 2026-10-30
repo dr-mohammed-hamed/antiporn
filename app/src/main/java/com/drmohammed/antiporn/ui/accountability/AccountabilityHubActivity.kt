@@ -67,6 +67,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
     private lateinit var cardMyPairingCode: MaterialCardView
     private lateinit var tvMyDisplayName: TextView
     private lateinit var btnEditMyName: MaterialButton
+    private lateinit var btnHubOpenSelfControl: MaterialButton
     private lateinit var tvMyPairingCode: TextView
     private lateinit var btnCopyCode: MaterialButton
     private lateinit var btnAddPartner: MaterialButton
@@ -79,6 +80,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
     private var lastAddPartnerClickTime = 0L
     private var lastManageClickTime = 0L
     private var lastEditNameClickTime = 0L
+    private var lastSelfControlClickTime = 0L
     private var lastBreakoutClickTime = 0L
     private var lastSecureAccountClickTime = 0L
     private var lastCancelBreakoutClickTime = 0L
@@ -178,6 +180,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
         cardMyPairingCode = findViewById(R.id.cardMyPairingCode)
         tvMyDisplayName = findViewById(R.id.tvMyDisplayName)
         btnEditMyName = findViewById(R.id.btnEditMyName)
+        btnHubOpenSelfControl = findViewById(R.id.btnHubOpenSelfControl)
         tvMyDisplayName.text = accountabilityRepo.getMyDisplayName()
         tvMyPairingCode = findViewById(R.id.tvMyPairingCode)
         btnCopyCode = findViewById(R.id.btnCopyCode)
@@ -235,6 +238,23 @@ class AccountabilityHubActivity : AppCompatActivity() {
             if (now - lastEditNameClickTime < 800L) return@setOnClickListener
             lastEditNameClickTime = now
             showEditMyNameDialog()
+        }
+
+        btnHubOpenSelfControl.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastSelfControlClickTime < 800L) return@setOnClickListener
+            lastSelfControlClickTime = now
+
+            val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
+            if (gate.canAccess(this)) {
+                startActivity(Intent(this, com.drmohammed.antiporn.ui.control.SelfControlActivity::class.java))
+            } else {
+                gate.requestAccess(this) {
+                    if (!isFinishing && !isDestroyed) {
+                        startActivity(Intent(this, com.drmohammed.antiporn.ui.control.SelfControlActivity::class.java))
+                    }
+                }
+            }
         }
 
         btnAddPartner.setOnClickListener {

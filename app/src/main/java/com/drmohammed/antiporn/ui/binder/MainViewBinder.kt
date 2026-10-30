@@ -51,6 +51,7 @@ class MainViewBinder(rootView: View) {
 
     val cardAdbHelp: MaterialCardView = rootView.findViewById(R.id.cardAdbHelp)
     val btnOpenAccountabilityHub: MaterialButton = rootView.findViewById(R.id.btnOpenAccountabilityHub)
+    val btnOpenSelfControl: MaterialButton = rootView.findViewById(R.id.btnOpenSelfControl)
     val btnEnforceNow: MaterialButton = rootView.findViewById(R.id.btnEnforceNow)
     private val tvHeaderAyah: TextView? = rootView.findViewById(R.id.tvHeaderAyah)
 
