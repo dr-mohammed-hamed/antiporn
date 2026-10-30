@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import java.lang.ref.WeakReference
 
 /**
@@ -121,32 +122,7 @@ class CurfewBlackholeVpnService : VpnService() {
     }
 
     private fun startForegroundNotification() {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-
-        val channelTitle = getString(R.string.curfew_vpn_channel_name)
-        val channelDesc = getString(R.string.curfew_vpn_channel_desc)
-        val notifTitle = getString(R.string.curfew_vpn_notification_title)
-        val notifDesc = getString(R.string.curfew_vpn_notification_desc)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                channelTitle,
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = channelDesc
-                setShowBadge(false)
-            }
-            notificationManager.createNotificationChannel(channel)
-        }
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(notifTitle)
-            .setContentText(notifDesc)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+        val notification = ProtectionNotificationCoordinator.buildProtectionNotification(this)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)

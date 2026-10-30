@@ -110,6 +110,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".curfew.notification.NapNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.drmohammed.antiporn.curfew.ACTION_EXTEND_NAP" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".DnsWatchdogService"
             android:exported="false"

@@ -14,6 +14,40 @@
     <string name="watchdog_notification_desc">Hisn app is active.</string>
     <string name="admin_disable_warning">Security Warning: Hisn protection cannot be disabled to prevent bypass!</string>
     <string name="curfew_vpn_session_name">Hisn Curfew Blackhole</string>
+    <string name="curfew_vpn_channel_name">Curfew Network Blackhole</string>
+    <string name="curfew_vpn_channel_desc">Notification channel for full internet blackout during sleep hours</string>
+    <string name="curfew_vpn_notification_title">Night Curfew Active: Internet Isolated</string>
+    <string name="curfew_vpn_notification_desc">Internet connection completely cut off. Voice calls and SMS work normally.</string>
+
+    <!-- Unified Protection & Curfew Notification Strings -->
+    <string name="protection_vpn_channel_name">Protection Network Isolation</string>
+    <string name="protection_vpn_channel_desc">Notifications for night curfew, nap mode, and guardian internet block</string>
+    <string name="protection_events_channel_name">Protection &amp; Approval Alerts</string>
+    <string name="protection_events_channel_desc">Alerts for guardian responses and timer completions</string>
+
+    <string name="notif_guardian_lockdown_title">Full Internet Blocked by Guardian</string>
+    <string name="notif_guardian_lockdown_desc">The guardian has completely isolated device internet data. Calls and SMS work normally.</string>
+    <string name="notif_guardian_lockdown_desc_curfew">Guardian block is active (along with night curfew). Calls and SMS work normally.</string>
+    <string name="notif_guardian_lockdown_desc_nap">Guardian block is active (along with nap mode). Calls and SMS work normally.</string>
+
+    <string name="notif_nap_active_title">Nap Mode is Active</string>
+    <string name="notif_nap_active_desc">Internet isolated and apps paused to protect your time and focus.</string>
+    <string name="notif_action_extend_nap">Extend 60 mins</string>
+    <string name="notif_nap_ended_title">Nap Mode Finished</string>
+    <string name="notif_nap_ended_desc">Apps and internet connection have been restored successfully.</string>
+    <string name="notif_nap_ended_desc_curfew_still_active">Nap mode finished, but curfew protection remains active on your device.</string>
+
+    <string name="notif_curfew_active_title">Night Curfew Active: Internet Isolated</string>
+    <string name="notif_curfew_active_desc_format">Internet and apps isolated until %1$02d:%2$02d AM. Calls and SMS work normally.</string>
+
+    <string name="notif_apps_suspended_title">Distraction Apps Temporarily Paused</string>
+    <string name="notif_apps_suspended_nap_desc">Nap mode active: Distraction apps paused to protect your focus.</string>
+    <string name="notif_apps_suspended_curfew_desc_format">Night curfew active: Apps paused until %1$02d:%2$02d AM to protect your sleep.</string>
+
+    <string name="notif_approval_granted_title">Application Approved</string>
+    <string name="notif_approval_granted_desc">Guardian %1$s approved application %2$s.</string>
+    <string name="notif_approval_rejected_title">Application Request Rejected</string>
+    <string name="notif_approval_rejected_desc">Guardian %1$s rejected application %2$s.</string>
     <string name="toast_app_suspended_by_guardian">This app has been suspended pending guardian approval</string>
     <string name="guardian_curfew_master_switch_title">Enable Scheduled Night Curfew</string>
     <string name="guardian_curfew_master_switch_desc">Enable or completely turn off automated night curfew on ward device</string>

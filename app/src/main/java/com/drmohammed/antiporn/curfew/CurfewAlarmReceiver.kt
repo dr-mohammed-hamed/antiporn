@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
+import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 
@@ -43,6 +44,9 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
                         CurfewEnforcer.syncBlockState(appContext)
                         CurfewScheduler.scheduleNextAlarms(appContext)
                         rescheduleNapIfNeeded(appContext)
+                        if (!NapController.isNapActive(appContext)) {
+                            ProtectionNotificationCoordinator.postNapEndedNotification(appContext)
+                        }
                         return@execute
                     }
                     // General path (START/END/BOOT/TIME_SET/...): merged block state is safe
@@ -58,6 +62,7 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
                     if (action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_TIMEZONE_CHANGED) {
                         Log.i(TAG, "Time/Timezone change detected; re-enforcing system policies immediately")
                         ProtectionEngine.applyAllAsync(appContext)
+                        ProtectionNotificationCoordinator.syncProtectionNotification(appContext)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error processing curfew alarm action: $action", e)

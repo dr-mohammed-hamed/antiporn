@@ -6,6 +6,7 @@ import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
+import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -64,13 +65,24 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
                 val decidedBy = data["decided_by"]
                 Log.i(TAG, "Processing APPROVAL_RESPONSE for $packageName with status $status")
 
-                if (status.equals("APPROVED", ignoreCase = true)) {
+                val isApproved = status.equals("APPROVED", ignoreCase = true)
+                val isPermanentlyBlocked = com.drmohammed.antiporn.shields.AppSuspensionShield.isBlacklisted(packageName) ||
+                    PolicyRepository.getInstance(applicationContext).getCurrentPolicy().customBlacklistPackages.contains(packageName)
+                val actuallyApproved = isApproved && !isPermanentlyBlocked
+
+                if (isApproved) {
                     ApprovalRepository.getInstance(applicationContext).unsuspendAndApprove(packageName, decidedBy)
                 } else {
                     // Stays suspended and record rejection in local SQLite
                     ApprovalRepository.getInstance(applicationContext).recordRejection(packageName, decidedBy)
                     Log.i(TAG, "Application $packageName rejection recorded from $decidedBy")
                 }
+                ProtectionNotificationCoordinator.postAppApprovalDecisionNotification(
+                    applicationContext,
+                    packageName,
+                    actuallyApproved,
+                    decidedBy
+                )
             }
 
             ACTION_OTA_CHECK_UPDATE, ACTION_TRIGGER_OTA_UPDATE -> {

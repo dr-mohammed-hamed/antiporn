@@ -197,6 +197,36 @@
 
     <string name="curfew_vpn_session_name">AntiPorn Curfew Blackhole</string>
 
+    <!-- Unified Protection & Curfew Notification Strings -->
+    <string name="protection_vpn_channel_name">عزل وحماية شبكة الحظر</string>
+    <string name="protection_vpn_channel_desc">إشعارات أوضاع الحظر الليلي، وضع القيلولة، وعزل الإنترنت</string>
+    <string name="protection_events_channel_name">تنبيهات وأحداث الحماية</string>
+    <string name="protection_events_channel_desc">تنبيهات استجابات المشرف وانتهاء فترات الحظر</string>
+
+    <string name="notif_guardian_lockdown_title">تم حظر الإنترنت بالكامل من المشرف</string>
+    <string name="notif_guardian_lockdown_desc">قام المشرف بعزل بيانات الإنترنت عن الجهاز. المكالمات وSMS تعمل بشكل طبيعي.</string>
+    <string name="notif_guardian_lockdown_desc_curfew">حظر المشرف نشط (بالتزامن مع الحظر الليلي). المكالمات وSMS تعمل بشكل طبيعي.</string>
+    <string name="notif_guardian_lockdown_desc_nap">حظر المشرف نشط (بالتزامن مع وضع القيلولة). المكالمات وSMS تعمل بشكل طبيعي.</string>
+
+    <string name="notif_nap_active_title">وضع القيلولة قيد التشغيل</string>
+    <string name="notif_nap_active_desc">تم عزل الإنترنت وتجميد التطبيقات لحفظ وقتك وتركيزك.</string>
+    <string name="notif_action_extend_nap">تمديد 60 دقيقة</string>
+    <string name="notif_nap_ended_title">انتهى وضع القيلولة</string>
+    <string name="notif_nap_ended_desc">تمت استعادة التطبيقات والاتصال بالإنترنت بنجاح.</string>
+    <string name="notif_nap_ended_desc_curfew_still_active">انتهت القيلولة، لكن الحظر لا يزال نشطاً على جهازك.</string>
+
+    <string name="notif_curfew_active_title">الحظر الليلي نشط: تم عزل الإنترنت</string>
+    <string name="notif_curfew_active_desc_format">تم عزل الإنترنت والتطبيقات حتى %1$02d:%2$02d ص. المكالمات وSMS تعمل بشكل طبيعي.</string>
+
+    <string name="notif_apps_suspended_title">تطبيقات التشتت معطلة مؤقتاً</string>
+    <string name="notif_apps_suspended_nap_desc">وضع القيلولة نشط: التطبيقات معطلة مؤقتاً لحفظ وقتك.</string>
+    <string name="notif_apps_suspended_curfew_desc_format">الحظر الليلي نشط: التطبيقات معطلة حتى %1$02d:%2$02d ص لحفظ وقتك.</string>
+
+    <string name="notif_approval_granted_title">تمت الموافقة على التطبيق</string>
+    <string name="notif_approval_granted_desc">وافق المشرف %1$s على تشغيل تطبيق %2$s.</string>
+    <string name="notif_approval_rejected_title">تم رفض طلب التطبيق</string>
+    <string name="notif_approval_rejected_desc">رفض المشرف %1$s فك حظر تطبيق %2$s.</string>
+
     <!-- AI Shield Strings -->
     <string name="card_ai_shield_title">فحص الذكاء الاصطناعي (YOLO11 تجريبي)</string>
 

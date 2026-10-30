@@ -11,6 +11,7 @@ import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.shields.AppSuspensionShield
+import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import java.util.Calendar
 import java.util.concurrent.Executors
 
@@ -229,6 +230,13 @@ object CurfewEnforcer {
             }
         }
 
+        // Live synchronize unified protection & curfew notifications (VPN, AppsOnly, or Guardian Lockdown)
+        try {
+            ProtectionNotificationCoordinator.syncProtectionNotification(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error synchronizing protection notification in enforce()", e)
+        }
+
         return if (activate) {
             val targets = CurfewAppResolver.getCurfewTargetPackages(context)
             Log.i(TAG, "Enforcing Curfew ON for ${targets.size} targeted packages")
@@ -404,6 +412,11 @@ object CurfewEnforcer {
             }
 
             prefs.edit().remove(CurfewConfig.KEY_CURFEW_SUSPENDED_PACKAGES).apply()
+            try {
+                ProtectionNotificationCoordinator.syncProtectionNotification(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error synchronizing notification on curfew release", e)
+            }
             true
         }
     }
