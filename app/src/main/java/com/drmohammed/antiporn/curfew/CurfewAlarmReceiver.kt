@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
+import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -21,8 +22,18 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
         val action = intent.action ?: return
         Log.i(TAG, "CurfewAlarmReceiver triggered with action: $action")
 
-        val pendingResult = goAsync()
+
         val appContext = context.applicationContext
+
+        // CRITICAL(R6): Synchronously persist trusted time state on the main thread before OS kills process
+        if (action == Intent.ACTION_SHUTDOWN || action == "android.intent.action.QUICKBOOT_POWEROFF") {
+            Log.i(TAG, "Device shutdown broadcast received. Persisting trusted time synchronously on main thread.")
+            TrustedTimeProvider.persistOnShutdown(appContext)
+            return
+        }
+
+        val pendingResult = goAsync()
+        // appContext already resolved above
 
         try {
             bgExecutor.execute {
@@ -60,7 +71,8 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
                     }
 
                     if (action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_TIMEZONE_CHANGED) {
-                        Log.i(TAG, "Time/Timezone change detected; re-enforcing system policies immediately")
+                        Log.i(TAG, "Time/Timezone change detected; re-synchronizing trusted time and policies immediately")
+                        TrustedTimeProvider.syncNowAsync(appContext)
                         ProtectionEngine.applyAllAsync(appContext)
                         ProtectionNotificationCoordinator.syncProtectionNotification(appContext)
                     }
@@ -87,7 +99,7 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
             try {
                 if (NapController.isNapActive(appContext)) {
                     val napEndWall = NapController.getEndWall(appContext)
-                    if (napEndWall > System.currentTimeMillis()) {
+                    if (napEndWall > TrustedTimeProvider.currentTimeMillis(appContext)) {
                         CurfewScheduler.scheduleNapEndAlarm(appContext, napEndWall)
                     } else {
                         CurfewScheduler.cancelNapEndAlarm(appContext)
@@ -104,7 +116,7 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
             try {
                 if (CurfewEnforcer.isSnoozeActive(appContext)) {
                     val snoozeEnd = CurfewEnforcer.getSnoozeEndWall(appContext)
-                    if (snoozeEnd > System.currentTimeMillis()) {
+                    if (snoozeEnd > TrustedTimeProvider.currentTimeMillis(appContext)) {
                         CurfewScheduler.scheduleCurfewSnoozeAlarm(appContext, snoozeEnd)
                     } else {
                         CurfewEnforcer.clearSnooze(appContext)

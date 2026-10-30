@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
+import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import java.util.Calendar
 
 /**
@@ -135,9 +136,11 @@ object CurfewScheduler {
         val endPendingIntent = PendingIntent.getBroadcast(context, REQUEST_CODE_END, endIntent, flags)
 
         try {
-            setExactCompat(alarmManager, AlarmManager.RTC_WAKEUP, nextStart.timeInMillis, startPendingIntent)
-            setExactCompat(alarmManager, AlarmManager.RTC_WAKEUP, nextEnd.timeInMillis, endPendingIntent)
-            Log.i(TAG, "Scheduled exact curfew alarms: Start at ${nextStart.time}, End at ${nextEnd.time}")
+            val startElapsed = TrustedTimeProvider.computeElapsedTrigger(nextStart.timeInMillis)
+            val endElapsed = TrustedTimeProvider.computeElapsedTrigger(nextEnd.timeInMillis)
+            setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, startElapsed, startPendingIntent)
+            setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, endElapsed, endPendingIntent)
+            Log.i(TAG, "Scheduled exact curfew alarms via ELAPSED_REALTIME: Start at ${nextStart.time} (elapsed=$startElapsed), End at ${nextEnd.time} (elapsed=$endElapsed)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact alarms via AlarmManager", e)
         }
@@ -179,13 +182,9 @@ object CurfewScheduler {
         }
         try {
             val piElapsed = buildNapEndPendingIntent(context, NapConfig.REQUEST_CODE_NAP_END_ELAPSED)
-            val piRtc = buildNapEndPendingIntent(context, NapConfig.REQUEST_CODE_NAP_END_RTC)
-            var elapsedDelay = triggerWallMs - System.currentTimeMillis()
-            if (elapsedDelay <= 0) elapsedDelay = 1000L
-            val elapsedTrigger = SystemClock.elapsedRealtime() + elapsedDelay
+            val elapsedTrigger = TrustedTimeProvider.computeElapsedTrigger(triggerWallMs)
             setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsedTrigger, piElapsed)
-            setExactCompat(alarmManager, AlarmManager.RTC_WAKEUP, triggerWallMs, piRtc)
-            Log.i(TAG, "Scheduled dual nap end alarms: wall=$triggerWallMs elapsedTrigger=$elapsedTrigger")
+            Log.i(TAG, "Scheduled nap end alarm via ELAPSED_REALTIME: wall=$triggerWallMs elapsedTrigger=$elapsedTrigger")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule nap end alarms", e)
         }
@@ -218,8 +217,9 @@ object CurfewScheduler {
             action = CurfewConfig.ACTION_CURFEW_SNOOZE_END
         }
         val pi = PendingIntent.getBroadcast(context, REQUEST_CODE_SNOOZE, intent, flags)
-        setExactCompat(alarmManager, AlarmManager.RTC_WAKEUP, triggerWallMs, pi)
-        Log.i(TAG, "Scheduled snooze expiration alarm at $triggerWallMs")
+        val elapsedTrigger = TrustedTimeProvider.computeElapsedTrigger(triggerWallMs)
+        setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsedTrigger, pi)
+        Log.i(TAG, "Scheduled snooze expiration alarm via ELAPSED_REALTIME at $triggerWallMs (elapsed=$elapsedTrigger)")
     }
 
     fun cancelCurfewSnoozeAlarm(context: Context) {

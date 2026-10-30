@@ -19,6 +19,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
+import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewForegroundWatcher
@@ -89,6 +90,7 @@ class DnsWatchdogService : Service() {
             Log.d(TAG, "Layer 3 - Periodic heartbeat (60s): cleaning stray apps & verifying shields")
             AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
             checkAndEnforceProtection()
+            TrustedTimeProvider.syncNowAsync(applicationContext)
 
             val nowRealtime = android.os.SystemClock.elapsedRealtime()
             if (nowRealtime - lastCloudHeartbeatElapsed >= CLOUD_HEARTBEAT_INTERVAL_MS || lastCloudHeartbeatElapsed == 0L) {
@@ -283,6 +285,7 @@ class DnsWatchdogService : Service() {
             Log.i(TAG, "Network became available! Debouncing protection check...")
             debounceHandler.removeCallbacks(checkRunnable)
             debounceHandler.postDelayed(checkRunnable, 1000L)
+            TrustedTimeProvider.syncNowAsync(applicationContext)
         }
     }
 

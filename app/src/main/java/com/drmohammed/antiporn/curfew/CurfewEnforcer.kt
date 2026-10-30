@@ -11,6 +11,7 @@ import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.shields.AppSuspensionShield
+import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import java.util.Calendar
 import java.util.concurrent.Executors
@@ -135,7 +136,7 @@ object CurfewEnforcer {
     fun isSnoozeActive(context: Context): Boolean {
         val prefs = context.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
         val snoozeEnd = prefs.getLong(CurfewConfig.KEY_CURFEW_SNOOZE_END_WALL, 0L)
-        return System.currentTimeMillis() < snoozeEnd
+        return TrustedTimeProvider.currentTimeMillis(context) < snoozeEnd
     }
 
     fun getSnoozeEndWall(context: Context): Long {
@@ -152,7 +153,7 @@ object CurfewEnforcer {
     fun snoozeCurfew(context: Context, minutes: Int = 15) {
         val safeMinutes = minutes.coerceIn(1, 60)
         val prefs = context.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
-        val snoozeEnd = System.currentTimeMillis() + (safeMinutes * 60 * 1000L)
+        val snoozeEnd = TrustedTimeProvider.currentTimeMillis(context) + (safeMinutes * 60 * 1000L)
         prefs.edit().putLong(CurfewConfig.KEY_CURFEW_SNOOZE_END_WALL, snoozeEnd).apply()
         CurfewScheduler.scheduleCurfewSnoozeAlarm(context, snoozeEnd)
         enforce(context, false)

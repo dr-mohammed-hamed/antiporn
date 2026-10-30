@@ -30,7 +30,7 @@ data class DevicePolicyBundle(
     val guardianName: String? = null,
     val isSupervised: Boolean = false,
     val isDateTimeLocked: Boolean = false,
-    val timeZoneId: String = com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID,
+    val timeZoneId: String = com.drmohammed.antiporn.curfew.CurfewConfig.getDefaultFallbackTimeZone(),
     val lastHeartbeat: Long = 0L,
     val breakoutStatus: String? = null,
     val breakoutRequestedAt: Long? = null,
@@ -135,7 +135,7 @@ data class DevicePolicyBundle(
             guardianName = null,
             isSupervised = false,
             isDateTimeLocked = false,
-            timeZoneId = com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
+            timeZoneId = com.drmohammed.antiporn.curfew.CurfewConfig.getDefaultFallbackTimeZone()
         )
 
         fun reconcileLegacyV1(policy: DevicePolicyBundle): DevicePolicyBundle {

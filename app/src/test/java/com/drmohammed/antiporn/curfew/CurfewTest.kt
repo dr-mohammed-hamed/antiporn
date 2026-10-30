@@ -4,6 +4,7 @@ import android.content.pm.ApplicationInfo
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
@@ -225,8 +226,10 @@ class CurfewTest {
     @Test
     fun testMakkahTimezone_isConfiguredCorrectly() {
         assertEquals("Asia/Riyadh", CurfewConfig.MAKKAH_TIMEZONE_ID)
-        val makkahCal = CurfewConfig.getCurfewCalendar()
-        assertEquals(3 * 3600 * 1000, makkahCal.timeZone.rawOffset)
+        val makkahTz = TimeZone.getTimeZone(CurfewConfig.MAKKAH_TIMEZONE_ID)
+        val defaultTz = CurfewConfig.getDefaultFallbackTimeZone()
+        assertTrue(com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(defaultTz))
+        assertEquals(3 * 3600 * 1000, makkahTz.rawOffset)
     }
 
     @Test
@@ -336,7 +339,7 @@ class CurfewTest {
         assertEquals(0, bundle.weekendCurfewStartMinute)
         assertEquals(7, bundle.weekendCurfewEndHour)
         assertEquals(0, bundle.weekendCurfewEndMinute)
-        assertEquals(CurfewConfig.MAKKAH_TIMEZONE_ID, bundle.timeZoneId)
+        assertEquals(CurfewConfig.getDefaultFallbackTimeZone(), bundle.timeZoneId)
         assertTrue(bundle.protectedAppPackages.isEmpty())
     }
 

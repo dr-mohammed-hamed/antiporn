@@ -15,7 +15,7 @@ object NapController {
     private const val TAG = "AntiPorn_NapController"
 
     var elapsedProvider: () -> Long = { SystemClock.elapsedRealtime() }
-    var wallProvider: () -> Long = { System.currentTimeMillis() }
+    var wallProvider: () -> Long = { com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis() }
 
     fun computeActive(elapsed: Long, endElapsed: Long, wall: Long, endWall: Long, flagActive: Boolean): Boolean {
         if (!flagActive) return false

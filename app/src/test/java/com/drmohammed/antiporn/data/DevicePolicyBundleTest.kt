@@ -31,7 +31,7 @@ class DevicePolicyBundleTest {
         assertTrue(policy.protectedAppPackages.isEmpty())
         assertFalse(policy.isDateTimeLocked)
         assertEquals(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST, policy.dnsHost)
-        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, policy.timeZoneId)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.getDefaultFallbackTimeZone(), policy.timeZoneId)
         assertEquals(1L, policy.version)
     }
 

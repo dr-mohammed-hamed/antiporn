@@ -23,6 +23,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.cloud.auth.GoogleAuthManager
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
+import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
@@ -295,7 +296,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
 
             breakoutCountdownJob = lifecycleScope.launch {
                 while (isActive) {
-                    val remainingMs = (policy.breakoutUnlockAt - System.currentTimeMillis()).coerceAtLeast(0L)
+                    val remainingMs = (policy.breakoutUnlockAt - TrustedTimeProvider.currentTimeMillis(this@AccountabilityHubActivity)).coerceAtLeast(0L)
                     val hours = remainingMs / (1000 * 3600)
                     val mins = (remainingMs % (1000 * 3600)) / (1000 * 60)
                     val secs = (remainingMs % (1000 * 60)) / 1000

@@ -219,6 +219,7 @@
     <string name="toast_breakout_rejected">Emergency unpair request rejected; supervision maintained</string>
     <string name="error_breakout_already_pending">An emergency unpair countdown is already active</string>
     <string name="error_breakout_not_ready">The 24-hour grace period has not yet elapsed</string>
+    <string name="error_trusted_time_required">Emergency breakout requires network-verified trusted time</string>
     <string name="error_switch_account_while_supervised">Cannot switch to an existing Google account while supervised to prevent breaking your active guardian link</string>
 
     <!-- Accountability & Supervision Translations -->

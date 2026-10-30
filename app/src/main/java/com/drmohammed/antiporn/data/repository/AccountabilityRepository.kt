@@ -5,6 +5,7 @@ import android.os.Build
 import android.util.Log
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
+import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
 import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
@@ -632,7 +633,7 @@ class AccountabilityRepository private constructor(context: Context) {
                 return@withContext Result.failure(IllegalStateException(appContext.getString(R.string.error_breakout_already_pending)))
             }
 
-            val now = System.currentTimeMillis()
+            val now = TrustedTimeProvider.currentTimeMillis(appContext)
             val unlockAt = now + DevicePolicyBundle.BREAKOUT_GRACE_PERIOD_MS
             val updates = mapOf(
                 "breakoutStatus" to DevicePolicyBundle.BREAKOUT_STATUS_PENDING,
@@ -660,7 +661,7 @@ class AccountabilityRepository private constructor(context: Context) {
                 "breakoutStatus" to DevicePolicyBundle.BREAKOUT_STATUS_CANCELLED,
                 "breakoutRequestedAt" to null,
                 "breakoutUnlockAt" to null,
-                "updatedAt" to System.currentTimeMillis()
+                "updatedAt" to TrustedTimeProvider.currentTimeMillis(appContext)
             )
             docRef.update(updates).await()
             Log.i(TAG, "Emergency breakout request cancelled by ward")
@@ -681,7 +682,7 @@ class AccountabilityRepository private constructor(context: Context) {
                 "breakoutStatus" to DevicePolicyBundle.BREAKOUT_STATUS_REJECTED,
                 "breakoutRequestedAt" to null,
                 "breakoutUnlockAt" to null,
-                "updatedAt" to System.currentTimeMillis()
+                "updatedAt" to TrustedTimeProvider.currentTimeMillis(appContext)
             )
             docRef.update(updates).await()
             Log.i(TAG, "Guardian rejected emergency breakout for ward $wardUid")
@@ -706,7 +707,15 @@ class AccountabilityRepository private constructor(context: Context) {
 
             val status = snapshot.getString("breakoutStatus")
             val unlockAt = snapshot.getLong("breakoutUnlockAt") ?: 0L
-            val now = System.currentTimeMillis()
+
+            if (!TrustedTimeProvider.isTrusted()) {
+                TrustedTimeProvider.syncNow(appContext, force = true)
+            }
+            if (!TrustedTimeProvider.isTrusted()) {
+                return@withContext Result.failure(IllegalStateException(appContext.getString(R.string.error_trusted_time_required)))
+            }
+
+            val now = TrustedTimeProvider.currentTimeMillis(appContext)
             if (status != DevicePolicyBundle.BREAKOUT_STATUS_PENDING || now < unlockAt) {
                 return@withContext Result.failure(IllegalStateException(appContext.getString(R.string.error_breakout_not_ready)))
             }

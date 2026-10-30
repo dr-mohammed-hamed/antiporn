@@ -3,6 +3,7 @@ package com.drmohammed.antiporn.curfew
 import android.content.Context
 import android.util.Log
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
+import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import java.util.Calendar
 import java.util.TimeZone
 
@@ -15,28 +16,42 @@ object CurfewConfig {
 
     const val MAKKAH_TIMEZONE_ID = "Asia/Riyadh"
 
+    /**
+     * Resolves the default fallback timezone dynamically from the device's system timezone,
+     * validated against known IANA identifiers. Falls back to Makkah (Asia/Riyadh) if unresolvable.
+     */
+    fun getDefaultFallbackTimeZone(): String {
+        return try {
+            val localId = TimeZone.getDefault().id
+            if (!localId.isNullOrBlank() && com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(localId)) {
+                localId
+            } else {
+                MAKKAH_TIMEZONE_ID
+            }
+        } catch (_: Exception) {
+            MAKKAH_TIMEZONE_ID
+        }
+    }
+
     fun getTargetTimeZoneId(context: Context): String {
         val tzId = try {
             com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context)
                 .getCurrentPolicy().timeZoneId
         } catch (e: Exception) {
             Log.w("AntiPorn_CurfewConfig", "Failed reading policy timezone, falling back to default", e)
-            MAKKAH_TIMEZONE_ID
+            getDefaultFallbackTimeZone()
         }
 
         return if (tzId.isNotBlank() && com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(tzId)) {
             tzId
         } else {
-            MAKKAH_TIMEZONE_ID
+            getDefaultFallbackTimeZone()
         }
     }
 
-    fun getCurfewCalendar(): Calendar = Calendar.getInstance(TimeZone.getTimeZone(MAKKAH_TIMEZONE_ID))
+    fun getCurfewCalendar(): Calendar = TrustedTimeProvider.getCurfewCalendar()
 
-    fun getCurfewCalendar(context: Context): Calendar {
-        val validTzId = getTargetTimeZoneId(context)
-        return Calendar.getInstance(TimeZone.getTimeZone(validTzId))
-    }
+    fun getCurfewCalendar(context: Context): Calendar = TrustedTimeProvider.getCurfewCalendar(context)
 
     const val START_HOUR = 20
     const val START_MINUTE = 0

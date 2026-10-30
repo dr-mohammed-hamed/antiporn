@@ -1,6 +1,13 @@
 {
+  "include": [
+    "app/src/main/java/**/*.kt",
+    "app/src/main/AndroidManifest.xml",
+    "app/build.gradle.kts",
+    "build.gradle.kts",
+    "settings.gradle.kts"
+  ],
   "output": {
-    "filePath": "repomix-output.xml",
+    "filePath": "repomix-output-functional.xml",
     "style": "xml",
     "removeComments": true,
     "removeEmptyLines": true,
@@ -11,9 +18,19 @@
     "useGitignore": true,
     "useDefaultPatterns": true,
     "customPatterns": [
+      "**/*.png",
+      "**/*.webp",
+      "**/*.jpg",
+      "**/*.svg",
+      "app/src/androidTest/**",
+      "app/src/test/**",
+      "app/src/main/res/**",
       ".agents/**",
       ".specify/**",
-      "repomix-output*"
+      "repomix-output*",
+      "*.md",
+      "local.properties",
+      "key.properties"
     ]
   }
 }

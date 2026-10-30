@@ -675,6 +675,7 @@
     <string name="toast_breakout_rejected">تم رفض طلب فك الارتباط وإبقاء الإشراف</string>
     <string name="error_breakout_already_pending">يوجد طلب فك ارتباط اضطراري قيد الانتظار بالفعل</string>
     <string name="error_breakout_not_ready">لم تنتهِ مهلة الـ 24 ساعة بعد</string>
+    <string name="error_trusted_time_required">يتطلب فك الارتباط توثيق الوقت عبر الشبكة لمنع التلاعب</string>
     <string name="error_switch_account_while_supervised">لا يمكن التبديل إلى حساب Google مسجل مسبقاً أثناء خضوع الجهاز للإشراف حمايةً لرابط الإشراف</string>
 
     <!-- Enterprise Provisioning (OOBE QR Code) -->
