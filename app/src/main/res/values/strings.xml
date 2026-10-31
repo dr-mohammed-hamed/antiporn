@@ -759,6 +759,10 @@
     <string name="toast_self_policy_save_failed">تعذر حفظ السياسات، يرجى إعادة المحاولة</string>
     <string name="gate_open_title">الوصول المباشر</string>
     <string name="gate_access_denied">تم رفض الوصول إلى لوحة التحكم</string>
+    <string name="gate_access_denied_by_guardian">تم إيقاف التحكم الذاتي بواسطة المشرف. جميع الدروع مدارة عن بُعد.</string>
+    <string name="guardian_self_control_card_title">صلاحيات التحكم الذاتي</string>
+    <string name="guardian_switch_allow_self_control">السماح للمكفول بالتحكم الذاتي في دروعه</string>
+    <string name="guardian_switch_allow_self_control_desc">عند التعطيل، يُمنع المكفول من تعديل الدروع أو فتح تبويب «الذاتي»، ويقتصر التحكم بالكامل على المشرف</string>
     <string name="btn_manage_my_device">إدارة جهازي</string>
 
     <!-- Modern Redesign & Navigation Tokens -->

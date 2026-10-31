@@ -32,6 +32,7 @@ class DevicePolicyBundleTest {
         assertEquals(DevicePolicyBundle.BROWSER_FILTER_OFF, policy.browserFilterMode)
         assertTrue(policy.customBlockedUrls.isEmpty())
         assertTrue(policy.customAllowedUrls.isEmpty())
+        assertTrue(policy.isSelfControlAllowed)
         assertFalse(policy.isDateTimeLocked)
         assertEquals(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST, policy.dnsHost)
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.getDefaultFallbackTimeZone(), policy.timeZoneId)
@@ -55,6 +56,7 @@ class DevicePolicyBundleTest {
             isVpnBlackholeEnabled = true,
             isIncognitoBlocked = true,
             lockNewInstallsUntilApproved = true,
+            isSelfControlAllowed = false,
             isDateTimeLocked = true,
             customBlacklistPackages = setOf("com.bad.app1", "com.bad.app2"),
             customCurfewWhitelistPackages = setOf("com.work.app1"),
@@ -89,6 +91,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.isVpnBlackholeEnabled, restored.isVpnBlackholeEnabled)
         assertEquals(original.isIncognitoBlocked, restored.isIncognitoBlocked)
         assertEquals(original.lockNewInstallsUntilApproved, restored.lockNewInstallsUntilApproved)
+        assertEquals(original.isSelfControlAllowed, restored.isSelfControlAllowed)
         assertEquals(original.isDateTimeLocked, restored.isDateTimeLocked)
         assertEquals(original.customBlacklistPackages, restored.customBlacklistPackages)
         assertEquals(original.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
@@ -123,6 +126,7 @@ class DevicePolicyBundleTest {
             isVpnBlackholeEnabled = false,
             isIncognitoBlocked = false,
             lockNewInstallsUntilApproved = true,
+            isSelfControlAllowed = false,
             isDateTimeLocked = true,
             customBlacklistPackages = setOf("pkg.a"),
             customCurfewWhitelistPackages = setOf("pkg.b"),
@@ -157,6 +161,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.isVpnBlackholeEnabled, restored.isVpnBlackholeEnabled)
         assertEquals(original.isIncognitoBlocked, restored.isIncognitoBlocked)
         assertEquals(original.lockNewInstallsUntilApproved, restored.lockNewInstallsUntilApproved)
+        assertEquals(original.isSelfControlAllowed, restored.isSelfControlAllowed)
         assertEquals(original.isDateTimeLocked, restored.isDateTimeLocked)
         assertEquals(original.customBlacklistPackages, restored.customBlacklistPackages)
         assertEquals(original.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
@@ -186,6 +191,7 @@ class DevicePolicyBundleTest {
         val parsed = DevicePolicyBundle.fromJson(legacyJson)
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, parsed.timeZoneId)
         assertFalse(parsed.isDateTimeLocked)
+        assertTrue(parsed.isSelfControlAllowed)
 
         val legacyMap = mapOf<String, Any?>(
             "curfewStartHour" to 20,
@@ -194,6 +200,7 @@ class DevicePolicyBundleTest {
         val fromMap = DevicePolicyBundle.fromMap(legacyMap)
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, fromMap.timeZoneId)
         assertFalse(fromMap.isDateTimeLocked)
+        assertTrue(fromMap.isSelfControlAllowed)
 
         val emptyTzPolicy = DevicePolicyBundle(timeZoneId = "")
         val reconciled = DevicePolicyBundle.reconcileLegacyV1(emptyTzPolicy)
@@ -251,5 +258,20 @@ class DevicePolicyBundleTest {
         assertEquals(DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST, parsed.browserFilterMode)
         assertEquals(setOf("site1.com", "site2.com"), parsed.customBlockedUrls)
         assertEquals(setOf("allowed.com"), parsed.customAllowedUrls)
+    }
+
+    @Test
+    fun testSelfControlAllowed_deserializationEdgeCases() {
+        val jsonExplicitFalse = """{"isSelfControlAllowed": false}"""
+        assertFalse(DevicePolicyBundle.fromJson(jsonExplicitFalse).isSelfControlAllowed)
+
+        val jsonExplicitTrue = """{"isSelfControlAllowed": true}"""
+        assertTrue(DevicePolicyBundle.fromJson(jsonExplicitTrue).isSelfControlAllowed)
+
+        val mapExplicitFalse = mapOf("isSelfControlAllowed" to false)
+        assertFalse(DevicePolicyBundle.fromMap(mapExplicitFalse).isSelfControlAllowed)
+
+        val mapExplicitTrue = mapOf("isSelfControlAllowed" to true)
+        assertTrue(DevicePolicyBundle.fromMap(mapExplicitTrue).isSelfControlAllowed)
     }
 }

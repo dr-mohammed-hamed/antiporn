@@ -71,6 +71,10 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var tvBreakoutAlertMsg: TextView
     private lateinit var btnRejectBreakout: MaterialButton
 
+    // Self-Control Permission
+    private lateinit var cardSelfControlPermission: MaterialCardView
+    private lateinit var switchAllowSelfControl: MaterialSwitch
+
     // Curfew controls
     private lateinit var switchCurfewMaster: MaterialSwitch
     private lateinit var tvCurfewStartTime: TextView
@@ -144,6 +148,7 @@ class GuardianControlActivity : AppCompatActivity() {
     private var hasLoadedInitialPolicy = false
     private var lastEditNameClickTime = 0L
     private var lastRejectBreakoutClickTime = 0L
+    private var lastSaveClickTime = 0L
     private var approvalsListener: ListenerRegistration? = null
 
     private val appManagerLauncher = registerForActivityResult(
@@ -259,6 +264,10 @@ class GuardianControlActivity : AppCompatActivity() {
         tvBreakoutAlertMsg = findViewById(R.id.tvBreakoutAlertMsg)
         btnRejectBreakout = findViewById(R.id.btnRejectBreakout)
 
+        // Self-Control Permission
+        cardSelfControlPermission = findViewById(R.id.cardSelfControlPermission)
+        switchAllowSelfControl = findViewById(R.id.switchAllowSelfControl)
+
         // Master Curfew & Weekday
         switchCurfewMaster = findViewById(R.id.switchCurfewMaster)
         tvCurfewStartTime = findViewById(R.id.tvCurfewStartTime)
@@ -330,6 +339,7 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun setInputsEnabled(enabled: Boolean) {
+        switchAllowSelfControl.isEnabled = enabled
         switchCurfewMaster.isEnabled = enabled
         btnChangeStartTime.isEnabled = enabled
         btnChangeEndTime.isEnabled = enabled
@@ -364,7 +374,8 @@ class GuardianControlActivity : AppCompatActivity() {
 
     private fun hasUnsavedChanges(): Boolean {
         val snapshot = initialPolicySnapshot ?: return false
-        return selectedStartHour != snapshot.curfewStartHour ||
+        return switchAllowSelfControl.isChecked != snapshot.isSelfControlAllowed ||
+                selectedStartHour != snapshot.curfewStartHour ||
                 selectedStartMinute != snapshot.curfewStartMinute ||
                 selectedEndHour != snapshot.curfewEndHour ||
                 selectedEndMinute != snapshot.curfewEndMinute ||
@@ -552,6 +563,7 @@ class GuardianControlActivity : AppCompatActivity() {
         }
 
         val switchListener = { _: View, _: Boolean -> updateSaveButtonState() }
+        switchAllowSelfControl.setOnCheckedChangeListener(switchListener)
         switchCurfewMaster.setOnCheckedChangeListener(switchListener)
         switchWeekendCurfew.setOnCheckedChangeListener(switchListener)
         switchVpnBlackhole.setOnCheckedChangeListener(switchListener)
@@ -619,6 +631,9 @@ class GuardianControlActivity : AppCompatActivity() {
         }
 
         btnSavePolicyChanges.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastSaveClickTime < 800L) return@setOnClickListener
+            lastSaveClickTime = now
             saveAndPushPolicy()
         }
 
@@ -678,6 +693,7 @@ class GuardianControlActivity : AppCompatActivity() {
         updateTimingLabels()
         updateTimezoneViews()
 
+        switchAllowSelfControl.isChecked = policy.isSelfControlAllowed
         switchCurfewMaster.isChecked = policy.isCurfewEnabled
         switchWeekendCurfew.isChecked = policy.isWeekendCurfewEnabled
         switchVpnBlackhole.isChecked = policy.isVpnBlackholeEnabled
@@ -757,6 +773,7 @@ class GuardianControlActivity : AppCompatActivity() {
                         weekendCurfewEndMinute = selectedWeekendEndMinute,
                         isCurfewEnabled = switchCurfewMaster.isChecked,
                         isWeekendCurfewEnabled = switchWeekendCurfew.isChecked,
+                        isSelfControlAllowed = switchAllowSelfControl.isChecked,
                         isVpnBlackholeEnabled = switchVpnBlackhole.isChecked,
                         isInstantInternetKillEnabled = switchInstantInternetKill.isChecked,
                         isIncognitoBlocked = switchIncognitoBlocked.isChecked,
@@ -787,6 +804,7 @@ class GuardianControlActivity : AppCompatActivity() {
                         weekendCurfewEndMinute = selectedWeekendEndMinute,
                         isCurfewEnabled = switchCurfewMaster.isChecked,
                         isWeekendCurfewEnabled = switchWeekendCurfew.isChecked,
+                        isSelfControlAllowed = switchAllowSelfControl.isChecked,
                         isVpnBlackholeEnabled = switchVpnBlackhole.isChecked,
                         isInstantInternetKillEnabled = switchInstantInternetKill.isChecked,
                         isIncognitoBlocked = switchIncognitoBlocked.isChecked,
@@ -978,6 +996,7 @@ class GuardianControlActivity : AppCompatActivity() {
                     isVpnBlackholeEnabled = switchVpnBlackhole.isChecked,
                     isIncognitoBlocked = switchIncognitoBlocked.isChecked,
                     lockNewInstallsUntilApproved = switchLockNewInstalls.isChecked,
+                    isSelfControlAllowed = switchAllowSelfControl.isChecked,
                     isDateTimeLocked = switchLockDateTime.isChecked,
                     browserFilterMode = currentPolicy.browserFilterMode,
                     customBlockedUrls = currentPolicy.customBlockedUrls,

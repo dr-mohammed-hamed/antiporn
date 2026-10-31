@@ -50,6 +50,7 @@ class PolicyRepository private constructor(context: Context) {
     private var firestoreListener: ListenerRegistration? = null
 
     init {
+        com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = _currentPolicyFlow.value.isSelfControlAllowed
         // Observe local policy changes and trigger background sync
         startFirestoreSync()
     }
@@ -232,7 +233,21 @@ class PolicyRepository private constructor(context: Context) {
         }
         _currentPolicyFlow.value = bundle
         database.saveDevicePolicy(DevicePolicyEntity.fromBundle(bundle))
+        com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = bundle.isSelfControlAllowed
         applyPolicyToSystem(bundle, current)
+    }
+
+    /**
+     * Convenience API to toggle self-control permission directly in local policy and enforce it.
+     */
+    fun updateSelfControlAllowed(allowed: Boolean) {
+        val current = _currentPolicyFlow.value
+        if (current.isSelfControlAllowed == allowed) return
+        val updated = current.copy(
+            isSelfControlAllowed = allowed,
+            updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
+        )
+        updateLocalPolicyAndEnforce(updated)
     }
 
     /**
@@ -433,9 +448,25 @@ class PolicyRepository private constructor(context: Context) {
      */
     suspend fun saveAndEnforceSelfPolicy(bundle: DevicePolicyBundle): Boolean = withContext(Dispatchers.IO) {
         try {
+            val current = _currentPolicyFlow.value
+            val isSupervised = current.isSupervised || bundle.isSupervised || try {
+                AccountabilityRepository.getInstance(appContext).isSupervised()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to query accountability supervision in saveAndEnforceSelfPolicy", e)
+                false
+            }
+
+            if (isSupervised && (!current.isSelfControlAllowed || !bundle.isSelfControlAllowed)) {
+                Log.w(TAG, "saveAndEnforceSelfPolicy rejected: self-control is disabled by supervisor")
+                return@withContext false
+            }
+
             val updated = synchronized(this@PolicyRepository) {
-                val current = _currentPolicyFlow.value
                 val newPolicy = bundle.copy(
+                    guardianUid = current.guardianUid,
+                    guardianName = current.guardianName,
+                    isSupervised = current.isSupervised,
+                    isSelfControlAllowed = current.isSelfControlAllowed,
                     version = current.version + 1,
                     updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
                 )

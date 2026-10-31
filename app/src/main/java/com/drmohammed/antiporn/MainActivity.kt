@@ -28,7 +28,9 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.ai.service.ScreenAiProjectionService
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
@@ -78,6 +80,7 @@ class MainActivity : AppCompatActivity(),
     private var lastAiToggleMs = 0L
     private var hasShownOtaPrompt = false
     private var lastProtectionState: ProtectionUiState? = null
+    private var lastDeniedToastTime = 0L
 
     private val aiRefreshRunnable = Runnable {
         if (!isFinishing && !isDestroyed) {
@@ -228,7 +231,7 @@ class MainActivity : AppCompatActivity(),
                 R.id.nav_self_control -> {
                     val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
                     if (!gate.canAccess(this)) {
-                        Toast.makeText(this, R.string.gate_access_denied, Toast.LENGTH_SHORT).show()
+                        showSelfControlAccessDeniedMessage()
                         false
                     } else {
                         switchFragment(selfControlFragment)
@@ -246,6 +249,42 @@ class MainActivity : AppCompatActivity(),
                 else -> false
             }
         }
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(applicationContext).currentPolicyFlow.collect { policy ->
+                    if (isFinishing || isDestroyed) return@collect
+                    if (activeFragment == selfControlFragment) {
+                        val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
+                        if (!gate.canAccess(this@MainActivity)) {
+                            showSelfControlAccessDeniedMessage()
+                            bottomNav.selectedItemId = R.id.nav_home
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun showSelfControlAccessDeniedMessage() {
+        if (isFinishing || isDestroyed) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastDeniedToastTime < 1500L) return
+        lastDeniedToastTime = now
+
+        val policy = try {
+            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to retrieve policy for access denied message", e)
+            null
+        }
+
+        val msgRes = if (policy?.isSupervised == true && !policy.isSelfControlAllowed) {
+            R.string.gate_access_denied_by_guardian
+        } else {
+            R.string.gate_access_denied
+        }
+        Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show()
     }
 
     private fun switchFragment(target: Fragment) {
@@ -273,7 +312,7 @@ class MainActivity : AppCompatActivity(),
     override fun onNavigateToSelfControl() {
         val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
         if (!gate.canAccess(this)) {
-            Toast.makeText(this, R.string.gate_access_denied, Toast.LENGTH_SHORT).show()
+            showSelfControlAccessDeniedMessage()
             return
         }
         bottomNav.selectedItemId = R.id.nav_self_control
