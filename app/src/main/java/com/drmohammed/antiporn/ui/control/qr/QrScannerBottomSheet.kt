@@ -116,10 +116,16 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
-        val options = BarcodeScannerOptions.Builder()
-            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-            .build()
-        barcodeScanner = BarcodeScanning.getClient(options)
+        try {
+            val options = BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                .build()
+            barcodeScanner = BarcodeScanning.getClient(options)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize BarcodeScanner client", e)
+            barcodeScanner = null
+            tvScanStatus.text = getString(R.string.qr_scan_camera_permission_required)
+        }
 
         btnCloseScanner.setOnClickListener {
             dismiss()
