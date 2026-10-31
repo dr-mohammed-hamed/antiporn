@@ -1,11 +1,11 @@
 {
-  "versionCode": 4,
-  "versionName": "1.3",
+  "versionCode": 5,
+  "versionName": "1.4",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 41569011,
+  "fileSizeBytes": 41900787,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.3: دعم فلترة روابط المتصفحات المتقدمة والقوائم البيضاء والسوداء المخصصة، حماية إعدادات المتصفح برمز الاستجابة السريعة QR، تعريب شامل لكافة الواجهات، وتحسينات أمنية لمنع حالات التزامن.",
+  "releaseNotes": "إصدار 1.4: ميزة التحكم الذاتي بالمشرف الأمني عن بُعد (Remote Guardian Self-Control Toggle)، تحسينات حماية واستجابة ماسح الـ QR، وضمان أقصى درجات الاستقرار لمنع الالتفاف على الحماية.",
   "releaseDate": "2026-10-31"
 }
