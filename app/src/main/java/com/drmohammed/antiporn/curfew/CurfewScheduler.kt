@@ -172,8 +172,7 @@ object CurfewScheduler {
     }
 
     /**
-     * Schedules the dual nap-end alarm (ELAPSED_REALTIME_WAKEUP + RTC_WAKEUP) for the given wall-clock end.
-     * Uses distinct PendingIntent request codes so neither alarm overwrites the other.
+     * Schedules the nap-end alarm via ELAPSED_REALTIME_WAKEUP computed from monotonic hardware elapsed time.
      */
     fun scheduleNapEndAlarm(context: Context, triggerWallMs: Long) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: run {

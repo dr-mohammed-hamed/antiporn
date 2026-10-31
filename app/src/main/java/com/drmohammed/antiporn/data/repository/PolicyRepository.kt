@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 /**
  * Unified Single Source of Truth (SSOT) repository for device protection policies.
@@ -350,8 +351,13 @@ class PolicyRepository private constructor(context: Context) {
                     if (removedFromBlacklist.isNotEmpty()) {
                         val isBlockActive = CurfewEnforcer.isEffectiveBlockActive(appContext)
                         val immunePackages = CurfewAppResolver.resolveImmunePackages(appContext)
+                        val pendingPackages = ApprovalRepository.getInstance(appContext)
+                            .getLocalPendingApprovals()
+                            .filter { it.isPending }
+                            .map { it.packageName }
+                            .toSet()
                         val packagesToUnsuspend = removedFromBlacklist.filter { pkg ->
-                            !isBlockActive || immunePackages.contains(pkg)
+                            (!isBlockActive || immunePackages.contains(pkg)) && !pendingPackages.contains(pkg)
                         }.toTypedArray()
                         if (packagesToUnsuspend.isNotEmpty()) {
                             try {
@@ -425,14 +431,17 @@ class PolicyRepository private constructor(context: Context) {
      * Saves updated policy bundle directly for the local device, enforcing immediately
      * in SQLite and system engines (DPM), with asynchronous background cloud sync to Firestore.
      */
-    suspend fun saveAndEnforceSelfPolicy(bundle: DevicePolicyBundle): Boolean {
-        return try {
-            val current = _currentPolicyFlow.value
-            val updated = bundle.copy(
-                version = current.version + 1,
-                updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
-            )
-            updateLocalPolicyAndEnforce(updated)
+    suspend fun saveAndEnforceSelfPolicy(bundle: DevicePolicyBundle): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val updated = synchronized(this@PolicyRepository) {
+                val current = _currentPolicyFlow.value
+                val newPolicy = bundle.copy(
+                    version = current.version + 1,
+                    updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
+                )
+                updateLocalPolicyAndEnforce(newPolicy)
+                newPolicy
+            }
 
             // Asynchronously sync to cloud document if a synchronized UID exists
             val myUid = AccountabilityRepository.getInstance(appContext).getCachedUid()

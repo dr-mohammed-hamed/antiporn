@@ -164,13 +164,13 @@ class SettingsFragment : Fragment() {
                 val fpsText = getString(R.string.ai_fps_format, fps)
                 val modelText = getString(R.string.ai_model_active_format, ScreenAiProjectionService.modelName)
                 tvAiMetrics?.text = getString(R.string.ai_metrics_simple_format, fpsText, modelText)
-                tvAiMetrics?.setTextColor(ContextCompat.getColor(ctx, R.color.shield_hero_desc))
+                tvAiMetrics?.setTextColor(com.google.android.material.color.MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, ContextCompat.getColor(ctx, R.color.shield_hero_desc)))
             }
         } else {
             tvAiStatusSubtext?.setText(R.string.settings_ai_desc)
-            tvAiStatusSubtext?.setTextColor(ContextCompat.getColor(ctx, R.color.shield_hero_desc))
+            tvAiStatusSubtext?.setTextColor(com.google.android.material.color.MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, ContextCompat.getColor(ctx, R.color.shield_hero_desc)))
             tvAiMetrics?.setText(R.string.ai_no_detections_yet)
-            tvAiMetrics?.setTextColor(ContextCompat.getColor(ctx, R.color.shield_hero_desc))
+            tvAiMetrics?.setTextColor(com.google.android.material.color.MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, ContextCompat.getColor(ctx, R.color.shield_hero_desc)))
         }
     }
 
@@ -188,7 +188,7 @@ class SettingsFragment : Fragment() {
             btnLinkGoogle?.visibility = View.GONE
         } else {
             tvGoogleAccountStatus?.setText(R.string.settings_google_unlinked)
-            tvGoogleAccountStatus?.setTextColor(ContextCompat.getColor(ctx, R.color.shield_hero_desc))
+            tvGoogleAccountStatus?.setTextColor(com.google.android.material.color.MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, ContextCompat.getColor(ctx, R.color.shield_hero_desc)))
             btnLinkGoogle?.visibility = View.VISIBLE
             btnLinkGoogle?.setText(R.string.btn_secure_with_google)
         }

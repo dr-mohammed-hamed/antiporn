@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.drmohammed.antiporn.R
@@ -139,10 +140,31 @@ class HomeFragment : Fragment() {
             lastNapTapTime = now
 
             val ctx = context ?: return@setOnClickListener
-            if (CurfewEnforcer.isCurfewActive(ctx)) return@setOnClickListener
+            if (CurfewEnforcer.isCurfewActive(ctx)) {
+                Toast.makeText(ctx, R.string.card_curfew_night_locked_hint, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
-            NapController.startNap(ctx)
-            updateNapDisplay()
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(ctx)
+                .setTitle(R.string.dialog_nap_confirm_title)
+                .setMessage(R.string.dialog_nap_confirm_msg)
+                .setPositiveButton(android.R.string.ok) { dialog, _ ->
+                    dialog.dismiss()
+                    btnHeroNapStart?.isEnabled = false
+                    btnHeroNapExtend?.isEnabled = false
+                    NapController.startNap(ctx)
+                    com.drmohammed.antiporn.curfew.CurfewScheduler.scheduleNapEndAlarm(ctx, NapController.getEndWall(ctx))
+                    com.drmohammed.antiporn.curfew.CurfewEnforcer.syncBlockStateAsync(ctx) {
+                        if (isAdded && view != null) {
+                            btnHeroNapStart?.isEnabled = true
+                            btnHeroNapExtend?.isEnabled = true
+                            Toast.makeText(ctx, R.string.toast_nap_started, Toast.LENGTH_SHORT).show()
+                            updateNapDisplay()
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
 
         btnHeroNapExtend?.setOnClickListener {
@@ -151,8 +173,18 @@ class HomeFragment : Fragment() {
             lastNapTapTime = now
 
             val ctx = context ?: return@setOnClickListener
+            if (!NapController.isNapActive(ctx)) return@setOnClickListener
+
+            btnHeroNapExtend?.isEnabled = false
             NapController.extendNap(ctx)
-            updateNapDisplay()
+            com.drmohammed.antiporn.curfew.CurfewScheduler.scheduleNapEndAlarm(ctx, NapController.getEndWall(ctx))
+            com.drmohammed.antiporn.curfew.CurfewEnforcer.syncBlockStateAsync(ctx) {
+                if (isAdded && view != null) {
+                    btnHeroNapExtend?.isEnabled = true
+                    Toast.makeText(ctx, R.string.toast_nap_extended, Toast.LENGTH_SHORT).show()
+                    updateNapDisplay()
+                }
+            }
         }
 
         btnEnforceNow?.setOnClickListener {
@@ -208,6 +240,7 @@ class HomeFragment : Fragment() {
                         tvHeroShieldStatus?.text = getString(R.string.home_shield_inactive)
                         tvHeroShieldStatus?.setTextColor(ContextCompat.getColor(ctx, R.color.shield_amber_calm))
                         tvHeroShieldStatus?.setBackgroundResource(R.drawable.bg_shield_status_badge_amber)
+                        frameHeroShieldGlow?.background = null
                     }
                 } else {
                     cardAdbHelp?.visibility = View.VISIBLE
@@ -218,6 +251,7 @@ class HomeFragment : Fragment() {
                     tvHeroShieldStatus?.text = getString(R.string.home_shield_inactive)
                     tvHeroShieldStatus?.setTextColor(ContextCompat.getColor(ctx, R.color.shield_amber_calm))
                     tvHeroShieldStatus?.setBackgroundResource(R.drawable.bg_shield_status_badge_amber)
+                    frameHeroShieldGlow?.background = null
                 }
             }
         }

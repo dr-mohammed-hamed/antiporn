@@ -1,11 +1,11 @@
 {
-  "versionCode": 2,
-  "versionName": "1.1",
+  "versionCode": 3,
+  "versionName": "1.2",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 29067817,
+  "fileSizeBytes": 41523394,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "تحديث شامل للواجهة الرئيسية (تفريغ وتجميل الواجهة، نافذة الدروع المنبثقة التفاعلية Material 3 Bottom Sheet مع فرز صارم للدروع النشطة، بطاقة مخصصة لوضع القيلولة المؤقت)",
-  "releaseDate": "2026-10-29"
+  "releaseNotes": "إصدار شامل فائق التوافق مع معالجات الهواتف (دعم معالجات 64-bit و 32-bit ARM) وبأعلى مستويات تقليص الحجم مع الحفاظ الكامل على نماذج الحماية والذكاء الاصطناعي.",
+  "releaseDate": "2026-10-30"
 }

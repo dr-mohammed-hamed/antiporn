@@ -78,6 +78,7 @@ object OtaRemoteSource {
                 try {
                     connection?.disconnect()
                 } catch (ignored: Exception) {
+                    Log.w(TAG, "Error disconnecting HTTP connection: ${ignored.message}")
                 }
             }
         }
@@ -240,6 +241,7 @@ object OtaRemoteSource {
             try {
                 connection?.disconnect()
             } catch (ignored: Exception) {
+                Log.w(TAG, "Error disconnecting HTTP connection: ${ignored.message}")
             }
         }
     }

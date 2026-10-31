@@ -480,7 +480,7 @@ class AccountabilityFragment : Fragment() {
             container.addView(emptyText)
         } else {
             for (ward in wards) {
-                val card = createPartnerCard(ward, isWard = true)
+                val card = createPartnerCard(ward, isWard = true) ?: continue
                 container.addView(card)
             }
         }
@@ -494,14 +494,14 @@ class AccountabilityFragment : Fragment() {
             container.addView(emptyText)
         } else {
             for (guardian in guardians) {
-                val card = createPartnerCard(guardian, isWard = false)
+                val card = createPartnerCard(guardian, isWard = false) ?: continue
                 container.addView(card)
             }
         }
     }
 
-    private fun createPartnerCard(partner: PartnerEntity, isWard: Boolean): View {
-        val ctx = context ?: return View(requireContext())
+    private fun createPartnerCard(partner: PartnerEntity, isWard: Boolean): View? {
+        val ctx = context ?: return null
         val card = MaterialCardView(ctx).apply {
             radius = resources.displayMetrics.density * 18
             cardElevation = 0f

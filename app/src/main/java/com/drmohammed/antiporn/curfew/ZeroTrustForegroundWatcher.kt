@@ -242,11 +242,28 @@ object ZeroTrustForegroundWatcher {
             }
         } else {
             syncWatcherState(appContext)
-            executor?.execute {
-                try {
-                    checkAndKickout(appContext, immediateTargetPackage)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error in fallback ZeroTrust check", e)
+            val fallbackExec = executor
+            if (fallbackExec != null && !fallbackExec.isShutdown) {
+                fallbackExec.execute {
+                    try {
+                        checkAndKickout(appContext, immediateTargetPackage)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error in fallback ZeroTrust check", e)
+                    }
+                }
+            } else if (!immediateTargetPackage.isNullOrBlank()) {
+                // If watcher is dormant, dispatch immediate target kickout evaluation on dedicated daemon thread
+                val oneShotExec = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+                    Thread(r, "ZeroTrustImmediateCheck").apply { isDaemon = true }
+                }
+                oneShotExec.execute {
+                    try {
+                        checkAndKickout(appContext, immediateTargetPackage)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error in one-shot ZeroTrust check", e)
+                    } finally {
+                        oneShotExec.shutdown()
+                    }
                 }
             }
         }

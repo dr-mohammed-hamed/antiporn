@@ -28,6 +28,10 @@ import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.ui.accountability.RemoteAppManagerActivity
 import com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry
+import com.drmohammed.antiporn.ui.control.qr.QrExportDialog
+import com.drmohammed.antiporn.ui.control.qr.QrScannerBottomSheet
+import com.drmohammed.antiporn.ui.control.qr.SelfControlQrManager
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -104,6 +108,13 @@ class SelfControlFragment : Fragment() {
     private var layoutPendingApps: LinearLayout? = null
     private var tvNoPendingApps: TextView? = null
 
+    // QR Lock controls
+    private var switchQrLockEnabled: MaterialSwitch? = null
+    private var layoutQrActionButtons: View? = null
+    private var btnShowQrCode: MaterialButton? = null
+    private var btnRegenerateQrCode: MaterialButton? = null
+    private var isQrPolicyLoading = false
+
     // Bottom Bar
     private var btnSaveSelfControlChanges: MaterialButton? = null
 
@@ -149,6 +160,17 @@ class SelfControlFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        checkGateAndRefresh()
+    }
+
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        if (!hidden) {
+            checkGateAndRefresh()
+        }
+    }
+
+    private fun checkGateAndRefresh() {
         val ctx = context ?: return
         val gate = SelfControlAccessGateRegistry.getActiveGate()
         if (!gate.canAccess(ctx)) {
@@ -210,13 +232,123 @@ class SelfControlFragment : Fragment() {
 
         btnOpenLocalAppManager = root.findViewById(R.id.btnOpenLocalAppManager)
 
+        switchQrLockEnabled = root.findViewById(R.id.switchQrLockEnabled)
+        layoutQrActionButtons = root.findViewById(R.id.layoutQrActionButtons)
+        btnShowQrCode = root.findViewById(R.id.btnShowQrCode)
+        btnRegenerateQrCode = root.findViewById(R.id.btnRegenerateQrCode)
+
         layoutPendingApps = root.findViewById(R.id.layoutPendingApps)
         tvNoPendingApps = root.findViewById(R.id.tvNoPendingApps)
 
         btnSaveSelfControlChanges = root.findViewById(R.id.btnSaveSelfControlChanges)
     }
 
+    private fun showQrScannerWithFallback(tag: String, onAuthorized: () -> Unit) {
+        if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return
+        childFragmentManager.setFragmentResultListener(tag, viewLifecycleOwner) { _, bundle ->
+            val verified = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_VERIFIED, false)
+            val bypass = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_EMERGENCY_BYPASS, false)
+            if (verified || bypass) {
+                onAuthorized()
+            }
+        }
+        QrScannerBottomSheet.newInstance(tag).apply {
+            onVerified = { onAuthorized() }
+            onEmergencyBypassTriggered = { onAuthorized() }
+        }.show(childFragmentManager, tag)
+    }
+
     private fun setupListeners() {
+        switchQrLockEnabled?.setOnCheckedChangeListener { _, isChecked ->
+            if (isQrPolicyLoading) return@setOnCheckedChangeListener
+            val ctx = context?.applicationContext ?: return@setOnCheckedChangeListener
+            val qrManager = SelfControlQrManager.getInstance(ctx)
+            if (isChecked) {
+                if (!qrManager.hasToken()) {
+                    qrManager.generateAndSaveNewToken()
+                }
+                qrManager.setQrLockEnabled(true)
+                layoutQrActionButtons?.isVisible = true
+                if (!childFragmentManager.isStateSaved && childFragmentManager.findFragmentByTag(QrExportDialog.TAG) == null) {
+                    QrExportDialog.newInstance().show(childFragmentManager, QrExportDialog.TAG)
+                }
+            } else {
+                if (qrManager.isQrLockEnabled()) {
+                    isQrPolicyLoading = true
+                    switchQrLockEnabled?.isChecked = true
+                    isQrPolicyLoading = false
+
+                    val tag = "qr_scanner_disable_barrier"
+                    if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return@setOnCheckedChangeListener
+                    showQrScannerWithFallback(tag) {
+                        qrManager.setQrLockEnabled(false)
+                        isQrPolicyLoading = true
+                        switchQrLockEnabled?.isChecked = false
+                        layoutQrActionButtons?.isVisible = false
+                        isQrPolicyLoading = false
+                        Toast.makeText(context ?: ctx, R.string.self_control_qr_disabled_toast, Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    layoutQrActionButtons?.isVisible = false
+                }
+            }
+        }
+
+        btnShowQrCode?.setOnClickListener {
+            val ctx = context?.applicationContext ?: return@setOnClickListener
+            val qrManager = SelfControlQrManager.getInstance(ctx)
+            if (!qrManager.hasToken()) {
+                qrManager.generateAndSaveNewToken()
+            }
+            fun showExportDialog() {
+                if (!childFragmentManager.isStateSaved && childFragmentManager.findFragmentByTag(QrExportDialog.TAG) == null) {
+                    QrExportDialog.newInstance().show(childFragmentManager, QrExportDialog.TAG)
+                }
+            }
+            if (qrManager.isQrLockEnabled()) {
+                val tag = "qr_scanner_show_code"
+                if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return@setOnClickListener
+                showQrScannerWithFallback(tag) {
+                    showExportDialog()
+                }
+            } else {
+                showExportDialog()
+            }
+        }
+
+        btnRegenerateQrCode?.setOnClickListener {
+            val ctx = context?.applicationContext ?: return@setOnClickListener
+            val qrManager = SelfControlQrManager.getInstance(ctx)
+            fun proceedWithRegeneration() {
+                val act = activity ?: return
+                MaterialAlertDialogBuilder(act)
+                    .setTitle(R.string.self_control_qr_regenerate_confirm_title)
+                    .setMessage(R.string.self_control_qr_regenerate_confirm_message)
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(R.string.self_control_qr_btn_regenerate_confirm) { _, _ ->
+                        qrManager.generateAndSaveNewToken()
+                        qrManager.setQrLockEnabled(true)
+                        isQrPolicyLoading = true
+                        switchQrLockEnabled?.isChecked = true
+                        layoutQrActionButtons?.isVisible = true
+                        isQrPolicyLoading = false
+                        if (!childFragmentManager.isStateSaved && childFragmentManager.findFragmentByTag(QrExportDialog.TAG) == null) {
+                            QrExportDialog.newInstance().show(childFragmentManager, QrExportDialog.TAG)
+                        }
+                    }
+                    .show()
+            }
+
+            if (qrManager.isQrLockEnabled()) {
+                val tag = "qr_scanner_regenerate_auth"
+                if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return@setOnClickListener
+                showQrScannerWithFallback(tag) {
+                    proceedWithRegeneration()
+                }
+            } else {
+                proceedWithRegeneration()
+            }
+        }
         btnChangeStartTime?.setOnClickListener {
             val ctx = context ?: return@setOnClickListener
             val is24Hour = android.text.format.DateFormat.is24HourFormat(ctx)
@@ -233,7 +365,9 @@ class SelfControlFragment : Fragment() {
                 updateTimingLabels()
                 updateSaveButtonState()
             }
-            picker.show(childFragmentManager, "weekday_start_picker")
+            val tag = "weekday_start_picker"
+            if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return@setOnClickListener
+            picker.show(childFragmentManager, tag)
         }
 
         btnChangeEndTime?.setOnClickListener {
@@ -252,7 +386,9 @@ class SelfControlFragment : Fragment() {
                 updateTimingLabels()
                 updateSaveButtonState()
             }
-            picker.show(childFragmentManager, "weekday_end_picker")
+            val tag = "weekday_end_picker"
+            if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return@setOnClickListener
+            picker.show(childFragmentManager, tag)
         }
 
         btnChangeWeekendStartTime?.setOnClickListener {
@@ -271,7 +407,9 @@ class SelfControlFragment : Fragment() {
                 updateTimingLabels()
                 updateSaveButtonState()
             }
-            picker.show(childFragmentManager, "weekend_start_picker")
+            val tag = "weekend_start_picker"
+            if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return@setOnClickListener
+            picker.show(childFragmentManager, tag)
         }
 
         btnChangeWeekendEndTime?.setOnClickListener {
@@ -290,7 +428,9 @@ class SelfControlFragment : Fragment() {
                 updateTimingLabels()
                 updateSaveButtonState()
             }
-            picker.show(childFragmentManager, "weekend_end_picker")
+            val tag = "weekend_end_picker"
+            if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return@setOnClickListener
+            picker.show(childFragmentManager, tag)
         }
 
         layoutTimezoneHeader?.setOnClickListener {
@@ -358,10 +498,19 @@ class SelfControlFragment : Fragment() {
             lastAppManagerClickTime = now
 
             val ctx = context ?: return@setOnClickListener
-            val intent = Intent(ctx, RemoteAppManagerActivity::class.java).apply {
-                putExtra(RemoteAppManagerActivity.EXTRA_IS_LOCAL, true)
+            val launchAction = {
+                val intent = Intent(ctx, RemoteAppManagerActivity::class.java).apply {
+                    putExtra(RemoteAppManagerActivity.EXTRA_IS_LOCAL, true)
+                }
+                appManagerLauncher.launch(intent)
             }
-            appManagerLauncher.launch(intent)
+
+            val qrManager = SelfControlQrManager.getInstance(ctx)
+            if (qrManager.isQrLockEnabled()) {
+                showQrScannerWithFallback("qr_scanner_app_mgr") { launchAction() }
+            } else {
+                launchAction()
+            }
         }
 
         btnSaveSelfControlChanges?.setOnClickListener {
@@ -398,6 +547,14 @@ class SelfControlFragment : Fragment() {
         etDnsHost?.setText(policy.dnsHost)
         updateTimingLabels()
         updateTimezoneViews()
+
+        val qrManager = SelfControlQrManager.getInstance(ctx)
+        val isQrEnabled = qrManager.isQrLockEnabled()
+        isQrPolicyLoading = true
+        switchQrLockEnabled?.isChecked = isQrEnabled
+        layoutQrActionButtons?.isVisible = isQrEnabled
+        isQrPolicyLoading = false
+
         updateSaveButtonState()
     }
 
@@ -556,24 +713,33 @@ class SelfControlFragment : Fragment() {
             }
 
             approveBtn.setOnClickListener {
-                approveBtn.isEnabled = false
-                rejectBtn.isEnabled = false
-                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                    try {
-                        ApprovalRepository.getInstance(ctx.applicationContext).unsuspendAndApprove(pkg, "SELF")
-                        withContext(Dispatchers.Main) {
-                            if (isAdded && view != null) loadPendingApprovals()
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed approving package $pkg", e)
-                        withContext(Dispatchers.Main) {
-                            if (isAdded && view != null) {
-                                approveBtn.isEnabled = true
-                                rejectBtn.isEnabled = true
-                                Toast.makeText(ctx, R.string.toast_self_policy_save_failed, Toast.LENGTH_SHORT).show()
+                val qrManager = com.drmohammed.antiporn.ui.control.qr.SelfControlQrManager.getInstance(ctx)
+                val executeApprove = {
+                    approveBtn.isEnabled = false
+                    rejectBtn.isEnabled = false
+                    viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            ApprovalRepository.getInstance(ctx.applicationContext).unsuspendAndApprove(pkg, "SELF")
+                            withContext(Dispatchers.Main) {
+                                if (isAdded && view != null) loadPendingApprovals()
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed approving package $pkg", e)
+                            withContext(Dispatchers.Main) {
+                                if (isAdded && view != null) {
+                                    approveBtn.isEnabled = true
+                                    rejectBtn.isEnabled = true
+                                    Toast.makeText(ctx, R.string.toast_self_policy_save_failed, Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
                     }
+                }
+
+                if (qrManager.isQrLockEnabled()) {
+                    showQrScannerWithFallback("qr_scanner_approve_$pkg") { executeApprove() }
+                } else {
+                    executeApprove()
                 }
             }
 
@@ -638,48 +804,59 @@ class SelfControlFragment : Fragment() {
 
     private fun saveChanges() {
         if (isSavingPolicy || !hasUnsavedChanges()) return
-        isSavingPolicy = true
-        btnSaveSelfControlChanges?.isEnabled = false
-
-        val hostInput = etDnsHost?.text?.toString()?.trim().orEmpty()
-        val dnsToSave = hostInput.ifBlank { DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST }
-
-        val updatedPolicy = currentPolicy.copy(
-            curfewStartHour = selectedStartHour,
-            curfewStartMinute = selectedStartMinute,
-            curfewEndHour = selectedEndHour,
-            curfewEndMinute = selectedEndMinute,
-            isCurfewEnabled = switchCurfewMaster?.isChecked == true,
-            isWeekendCurfewEnabled = switchWeekendCurfew?.isChecked == true,
-            weekendCurfewStartHour = selectedWeekendStartHour,
-            weekendCurfewStartMinute = selectedWeekendStartMinute,
-            weekendCurfewEndHour = selectedWeekendEndHour,
-            weekendCurfewEndMinute = selectedWeekendEndMinute,
-            isVpnBlackholeEnabled = switchVpnBlackhole?.isChecked == true,
-            isInstantInternetKillEnabled = switchInstantInternetKill?.isChecked == true,
-            isIncognitoBlocked = switchIncognitoBlocked?.isChecked == true,
-            lockNewInstallsUntilApproved = switchLockNewInstalls?.isChecked == true,
-            isDateTimeLocked = switchLockDateTime?.isChecked == true,
-            timeZoneId = selectedTimeZoneId,
-            dnsHost = dnsToSave
-        )
 
         val ctx = context?.applicationContext ?: return
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-            val success = PolicyRepository.getInstance(ctx).saveAndEnforceSelfPolicy(updatedPolicy)
-            withContext(Dispatchers.Main) {
-                if (!isAdded || view == null) return@withContext
-                isSavingPolicy = false
-                if (success) {
-                    currentPolicy = updatedPolicy
-                    initialPolicySnapshot = updatedPolicy
-                    updateSaveButtonState()
-                    Toast.makeText(context ?: ctx, R.string.toast_self_policy_saved, Toast.LENGTH_SHORT).show()
-                } else {
-                    updateSaveButtonState()
-                    Toast.makeText(context ?: ctx, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
+        val qrManager = com.drmohammed.antiporn.ui.control.qr.SelfControlQrManager.getInstance(ctx)
+
+        val executeSave = {
+            isSavingPolicy = true
+            btnSaveSelfControlChanges?.isEnabled = false
+
+            val hostInput = etDnsHost?.text?.toString()?.trim().orEmpty()
+            val dnsToSave = hostInput.ifBlank { DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST }
+
+            val updatedPolicy = currentPolicy.copy(
+                curfewStartHour = selectedStartHour,
+                curfewStartMinute = selectedStartMinute,
+                curfewEndHour = selectedEndHour,
+                curfewEndMinute = selectedEndMinute,
+                isCurfewEnabled = switchCurfewMaster?.isChecked == true,
+                isWeekendCurfewEnabled = switchWeekendCurfew?.isChecked == true,
+                weekendCurfewStartHour = selectedWeekendStartHour,
+                weekendCurfewStartMinute = selectedWeekendStartMinute,
+                weekendCurfewEndHour = selectedWeekendEndHour,
+                weekendCurfewEndMinute = selectedWeekendEndMinute,
+                isVpnBlackholeEnabled = switchVpnBlackhole?.isChecked == true,
+                isInstantInternetKillEnabled = switchInstantInternetKill?.isChecked == true,
+                isIncognitoBlocked = switchIncognitoBlocked?.isChecked == true,
+                lockNewInstallsUntilApproved = switchLockNewInstalls?.isChecked == true,
+                isDateTimeLocked = switchLockDateTime?.isChecked == true,
+                timeZoneId = selectedTimeZoneId,
+                dnsHost = dnsToSave
+            )
+
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                val success = PolicyRepository.getInstance(ctx).saveAndEnforceSelfPolicy(updatedPolicy)
+                withContext(Dispatchers.Main) {
+                    if (!isAdded || view == null) return@withContext
+                    isSavingPolicy = false
+                    if (success) {
+                        currentPolicy = updatedPolicy
+                        initialPolicySnapshot = updatedPolicy
+                        updateSaveButtonState()
+                        Toast.makeText(context ?: ctx, R.string.toast_self_policy_saved, Toast.LENGTH_SHORT).show()
+                    } else {
+                        updateSaveButtonState()
+                        Toast.makeText(context ?: ctx, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
+                    }
                 }
             }
+        }
+
+        if (qrManager.isQrLockEnabled()) {
+            showQrScannerWithFallback("qr_scanner_fragment_save") { executeSave() }
+        } else {
+            executeSave()
         }
     }
 
@@ -720,6 +897,10 @@ class SelfControlFragment : Fragment() {
         layoutPendingApps = null
         tvNoPendingApps = null
         btnSaveSelfControlChanges = null
+        switchQrLockEnabled = null
+        layoutQrActionButtons = null
+        btnShowQrCode = null
+        btnRegenerateQrCode = null
         super.onDestroyView()
     }
 

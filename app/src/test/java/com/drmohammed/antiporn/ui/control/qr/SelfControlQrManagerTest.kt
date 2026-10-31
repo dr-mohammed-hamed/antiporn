@@ -19,7 +19,7 @@ class SelfControlQrManagerTest {
     fun setUp() {
         fakePrefs = FakeSharedPreferences()
         currentTime = 1_000_000_000L
-        manager = SelfControlQrManager(fakePrefs, timeProvider = { currentTime })
+        manager = SelfControlQrManager(fakePrefs, timeProvider = { currentTime }, trustProvider = { true })
     }
 
     @Test
@@ -212,5 +212,18 @@ class SelfControlQrManagerTest {
                 pending.clear()
             }
         }
+    }
+    @Test
+    fun testEmergencyDelay_offlineUntrusted_rejectsElapsed() {
+        val untrustedManager = SelfControlQrManager(
+            fakePrefs,
+            timeProvider = { currentTime },
+            trustProvider = { false }
+        )
+        untrustedManager.requestEmergencyDelay()
+        currentTime += 30L * 3600L * 1000L // 30 hours elapsed
+        assertEquals(0L, untrustedManager.getEmergencyDelayRemainingMs())
+        // Anti-tamper: Must return false because time is untrusted (offline clock spoof)
+        assertFalse(untrustedManager.isEmergencyDelayActiveAndElapsed())
     }
 }

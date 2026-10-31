@@ -550,6 +550,10 @@ class ApprovalRepository private constructor(context: Context) {
 
         val packagesToUnsuspend = mutableListOf<String>()
 
+        val policy = if (isDo && dpm != null) PolicyRepository.getInstance(appContext).getCurrentPolicy() else null
+        val isBlockActive = if (isDo && dpm != null) CurfewEnforcer.isEffectiveBlockActive(appContext) else false
+        val immunePackages = if (isDo && dpm != null) CurfewAppResolver.resolveImmunePackages(appContext) else emptySet()
+
         for (pkgInfo in installedPackages) {
             val pkg = pkgInfo.packageName ?: continue
             if (pkg == appContext.packageName) continue
@@ -576,8 +580,17 @@ class ApprovalRepository private constructor(context: Context) {
             )
             database.savePendingApproval(baselineEntity)
 
-            // If it was inadvertently suspended or hidden, queue it for unfreezing
-            if (isDo && dpm != null) {
+            // If it was inadvertently suspended or hidden, queue it for unfreezing ONLY if not restricted by Curfew or Custom Blacklist
+            if (isDo && dpm != null && policy != null) {
+                val isWhitelisted = CurfewConfig.STATIC_WHITELIST.contains(pkg) || immunePackages.contains(pkg)
+
+                if (policy.customBlacklistPackages.contains(pkg)) {
+                    continue
+                }
+                if (isBlockActive && !isWhitelisted) {
+                    continue
+                }
+
                 val isSuspended = try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
                 val isHidden = try { dpm.isApplicationHidden(admin, pkg) } catch (e: Exception) { false }
                 if (isSuspended || isHidden) {

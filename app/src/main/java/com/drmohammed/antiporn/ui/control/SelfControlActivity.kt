@@ -147,6 +147,7 @@ class SelfControlActivity : AppCompatActivity() {
 
     private val backPressedCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
+            if (isFinishing || isDestroyed) return
             if (isSavingPolicy) return
             if (hasUnsavedChanges()) {
                 showDiscardConfirmationDialog()
@@ -854,6 +855,7 @@ class SelfControlActivity : AppCompatActivity() {
     }
 
     private fun showDiscardConfirmationDialog() {
+        if (isFinishing || isDestroyed) return
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_unsaved_changes_title)
             .setMessage(R.string.dialog_unsaved_changes_msg)

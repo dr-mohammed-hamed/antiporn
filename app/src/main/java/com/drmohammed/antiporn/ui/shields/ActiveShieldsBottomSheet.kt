@@ -1,6 +1,7 @@
 package com.drmohammed.antiporn.ui.shields
 
 import android.app.Activity
+import java.lang.ref.WeakReference
 import android.content.Context
 import android.content.ContextWrapper
 import android.view.LayoutInflater
@@ -22,14 +23,14 @@ import com.google.android.material.button.MaterialButton
  */
 object ActiveShieldsBottomSheet {
 
-    private var currentDialog: BottomSheetDialog? = null
+    private var currentDialog: WeakReference<BottomSheetDialog>? = null
 
     /**
      * Safely dismisses any currently active dialog instance.
      */
     fun dismiss() {
         try {
-            currentDialog?.dismiss()
+            currentDialog?.get()?.dismiss()
         } catch (_: Exception) {}
         currentDialog = null
     }
@@ -43,7 +44,7 @@ object ActiveShieldsBottomSheet {
         dismiss()
 
         val dialog = BottomSheetDialog(context)
-        currentDialog = dialog
+        currentDialog = WeakReference(dialog)
 
         val lifecycleObserver = if (activity is LifecycleOwner) {
             LifecycleEventObserver { _, event ->
@@ -61,7 +62,7 @@ object ActiveShieldsBottomSheet {
             if (activity is LifecycleOwner && lifecycleObserver != null) {
                 activity.lifecycle.removeObserver(lifecycleObserver)
             }
-            if (currentDialog === dialog) {
+            if (currentDialog?.get() === dialog) {
                 currentDialog = null
             }
         }

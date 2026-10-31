@@ -130,6 +130,13 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (::bottomNav.isInitialized) {
+            outState.putInt(KEY_SELECTED_TAB, bottomNav.selectedItemId)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         enableEdgeToEdge()
@@ -186,7 +193,15 @@ class MainActivity : AppCompatActivity(),
             accountabilityFragment = fm.findFragmentByTag(TAG_ACCOUNTABILITY) as? AccountabilityFragment ?: accountabilityFragment
             settingsFragment = fm.findFragmentByTag(TAG_SETTINGS) as? SettingsFragment ?: settingsFragment
 
-            activeFragment = when (bottomNav.selectedItemId) {
+            var restoredTabId = savedInstanceState?.getInt(KEY_SELECTED_TAB, R.id.nav_home) ?: R.id.nav_home
+            if (restoredTabId == R.id.nav_self_control) {
+                val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
+                if (!gate.canAccess(this)) {
+                    restoredTabId = R.id.nav_home
+                }
+            }
+            bottomNav.selectedItemId = restoredTabId
+            activeFragment = when (restoredTabId) {
                 R.id.nav_self_control -> selfControlFragment
                 R.id.nav_accountability -> accountabilityFragment
                 R.id.nav_settings -> settingsFragment
@@ -520,5 +535,6 @@ class MainActivity : AppCompatActivity(),
         private const val TAG_SELF_CONTROL = "TAB_SELF_CONTROL"
         private const val TAG_ACCOUNTABILITY = "TAB_ACCOUNTABILITY"
         private const val TAG_SETTINGS = "TAB_SETTINGS"
+        private const val KEY_SELECTED_TAB = "key_selected_tab"
     }
 }
