@@ -29,6 +29,7 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
+import com.drmohammed.antiporn.ui.browser.BrowserUrlFilterActivity
 import com.drmohammed.antiporn.core.network.DnsFilteringValidator
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.google.android.material.appbar.MaterialToolbar
@@ -109,6 +110,10 @@ class GuardianControlActivity : AppCompatActivity() {
     // Remote App Manager
     private lateinit var btnOpenAppManager: MaterialButton
 
+    // Browser URL Filter
+    private lateinit var tvBrowserFilterStatus: TextView
+    private lateinit var btnManageBrowserUrls: MaterialButton
+
     // DNS controls
     private lateinit var tilDnsHost: TextInputLayout
     private lateinit var etDnsHost: TextInputEditText
@@ -146,6 +151,25 @@ class GuardianControlActivity : AppCompatActivity() {
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             loadWardPolicy()
+        }
+    }
+
+    private val browserFilterLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (isFinishing || isDestroyed) return@registerForActivityResult
+        if (result.resultCode == Activity.RESULT_OK) {
+            val updatedJson = result.data?.getStringExtra(BrowserUrlFilterActivity.EXTRA_UPDATED_POLICY_JSON)
+            if (!updatedJson.isNullOrBlank()) {
+                val updated = DevicePolicyBundle.fromJson(updatedJson)
+                currentPolicy = currentPolicy.copy(
+                    browserFilterMode = updated.browserFilterMode,
+                    customBlockedUrls = updated.customBlockedUrls,
+                    customAllowedUrls = updated.customAllowedUrls
+                )
+                populateUiFromPolicy(currentPolicy)
+                updateSaveButtonState()
+            }
         }
     }
 
@@ -278,6 +302,10 @@ class GuardianControlActivity : AppCompatActivity() {
         // App Manager
         btnOpenAppManager = findViewById(R.id.btnOpenAppManager)
 
+        // Browser Filter
+        tvBrowserFilterStatus = findViewById(R.id.tvBrowserFilterStatus)
+        btnManageBrowserUrls = findViewById(R.id.btnManageBrowserUrls)
+
         // DNS
         tilDnsHost = findViewById(R.id.tilDnsHost)
         etDnsHost = findViewById(R.id.etDnsHost)
@@ -314,6 +342,7 @@ class GuardianControlActivity : AppCompatActivity() {
         switchLockNewInstalls.isEnabled = enabled
         switchLockDateTime.isEnabled = enabled
         btnOpenAppManager.isEnabled = enabled
+        btnManageBrowserUrls.isEnabled = enabled
         etDnsHost.isEnabled = enabled
         btnPresetAdguard.isEnabled = enabled
         btnPresetCloudflare.isEnabled = enabled
@@ -351,7 +380,10 @@ class GuardianControlActivity : AppCompatActivity() {
                 switchLockNewInstalls.isChecked != snapshot.lockNewInstallsUntilApproved ||
                 switchLockDateTime.isChecked != snapshot.isDateTimeLocked ||
                 getCleanDnsHost() != snapshot.dnsHost ||
-                selectedTimeZoneId != snapshot.timeZoneId
+                selectedTimeZoneId != snapshot.timeZoneId ||
+                currentPolicy.browserFilterMode != snapshot.browserFilterMode ||
+                currentPolicy.customBlockedUrls != snapshot.customBlockedUrls ||
+                currentPolicy.customAllowedUrls != snapshot.customAllowedUrls
     }
 
     private fun updateSaveButtonState() {
@@ -554,6 +586,20 @@ class GuardianControlActivity : AppCompatActivity() {
             appManagerLauncher.launch(intent)
         }
 
+        var lastBrowserFilterClickTime = 0L
+        btnManageBrowserUrls.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastBrowserFilterClickTime < 800L) return@setOnClickListener
+            lastBrowserFilterClickTime = now
+
+            val intent = Intent(this@GuardianControlActivity, BrowserUrlFilterActivity::class.java).apply {
+                putExtra(BrowserUrlFilterActivity.EXTRA_IS_REMOTE, true)
+                putExtra(BrowserUrlFilterActivity.EXTRA_WARD_DEVICE_ID, wardId)
+                putExtra(BrowserUrlFilterActivity.EXTRA_POLICY_JSON, currentPolicy.toJson())
+            }
+            browserFilterLauncher.launch(intent)
+        }
+
         btnPresetAdguard.setOnClickListener {
             etDnsHost.setText(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST)
             tilDnsHost.error = null
@@ -642,6 +688,15 @@ class GuardianControlActivity : AppCompatActivity() {
         cardTimezoneControl.isVisible = policy.isDateTimeLocked
         etDnsHost.setText(policy.dnsHost)
         tilDnsHost.error = null
+
+        tvBrowserFilterStatus.text = when (policy.browserFilterMode) {
+            DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST ->
+                getString(R.string.browser_filter_status_blocklist, policy.customBlockedUrls.size)
+            DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY ->
+                getString(R.string.browser_filter_status_whitelist, policy.customAllowedUrls.size)
+            else ->
+                getString(R.string.browser_filter_status_off)
+        }
 
         if (policy.breakoutStatus == DevicePolicyBundle.BREAKOUT_STATUS_PENDING && policy.breakoutUnlockAt != null) {
             cardBreakoutAlertBanner.visibility = View.VISIBLE
@@ -924,6 +979,9 @@ class GuardianControlActivity : AppCompatActivity() {
                     isIncognitoBlocked = switchIncognitoBlocked.isChecked,
                     lockNewInstallsUntilApproved = switchLockNewInstalls.isChecked,
                     isDateTimeLocked = switchLockDateTime.isChecked,
+                    browserFilterMode = currentPolicy.browserFilterMode,
+                    customBlockedUrls = currentPolicy.customBlockedUrls,
+                    customAllowedUrls = currentPolicy.customAllowedUrls,
                     dnsHost = rawDns,
                     timeZoneId = selectedTimeZoneId,
                     version = latestPolicy.version + 1,

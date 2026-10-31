@@ -29,6 +29,9 @@ class DevicePolicyBundleTest {
         assertTrue(policy.customBlacklistPackages.isEmpty())
         assertTrue(policy.customCurfewWhitelistPackages.isEmpty())
         assertTrue(policy.protectedAppPackages.isEmpty())
+        assertEquals(DevicePolicyBundle.BROWSER_FILTER_OFF, policy.browserFilterMode)
+        assertTrue(policy.customBlockedUrls.isEmpty())
+        assertTrue(policy.customAllowedUrls.isEmpty())
         assertFalse(policy.isDateTimeLocked)
         assertEquals(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST, policy.dnsHost)
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.getDefaultFallbackTimeZone(), policy.timeZoneId)
@@ -56,6 +59,9 @@ class DevicePolicyBundleTest {
             customBlacklistPackages = setOf("com.bad.app1", "com.bad.app2"),
             customCurfewWhitelistPackages = setOf("com.work.app1"),
             protectedAppPackages = setOf("com.vital.app1", "com.vital.app2"),
+            browserFilterMode = DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST,
+            customBlockedUrls = setOf("badsite.com", "gambling.org"),
+            customAllowedUrls = setOf("safe.org"),
             dnsHost = "custom.dns.nextdns.io",
             timeZoneId = "Africa/Cairo",
             lastHeartbeat = 1790000050000L,
@@ -87,6 +93,9 @@ class DevicePolicyBundleTest {
         assertEquals(original.customBlacklistPackages, restored.customBlacklistPackages)
         assertEquals(original.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
+        assertEquals(original.browserFilterMode, restored.browserFilterMode)
+        assertEquals(original.customBlockedUrls, restored.customBlockedUrls)
+        assertEquals(original.customAllowedUrls, restored.customAllowedUrls)
         assertEquals(original.dnsHost, restored.dnsHost)
         assertEquals(original.timeZoneId, restored.timeZoneId)
         assertEquals(original.lastHeartbeat, restored.lastHeartbeat)
@@ -118,6 +127,9 @@ class DevicePolicyBundleTest {
             customBlacklistPackages = setOf("pkg.a"),
             customCurfewWhitelistPackages = setOf("pkg.b"),
             protectedAppPackages = setOf("pkg.c"),
+            browserFilterMode = DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY,
+            customBlockedUrls = setOf("blocked1.com", "blocked2.com"),
+            customAllowedUrls = setOf("allowed1.com"),
             dnsHost = "custom.dns.nextdns.io",
             timeZoneId = "Asia/Dubai",
             lastHeartbeat = 1234567890L,
@@ -149,6 +161,9 @@ class DevicePolicyBundleTest {
         assertEquals(original.customBlacklistPackages, restored.customBlacklistPackages)
         assertEquals(original.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
+        assertEquals(original.browserFilterMode, restored.browserFilterMode)
+        assertEquals(original.customBlockedUrls, restored.customBlockedUrls)
+        assertEquals(original.customAllowedUrls, restored.customAllowedUrls)
         assertEquals(original.dnsHost, restored.dnsHost)
         assertEquals(original.timeZoneId, restored.timeZoneId)
         assertEquals(original.lastHeartbeat, restored.lastHeartbeat)
@@ -183,5 +198,58 @@ class DevicePolicyBundleTest {
         val emptyTzPolicy = DevicePolicyBundle(timeZoneId = "")
         val reconciled = DevicePolicyBundle.reconcileLegacyV1(emptyTzPolicy)
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, reconciled.timeZoneId)
+    }
+
+    @Test
+    fun testLegacyPayloadWithoutBrowserFilter_defaultsSafely() {
+        val legacyJson = """
+            {
+                "curfewStartHour": 20,
+                "version": 1
+            }
+        """.trimIndent()
+        val parsed = DevicePolicyBundle.fromJson(legacyJson)
+        assertEquals(DevicePolicyBundle.BROWSER_FILTER_OFF, parsed.browserFilterMode)
+        assertTrue(parsed.customBlockedUrls.isEmpty())
+        assertTrue(parsed.customAllowedUrls.isEmpty())
+
+        val legacyMap = emptyMap<String, Any?>()
+        val parsedMap = DevicePolicyBundle.fromMap(legacyMap)
+        assertEquals(DevicePolicyBundle.BROWSER_FILTER_OFF, parsedMap.browserFilterMode)
+        assertTrue(parsedMap.customBlockedUrls.isEmpty())
+        assertTrue(parsedMap.customAllowedUrls.isEmpty())
+    }
+
+    @Test
+    fun testBrowserFilterMode_coercesOutOfBoundsValues() {
+        val jsonTooHigh = """{"browserFilterMode": 99}"""
+        assertEquals(DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY, DevicePolicyBundle.fromJson(jsonTooHigh).browserFilterMode)
+
+        val jsonNegative = """{"browserFilterMode": -5}"""
+        assertEquals(DevicePolicyBundle.BROWSER_FILTER_OFF, DevicePolicyBundle.fromJson(jsonNegative).browserFilterMode)
+
+        val mapTooHigh = mapOf("browserFilterMode" to 50)
+        assertEquals(DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY, DevicePolicyBundle.fromMap(mapTooHigh).browserFilterMode)
+
+        val mapNegative = mapOf("browserFilterMode" to -10)
+        assertEquals(DevicePolicyBundle.BROWSER_FILTER_OFF, DevicePolicyBundle.fromMap(mapNegative).browserFilterMode)
+
+        val mapString = mapOf("browserFilterMode" to "1")
+        assertEquals(DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST, DevicePolicyBundle.fromMap(mapString).browserFilterMode)
+    }
+
+    @Test
+    fun testBrowserFilterUrls_handlesNullAndMalformedEntriesSafely() {
+        val jsonWithNullEntries = """
+            {
+                "browserFilterMode": 1,
+                "customBlockedUrls": ["site1.com", null, "", "   ", "site2.com"],
+                "customAllowedUrls": [null, "allowed.com"]
+            }
+        """.trimIndent()
+        val parsed = DevicePolicyBundle.fromJson(jsonWithNullEntries)
+        assertEquals(DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST, parsed.browserFilterMode)
+        assertEquals(setOf("site1.com", "site2.com"), parsed.customBlockedUrls)
+        assertEquals(setOf("allowed.com"), parsed.customAllowedUrls)
     }
 }

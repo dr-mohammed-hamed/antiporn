@@ -27,6 +27,7 @@ import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.ui.accountability.RemoteAppManagerActivity
+import com.drmohammed.antiporn.ui.browser.BrowserUrlFilterActivity
 import com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry
 import com.drmohammed.antiporn.ui.control.qr.QrExportDialog
 import com.drmohammed.antiporn.ui.control.qr.QrScannerBottomSheet
@@ -104,6 +105,10 @@ class SelfControlFragment : Fragment() {
     // Local App Manager
     private var btnOpenLocalAppManager: MaterialButton? = null
 
+    // Browser URL Filter
+    private var tvBrowserFilterStatus: TextView? = null
+    private var btnManageBrowserUrls: MaterialButton? = null
+
     // Approvals
     private var layoutPendingApps: LinearLayout? = null
     private var tvNoPendingApps: TextView? = null
@@ -133,6 +138,26 @@ class SelfControlFragment : Fragment() {
     private var selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
 
     private var isSavingPolicy = false
+
+    private val browserFilterLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (!isAdded || view == null) return@registerForActivityResult
+        if (result.resultCode == Activity.RESULT_OK) {
+            val ctx = context?.applicationContext ?: return@registerForActivityResult
+            val latest = PolicyRepository.getInstance(ctx).getCurrentPolicy()
+            currentPolicy = currentPolicy.copy(
+                browserFilterMode = latest.browserFilterMode,
+                customBlockedUrls = latest.customBlockedUrls,
+                customAllowedUrls = latest.customAllowedUrls
+            )
+            initialPolicySnapshot = initialPolicySnapshot?.copy(
+                browserFilterMode = latest.browserFilterMode,
+                customBlockedUrls = latest.customBlockedUrls,
+                customAllowedUrls = latest.customAllowedUrls
+            )
+            updateBrowserFilterStatus(latest)
+            updateSaveButtonState()
+        }
+    }
 
     private val appManagerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (!isAdded || view == null) return@registerForActivityResult
@@ -231,6 +256,9 @@ class SelfControlFragment : Fragment() {
         switchLockNewInstalls = root.findViewById(R.id.switchLockNewInstalls)
 
         btnOpenLocalAppManager = root.findViewById(R.id.btnOpenLocalAppManager)
+
+        tvBrowserFilterStatus = root.findViewById(R.id.tvBrowserFilterStatus)
+        btnManageBrowserUrls = root.findViewById(R.id.btnManageBrowserUrls)
 
         switchQrLockEnabled = root.findViewById(R.id.switchQrLockEnabled)
         layoutQrActionButtons = root.findViewById(R.id.layoutQrActionButtons)
@@ -513,6 +541,29 @@ class SelfControlFragment : Fragment() {
             }
         }
 
+        var lastBrowserFilterClickTime = 0L
+        btnManageBrowserUrls?.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastBrowserFilterClickTime < 800L) return@setOnClickListener
+            lastBrowserFilterClickTime = now
+
+            val ctx = context ?: return@setOnClickListener
+            val launchAction = {
+                val intent = Intent(ctx, BrowserUrlFilterActivity::class.java).apply {
+                    putExtra(BrowserUrlFilterActivity.EXTRA_IS_REMOTE, false)
+                    putExtra(BrowserUrlFilterActivity.EXTRA_POLICY_JSON, currentPolicy.toJson())
+                }
+                browserFilterLauncher.launch(intent)
+            }
+
+            val qrManager = SelfControlQrManager.getInstance(ctx)
+            if (qrManager.isQrLockEnabled()) {
+                showQrScannerWithFallback("qr_scanner_browser_filter") { launchAction() }
+            } else {
+                launchAction()
+            }
+        }
+
         btnSaveSelfControlChanges?.setOnClickListener {
             saveChanges()
         }
@@ -545,6 +596,7 @@ class SelfControlFragment : Fragment() {
         cardTimezoneControl?.isVisible = policy.isDateTimeLocked
 
         etDnsHost?.setText(policy.dnsHost)
+        updateBrowserFilterStatus(policy)
         updateTimingLabels()
         updateTimezoneViews()
 
@@ -572,6 +624,17 @@ class SelfControlFragment : Fragment() {
             protectedAppPackages = latestPolicy.protectedAppPackages
         )
         updateSaveButtonState()
+    }
+
+    private fun updateBrowserFilterStatus(policy: DevicePolicyBundle) {
+        tvBrowserFilterStatus?.text = when (policy.browserFilterMode) {
+            DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST ->
+                getString(R.string.browser_filter_status_blocklist, policy.customBlockedUrls.size)
+            DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY ->
+                getString(R.string.browser_filter_status_whitelist, policy.customAllowedUrls.size)
+            else ->
+                getString(R.string.browser_filter_status_off)
+        }
     }
 
     private fun updateTimingLabels() {
@@ -894,6 +957,8 @@ class SelfControlFragment : Fragment() {
         switchIncognitoBlocked = null
         switchLockNewInstalls = null
         btnOpenLocalAppManager = null
+        tvBrowserFilterStatus = null
+        btnManageBrowserUrls = null
         layoutPendingApps = null
         tvNoPendingApps = null
         btnSaveSelfControlChanges = null

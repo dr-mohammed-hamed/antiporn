@@ -8,13 +8,16 @@ import android.util.Log
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
+import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
+import com.drmohammed.antiporn.core.util.BrowserUrlSanitizer
+import com.drmohammed.antiporn.data.repository.PolicyRepository
 
 /**
  * Isolated security shield that disables Incognito / Private browsing and enforces
- * Google SafeSearch, YouTube Restricted Mode, and SafeSites filters on Chromium browsers.
+ * Google SafeSearch, YouTube Restricted Mode, SafeSites filters, and URL filtering on Chromium browsers.
  */
 object BrowserShield : ProtectionShield {
 
@@ -25,30 +28,48 @@ object BrowserShield : ProtectionShield {
 
     val TARGET_BROWSER_PACKAGES: List<String> get() = AppPolicyRegistry.getTargetBrowserPackages()
 
-    fun buildBrowserRestrictionsBundle(isIncognitoBlocked: Boolean = true): Bundle {
+    fun buildBrowserRestrictionsBundle(policy: DevicePolicyBundle): Bundle {
         return Bundle().apply {
-            putInt("IncognitoModeAvailability", if (isIncognitoBlocked) 1 else 0)
-            putInt("InPrivateModeAvailability", if (isIncognitoBlocked) 1 else 0)
+            putInt("IncognitoModeAvailability", if (policy.isIncognitoBlocked) 1 else 0)
+            putInt("InPrivateModeAvailability", if (policy.isIncognitoBlocked) 1 else 0)
             putBoolean("ForceGoogleSafeSearch", true)
             putBoolean("ForceYouTubeSafetyMode", true)
             putInt("ForceYouTubeRestrict", 2)
             putInt("SafeSitesFilterBehavior", 1)
             putBoolean("BrowserGuestModeEnabled", false)
+
+            val (blocklist, allowlist) = when (policy.browserFilterMode) {
+                DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST ->
+                    policy.customBlockedUrls.toTypedArray() to emptyArray()
+                DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY ->
+                    arrayOf("*") to (policy.customAllowedUrls + BrowserUrlSanitizer.CAPTIVE_PORTAL_EXEMPTIONS).distinct().toTypedArray()
+                else ->
+                    emptyArray<String>() to emptyArray()
+            }
+            putStringArray("URLBlocklist", blocklist)
+            putStringArray("URLBlacklist", blocklist)
+            putStringArray("URLAllowlist", allowlist)
+            putStringArray("URLWhitelist", allowlist)
         }
+    }
+
+    fun buildBrowserRestrictionsBundle(isIncognitoBlocked: Boolean = true): Bundle {
+        val policy = DevicePolicyBundle.defaultPolicy().copy(isIncognitoBlocked = isIncognitoBlocked)
+        return buildBrowserRestrictionsBundle(policy)
     }
 
     fun applyBrowserRestrictions(
         dpm: DevicePolicyManager,
         admin: ComponentName,
-        isIncognitoBlocked: Boolean = true
+        policy: DevicePolicyBundle
     ): Boolean {
-        val bundle = buildBrowserRestrictionsBundle(isIncognitoBlocked)
+        val bundle = buildBrowserRestrictionsBundle(policy)
         var appliedCount = 0
         for (pkg in TARGET_BROWSER_PACKAGES) {
             try {
                 dpm.setApplicationRestrictions(admin, pkg, bundle)
                 appliedCount++
-                Log.d(TAG, "Applied browser restrictions to $pkg (incognitoBlocked=$isIncognitoBlocked)")
+                Log.d(TAG, "Applied browser restrictions to $pkg (filterMode=${policy.browserFilterMode}, incognitoBlocked=${policy.isIncognitoBlocked})")
             } catch (e: Exception) {
                 Log.d(TAG, "Could not apply browser restrictions to $pkg: ${e.message}")
             }
@@ -57,11 +78,18 @@ object BrowserShield : ProtectionShield {
         return appliedCount > 0
     }
 
+    fun applyBrowserRestrictions(
+        dpm: DevicePolicyManager,
+        admin: ComponentName,
+        isIncognitoBlocked: Boolean = true
+    ): Boolean {
+        val policy = DevicePolicyBundle.defaultPolicy().copy(isIncognitoBlocked = isIncognitoBlocked)
+        return applyBrowserRestrictions(dpm, admin, policy)
+    }
 
     fun checkBrowserRestrictions(context: Context, dpm: DevicePolicyManager, admin: ComponentName): Boolean {
         val isIncognitoBlocked = try {
-            com.drmohammed.antiporn.data.repository.PolicyRepository
-                .getInstance(context).getCurrentPolicy().isIncognitoBlocked
+            PolicyRepository.getInstance(context.applicationContext).getCurrentPolicy().isIncognitoBlocked
         } catch (e: Exception) {
             true
         }
@@ -134,9 +162,8 @@ object BrowserShield : ProtectionShield {
         }
 
         return try {
-            val isIncognitoBlocked = com.drmohammed.antiporn.data.repository.PolicyRepository
-                .getInstance(context).getCurrentPolicy().isIncognitoBlocked
-            val applied = applyBrowserRestrictions(dpm, admin, isIncognitoBlocked)
+            val policy = PolicyRepository.getInstance(context.applicationContext).getCurrentPolicy()
+            val applied = applyBrowserRestrictions(dpm, admin, policy)
             ShieldResult(
                 shieldId = id,
                 success = applied,

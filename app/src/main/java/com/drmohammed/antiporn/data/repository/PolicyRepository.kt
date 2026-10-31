@@ -326,7 +326,7 @@ class PolicyRepository private constructor(context: Context) {
 
                 // 4. Apply browser & DNS restrictions, custom blacklist suspension, and protected apps
                 if (isDeviceOwner && admin != null) {
-                    BrowserShield.applyBrowserRestrictions(dpm, admin, bundle.isIncognitoBlocked)
+                    BrowserShield.applyBrowserRestrictions(dpm, admin, bundle)
                     DnsShield.apply(appContext, dpm, admin)
 
                     // 24/7 Custom App Freezing (bundle.customBlacklistPackages)
