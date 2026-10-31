@@ -794,6 +794,7 @@
     <string name="qr_scan_aim_camera">وجّه الكاميرا نحو رمز الـ QR...</string>
     <string name="qr_scan_success">تم التحقق من الرمز بنجاح!</string>
     <string name="qr_scan_invalid">الرمز غير مطابق لهذا الهاتف</string>
+    <string name="qr_scan_error_init">تعذر تشغيل قارئ الرموز على هذا الجهاز</string>
     <string name="qr_scan_camera_permission_required">يلزم منح إذن الكاميرا لمسح رمز الـ QR</string>
     <string name="qr_scan_camera_permission_grant">منح الإذن</string>
     <string name="qr_torch_on">تشغيل الفلاش</string>

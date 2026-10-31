@@ -124,7 +124,8 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize BarcodeScanner client", e)
             barcodeScanner = null
-            tvScanStatus.text = getString(R.string.qr_scan_camera_permission_required)
+            tvScanStatus.text = getString(R.string.qr_scan_error_init)
+            tvScanStatus.setTextColor(Color.parseColor("#EF4444"))
         }
 
         btnCloseScanner.setOnClickListener {
@@ -141,7 +142,9 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
 
         setupEmergencyBypassUi()
 
-        if (hasCameraPermission()) {
+        if (barcodeScanner == null) {
+            layoutPermissionFallback.isVisible = false
+        } else if (hasCameraPermission()) {
             layoutPermissionFallback.isVisible = false
             startCamera()
         } else {
@@ -281,8 +284,9 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
                     val reqKey = arguments?.getString(EXTRA_REQUEST_KEY)
                     if (reqKey != null) {
                         parentFragmentManager.setFragmentResult(reqKey, Bundle().apply { putBoolean(RESULT_KEY_VERIFIED, true) })
+                    } else {
+                        onVerified?.invoke()
                     }
-                    onVerified?.invoke()
                     dismissAllowingStateLoss()
                 }
             } else {
@@ -380,8 +384,9 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
                     val reqKey = arguments?.getString(EXTRA_REQUEST_KEY)
                     if (reqKey != null) {
                         parentFragmentManager.setFragmentResult(reqKey, Bundle().apply { putBoolean(RESULT_KEY_EMERGENCY_BYPASS, true) })
+                    } else {
+                        onEmergencyBypassTriggered?.invoke()
                     }
-                    onEmergencyBypassTriggered?.invoke()
                     dismissAllowingStateLoss()
                 }
             } else {
@@ -421,6 +426,7 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
         super.onDestroyView()
         countdownJob?.cancel()
         countdownJob = null
+        isCodeProcessing.set(false)
 
         try {
             cameraProvider?.unbindAll()

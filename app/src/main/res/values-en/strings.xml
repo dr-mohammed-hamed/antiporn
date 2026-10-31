@@ -343,6 +343,7 @@
     <string name="qr_scan_aim_camera">Point camera at QR code...</string>
     <string name="qr_scan_success">Code verified successfully!</string>
     <string name="qr_scan_invalid">Invalid code for this device</string>
+    <string name="qr_scan_error_init">Unable to initialize barcode scanner on this device</string>
     <string name="qr_scan_camera_permission_required">Camera permission is required to scan QR code</string>
     <string name="qr_scan_camera_permission_grant">Grant Permission</string>
     <string name="qr_torch_on">Turn Flash On</string>
