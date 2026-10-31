@@ -1,6 +1,8 @@
 package com.drmohammed.antiporn
 
+import android.app.admin.DevicePolicyManager
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
@@ -14,6 +16,7 @@ import com.drmohammed.antiporn.data.repository.AppInventoryManager
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.shields.AppSuspensionShield
+import com.drmohammed.antiporn.shields.BrowserShield
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -89,6 +92,22 @@ object PackageChangeHandler {
                         } else {
                             Log.i(TAG, "⚖️ [CURFEW_EVAL] Package $packageName not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")
                             CurfewEnforcer.handlePackageAdded(appContext, packageName)
+                        }
+                    }
+
+                    if (AppPolicyRegistry.isRestrictedBrowser(packageName)) {
+                        try {
+                            val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
+                            if (dpm != null && com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) {
+                                val admin = ComponentName(appContext, AdminReceiver::class.java)
+                                val currentPolicy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
+                                BrowserShield.applyBrowserRestrictions(dpm, admin, currentPolicy)
+                                val restrictionsBundle = BrowserShield.buildBrowserRestrictionsBundle(currentPolicy)
+                                dpm.setApplicationRestrictions(admin, packageName, restrictionsBundle)
+                                Log.i(TAG, "Applied browser restrictions to newly added/replaced restricted browser: $packageName")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed applying browser restrictions to $packageName", e)
                         }
                     }
 

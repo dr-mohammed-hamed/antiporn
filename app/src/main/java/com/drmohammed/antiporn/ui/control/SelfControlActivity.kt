@@ -29,6 +29,7 @@ import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.ui.accountability.RemoteAppManagerActivity
+import com.drmohammed.antiporn.ui.browser.BrowserUrlFilterActivity
 import com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
@@ -103,6 +104,10 @@ class SelfControlActivity : AppCompatActivity() {
     // Local App Manager
     private lateinit var btnOpenLocalAppManager: MaterialButton
 
+    // Browser URL Filter
+    private lateinit var tvBrowserFilterStatus: TextView
+    private lateinit var btnManageBrowserUrls: MaterialButton
+
     // Approvals
     private lateinit var layoutPendingApps: LinearLayout
     private lateinit var tvNoPendingApps: TextView
@@ -131,6 +136,25 @@ class SelfControlActivity : AppCompatActivity() {
         if (result.resultCode == Activity.RESULT_OK) {
             // Reload package collections without wiping in-progress time/switch edits
             reloadPackageCollectionsOnly()
+        }
+    }
+
+    private val browserFilterLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (isFinishing || isDestroyed) return@registerForActivityResult
+        if (result.resultCode == Activity.RESULT_OK) {
+            val latest = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+            currentPolicy = currentPolicy.copy(
+                browserFilterMode = latest.browserFilterMode,
+                customBlockedUrls = latest.customBlockedUrls,
+                customAllowedUrls = latest.customAllowedUrls
+            )
+            initialPolicySnapshot = initialPolicySnapshot?.copy(
+                browserFilterMode = latest.browserFilterMode,
+                customBlockedUrls = latest.customBlockedUrls,
+                customAllowedUrls = latest.customAllowedUrls
+            )
+            updateBrowserFilterStatus(latest)
+            updateSaveButtonState()
         }
     }
 
@@ -197,6 +221,18 @@ class SelfControlActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        val latest = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+        currentPolicy = currentPolicy.copy(
+            browserFilterMode = latest.browserFilterMode,
+            customBlockedUrls = latest.customBlockedUrls,
+            customAllowedUrls = latest.customAllowedUrls
+        )
+        initialPolicySnapshot = initialPolicySnapshot?.copy(
+            browserFilterMode = latest.browserFilterMode,
+            customBlockedUrls = latest.customBlockedUrls,
+            customAllowedUrls = latest.customAllowedUrls
+        )
+        updateBrowserFilterStatus(latest)
         loadPendingApprovals()
     }
 
@@ -258,6 +294,10 @@ class SelfControlActivity : AppCompatActivity() {
 
         // App Manager
         btnOpenLocalAppManager = findViewById(R.id.btnOpenLocalAppManager)
+
+        // Browser Filter
+        tvBrowserFilterStatus = findViewById(R.id.tvBrowserFilterStatus)
+        btnManageBrowserUrls = findViewById(R.id.btnManageBrowserUrls)
 
         // Approvals
         layoutPendingApps = findViewById(R.id.layoutPendingApps)
@@ -417,6 +457,19 @@ class SelfControlActivity : AppCompatActivity() {
             appManagerLauncher.launch(intent)
         }
 
+        var lastBrowserFilterClickTime = 0L
+        btnManageBrowserUrls.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastBrowserFilterClickTime < 800L) return@setOnClickListener
+            lastBrowserFilterClickTime = now
+
+            val intent = Intent(this, BrowserUrlFilterActivity::class.java).apply {
+                putExtra(BrowserUrlFilterActivity.EXTRA_IS_REMOTE, false)
+                putExtra(BrowserUrlFilterActivity.EXTRA_POLICY_JSON, currentPolicy.toJson())
+            }
+            browserFilterLauncher.launch(intent)
+        }
+
         btnSaveSelfControlChanges.setOnClickListener {
             saveChanges()
         }
@@ -448,6 +501,7 @@ class SelfControlActivity : AppCompatActivity() {
         cardTimezoneControl.isVisible = policy.isDateTimeLocked
 
         etDnsHost.setText(policy.dnsHost)
+        updateBrowserFilterStatus(policy)
         updateTimingLabels()
         updateTimezoneViews()
         updateSaveButtonState()
@@ -466,6 +520,17 @@ class SelfControlActivity : AppCompatActivity() {
             protectedAppPackages = latestPolicy.protectedAppPackages
         )
         updateSaveButtonState()
+    }
+
+    private fun updateBrowserFilterStatus(policy: DevicePolicyBundle) {
+        tvBrowserFilterStatus.text = when (policy.browserFilterMode) {
+            DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST ->
+                getString(R.string.browser_filter_status_blocklist, policy.customBlockedUrls.size)
+            DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY ->
+                getString(R.string.browser_filter_status_whitelist, policy.customAllowedUrls.size)
+            else ->
+                getString(R.string.browser_filter_status_off)
+        }
     }
 
     private fun updateTimingLabels() {

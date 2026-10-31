@@ -760,4 +760,38 @@
     <string name="gate_open_title">الوصول المباشر</string>
     <string name="gate_access_denied">تم رفض الوصول إلى لوحة التحكم</string>
     <string name="btn_manage_my_device">إدارة جهازي</string>
+
+    <!-- Browser URL Filter -->
+    <string name="title_browser_url_filter">التحكم في مواقع المتصفح</string>
+    <string name="browser_filter_card_title">فلترة وحظر مواقع المتصفح</string>
+    <string name="browser_filter_card_desc">تحديد المواقع المسموحة أو المحظورة في المتصفحات المدعومة عبر Device Owner</string>
+    <string name="browser_filter_btn_manage">إدارة مواقع المتصفح</string>
+    <string name="browser_filter_mode_off">معطل (تصفح اعتيادي مع البحث الآمن)</string>
+    <string name="browser_filter_mode_blocklist">قائمة الحظر (حظر مواقع محددة)</string>
+    <string name="browser_filter_mode_whitelist">قائمة بيضاء فقط (حظر كل الإنترنت عدا مواقع محددة)</string>
+    <string name="browser_filter_desc_off">المتصفح متاح بالكامل مع الحماية العامة وإجبار البحث الآمن ومنع المواقع الإباحية عبر خادم DNS.</string>
+    <string name="browser_filter_desc_blocklist">يمكن للمستخدم تصفح كافة المواقع بحرية، باستثناء المواقع المضافة في قائمة الحظر أدناه.</string>
+    <string name="browser_filter_desc_whitelist">يتم حظر الإنترنت في المتصفح بالكامل، ولن يتمكن المستخدم من فتح أي موقع سوى المواقع المحددة في القائمة البيضاء أدناه.</string>
+    <string name="browser_filter_hint_url">أدخل نطاق الموقع (مثال: example.com)</string>
+    <string name="browser_filter_btn_add">إضافة</string>
+    <string name="browser_filter_error_invalid_url">صيغة النطاق غير صالحة. يرجى إدخال نطاق صحيح مثل example.com</string>
+    <string name="browser_filter_error_duplicate_url">هذا الموقع مضاف بالفعل في القائمة.</string>
+    <string name="browser_filter_presets_title">قوالب حظر سريعة</string>
+    <string name="browser_filter_preset_social">حظر منصات التواصل الشهيرة (فيسبوك، إنستغرام، تيك توك، إكس، ريديت...)</string>
+    <string name="browser_filter_social_added">تمت إضافة %1$d موقع من منصات التواصل الاجتماعي لقائمة الحظر</string>
+    <string name="browser_filter_empty_blocklist">قائمة الحظر فارغة حالياً.</string>
+    <string name="browser_filter_empty_whitelist">القائمة البيضاء فارغة حالياً.</string>
+    <string name="browser_filter_whitelist_empty_warning">لا يمكن تفعيل وضع القائمة البيضاء وقائمتك فارغة تماماً؛ لأن ذلك سيمنع كافة مواقع الإنترنت. يرجى إضافة موقع واحد على الأقل.</string>
+    <string name="browser_filter_saved_success">تم حفظ وتطبيق سياسة مواقع المتصفح بنجاح</string>
+    <string name="browser_filter_count_format">المواقع المسجلة: %1$d</string>
+    <string name="browser_filter_status_off">الوضع: معطل</string>
+    <string name="browser_filter_status_blocklist">الوضع: قائمة حظر (%1$d موقع)</string>
+    <string name="browser_filter_status_whitelist">الوضع: قائمة بيضاء فقط (%1$d موقع)</string>
+    <string name="browser_filter_url_deleted">تم حذف %1$s</string>
+    <string name="browser_filter_undo">تراجع</string>
+    <string name="browser_filter_item_delete_cd">حذف الموقع</string>
+    <string name="browser_filter_list_title">قائمة المواقع</string>
+    <string name="browser_filter_btn_save">حفظ وتطبيق السياسة</string>
+    <string name="browser_filter_info_title">سياسة تصفية عناوين الويب للمتصفحات</string>
+    <string name="browser_filter_info_desc">يتم تطبيق هذه القواعد إجبارياً على مستوى نظام التشغيل (Device Owner) في كافة المتصفحات المتوافقة مثل Google Chrome، Brave، و Edge.</string>
 </resources>

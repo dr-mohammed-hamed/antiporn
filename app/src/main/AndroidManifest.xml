@@ -186,6 +186,12 @@
         <activity
             android:name=".ui.accountability.RemoteAppManagerActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.browser.BrowserUrlFilterActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
+            android:label="@string/title_browser_url_filter" />
         <!-- Device Owner In-App Provisioning -->
         <activity
             android:name=".provisioning.ui.ProvisioningWizardActivity"

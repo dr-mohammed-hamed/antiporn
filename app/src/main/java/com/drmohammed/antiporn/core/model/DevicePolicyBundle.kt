@@ -25,6 +25,9 @@ data class DevicePolicyBundle(
     val customBlacklistPackages: Set<String> = emptySet(),
     val customCurfewWhitelistPackages: Set<String> = emptySet(),
     val protectedAppPackages: Set<String> = emptySet(),
+    val browserFilterMode: Int = BROWSER_FILTER_OFF,
+    val customBlockedUrls: Set<String> = emptySet(),
+    val customAllowedUrls: Set<String> = emptySet(),
     val dnsHost: String = ADGUARD_FAMILY_DNS_HOST,
     val guardianUid: String? = null,
     val guardianName: String? = null,
@@ -58,6 +61,9 @@ data class DevicePolicyBundle(
             "customBlacklistPackages" to customBlacklistPackages.toList(),
             "customCurfewWhitelistPackages" to customCurfewWhitelistPackages.toList(),
             "protectedAppPackages" to protectedAppPackages.toList(),
+            "browserFilterMode" to browserFilterMode,
+            "customBlockedUrls" to customBlockedUrls.toList(),
+            "customAllowedUrls" to customAllowedUrls.toList(),
             "dnsHost" to dnsHost,
             "isSupervised" to isSupervised,
             "isDateTimeLocked" to isDateTimeLocked,
@@ -103,6 +109,16 @@ data class DevicePolicyBundle(
         protectedAppPackages.forEach { protectedArr.put(it) }
         json.put("protectedAppPackages", protectedArr)
 
+        json.put("browserFilterMode", browserFilterMode)
+
+        val blockedUrlsArr = JSONArray()
+        customBlockedUrls.forEach { blockedUrlsArr.put(it) }
+        json.put("customBlockedUrls", blockedUrlsArr)
+
+        val allowedUrlsArr = JSONArray()
+        customAllowedUrls.forEach { allowedUrlsArr.put(it) }
+        json.put("customAllowedUrls", allowedUrlsArr)
+
         json.put("dnsHost", dnsHost)
         if (guardianUid != null) json.put("guardianUid", guardianUid)
         if (guardianName != null) json.put("guardianName", guardianName)
@@ -119,6 +135,11 @@ data class DevicePolicyBundle(
     }
 
     companion object {
+        const val BROWSER_FILTER_OFF = 0
+        const val BROWSER_FILTER_BLOCKLIST = 1
+        const val BROWSER_FILTER_BLOCKLIST_ONLY = 1
+        const val BROWSER_FILTER_WHITELIST_ONLY = 2
+
         const val ADGUARD_FAMILY_DNS_HOST = "family.adguard-dns.com"
         const val CLOUDFLARE_FAMILY_DNS_HOST = "family.cloudflare-dns.com"
         const val LEGACY_DEFAULT_NEXTDNS_HOST = "family.cloudflare-dns.com"
@@ -130,6 +151,9 @@ data class DevicePolicyBundle(
         const val BREAKOUT_GRACE_PERIOD_MS = 24L * 60L * 60L * 1000L // 24 Hours
 
         fun defaultPolicy(): DevicePolicyBundle = DevicePolicyBundle(
+            browserFilterMode = BROWSER_FILTER_OFF,
+            customBlockedUrls = emptySet(),
+            customAllowedUrls = emptySet(),
             dnsHost = ADGUARD_FAMILY_DNS_HOST,
             guardianUid = null,
             guardianName = null,
@@ -167,6 +191,12 @@ data class DevicePolicyBundle(
             val whitelist = (map["customCurfewWhitelistPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
             val protectedApps = (map["protectedAppPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
 
+            val browserFilterMode = ((map["browserFilterMode"] as? Number)?.toInt()
+                ?: (map["browserFilterMode"] as? String)?.toIntOrNull()
+                ?: BROWSER_FILTER_OFF).coerceIn(0, 2)
+            val customBlockedUrls = (map["customBlockedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+            val customAllowedUrls = (map["customAllowedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+
             val dns = (map["dnsHost"] as? String)?.takeIf { it.isNotBlank() } ?: LEGACY_DEFAULT_NEXTDNS_HOST
 
             val gUid = (map["guardianUid"] as? String)?.takeIf { it.isNotBlank() }
@@ -200,6 +230,9 @@ data class DevicePolicyBundle(
                 customBlacklistPackages = blacklist,
                 customCurfewWhitelistPackages = whitelist,
                 protectedAppPackages = protectedApps,
+                browserFilterMode = browserFilterMode,
+                customBlockedUrls = customBlockedUrls,
+                customAllowedUrls = customAllowedUrls,
                 dnsHost = dns,
                 guardianUid = gUid,
                 guardianName = gName,
@@ -242,6 +275,30 @@ data class DevicePolicyBundle(
                     }
                 }
 
+                val browserFilterMode = json.optInt("browserFilterMode", BROWSER_FILTER_OFF).coerceIn(0, 2)
+
+                val customBlockedUrls = mutableSetOf<String>()
+                val blockedUrlsArr = json.optJSONArray("customBlockedUrls")
+                if (blockedUrlsArr != null) {
+                    for (i in 0 until blockedUrlsArr.length()) {
+                        val url = blockedUrlsArr.optString(i)
+                        if (!url.isNullOrBlank() && url != "null") {
+                            customBlockedUrls.add(url)
+                        }
+                    }
+                }
+
+                val customAllowedUrls = mutableSetOf<String>()
+                val allowedUrlsArr = json.optJSONArray("customAllowedUrls")
+                if (allowedUrlsArr != null) {
+                    for (i in 0 until allowedUrlsArr.length()) {
+                        val url = allowedUrlsArr.optString(i)
+                        if (!url.isNullOrBlank() && url != "null") {
+                            customAllowedUrls.add(url)
+                        }
+                    }
+                }
+
                 val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: LEGACY_DEFAULT_NEXTDNS_HOST
                 val gUid = json.optString("guardianUid", "").takeIf { it.isNotBlank() }
                 val gName = json.optString("guardianName", "").takeIf { it.isNotBlank() }
@@ -271,6 +328,9 @@ data class DevicePolicyBundle(
                     customBlacklistPackages = blacklist,
                     customCurfewWhitelistPackages = whitelist,
                     protectedAppPackages = protectedApps,
+                    browserFilterMode = browserFilterMode,
+                    customBlockedUrls = customBlockedUrls,
+                    customAllowedUrls = customAllowedUrls,
                     dnsHost = dns,
                     guardianUid = gUid,
                     guardianName = gName,
