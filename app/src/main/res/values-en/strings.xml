@@ -555,6 +555,10 @@
     <string name="toast_self_policy_save_failed">Failed saving self-control policy.</string>
     <string name="gate_open_title">Unrestricted Access</string>
     <string name="gate_access_denied">Access Denied: QR code verification required.</string>
+    <string name="gate_access_denied_by_guardian">Self-control has been disabled by your supervisor. All shields are remotely managed.</string>
+    <string name="guardian_self_control_card_title">Self-Control Permissions</string>
+    <string name="guardian_switch_allow_self_control">Allow Ward Self-Control Over Shields</string>
+    <string name="guardian_switch_allow_self_control_desc">When disabled, the ward cannot modify shields or access the Self tab; all protection is managed remotely by the guardian.</string>
     <string name="btn_manage_my_device">Manage My Device</string>
 
     <!-- Browser URL Filter -->

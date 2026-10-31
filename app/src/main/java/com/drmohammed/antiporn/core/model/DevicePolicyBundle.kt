@@ -32,6 +32,7 @@ data class DevicePolicyBundle(
     val guardianUid: String? = null,
     val guardianName: String? = null,
     val isSupervised: Boolean = false,
+    val isSelfControlAllowed: Boolean = true,
     val isDateTimeLocked: Boolean = false,
     val timeZoneId: String = com.drmohammed.antiporn.curfew.CurfewConfig.getDefaultFallbackTimeZone(),
     val lastHeartbeat: Long = 0L,
@@ -66,6 +67,7 @@ data class DevicePolicyBundle(
             "customAllowedUrls" to customAllowedUrls.toList(),
             "dnsHost" to dnsHost,
             "isSupervised" to isSupervised,
+            "isSelfControlAllowed" to isSelfControlAllowed,
             "isDateTimeLocked" to isDateTimeLocked,
             "timeZoneId" to timeZoneId,
             "lastHeartbeat" to lastHeartbeat,
@@ -123,6 +125,7 @@ data class DevicePolicyBundle(
         if (guardianUid != null) json.put("guardianUid", guardianUid)
         if (guardianName != null) json.put("guardianName", guardianName)
         json.put("isSupervised", isSupervised)
+        json.put("isSelfControlAllowed", isSelfControlAllowed)
         json.put("isDateTimeLocked", isDateTimeLocked)
         json.put("timeZoneId", timeZoneId)
         json.put("lastHeartbeat", lastHeartbeat)
@@ -158,6 +161,7 @@ data class DevicePolicyBundle(
             guardianUid = null,
             guardianName = null,
             isSupervised = false,
+            isSelfControlAllowed = true,
             isDateTimeLocked = false,
             timeZoneId = com.drmohammed.antiporn.curfew.CurfewConfig.getDefaultFallbackTimeZone()
         )
@@ -202,6 +206,7 @@ data class DevicePolicyBundle(
             val gUid = (map["guardianUid"] as? String)?.takeIf { it.isNotBlank() }
             val gName = (map["guardianName"] as? String)?.takeIf { it.isNotBlank() }
             val supervised = (map["isSupervised"] as? Boolean) ?: (!gUid.isNullOrBlank())
+            val isSelfControlAllowed = (map["isSelfControlAllowed"] as? Boolean) ?: true
             val isDateTimeLocked = (map["isDateTimeLocked"] as? Boolean) ?: false
             val timeZoneId = (map["timeZoneId"] as? String)?.takeIf { it.isNotBlank() } ?: com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
             val lastHeartbeat = (map["lastHeartbeat"] as? Number)?.toLong() ?: 0L
@@ -237,6 +242,7 @@ data class DevicePolicyBundle(
                 guardianUid = gUid,
                 guardianName = gName,
                 isSupervised = supervised,
+                isSelfControlAllowed = isSelfControlAllowed,
                 isDateTimeLocked = isDateTimeLocked,
                 timeZoneId = timeZoneId,
                 lastHeartbeat = lastHeartbeat,
@@ -303,6 +309,7 @@ data class DevicePolicyBundle(
                 val gUid = json.optString("guardianUid", "").takeIf { it.isNotBlank() }
                 val gName = json.optString("guardianName", "").takeIf { it.isNotBlank() }
                 val supervised = json.optBoolean("isSupervised", !gUid.isNullOrBlank())
+                val isSelfControlAllowed = json.optBoolean("isSelfControlAllowed", true)
                 val isDateTimeLocked = json.optBoolean("isDateTimeLocked", false)
                 val timeZoneId = json.optString("timeZoneId", com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID).ifBlank { com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID }
                 val lastHeartbeat = json.optLong("lastHeartbeat", 0L)
@@ -335,6 +342,7 @@ data class DevicePolicyBundle(
                     guardianUid = gUid,
                     guardianName = gName,
                     isSupervised = supervised,
+                    isSelfControlAllowed = isSelfControlAllowed,
                     isDateTimeLocked = isDateTimeLocked,
                     timeZoneId = timeZoneId,
                     lastHeartbeat = lastHeartbeat,

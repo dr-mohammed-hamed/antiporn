@@ -21,7 +21,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry
@@ -186,7 +188,18 @@ class SelfControlActivity : AppCompatActivity() {
         val gate = SelfControlAccessGateRegistry.getActiveGate()
         if (!gate.canAccess(this)) {
             Log.w(TAG, "Access denied by active gate (${gate.gateId})")
-            Toast.makeText(this, R.string.gate_access_denied, Toast.LENGTH_SHORT).show()
+            val policy = try {
+                PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to retrieve policy for gate message", e)
+                null
+            }
+            val msgRes = if (policy?.isSupervised == true && !policy.isSelfControlAllowed) {
+                R.string.gate_access_denied_by_guardian
+            } else {
+                R.string.gate_access_denied
+            }
+            Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show()
             finish()
             return
         }
@@ -221,10 +234,52 @@ class SelfControlActivity : AppCompatActivity() {
         setupListeners()
         loadCurrentPolicy()
         loadPendingApprovals()
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                PolicyRepository.getInstance(applicationContext).currentPolicyFlow.collect {
+                    if (isFinishing || isDestroyed) return@collect
+                    val activeGate = SelfControlAccessGateRegistry.getActiveGate()
+                    if (!activeGate.canAccess(this@SelfControlActivity)) {
+                        val policy = try {
+                            PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to retrieve policy on real-time ejection", e)
+                            null
+                        }
+                        val msgRes = if (policy?.isSupervised == true && !policy.isSelfControlAllowed) {
+                            R.string.gate_access_denied_by_guardian
+                        } else {
+                            R.string.gate_access_denied
+                        }
+                        Toast.makeText(this@SelfControlActivity, msgRes, Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
+                }
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
+        if (isFinishing || isDestroyed) return
+        val gate = SelfControlAccessGateRegistry.getActiveGate()
+        if (!gate.canAccess(this)) {
+            val policy = try {
+                PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to retrieve policy in onResume", e)
+                null
+            }
+            val msgRes = if (policy?.isSupervised == true && !policy.isSelfControlAllowed) {
+                R.string.gate_access_denied_by_guardian
+            } else {
+                R.string.gate_access_denied
+            }
+            Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
         val latest = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
         currentPolicy = currentPolicy.copy(
             browserFilterMode = latest.browserFilterMode,

@@ -185,6 +185,7 @@ class SelfControlFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        if (isHidden) return
         checkGateAndRefresh()
     }
 
@@ -196,10 +197,22 @@ class SelfControlFragment : Fragment() {
     }
 
     private fun checkGateAndRefresh() {
+        if (!isAdded) return
         val ctx = context ?: return
         val gate = SelfControlAccessGateRegistry.getActiveGate()
         if (!gate.canAccess(ctx)) {
-            Toast.makeText(ctx, R.string.gate_access_denied, Toast.LENGTH_SHORT).show()
+            val policy = try {
+                PolicyRepository.getInstance(ctx.applicationContext).getCurrentPolicy()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to retrieve local policy in checkGateAndRefresh", e)
+                null
+            }
+            val msgRes = if (policy?.isSupervised == true && !policy.isSelfControlAllowed) {
+                R.string.gate_access_denied_by_guardian
+            } else {
+                R.string.gate_access_denied
+            }
+            Toast.makeText(ctx, msgRes, Toast.LENGTH_SHORT).show()
             (activity as? com.drmohammed.antiporn.MainActivity)?.navigateToTab(R.id.nav_home)
             return
         }
