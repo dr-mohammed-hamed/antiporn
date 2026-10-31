@@ -42,11 +42,11 @@
 
         <ImageButton
             android:id="@+id/btnDeleteUrl"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/browser_filter_item_delete_cd"
-            android:padding="8dp"
+            android:padding="12dp"
             android:src="@drawable/ic_delete"
             app:tint="?attr/colorError" />
 

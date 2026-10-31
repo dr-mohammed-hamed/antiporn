@@ -381,15 +381,14 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
             return
         }
 
-        val updated = basePolicy.copy(
-            browserFilterMode = selectedMode,
-            customBlockedUrls = blockedUrls.toSet(),
-            customAllowedUrls = allowedUrls.toSet(),
-            version = basePolicy.version + 1,
-            updatedAt = TrustedTimeProvider.currentTimeMillis(applicationContext)
-        )
-
         if (isRemote) {
+            val updated = basePolicy.copy(
+                browserFilterMode = selectedMode,
+                customBlockedUrls = blockedUrls.toSet(),
+                customAllowedUrls = allowedUrls.toSet(),
+                version = basePolicy.version + 1,
+                updatedAt = TrustedTimeProvider.currentTimeMillis(applicationContext)
+            )
             val resultIntent = Intent().apply {
                 putExtra(EXTRA_UPDATED_POLICY_JSON, updated.toJson())
             }
@@ -400,6 +399,14 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
             btnSaveBrowserPolicy.isEnabled = false
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
+                    val freshPersisted = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+                    val updated = freshPersisted.copy(
+                        browserFilterMode = selectedMode,
+                        customBlockedUrls = blockedUrls.toSet(),
+                        customAllowedUrls = allowedUrls.toSet(),
+                        version = freshPersisted.version + 1,
+                        updatedAt = TrustedTimeProvider.currentTimeMillis(applicationContext)
+                    )
                     val success = PolicyRepository.getInstance(applicationContext).saveAndEnforceSelfPolicy(updated)
                     withContext(Dispatchers.Main) {
                         if (isFinishing || isDestroyed) return@withContext

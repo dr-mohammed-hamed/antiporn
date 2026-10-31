@@ -556,4 +556,38 @@
     <string name="gate_open_title">Unrestricted Access</string>
     <string name="gate_access_denied">Access Denied: QR code verification required.</string>
     <string name="btn_manage_my_device">Manage My Device</string>
+
+    <!-- Browser URL Filter -->
+    <string name="title_browser_url_filter">Browser URL Filtering</string>
+    <string name="browser_filter_card_title">Browser URL Filtering &amp; Rules</string>
+    <string name="browser_filter_card_desc">Specify allowed or blocked websites across supported Chromium browsers via Device Owner</string>
+    <string name="browser_filter_btn_manage">Manage Browser Websites</string>
+    <string name="browser_filter_mode_off">Disabled (Standard browsing with SafeSearch)</string>
+    <string name="browser_filter_mode_blocklist">Blocklist (Block specific websites)</string>
+    <string name="browser_filter_mode_whitelist">Whitelist Only (Block entire web except specific sites)</string>
+    <string name="browser_filter_desc_off">Browsing is completely open with general protection, enforced SafeSearch, and DNS filtering.</string>
+    <string name="browser_filter_desc_blocklist">Users can browse freely except for the domains specified in the blocklist below.</string>
+    <string name="browser_filter_desc_whitelist">The entire web is blocked in browsers. Users can only open the specific sites listed in the whitelist below.</string>
+    <string name="browser_filter_hint_url">Enter domain or URL pattern (e.g. example.com)</string>
+    <string name="browser_filter_btn_add">Add Website</string>
+    <string name="browser_filter_error_invalid_url">Invalid domain format. Please enter a valid domain like example.com</string>
+    <string name="browser_filter_error_duplicate_url">This website is already in the list.</string>
+    <string name="browser_filter_presets_title">Quick Blocking Presets</string>
+    <string name="browser_filter_preset_social">Block popular social media (Facebook, Instagram, TikTok, X, Reddit...)</string>
+    <string name="browser_filter_social_added">Added %1$d social media websites to the blocklist</string>
+    <string name="browser_filter_empty_blocklist">The blocklist is currently empty.</string>
+    <string name="browser_filter_empty_whitelist">The whitelist is currently empty.</string>
+    <string name="browser_filter_whitelist_empty_warning">Cannot enable Whitelist Only mode while your list is empty, as this blocks all web traffic. Please add at least one domain.</string>
+    <string name="browser_filter_saved_success">Browser filtering policy saved and enforced successfully</string>
+    <string name="browser_filter_count_format">Configured websites: %1$d</string>
+    <string name="browser_filter_status_off">Mode: Disabled</string>
+    <string name="browser_filter_status_blocklist">Mode: Blocklist (%1$d sites)</string>
+    <string name="browser_filter_status_whitelist">Mode: Whitelist (%1$d sites)</string>
+    <string name="browser_filter_url_deleted">Removed %1$s</string>
+    <string name="browser_filter_undo">Undo</string>
+    <string name="browser_filter_item_delete_cd">Delete website</string>
+    <string name="browser_filter_list_title">Websites List</string>
+    <string name="browser_filter_btn_save">Save &amp; Enforce Policy</string>
+    <string name="browser_filter_info_title">Enterprise Browser URL Policy</string>
+    <string name="browser_filter_info_desc">Enforced at the OS level (Device Owner) across Chromium browsers such as Google Chrome, Brave, and Edge.</string>
 </resources>

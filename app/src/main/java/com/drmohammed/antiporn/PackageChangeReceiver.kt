@@ -101,7 +101,6 @@ object PackageChangeHandler {
                             if (dpm != null && com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) {
                                 val admin = ComponentName(appContext, AdminReceiver::class.java)
                                 val currentPolicy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
-                                BrowserShield.applyBrowserRestrictions(dpm, admin, currentPolicy)
                                 val restrictionsBundle = BrowserShield.buildBrowserRestrictionsBundle(currentPolicy)
                                 dpm.setApplicationRestrictions(admin, packageName, restrictionsBundle)
                                 Log.i(TAG, "Applied browser restrictions to newly added/replaced restricted browser: $packageName")
