@@ -1,11 +1,11 @@
 {
-  "versionCode": 3,
-  "versionName": "1.2",
+  "versionCode": 4,
+  "versionName": "1.3",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 41523394,
+  "fileSizeBytes": 41569011,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار شامل فائق التوافق مع معالجات الهواتف (دعم معالجات 64-bit و 32-bit ARM) وبأعلى مستويات تقليص الحجم مع الحفاظ الكامل على نماذج الحماية والذكاء الاصطناعي.",
-  "releaseDate": "2026-10-30"
+  "releaseNotes": "إصدار 1.3: دعم فلترة روابط المتصفحات المتقدمة والقوائم البيضاء والسوداء المخصصة، حماية إعدادات المتصفح برمز الاستجابة السريعة QR، تعريب شامل لكافة الواجهات، وتحسينات أمنية لمنع حالات التزامن.",
+  "releaseDate": "2026-10-31"
 }
