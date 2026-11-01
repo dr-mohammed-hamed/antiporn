@@ -87,26 +87,25 @@ object SystemTamperShield : ProtectionShield {
                 false
             }
 
+            // Always synchronize device timezone with policy timezone
+            val targetTzId = CurfewConfig.getTargetTimeZoneId(context)
+            if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                try {
+                    TimeZone.setDefault(null) // Invalidate JVM cached default timezone
+                    val currentTz = TimeZone.getDefault()
+                    if (currentTz.id != targetTzId) {
+                        dpm.setTimeZone(admin, targetTzId)
+                        TimeZone.setDefault(null) // Invalidate JVM cached default timezone
+                        Log.i(TAG, "Applied timezone via DPM: $targetTzId")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not set timezone via DPM", e)
+                }
+            }
+
             if (isDateTimeLocked) {
                 if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     try { dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME) } catch (e: Exception) { Log.w(TAG, "Date time block: ${e.message}") }
-                }
-
-                // 6. Enforce persistent timezone (configured or default Makkah Al-Mukarramah)
-                val targetTzId = CurfewConfig.getTargetTimeZoneId(context)
-
-                if (isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    try {
-                        TimeZone.setDefault(null) // Invalidate JVM cached default timezone
-                        val currentTz = TimeZone.getDefault()
-                        if (currentTz.id != targetTzId) {
-                            dpm.setTimeZone(admin, targetTzId)
-                            TimeZone.setDefault(null) // Invalidate JVM cached default timezone
-                            Log.i(TAG, "Enforced timezone via DPM: $targetTzId")
-                        }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Could not set persistent timezone via DPM", e)
-                    }
                 }
 
                 // 7. Enforce atomic network time sync (NTP) while keeping timezone locked to Makkah

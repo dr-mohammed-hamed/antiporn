@@ -15,7 +15,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.drmohammed.antiporn.R
@@ -123,6 +126,23 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         isLocalMode = intent.getBooleanExtra(EXTRA_IS_LOCAL, false)
         wardId = intent.getStringExtra(EXTRA_WARD_ID) ?: ""
         wardName = intent.getStringExtra(EXTRA_WARD_NAME) ?: getString(R.string.status_ward_badge)
+        if (isLocalMode && !SelfControlAccessGateRegistry.getActiveGate().canAccess(this)) {
+            Toast.makeText(this, R.string.gate_access_denied_by_guardian, Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                PolicyRepository.getInstance(applicationContext).currentPolicyFlow.collect {
+                    if (isFinishing || isDestroyed) return@collect
+                    if (isLocalMode && !SelfControlAccessGateRegistry.getActiveGate().canAccess(this@RemoteAppManagerActivity)) {
+                        Toast.makeText(this@RemoteAppManagerActivity, R.string.gate_access_denied_by_guardian, Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
+                }
+            }
+        }
 
         if (!isLocalMode && wardId.isBlank()) {
             finish()
@@ -646,4 +666,14 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        if (isFinishing || isDestroyed) return
+        if (isLocalMode && !SelfControlAccessGateRegistry.getActiveGate().canAccess(this)) {
+            Toast.makeText(this, R.string.gate_access_denied_by_guardian, Toast.LENGTH_SHORT).show()
+            finish()
+        }
+    }
+
 }

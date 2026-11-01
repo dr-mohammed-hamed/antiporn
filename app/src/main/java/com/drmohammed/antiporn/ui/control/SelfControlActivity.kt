@@ -92,6 +92,7 @@ class SelfControlActivity : AppCompatActivity() {
     private lateinit var actvTimezonePicker: MaterialAutoCompleteTextView
     private lateinit var tvTimezonePreview: TextView
     private lateinit var btnResetToMakkah: MaterialButton
+    private lateinit var btnAutoDetectTimezone: MaterialButton
 
     // DNS controls
     private lateinit var tilDnsHost: TextInputLayout
@@ -328,6 +329,7 @@ class SelfControlActivity : AppCompatActivity() {
         actvTimezonePicker = findViewById(R.id.actvTimezonePicker)
         tvTimezonePreview = findViewById(R.id.tvTimezonePreview)
         btnResetToMakkah = findViewById(R.id.btnResetToMakkah)
+        btnAutoDetectTimezone = findViewById(R.id.btnAutoDetectTimezone)
 
         // Timezone adapter
         val timezoneOptions = IslamicTimeZoneRegistry.getAllOptions()
@@ -465,6 +467,22 @@ class SelfControlActivity : AppCompatActivity() {
                 updateSaveButtonState()
             }
         }
+        var lastAutoDetectClickTime = 0L
+        btnAutoDetectTimezone.setOnClickListener {
+            if (isFinishing || isDestroyed) return@setOnClickListener
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastAutoDetectClickTime < 800L) return@setOnClickListener
+            lastAutoDetectClickTime = now
+            val detected = IslamicTimeZoneRegistry.detectCurrentDeviceOption()
+            android.widget.Toast.makeText(this, getString(R.string.timezone_detected_toast, detected.displayText), android.widget.Toast.LENGTH_SHORT).show()
+            if (selectedTimeZoneId != detected.id) {
+                selectedTimeZoneId = detected.id
+                updateTimezoneViews()
+                updateSaveButtonState()
+
+            }
+        }
+
         btnResetToMakkah.setOnClickListener {
             if (selectedTimeZoneId != CurfewConfig.MAKKAH_TIMEZONE_ID) {
                 selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
@@ -490,8 +508,7 @@ class SelfControlActivity : AppCompatActivity() {
         switchInstantInternetKill.setOnCheckedChangeListener(switchListener)
         switchIncognitoBlocked.setOnCheckedChangeListener(switchListener)
         switchLockNewInstalls.setOnCheckedChangeListener(switchListener)
-        switchLockDateTime.setOnCheckedChangeListener { _, isChecked ->
-            cardTimezoneControl.isVisible = isChecked
+        switchLockDateTime.setOnCheckedChangeListener { _, _ ->
             updateSaveButtonState()
         }
         etDnsHost.addTextChangedListener(object : TextWatcher {
@@ -688,7 +705,7 @@ class SelfControlActivity : AppCompatActivity() {
             switchIncognitoBlocked.isChecked = policy.isIncognitoBlocked
             switchLockNewInstalls.isChecked = policy.lockNewInstallsUntilApproved
             switchLockDateTime.isChecked = policy.isDateTimeLocked
-            cardTimezoneControl.isVisible = policy.isDateTimeLocked
+            // cardTimezoneControl is always visible
             val qrManager = SelfControlQrManager.getInstance(applicationContext)
             val isQrEnabled = qrManager.isQrLockEnabled()
             switchQrLockEnabled.isChecked = isQrEnabled
@@ -751,7 +768,7 @@ class SelfControlActivity : AppCompatActivity() {
     private fun updateTimezoneViews() {
         val option = IslamicTimeZoneRegistry.findByIanaId(selectedTimeZoneId)
         val cityName = option.majorCities.split("/").firstOrNull()?.trim() ?: option.majorCities
-        tvTimezoneBadge.text = getString(R.string.guardian_timezone_badge_format, option.gmtOffsetLabel, cityName)
+        tvTimezoneBadge.text = getString(R.string.guardian_timezone_badge_format, option.getLiveOffsetLabel(), cityName)
         actvTimezonePicker.setText(option.displayText, false)
         try {
             val tz = TimeZone.getTimeZone(option.ianaTimeZoneId)
@@ -759,7 +776,7 @@ class SelfControlActivity : AppCompatActivity() {
                 timeZone = tz
             }
             val formattedTime = sdf.format(Date())
-            val timeWithOffset = getString(R.string.guardian_timezone_preview_time_format, formattedTime, option.gmtOffsetLabel)
+            val timeWithOffset = getString(R.string.guardian_timezone_preview_time_format, formattedTime, option.getLiveOffsetLabel())
             tvTimezonePreview.text = getString(
                 R.string.guardian_timezone_preview_format,
                 timeWithOffset

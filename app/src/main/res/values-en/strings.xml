@@ -69,6 +69,11 @@
     <string name="guardian_timezone_badge_format">%1$s (%2$s)</string>
     <string name="guardian_timezone_preview_time_format">%1$s (%2$s)</string>
     <string name="btn_reset_to_makkah">Reset to Makkah Time (Default)</string>
+    <string name="btn_auto_detect_timezone">Auto-Detect Current Timezone</string>
+    <string name="timezone_detected_toast">Timezone automatically set to: %s</string>
+    <string name="timezone_auto_detect_failed">Auto-detection unavailable, used Makkah time</string>
+    <string name="section_timing_and_security_title">Timing &amp; Security Settings</string>
+    <string name="date_time_lock_standalone_desc">Lock date and time in Android phone settings to prevent tampering with curfew</string>
 
     <string name="guardian_instant_internet_kill_title">Instant Internet Kill (24/7)</string>
     <string name="guardian_instant_internet_kill_desc">Instantly cut all internet data on ward device at any time 24/7 with 1 click</string>
@@ -220,6 +225,14 @@
     <string name="error_breakout_not_ready">The 24-hour grace period has not yet elapsed</string>
     <string name="error_trusted_time_required">Emergency breakout requires network-verified trusted time</string>
     <string name="error_switch_account_while_supervised">Cannot switch to an existing Google account while supervised to prevent breaking your active guardian link</string>
+
+    <!-- Guardian Self-Control Alert Banner -->
+    <string name="guardian_self_control_alert_title">Alert: Settings modified by ward via Self-Control</string>
+    <string name="guardian_self_control_alert_msg">%1$s modified protection settings on %2$s. You can revert to your previous settings or accept the changes.</string>
+    <string name="btn_revert_self_control">Revert to My Settings</string>
+    <string name="btn_dismiss_self_control">Accept Changes</string>
+    <string name="toast_self_control_reverted">Guardian settings restored successfully</string>
+    <string name="toast_self_control_dismissed">Changes acknowledged and accepted</string>
 
     <!-- Accountability & Supervision Translations -->
     <string name="status_ward_badge">Supervised</string>

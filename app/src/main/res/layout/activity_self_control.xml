@@ -295,185 +295,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Card 2: Date & Time Protection and Islamic Timezone -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                app:cardBackgroundColor="?attr/colorSurfaceContainer"
-                app:cardCornerRadius="18dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/guardian_date_time_lock_title"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/switchLockDateTime"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/guardian_date_time_lock_desc"
-                        android:textColor="?attr/colorOutline"
-                        android:textSize="12sp" />
-
-                    <!-- Collapsible Timezone Controls -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardTimezoneControl"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-                        app:cardCornerRadius="14dp"
-                        app:cardElevation="0dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
-                        app:strokeWidth="1dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical">
-
-                            <LinearLayout
-                                android:id="@+id/layoutTimezoneHeader"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:background="?attr/selectableItemBackground"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal"
-                                android:padding="14dp">
-
-                                <LinearLayout
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:orientation="vertical">
-
-                                    <TextView
-                                        android:id="@+id/tvTimezoneTitle"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="@string/guardian_timezone_title"
-                                        android:textColor="?attr/colorOnSurface"
-                                        android:textSize="14sp"
-                                        android:textStyle="bold" />
-
-                                    <TextView
-                                        android:id="@+id/tvTimezoneSubtitle"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="2dp"
-                                        android:text="@string/guardian_timezone_subtitle"
-                                        android:textColor="?attr/colorOutline"
-                                        android:textSize="11sp" />
-                                </LinearLayout>
-
-                                <TextView
-                                    android:id="@+id/tvTimezoneBadge"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="8dp"
-                                    android:layout_marginEnd="8dp"
-                                    android:textColor="?attr/colorPrimary"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold"
-                                    tools:text="مكة المكرمة (GMT+3)" />
-
-                                <ImageView
-                                    android:id="@+id/ivTimezoneExpand"
-                                    android:layout_width="24dp"
-                                    android:layout_height="24dp"
-                                    android:contentDescription="@null"
-                                    android:src="@drawable/ic_expand_more"
-                                    app:tint="?attr/colorOutline" />
-                            </LinearLayout>
-
-                            <LinearLayout
-                                android:id="@+id/layoutTimezoneContent"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:orientation="vertical"
-                                android:paddingHorizontal="14dp"
-                                android:paddingBottom="14dp"
-                                android:visibility="gone"
-                                tools:visibility="visible">
-
-                                <TextView
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:text="@string/guardian_timezone_info"
-                                    android:textColor="?attr/colorOutline"
-                                    android:textSize="11sp" />
-
-                                <com.google.android.material.textfield.TextInputLayout
-                                    android:id="@+id/tilTimezonePicker"
-                                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="10dp"
-                                    android:hint="@string/guardian_timezone_dropdown_label">
-
-                                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
-                                        android:id="@+id/actvTimezonePicker"
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:inputType="none"
-                                        android:textSize="13sp" />
-                                </com.google.android.material.textfield.TextInputLayout>
-
-                                <TextView
-                                    android:id="@+id/tvTimezonePreview"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="8dp"
-                                    android:textColor="?attr/colorPrimary"
-                                    android:textSize="12sp"
-                                    android:textStyle="bold"
-                                    tools:text="الوقت المقدر الآن في الهاتف: 14:30 (GMT+3)" />
-
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/btnResetToMakkah"
-                                    style="@style/Widget.Material3.Button.TextButton"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="6dp"
-                                    android:text="@string/btn_reset_to_makkah"
-                                    android:textSize="12sp" />
-                            </LinearLayout>
-
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Card 3: Encrypted DNS Provider -->
+            <!-- Card 2: Encrypted DNS Provider -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -931,6 +753,229 @@
                         android:textSize="14sp"
                         android:textStyle="bold"
                         app:cornerRadius="12dp" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Section Header: Timing & Security Settings (إعدادات التوقيت والأمان) -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="4dp"
+                android:layout_marginStart="4dp"
+                android:text="@string/section_timing_and_security_title"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <!-- Card: Date & Time Protection Lock (Independent switch) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardDateTimeLockControl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:cardCornerRadius="18dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvDateTimeLockTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/guardian_date_time_lock_title"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvDateTimeLockDesc"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="@string/date_time_lock_standalone_desc"
+                                android:textColor="?attr/colorOutline"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switchLockDateTime"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Card: Timezone & Seasonal Clock -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardTimezoneControl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:cardCornerRadius="18dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Header Layout (clickable to toggle expansion) -->
+                    <LinearLayout
+                        android:id="@+id/layoutTimezoneHeader"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvTimezoneTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/guardian_timezone_title"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvTimezoneSubtitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/guardian_timezone_subtitle"
+                                android:textColor="?attr/colorOutline"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvTimezoneBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_marginEnd="8dp"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            tools:text="القاهرة (GMT+2)" />
+
+                        <ImageView
+                            android:id="@+id/ivTimezoneExpand"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_expand_more"
+                            app:tint="?attr/colorOutline" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/layoutTimezoneContent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingBottom="16dp"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/guardian_timezone_info"
+                            android:textColor="?attr/colorOutline"
+                            android:textSize="11sp" />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/tilTimezonePicker"
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:hint="@string/guardian_timezone_dropdown_label">
+
+                            <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                                android:id="@+id/actvTimezonePicker"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="none"
+                                android:textSize="13sp" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <TextView
+                            android:id="@+id/tvTimezonePreview"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            tools:text="الوقت المقدر الآن في الهاتف: 14:30 (GMT+2)" />
+
+                        <!-- Action Buttons Row: Auto Detect & Reset to Makkah -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnAutoDetectTimezone"
+                                style="@style/Widget.Material3.Button.TonalButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/btn_auto_detect_timezone"
+                                app:icon="@drawable/ic_globe"
+                                app:iconGravity="textStart"
+                                android:textSize="12sp"
+                                app:cornerRadius="10dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnResetToMakkah"
+                                style="@style/Widget.Material3.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:text="@string/btn_reset_to_makkah"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                    </LinearLayout>
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

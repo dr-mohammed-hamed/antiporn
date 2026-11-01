@@ -474,6 +474,11 @@
     <string name="guardian_timezone_badge_format">%1$s (%2$s)</string>
     <string name="guardian_timezone_preview_time_format">%1$s (%2$s)</string>
     <string name="btn_reset_to_makkah">استعادة توقيت مكة المكرمة (الافتراضي)</string>
+    <string name="btn_auto_detect_timezone">كشف التوقيت الحالي تلقائياً</string>
+    <string name="timezone_detected_toast">تم ضبط المنطقة الزمنية تلقائياً على: %s</string>
+    <string name="timezone_auto_detect_failed">تعذر الكشف التلقائي، تم استخدام توقيت مكة المكرمة</string>
+    <string name="section_timing_and_security_title">إعدادات التوقيت والأمان</string>
+    <string name="date_time_lock_standalone_desc">قفل شاشة ضبط الوقت في إعدادات هاتف أندرويد لمنع التلاعب بساعات الحظر</string>
 
     <string name="guardian_instant_internet_kill_title">قطع الإنترنت اللحظي (24/7)</string>
 
@@ -677,6 +682,14 @@
     <string name="error_breakout_not_ready">لم تنتهِ مهلة الـ 24 ساعة بعد</string>
     <string name="error_trusted_time_required">يتطلب فك الارتباط توثيق الوقت عبر الشبكة لمنع التلاعب</string>
     <string name="error_switch_account_while_supervised">لا يمكن التبديل إلى حساب Google مسجل مسبقاً أثناء خضوع الجهاز للإشراف حمايةً لرابط الإشراف</string>
+
+    <!-- Guardian Self-Control Alert Banner -->
+    <string name="guardian_self_control_alert_title">تنبيه: تم تعديل الإعدادات ذاتياً بواسطة التابع</string>
+    <string name="guardian_self_control_alert_msg">قام %1$s بتعديل إعدادات الحماية ذاتياً في %2$s. يمكنك استعادة إعداداتك السابقة أو إقرار هذا التعديل.</string>
+    <string name="btn_revert_self_control">استعادة إعداداتي السابقة</string>
+    <string name="btn_dismiss_self_control">إقرار وقبول التعديل</string>
+    <string name="toast_self_control_reverted">تمت استعادة إعدادات المشرف السابقة بنجاح</string>
+    <string name="toast_self_control_dismissed">تم إقرار واعتماد التعديلات بنجاح</string>
 
     <!-- Enterprise Provisioning (OOBE QR Code) -->
     <string name="provisioning_setup_title">تهيئة حماية حِصن</string>

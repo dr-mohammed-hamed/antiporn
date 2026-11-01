@@ -240,6 +240,7 @@ class PolicyRepository private constructor(context: Context) {
     /**
      * Convenience API to toggle self-control permission directly in local policy and enforce it.
      */
+    @Deprecated("Legacy convenience method")
     fun updateSelfControlAllowed(allowed: Boolean) {
         val current = _currentPolicyFlow.value
         if (current.isSelfControlAllowed == allowed) return
@@ -265,31 +266,32 @@ class PolicyRepository private constructor(context: Context) {
 
                 // 1. Dynamic Date & Time Protection / Timezone Configuration (Requires DO)
                 if (isDo && admin != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    // Always synchronize device timezone with policy timezone (e.g. Cairo or Makkah)
+                    if (bundle.timeZoneId.isNotBlank()) {
+                        val validTz = if (com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(bundle.timeZoneId)) {
+                            bundle.timeZoneId
+                        } else {
+                            com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
+                        }
+                        try {
+                            TimeZone.setDefault(null)
+                            val currentTz = TimeZone.getDefault()
+                            if (currentTz.id != validTz) {
+                                dpm.setTimeZone(admin, validTz)
+                                TimeZone.setDefault(null)
+                                Log.i(TAG, "Applied dynamic timezone update to: $validTz")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed setting timezone ${bundle.timeZoneId} via DPM", e)
+                        }
+                    }
+
                     if (bundle.isDateTimeLocked) {
                         try {
                             dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
                             Log.i(TAG, "Enforced DISALLOW_CONFIG_DATE_TIME restriction from policy bundle")
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed applying DISALLOW_CONFIG_DATE_TIME: ${e.message}")
-                        }
-
-                        if (bundle.timeZoneId.isNotBlank()) {
-                            val validTz = if (com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(bundle.timeZoneId)) {
-                                bundle.timeZoneId
-                            } else {
-                                com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
-                            }
-                            try {
-                                TimeZone.setDefault(null)
-                                val currentTz = TimeZone.getDefault()
-                                if (currentTz.id != validTz) {
-                                    dpm.setTimeZone(admin, validTz)
-                                    TimeZone.setDefault(null)
-                                    Log.i(TAG, "Applied dynamic timezone update to: $validTz")
-                                }
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Failed setting timezone ${bundle.timeZoneId} via DPM", e)
-                            }
                         }
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -311,7 +313,7 @@ class PolicyRepository private constructor(context: Context) {
                         // Time lock is not enabled: Clear restrictions and restore default auto-time state
                         try {
                             dpm.clearUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
-                            Log.i(TAG, "Cleared DISALLOW_CONFIG_DATE_TIME restriction from policy bundle")
+                            Log.i(TAG, "Cleared DISALLOW_CONFIG_DATE_TIME restriction from policy bundle (phone settings open)")
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed clearing DISALLOW_CONFIG_DATE_TIME: ${e.message}")
                         }
@@ -467,6 +469,8 @@ class PolicyRepository private constructor(context: Context) {
                     guardianName = current.guardianName,
                     isSupervised = current.isSupervised,
                     isSelfControlAllowed = current.isSelfControlAllowed,
+                    guardianPolicySnapshot = if (isSupervised) (current.guardianPolicySnapshot ?: current.toJson()) else null,
+                    lastSelfModifiedAt = if (isSupervised) TrustedTimeProvider.currentTimeMillis(appContext) else null,
                     version = current.version + 1,
                     updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
                 )

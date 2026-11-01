@@ -15,8 +15,27 @@ object IslamicTimeZoneRegistry {
         val majorCities: String,
         val ianaTimeZoneId: String
     ) {
+        fun getLiveOffsetLabel(): String {
+            return try {
+                val tz = TimeZone.getTimeZone(ianaTimeZoneId)
+                val now = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis()
+                val offsetMs = tz.getOffset(now)
+                val offsetHours = offsetMs / 3_600_000
+                val offsetMins = kotlin.math.abs((offsetMs % 3_600_000) / 60_000)
+                if (offsetMins == 0) {
+                    val sign = if (offsetHours >= 0) "+$offsetHours" else "$offsetHours"
+                    "GMT$sign"
+                } else {
+                    val sign = if (offsetHours >= 0) "+$offsetHours" else "$offsetHours"
+                    String.format(java.util.Locale.US, "GMT%s:%02d", sign, offsetMins)
+                }
+            } catch (_: Exception) {
+                gmtOffsetLabel
+            }
+        }
+
         val displayText: String
-            get() = "$gmtOffsetLabel ($majorCities)"
+            get() = "${getLiveOffsetLabel()} ($majorCities)"
 
         override fun toString(): String = displayText
     }
@@ -108,6 +127,25 @@ object IslamicTimeZoneRegistry {
     }
 
     fun findById(id: String?): TimeZoneOption = findByIanaId(id)
+
+    fun detectCurrentDeviceOption(): TimeZoneOption {
+        return try {
+            val currentTz = TimeZone.getDefault()
+            val localId = currentTz.id
+            val exact = OPTIONS.firstOrNull {
+                it.ianaTimeZoneId.equals(localId, ignoreCase = true) || it.id.equals(localId, ignoreCase = true)
+            }
+            if (exact != null) return exact
+
+            val now = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis()
+            val currentOffset = currentTz.getOffset(now)
+            OPTIONS.firstOrNull {
+                TimeZone.getTimeZone(it.ianaTimeZoneId).getOffset(now) == currentOffset
+            } ?: getDefaultOption()
+        } catch (_: Exception) {
+            getDefaultOption()
+        }
+    }
 
     fun isValidIanaId(ianaId: String?): Boolean {
         if (ianaId.isNullOrBlank()) return false

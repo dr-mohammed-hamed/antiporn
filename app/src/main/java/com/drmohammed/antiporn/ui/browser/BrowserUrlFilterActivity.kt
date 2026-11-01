@@ -18,7 +18,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.drmohammed.antiporn.R
@@ -90,6 +93,23 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
 
         setupWindowInsets()
         parseIntentData()
+        if (!isRemote && !SelfControlAccessGateRegistry.getActiveGate().canAccess(this)) {
+            Toast.makeText(this, R.string.gate_access_denied_by_guardian, Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                PolicyRepository.getInstance(applicationContext).currentPolicyFlow.collect {
+                    if (isFinishing || isDestroyed) return@collect
+                    if (!isRemote && !SelfControlAccessGateRegistry.getActiveGate().canAccess(this@BrowserUrlFilterActivity)) {
+                        Toast.makeText(this@BrowserUrlFilterActivity, R.string.gate_access_denied_by_guardian, Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
+                }
+            }
+        }
         initViews()
         setupListeners()
         populateFromPolicy()
@@ -489,4 +509,14 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
         const val EXTRA_WARD_DEVICE_ID = "extra_ward_device_id"
         const val EXTRA_UPDATED_POLICY_JSON = "extra_updated_policy_json"
     }
+
+    override fun onResume() {
+        super.onResume()
+        if (isFinishing || isDestroyed) return
+        if (!isRemote && !SelfControlAccessGateRegistry.getActiveGate().canAccess(this)) {
+            Toast.makeText(this, R.string.gate_access_denied_by_guardian, Toast.LENGTH_SHORT).show()
+            finish()
+        }
+    }
+
 }

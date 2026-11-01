@@ -84,21 +84,23 @@ object SelfControlAccessGateRegistry {
         val policy = try {
             com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context.applicationContext).getCurrentPolicy()
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to retrieve local policy in isSelfControlPermitted", e)
+            Log.w(TAG, "Failed retrieving local policy in isSelfControlPermitted", e)
             null
         }
+
         val isSupervised = (policy?.isSupervised == true) || try {
             com.drmohammed.antiporn.data.repository.AccountabilityRepository.getInstance(context.applicationContext).isSupervised()
         } catch (e: Exception) {
             Log.w(TAG, "Failed to check accountability supervision in isSelfControlPermitted", e)
-            false
+            true
         }
 
         if (isSupervised) {
-            if (policy != null && !policy.isSelfControlAllowed) {
+            if (policy == null) {
+                Log.w(TAG, "Precautionary lockout: policy cannot be retrieved on supervised device")
                 return false
             }
-            if (!isSelfControlAllowedWhenSupervised) {
+            if (!policy.isSelfControlAllowed) {
                 return false
             }
         }

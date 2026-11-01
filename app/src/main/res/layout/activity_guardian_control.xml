@@ -157,6 +157,74 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Self-Control Modification Alert Banner -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardSelfControlAlertBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorTertiaryContainer"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorTertiary"
+            app:strokeWidth="1.2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tvSelfControlAlertTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/guardian_self_control_alert_title"
+                    android:textColor="?attr/colorOnTertiaryContainer"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvSelfControlAlertMsg"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="?attr/colorOnTertiaryContainer"
+                    android:textSize="13sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnRevertSelfControlChanges"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="0dp"
+                        android:layout_height="38dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:backgroundTint="?attr/colorTertiary"
+                        android:text="@string/btn_revert_self_control"
+                        android:textColor="?attr/colorOnTertiary"
+                        android:textSize="12sp"
+                        app:cornerRadius="10dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnDismissSelfControlAlert"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="38dp"
+                        android:layout_weight="1"
+                        android:text="@string/btn_dismiss_self_control"
+                        android:textSize="12sp"
+                        app:cornerRadius="10dp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Card 0: Self-Control Permission & Armor Authority -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardSelfControlPermission"
@@ -500,8 +568,6 @@
         <!-- Card: Timezone & Seasonal Clock Control -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardTimezoneControl"
-            android:visibility="gone"
-            tools:visibility="visible"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
@@ -629,15 +695,36 @@
                         android:textStyle="bold"
                         tools:text="الوقت المقدر الآن في هاتف المكفول: 10:30 م" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnResetToMakkah"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="wrap_content"
+                                        <!-- Action Buttons Row: Auto Detect & Reset to Makkah -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:text="@string/btn_reset_to_makkah"
-                        android:textSize="12sp"
-                        app:cornerRadius="10dp" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnAutoDetectTimezone"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/btn_auto_detect_timezone"
+                            app:icon="@drawable/ic_globe"
+                            app:iconGravity="textStart"
+                            android:textSize="12sp"
+                            app:cornerRadius="10dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnResetToMakkah"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="@string/btn_reset_to_makkah"
+                            android:textSize="12sp"
+                            app:cornerRadius="10dp" />
+                    </LinearLayout>
 
                 </LinearLayout>
             </LinearLayout>

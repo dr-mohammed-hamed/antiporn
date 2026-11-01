@@ -70,6 +70,8 @@ class DevicePolicyBundleTest {
             breakoutStatus = DevicePolicyBundle.BREAKOUT_STATUS_PENDING,
             breakoutRequestedAt = 1790000000000L,
             breakoutUnlockAt = 1790086400000L,
+            guardianPolicySnapshot = "{\"version\":40}",
+            lastSelfModifiedAt = 1790000010000L,
             version = 42L,
             updatedAt = 1790000000000L
         )
@@ -105,6 +107,8 @@ class DevicePolicyBundleTest {
         assertEquals(original.breakoutStatus, restored.breakoutStatus)
         assertEquals(original.breakoutRequestedAt, restored.breakoutRequestedAt)
         assertEquals(original.breakoutUnlockAt, restored.breakoutUnlockAt)
+        assertEquals(original.guardianPolicySnapshot, restored.guardianPolicySnapshot)
+        assertEquals(original.lastSelfModifiedAt, restored.lastSelfModifiedAt)
         assertEquals(original.version, restored.version)
         assertEquals(original.updatedAt, restored.updatedAt)
     }
@@ -140,6 +144,8 @@ class DevicePolicyBundleTest {
             breakoutStatus = DevicePolicyBundle.BREAKOUT_STATUS_COMPLETED,
             breakoutRequestedAt = 1234560000L,
             breakoutUnlockAt = 1234567800L,
+            guardianPolicySnapshot = "{\"version\":4}",
+            lastSelfModifiedAt = 1234560500L,
             version = 5L,
             updatedAt = 123456789L
         )
@@ -175,6 +181,8 @@ class DevicePolicyBundleTest {
         assertEquals(original.breakoutStatus, restored.breakoutStatus)
         assertEquals(original.breakoutRequestedAt, restored.breakoutRequestedAt)
         assertEquals(original.breakoutUnlockAt, restored.breakoutUnlockAt)
+        assertEquals(original.guardianPolicySnapshot, restored.guardianPolicySnapshot)
+        assertEquals(original.lastSelfModifiedAt, restored.lastSelfModifiedAt)
         assertEquals(original.version, restored.version)
         assertEquals(original.updatedAt, restored.updatedAt)
     }

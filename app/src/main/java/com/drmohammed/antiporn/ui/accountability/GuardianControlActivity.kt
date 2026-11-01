@@ -72,6 +72,11 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var btnRejectBreakout: MaterialButton
 
     // Self-Control Permission
+    private lateinit var cardSelfControlAlertBanner: MaterialCardView
+    private lateinit var tvSelfControlAlertTitle: TextView
+    private lateinit var tvSelfControlAlertMsg: TextView
+    private lateinit var btnRevertSelfControlChanges: MaterialButton
+    private lateinit var btnDismissSelfControlAlert: MaterialButton
     private lateinit var cardSelfControlPermission: MaterialCardView
     private lateinit var switchAllowSelfControl: MaterialSwitch
 
@@ -104,6 +109,7 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var actvTimezonePicker: MaterialAutoCompleteTextView
     private lateinit var tvTimezonePreview: TextView
     private lateinit var btnResetToMakkah: MaterialButton
+    private lateinit var btnAutoDetectTimezone: MaterialButton
 
     // Enforcement & Security controls
     private lateinit var switchVpnBlackhole: MaterialSwitch
@@ -148,6 +154,8 @@ class GuardianControlActivity : AppCompatActivity() {
     private var hasLoadedInitialPolicy = false
     private var lastEditNameClickTime = 0L
     private var lastRejectBreakoutClickTime = 0L
+    private var lastAutoDetectClickTime = 0L
+    private val policyRepo by lazy { PolicyRepository.getInstance(applicationContext) }
     private var lastSaveClickTime = 0L
     private var approvalsListener: ListenerRegistration? = null
 
@@ -265,6 +273,11 @@ class GuardianControlActivity : AppCompatActivity() {
         btnRejectBreakout = findViewById(R.id.btnRejectBreakout)
 
         // Self-Control Permission
+        cardSelfControlAlertBanner = findViewById(R.id.cardSelfControlAlertBanner)
+        tvSelfControlAlertTitle = findViewById(R.id.tvSelfControlAlertTitle)
+        tvSelfControlAlertMsg = findViewById(R.id.tvSelfControlAlertMsg)
+        btnRevertSelfControlChanges = findViewById(R.id.btnRevertSelfControlChanges)
+        btnDismissSelfControlAlert = findViewById(R.id.btnDismissSelfControlAlert)
         cardSelfControlPermission = findViewById(R.id.cardSelfControlPermission)
         switchAllowSelfControl = findViewById(R.id.switchAllowSelfControl)
 
@@ -297,6 +310,7 @@ class GuardianControlActivity : AppCompatActivity() {
         actvTimezonePicker = findViewById(R.id.actvTimezonePicker)
         tvTimezonePreview = findViewById(R.id.tvTimezonePreview)
         btnResetToMakkah = findViewById(R.id.btnResetToMakkah)
+        btnAutoDetectTimezone = findViewById(R.id.btnAutoDetectTimezone)
 
         val timezoneOptions = IslamicTimeZoneRegistry.getAllOptions()
         val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, timezoneOptions)
@@ -361,6 +375,7 @@ class GuardianControlActivity : AppCompatActivity() {
         tilTimezonePicker.isEnabled = enabled
         actvTimezonePicker.isEnabled = enabled
         btnResetToMakkah.isEnabled = enabled
+        btnAutoDetectTimezone.isEnabled = enabled
         updateSaveButtonState()
     }
 
@@ -428,6 +443,81 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        btnRevertSelfControlChanges.setOnClickListener {
+            if (isFinishing || isDestroyed) return@setOnClickListener
+            val snapshotJson = currentPolicy.guardianPolicySnapshot
+            if (snapshotJson.isNullOrBlank()) {
+                cardSelfControlAlertBanner.visibility = View.GONE
+                return@setOnClickListener
+            }
+            btnRevertSelfControlChanges.isEnabled = false
+            lifecycleScope.launch {
+                try {
+                    val snapshotPolicy = DevicePolicyBundle.fromJson(snapshotJson)
+                    val revertedPolicy = snapshotPolicy.copy(
+                        guardianUid = currentPolicy.guardianUid,
+                        guardianName = currentPolicy.guardianName,
+                        isSupervised = true,
+                        isSelfControlAllowed = switchAllowSelfControl.isChecked,
+                        guardianPolicySnapshot = null,
+                        lastSelfModifiedAt = null,
+                        version = currentPolicy.version + 1,
+                        updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(applicationContext)
+                    )
+                    val success = policyRepo.pushPolicyToWard(wardId, revertedPolicy)
+                    if (isFinishing || isDestroyed) return@launch
+                    if (success) {
+                        currentPolicy = revertedPolicy
+                        populateUiFromPolicy(revertedPolicy)
+                        initialPolicySnapshot = revertedPolicy.copy()
+                        cardSelfControlAlertBanner.visibility = View.GONE
+                        Toast.makeText(this@GuardianControlActivity, R.string.toast_self_control_reverted, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this@GuardianControlActivity, R.string.toast_policy_push_failed, Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    Log.e(TAG, "Error reverting self-control policy", e)
+                } finally {
+                    if (!isFinishing && !isDestroyed) {
+                        btnRevertSelfControlChanges.isEnabled = true
+                    }
+                }
+            }
+        }
+
+        btnDismissSelfControlAlert.setOnClickListener {
+            if (isFinishing || isDestroyed) return@setOnClickListener
+            btnDismissSelfControlAlert.isEnabled = false
+            lifecycleScope.launch {
+                try {
+                    val acknowledgedPolicy = currentPolicy.copy(
+                        guardianPolicySnapshot = null,
+                        lastSelfModifiedAt = null,
+                        version = currentPolicy.version + 1,
+                        updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(applicationContext)
+                    )
+                    val success = policyRepo.pushPolicyToWard(wardId, acknowledgedPolicy)
+                    if (isFinishing || isDestroyed) return@launch
+                    if (success) {
+                        currentPolicy = acknowledgedPolicy
+                        initialPolicySnapshot = acknowledgedPolicy.copy()
+                        cardSelfControlAlertBanner.visibility = View.GONE
+                        Toast.makeText(this@GuardianControlActivity, R.string.toast_self_control_dismissed, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this@GuardianControlActivity, R.string.toast_policy_push_failed, Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    Log.e(TAG, "Error dismissing self-control alert", e)
+                } finally {
+                    if (!isFinishing && !isDestroyed) {
+                        btnDismissSelfControlAlert.isEnabled = true
+                    }
+                }
+            }
+        }
+
         btnRejectBreakout.setOnClickListener {
             if (isFinishing || isDestroyed) return@setOnClickListener
             val now = android.os.SystemClock.elapsedRealtime()
@@ -554,6 +644,20 @@ class GuardianControlActivity : AppCompatActivity() {
             }
         }
 
+        btnAutoDetectTimezone.setOnClickListener {
+            if (isFinishing || isDestroyed) return@setOnClickListener
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastAutoDetectClickTime < 1000L) return@setOnClickListener
+            lastAutoDetectClickTime = now
+            val detected = IslamicTimeZoneRegistry.detectCurrentDeviceOption()
+            if (selectedTimeZoneId != detected.id) {
+                selectedTimeZoneId = detected.id
+                updateTimezoneViews()
+                updateSaveButtonState()
+            }
+            android.widget.Toast.makeText(this, getString(R.string.timezone_detected_toast, detected.displayText), android.widget.Toast.LENGTH_SHORT).show()
+        }
+
         btnResetToMakkah.setOnClickListener {
             if (selectedTimeZoneId != CurfewConfig.MAKKAH_TIMEZONE_ID) {
                 selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
@@ -571,7 +675,7 @@ class GuardianControlActivity : AppCompatActivity() {
         switchIncognitoBlocked.setOnCheckedChangeListener(switchListener)
         switchLockNewInstalls.setOnCheckedChangeListener(switchListener)
         switchLockDateTime.setOnCheckedChangeListener { _, isChecked ->
-            cardTimezoneControl.isVisible = isChecked
+            // cardTimezoneControl is always visible
             updateSaveButtonState()
         }
 
@@ -655,7 +759,7 @@ class GuardianControlActivity : AppCompatActivity() {
     private fun updateTimezoneViews() {
         val option = IslamicTimeZoneRegistry.findByIanaId(selectedTimeZoneId)
         val cityName = option.majorCities.split("/").firstOrNull()?.trim() ?: option.majorCities
-        tvTimezoneBadge.text = getString(R.string.guardian_timezone_badge_format, option.gmtOffsetLabel, cityName)
+        tvTimezoneBadge.text = getString(R.string.guardian_timezone_badge_format, option.getLiveOffsetLabel(), cityName)
         actvTimezonePicker.setText(option.displayText, false)
 
         try {
@@ -664,7 +768,7 @@ class GuardianControlActivity : AppCompatActivity() {
                 timeZone = tz
             }
             val formattedTime = sdf.format(Date())
-            val timeWithOffset = getString(R.string.guardian_timezone_preview_time_format, formattedTime, option.gmtOffsetLabel)
+            val timeWithOffset = getString(R.string.guardian_timezone_preview_time_format, formattedTime, option.getLiveOffsetLabel())
             tvTimezonePreview.text = getString(
                 R.string.guardian_timezone_preview_format,
                 timeWithOffset
@@ -701,7 +805,7 @@ class GuardianControlActivity : AppCompatActivity() {
         switchIncognitoBlocked.isChecked = policy.isIncognitoBlocked
         switchLockNewInstalls.isChecked = policy.lockNewInstallsUntilApproved
         switchLockDateTime.isChecked = policy.isDateTimeLocked
-        cardTimezoneControl.isVisible = policy.isDateTimeLocked
+        // cardTimezoneControl is always visible
         etDnsHost.setText(policy.dnsHost)
         tilDnsHost.error = null
 
@@ -714,9 +818,23 @@ class GuardianControlActivity : AppCompatActivity() {
                 getString(R.string.browser_filter_status_off)
         }
 
+        if (!policy.guardianPolicySnapshot.isNullOrBlank() || policy.lastSelfModifiedAt != null) {
+            cardSelfControlAlertBanner.visibility = View.VISIBLE
+            val formattedTime = if (policy.lastSelfModifiedAt != null) {
+                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                sdf.format(java.util.Date(policy.lastSelfModifiedAt))
+            } else {
+                ""
+            }
+            tvSelfControlAlertMsg.text = getString(R.string.guardian_self_control_alert_msg, wardName, formattedTime)
+        } else {
+            cardSelfControlAlertBanner.visibility = View.GONE
+        }
+
         if (policy.breakoutStatus == DevicePolicyBundle.BREAKOUT_STATUS_PENDING && policy.breakoutUnlockAt != null) {
             cardBreakoutAlertBanner.visibility = View.VISIBLE
-            val remainingMs = (policy.breakoutUnlockAt - System.currentTimeMillis()).coerceAtLeast(0L)
+            val nowTrusted = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(applicationContext)
+            val remainingMs = (policy.breakoutUnlockAt - nowTrusted).coerceAtLeast(0L)
             val hours = remainingMs / (1000 * 3600)
             val mins = (remainingMs % (1000 * 3600)) / (1000 * 60)
             val timeStr = String.format(Locale.US, "%02d:%02d", hours, mins)
@@ -1004,11 +1122,14 @@ class GuardianControlActivity : AppCompatActivity() {
                     dnsHost = rawDns,
                     timeZoneId = selectedTimeZoneId,
                     version = latestPolicy.version + 1,
-                    updatedAt = System.currentTimeMillis()
+                    guardianPolicySnapshot = null,
+                    lastSelfModifiedAt = null,
+                    updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(applicationContext)
                 )
                 val success = policyRepo.pushPolicyToWard(wardId, updatedPolicy)
                 if (isFinishing || isDestroyed) return@launch
                 if (success) {
+                    cardSelfControlAlertBanner.visibility = View.GONE
                     initialPolicySnapshot = updatedPolicy.copy()
                     backPressedCallback.isEnabled = false
                     Toast.makeText(this@GuardianControlActivity, R.string.toast_policy_saved, Toast.LENGTH_LONG).show()

@@ -39,6 +39,8 @@ data class DevicePolicyBundle(
     val breakoutStatus: String? = null,
     val breakoutRequestedAt: Long? = null,
     val breakoutUnlockAt: Long? = null,
+    val guardianPolicySnapshot: String? = null,
+    val lastSelfModifiedAt: Long? = null,
     val version: Long = 1L,
     val updatedAt: Long = System.currentTimeMillis()
 ) {
@@ -74,6 +76,8 @@ data class DevicePolicyBundle(
             "breakoutStatus" to breakoutStatus,
             "breakoutRequestedAt" to breakoutRequestedAt,
             "breakoutUnlockAt" to breakoutUnlockAt,
+            "guardianPolicySnapshot" to guardianPolicySnapshot,
+            "lastSelfModifiedAt" to lastSelfModifiedAt,
             "version" to version,
             "updatedAt" to updatedAt
         )
@@ -132,6 +136,8 @@ data class DevicePolicyBundle(
         if (breakoutStatus != null) json.put("breakoutStatus", breakoutStatus)
         if (breakoutRequestedAt != null) json.put("breakoutRequestedAt", breakoutRequestedAt)
         if (breakoutUnlockAt != null) json.put("breakoutUnlockAt", breakoutUnlockAt)
+        if (guardianPolicySnapshot != null) json.put("guardianPolicySnapshot", guardianPolicySnapshot)
+        if (lastSelfModifiedAt != null) json.put("lastSelfModifiedAt", lastSelfModifiedAt)
         json.put("version", version)
         json.put("updatedAt", updatedAt)
         return json.toString()
@@ -213,6 +219,8 @@ data class DevicePolicyBundle(
             val breakoutStatus = (map["breakoutStatus"] as? String)?.takeIf { it.isNotBlank() }
             val breakoutRequestedAt = (map["breakoutRequestedAt"] as? Number)?.toLong()
             val breakoutUnlockAt = (map["breakoutUnlockAt"] as? Number)?.toLong()
+            val guardianPolicySnapshot = (map["guardianPolicySnapshot"] as? String)?.takeIf { it.isNotBlank() }
+            val lastSelfModifiedAt = (map["lastSelfModifiedAt"] as? Number)?.toLong()
 
             val version = (map["version"] as? Number)?.toLong() ?: 1L
             val updatedAt = (map["updatedAt"] as? Number)?.toLong() ?: 0L
@@ -249,6 +257,8 @@ data class DevicePolicyBundle(
                 breakoutStatus = breakoutStatus,
                 breakoutRequestedAt = breakoutRequestedAt,
                 breakoutUnlockAt = breakoutUnlockAt,
+                guardianPolicySnapshot = guardianPolicySnapshot,
+                lastSelfModifiedAt = lastSelfModifiedAt,
                 version = version,
                 updatedAt = updatedAt
             )
@@ -316,6 +326,8 @@ data class DevicePolicyBundle(
                 val breakoutStatus = json.optString("breakoutStatus", "").takeIf { it.isNotBlank() }
                 val breakoutRequestedAt = if (json.has("breakoutRequestedAt") && !json.isNull("breakoutRequestedAt")) json.optLong("breakoutRequestedAt") else null
                 val breakoutUnlockAt = if (json.has("breakoutUnlockAt") && !json.isNull("breakoutUnlockAt")) json.optLong("breakoutUnlockAt") else null
+                val guardianPolicySnapshot = json.optString("guardianPolicySnapshot", "").takeIf { it.isNotBlank() }
+                val lastSelfModifiedAt = if (json.has("lastSelfModifiedAt") && !json.isNull("lastSelfModifiedAt")) json.optLong("lastSelfModifiedAt") else null
 
                 DevicePolicyBundle(
                     curfewStartHour = json.optInt("curfewStartHour", com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR).coerceIn(0, 23),
@@ -349,6 +361,8 @@ data class DevicePolicyBundle(
                     breakoutStatus = breakoutStatus,
                     breakoutRequestedAt = breakoutRequestedAt,
                     breakoutUnlockAt = breakoutUnlockAt,
+                guardianPolicySnapshot = guardianPolicySnapshot,
+                lastSelfModifiedAt = lastSelfModifiedAt,
                     version = json.optLong("version", 1L),
                     updatedAt = json.optLong("updatedAt", System.currentTimeMillis())
                 )

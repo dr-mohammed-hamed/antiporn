@@ -26,10 +26,17 @@ class IslamicTimeZoneRegistryTest {
     fun testDisplayText_formatting() {
         val options = IslamicTimeZoneRegistry.getAllOptions()
         for (option in options) {
-            val expectedDisplay = "${option.gmtOffsetLabel} (${option.majorCities})"
+            val expectedDisplay = "${option.getLiveOffsetLabel()} (${option.majorCities})"
             assertEquals(expectedDisplay, option.displayText)
             assertEquals(expectedDisplay, option.toString())
         }
+    }
+
+    @Test
+    fun testDetectCurrentDeviceOption() {
+        val detected = IslamicTimeZoneRegistry.detectCurrentDeviceOption()
+        assertNotNull(detected)
+        assertTrue(IslamicTimeZoneRegistry.getAllOptions().contains(detected))
     }
 
     @Test

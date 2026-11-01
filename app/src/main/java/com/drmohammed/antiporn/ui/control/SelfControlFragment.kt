@@ -88,6 +88,7 @@ class SelfControlFragment : Fragment() {
     private var actvTimezonePicker: MaterialAutoCompleteTextView? = null
     private var tvTimezonePreview: TextView? = null
     private var btnResetToMakkah: MaterialButton? = null
+    private var btnAutoDetectTimezone: MaterialButton? = null
 
     // DNS controls
     private var tilDnsHost: TextInputLayout? = null
@@ -247,6 +248,7 @@ class SelfControlFragment : Fragment() {
         actvTimezonePicker = root.findViewById(R.id.actvTimezonePicker)
         tvTimezonePreview = root.findViewById(R.id.tvTimezonePreview)
         btnResetToMakkah = root.findViewById(R.id.btnResetToMakkah)
+        btnAutoDetectTimezone = root.findViewById(R.id.btnAutoDetectTimezone)
 
         val ctx = root.context
         val timezoneOptions = IslamicTimeZoneRegistry.getAllOptions()
@@ -494,6 +496,23 @@ class SelfControlFragment : Fragment() {
             }
         }
 
+        var lastAutoDetectClickTime = 0L
+        btnAutoDetectTimezone?.setOnClickListener {
+            if (!isAdded || isDetached) return@setOnClickListener
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastAutoDetectClickTime < 800L) return@setOnClickListener
+            lastAutoDetectClickTime = now
+            val detected = IslamicTimeZoneRegistry.detectCurrentDeviceOption()
+            context?.let { ctx ->
+                android.widget.Toast.makeText(ctx, getString(R.string.timezone_detected_toast, detected.displayText), android.widget.Toast.LENGTH_SHORT).show()
+            }
+            if (selectedTimeZoneId != detected.id) {
+                selectedTimeZoneId = detected.id
+                updateTimezoneViews()
+                updateSaveButtonState()
+
+            }
+        }
         btnResetToMakkah?.setOnClickListener {
             if (selectedTimeZoneId != CurfewConfig.MAKKAH_TIMEZONE_ID) {
                 selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
@@ -519,8 +538,7 @@ class SelfControlFragment : Fragment() {
         switchInstantInternetKill?.setOnCheckedChangeListener(switchListener)
         switchIncognitoBlocked?.setOnCheckedChangeListener(switchListener)
         switchLockNewInstalls?.setOnCheckedChangeListener(switchListener)
-        switchLockDateTime?.setOnCheckedChangeListener { _, isChecked ->
-            cardTimezoneControl?.isVisible = isChecked
+        switchLockDateTime?.setOnCheckedChangeListener { _, _ ->
             updateSaveButtonState()
         }
 
@@ -606,7 +624,7 @@ class SelfControlFragment : Fragment() {
         switchIncognitoBlocked?.isChecked = policy.isIncognitoBlocked
         switchLockNewInstalls?.isChecked = policy.lockNewInstallsUntilApproved
         switchLockDateTime?.isChecked = policy.isDateTimeLocked
-        cardTimezoneControl?.isVisible = policy.isDateTimeLocked
+        // cardTimezoneControl is always visible
 
         etDnsHost?.setText(policy.dnsHost)
         updateBrowserFilterStatus(policy)
@@ -674,7 +692,7 @@ class SelfControlFragment : Fragment() {
     private fun updateTimezoneViews() {
         val option = IslamicTimeZoneRegistry.findByIanaId(selectedTimeZoneId)
         val cityName = option.majorCities.split("/").firstOrNull()?.trim() ?: option.majorCities
-        tvTimezoneBadge?.text = getString(R.string.guardian_timezone_badge_format, option.gmtOffsetLabel, cityName)
+        tvTimezoneBadge?.text = getString(R.string.guardian_timezone_badge_format, option.getLiveOffsetLabel(), cityName)
         actvTimezonePicker?.setText(option.displayText, false)
 
         try {
@@ -683,7 +701,7 @@ class SelfControlFragment : Fragment() {
                 timeZone = tz
             }
             val formattedTime = sdf.format(Date())
-            val timeWithOffset = getString(R.string.guardian_timezone_preview_time_format, formattedTime, option.gmtOffsetLabel)
+            val timeWithOffset = getString(R.string.guardian_timezone_preview_time_format, formattedTime, option.getLiveOffsetLabel())
             tvTimezonePreview?.text = getString(
                 R.string.guardian_timezone_preview_format,
                 timeWithOffset
