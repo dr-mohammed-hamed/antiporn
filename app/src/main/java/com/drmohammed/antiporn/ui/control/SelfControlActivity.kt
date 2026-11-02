@@ -123,8 +123,12 @@ class SelfControlActivity : AppCompatActivity() {
     private lateinit var btnManageBrowserUrls: MaterialButton
 
     // Approvals
+    private var cardPendingApps: View? = null
+    private var tileLocalAppManager: View? = null
+    private var cardBrowserUrlFilter: View? = null
     private lateinit var layoutPendingApps: LinearLayout
     private lateinit var tvNoPendingApps: TextView
+    private lateinit var approvalsViewBinder: SelfControlApprovalsViewBinder
 
     // Bottom Bar
     private lateinit var btnSaveSelfControlChanges: MaterialButton
@@ -366,11 +370,22 @@ class SelfControlActivity : AppCompatActivity() {
         btnManageBrowserUrls = findViewById(R.id.btnManageBrowserUrls)
 
         // Approvals
+        tileLocalAppManager = findViewById(R.id.tileLocalAppManager)
+        cardBrowserUrlFilter = findViewById(R.id.cardBrowserUrlFilter)
+        cardPendingApps = findViewById(R.id.cardPendingApps)
         layoutPendingApps = findViewById(R.id.layoutPendingApps)
         tvNoPendingApps = findViewById(R.id.tvNoPendingApps)
+        approvalsViewBinder = SelfControlApprovalsViewBinder(
+            activity = this,
+            layoutPendingApps = layoutPendingApps,
+            tvNoPendingApps = tvNoPendingApps,
+            cardPendingApps = cardPendingApps,
+            onReloadRequested = { loadPendingApprovals() }
+        )
 
         // Bottom Bar
         btnSaveSelfControlChanges = findViewById(R.id.btnSaveSelfControlChanges)
+        updateTimingLabels()
     }
 
     private fun setupListeners() {
@@ -542,6 +557,7 @@ class SelfControlActivity : AppCompatActivity() {
                 appManagerLauncher.launch(intent)
             }
         }
+        tileLocalAppManager?.setOnClickListener { if (btnOpenLocalAppManager.isEnabled) btnOpenLocalAppManager.performClick() }
 
         // QR Lock listeners
         switchQrLockEnabled.setOnCheckedChangeListener { _, isChecked ->
@@ -677,6 +693,7 @@ class SelfControlActivity : AppCompatActivity() {
                 launchAction()
             }
         }
+        cardBrowserUrlFilter?.setOnClickListener { if (btnManageBrowserUrls.isEnabled) btnManageBrowserUrls.performClick() }
         btnSaveSelfControlChanges.setOnClickListener {
             saveChanges()
         }
@@ -758,10 +775,21 @@ class SelfControlActivity : AppCompatActivity() {
                 SimpleDateFormat("hh:mm a", Locale.getDefault()).format(cal.time)
             }
         }
-        tvCurfewStartTime.text = formatTime(selectedStartHour, selectedStartMinute)
-        tvCurfewEndTime.text = formatTime(selectedEndHour, selectedEndMinute)
-        tvWeekendStartTime.text = formatTime(selectedWeekendStartHour, selectedWeekendStartMinute)
-        tvWeekendEndTime.text = formatTime(selectedWeekendEndHour, selectedWeekendEndMinute)
+        val startFormatted = formatTime(selectedStartHour, selectedStartMinute)
+        tvCurfewStartTime.text = startFormatted
+        btnChangeStartTime.text = startFormatted
+
+        val endFormatted = formatTime(selectedEndHour, selectedEndMinute)
+        tvCurfewEndTime.text = endFormatted
+        btnChangeEndTime.text = endFormatted
+
+        val weekendStartFormatted = formatTime(selectedWeekendStartHour, selectedWeekendStartMinute)
+        tvWeekendStartTime.text = weekendStartFormatted
+        btnChangeWeekendStartTime.text = weekendStartFormatted
+
+        val weekendEndFormatted = formatTime(selectedWeekendEndHour, selectedWeekendEndMinute)
+        tvWeekendEndTime.text = weekendEndFormatted
+        btnChangeWeekendEndTime.text = weekendEndFormatted
     }
 
     private fun updateTimezoneViews() {
@@ -807,131 +835,8 @@ class SelfControlActivity : AppCompatActivity() {
             }
             withContext(Dispatchers.Main) {
                 if (isFinishing || isDestroyed) return@withContext
-                renderPendingApprovals(items)
+                approvalsViewBinder.renderPendingApprovals(items)
             }
-        }
-    }
-
-    private fun renderPendingApprovals(items: List<Pair<String, String>>) {
-        layoutPendingApps.removeAllViews()
-        if (items.isEmpty()) {
-            layoutPendingApps.addView(tvNoPendingApps)
-            tvNoPendingApps.visibility = View.VISIBLE
-            return
-        }
-        tvNoPendingApps.visibility = View.GONE
-        for ((pkg, name) in items) {
-            val card = MaterialCardView(this).apply {
-                radius = resources.displayMetrics.density * 10
-                cardElevation = resources.displayMetrics.density * 1
-                setCardBackgroundColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorSurfaceContainerHigh))
-                strokeWidth = (1 * resources.displayMetrics.density).toInt()
-                strokeColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutlineVariant)
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    bottomMargin = (8 * resources.displayMetrics.density).toInt()
-                }
-            }
-            val container = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                val pad = (12 * resources.displayMetrics.density).toInt()
-                setPadding(pad, pad, pad, pad)
-            }
-            val titleView = TextView(this).apply {
-                text = name
-                textSize = 14f
-                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurface))
-                typeface = Typeface.DEFAULT_BOLD
-            }
-            container.addView(titleView)
-            val pkgView = TextView(this).apply {
-                text = pkg
-                textSize = 11f
-                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutline))
-            }
-            container.addView(pkgView)
-            val btnRow = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setPadding(0, (8 * resources.displayMetrics.density).toInt(), 0, 0)
-            }
-            lateinit var approveBtn: MaterialButton
-            lateinit var rejectBtn: MaterialButton
-            approveBtn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonTonalStyle).apply {
-                text = getString(R.string.btn_approve_app)
-                textSize = 12f
-                cornerRadius = (8 * resources.displayMetrics.density).toInt()
-                setOnClickListener {
-                    val executeApproval = {
-                        approveBtn.isEnabled = false
-                        rejectBtn.isEnabled = false
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            try {
-                                ApprovalRepository.getInstance(applicationContext).unsuspendAndApprove(pkg, "SELF")
-                                withContext(Dispatchers.Main) {
-                                    if (!isFinishing && !isDestroyed) {
-                                        loadPendingApprovals()
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Failed approving package $pkg", e)
-                                withContext(Dispatchers.Main) {
-                                    if (!isFinishing && !isDestroyed) {
-                                        approveBtn.isEnabled = true
-                                        rejectBtn.isEnabled = true
-                                        Toast.makeText(this@SelfControlActivity, R.string.toast_self_policy_save_failed, Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    val qrManager = SelfControlQrManager.getInstance(applicationContext)
-                    if (qrManager.isQrLockEnabled()) {
-                        val tag = "qr_scanner_approve_app"
-                        if (supportFragmentManager.isStateSaved || supportFragmentManager.findFragmentByTag(tag) != null) return@setOnClickListener
-                        QrScannerBottomSheet.newInstance().apply {
-                            onVerified = { executeApproval() }
-                            onEmergencyBypassTriggered = { executeApproval() }
-                        }.show(supportFragmentManager, tag)
-                    } else {
-                        executeApproval()
-                    }
-                }
-            }
-            btnRow.addView(approveBtn)
-            rejectBtn = MaterialButton(this, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
-                text = getString(R.string.btn_reject_app)
-                textSize = 12f
-                setTextColor(getColor(R.color.status_orange))
-                setOnClickListener {
-                    approveBtn.isEnabled = false
-                    rejectBtn.isEnabled = false
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        try {
-                            ApprovalRepository.getInstance(applicationContext).recordRejection(pkg, "SELF")
-                            withContext(Dispatchers.Main) {
-                                if (!isFinishing && !isDestroyed) {
-                                    loadPendingApprovals()
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed recording rejection for package $pkg", e)
-                            withContext(Dispatchers.Main) {
-                                if (!isFinishing && !isDestroyed) {
-                                    approveBtn.isEnabled = true
-                                    rejectBtn.isEnabled = true
-                                    Toast.makeText(this@SelfControlActivity, R.string.toast_self_policy_save_failed, Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            btnRow.addView(rejectBtn)
-            container.addView(btnRow)
-            card.addView(container)
-            layoutPendingApps.addView(card)
         }
     }
 

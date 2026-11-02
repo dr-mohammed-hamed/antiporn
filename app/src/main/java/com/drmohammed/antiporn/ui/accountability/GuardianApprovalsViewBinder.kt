@@ -31,11 +31,15 @@ class GuardianApprovalsViewBinder(
 
     fun renderPendingApprovals(items: List<Pair<String, String>>) {
         layoutPendingApps.removeAllViews()
+        val cardParent = activity.findViewById<android.view.View>(R.id.cardPendingApps)
+            ?: (layoutPendingApps.parent?.parent as? android.view.View)
         if (items.isEmpty()) {
             (tvNoPendingApps.parent as? ViewGroup)?.removeView(tvNoPendingApps)
             layoutPendingApps.addView(tvNoPendingApps)
+            cardParent?.visibility = android.view.View.GONE
             return
         }
+        cardParent?.visibility = android.view.View.VISIBLE
 
         val context = activity
         for ((pkg, name) in items) {
@@ -112,6 +116,9 @@ class GuardianApprovalsViewBinder(
     }
 
     fun renderError() {
+        val cardParent = activity.findViewById<android.view.View>(R.id.cardPendingApps)
+            ?: (layoutPendingApps.parent?.parent as? android.view.View)
+        cardParent?.visibility = android.view.View.VISIBLE
         layoutPendingApps.removeAllViews()
         val errorView = TextView(activity).apply {
             text = activity.getString(R.string.error_loading_pending_apps)
@@ -157,8 +164,9 @@ class GuardianApprovalsViewBinder(
                     card?.let {
                         layoutPendingApps.removeView(it)
                         if (layoutPendingApps.childCount == 0) {
-                            (tvNoPendingApps.parent as? ViewGroup)?.removeView(tvNoPendingApps)
-                            layoutPendingApps.addView(tvNoPendingApps)
+                            val cardParent = activity.findViewById<android.view.View>(R.id.cardPendingApps)
+                                ?: (layoutPendingApps.parent?.parent as? android.view.View)
+                            cardParent?.visibility = android.view.View.GONE
                         }
                     }
                     onReloadRequested()

@@ -2,7 +2,6 @@ package com.drmohammed.antiporn.ui.control
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Typeface
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -16,7 +15,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -36,7 +35,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
-import com.google.android.material.color.MaterialColors
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
@@ -111,8 +109,12 @@ class SelfControlFragment : Fragment() {
     private var btnManageBrowserUrls: MaterialButton? = null
 
     // Approvals
+    private var cardPendingApps: View? = null
+    private var tileLocalAppManager: View? = null
+    private var cardBrowserUrlFilter: View? = null
     private var layoutPendingApps: LinearLayout? = null
     private var tvNoPendingApps: TextView? = null
+    private var approvalsViewBinder: SelfControlApprovalsViewBinder? = null
 
     // QR Lock controls
     private var switchQrLockEnabled: MaterialSwitch? = null
@@ -280,10 +282,27 @@ class SelfControlFragment : Fragment() {
         btnShowQrCode = root.findViewById(R.id.btnShowQrCode)
         btnRegenerateQrCode = root.findViewById(R.id.btnRegenerateQrCode)
 
+        tileLocalAppManager = root.findViewById(R.id.tileLocalAppManager)
+        cardBrowserUrlFilter = root.findViewById(R.id.cardBrowserUrlFilter)
+        cardPendingApps = root.findViewById(R.id.cardPendingApps)
         layoutPendingApps = root.findViewById(R.id.layoutPendingApps)
         tvNoPendingApps = root.findViewById(R.id.tvNoPendingApps)
 
+        val pendingLayout = layoutPendingApps
+        val noPendingTv = tvNoPendingApps
+        val act = activity as? AppCompatActivity
+        if (pendingLayout != null && noPendingTv != null && act != null) {
+            approvalsViewBinder = SelfControlApprovalsViewBinder(
+                activity = act,
+                layoutPendingApps = pendingLayout,
+                tvNoPendingApps = noPendingTv,
+                cardPendingApps = cardPendingApps,
+                onReloadRequested = { loadPendingApprovals() }
+            )
+        }
+
         btnSaveSelfControlChanges = root.findViewById(R.id.btnSaveSelfControlChanges)
+        updateTimingLabels()
     }
 
     private fun showQrScannerWithFallback(tag: String, onAuthorized: () -> Unit) {
@@ -571,6 +590,7 @@ class SelfControlFragment : Fragment() {
                 launchAction()
             }
         }
+        tileLocalAppManager?.setOnClickListener { if (btnOpenLocalAppManager?.isEnabled == true) btnOpenLocalAppManager?.performClick() }
 
         var lastBrowserFilterClickTime = 0L
         btnManageBrowserUrls?.setOnClickListener {
@@ -594,6 +614,7 @@ class SelfControlFragment : Fragment() {
                 launchAction()
             }
         }
+        cardBrowserUrlFilter?.setOnClickListener { if (btnManageBrowserUrls?.isEnabled == true) btnManageBrowserUrls?.performClick() }
 
         btnSaveSelfControlChanges?.setOnClickListener {
             saveChanges()
@@ -683,10 +704,21 @@ class SelfControlFragment : Fragment() {
             }
         }
 
-        tvCurfewStartTime?.text = formatTime(selectedStartHour, selectedStartMinute)
-        tvCurfewEndTime?.text = formatTime(selectedEndHour, selectedEndMinute)
-        tvWeekendStartTime?.text = formatTime(selectedWeekendStartHour, selectedWeekendStartMinute)
-        tvWeekendEndTime?.text = formatTime(selectedWeekendEndHour, selectedWeekendEndMinute)
+        val startFormatted = formatTime(selectedStartHour, selectedStartMinute)
+        tvCurfewStartTime?.text = startFormatted
+        btnChangeStartTime?.text = startFormatted
+
+        val endFormatted = formatTime(selectedEndHour, selectedEndMinute)
+        tvCurfewEndTime?.text = endFormatted
+        btnChangeEndTime?.text = endFormatted
+
+        val weekendStartFormatted = formatTime(selectedWeekendStartHour, selectedWeekendStartMinute)
+        tvWeekendStartTime?.text = weekendStartFormatted
+        btnChangeWeekendStartTime?.text = weekendStartFormatted
+
+        val weekendEndFormatted = formatTime(selectedWeekendEndHour, selectedWeekendEndMinute)
+        tvWeekendEndTime?.text = weekendEndFormatted
+        btnChangeWeekendEndTime?.text = weekendEndFormatted
     }
 
     private fun updateTimezoneViews() {
@@ -735,135 +767,8 @@ class SelfControlFragment : Fragment() {
 
             withContext(Dispatchers.Main) {
                 if (!isAdded || view == null) return@withContext
-                renderPendingApprovals(items)
+                approvalsViewBinder?.renderPendingApprovals(items)
             }
-        }
-    }
-
-    private fun renderPendingApprovals(items: List<Pair<String, String>>) {
-        val containerLayout = layoutPendingApps ?: return
-        val noPendingText = tvNoPendingApps ?: return
-        val ctx = context ?: return
-
-        containerLayout.removeAllViews()
-        if (items.isEmpty()) {
-            containerLayout.addView(noPendingText)
-            noPendingText.visibility = View.VISIBLE
-            return
-        }
-        noPendingText.visibility = View.GONE
-
-        for ((pkg, name) in items) {
-            val card = MaterialCardView(ctx).apply {
-                radius = resources.displayMetrics.density * 10
-                cardElevation = resources.displayMetrics.density * 1
-                setCardBackgroundColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorSurfaceContainerHigh))
-                strokeWidth = (1 * resources.displayMetrics.density).toInt()
-                strokeColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutlineVariant)
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    bottomMargin = (8 * resources.displayMetrics.density).toInt()
-                }
-            }
-
-            val cardInner = LinearLayout(ctx).apply {
-                orientation = LinearLayout.VERTICAL
-                val pad = (12 * resources.displayMetrics.density).toInt()
-                setPadding(pad, pad, pad, pad)
-            }
-
-            val titleView = TextView(ctx).apply {
-                text = name
-                textSize = 14f
-                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurface))
-                typeface = Typeface.DEFAULT_BOLD
-            }
-            cardInner.addView(titleView)
-
-            val pkgView = TextView(ctx).apply {
-                text = pkg
-                textSize = 11f
-                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutline))
-            }
-            cardInner.addView(pkgView)
-
-            val btnRow = LinearLayout(ctx).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setPadding(0, (8 * resources.displayMetrics.density).toInt(), 0, 0)
-            }
-
-            val approveBtn = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonTonalStyle).apply {
-                text = getString(R.string.btn_approve_app)
-                textSize = 12f
-                cornerRadius = (8 * resources.displayMetrics.density).toInt()
-            }
-
-            val rejectBtn = MaterialButton(ctx, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
-                text = getString(R.string.btn_reject_app)
-                textSize = 12f
-                setTextColor(ContextCompat.getColor(ctx, R.color.status_orange))
-            }
-
-            approveBtn.setOnClickListener {
-                val qrManager = com.drmohammed.antiporn.ui.control.qr.SelfControlQrManager.getInstance(ctx)
-                val executeApprove = {
-                    approveBtn.isEnabled = false
-                    rejectBtn.isEnabled = false
-                    viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                        try {
-                            ApprovalRepository.getInstance(ctx.applicationContext).unsuspendAndApprove(pkg, "SELF")
-                            withContext(Dispatchers.Main) {
-                                if (isAdded && view != null) loadPendingApprovals()
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed approving package $pkg", e)
-                            withContext(Dispatchers.Main) {
-                                if (isAdded && view != null) {
-                                    approveBtn.isEnabled = true
-                                    rejectBtn.isEnabled = true
-                                    Toast.makeText(ctx, R.string.toast_self_policy_save_failed, Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (qrManager.isQrLockEnabled()) {
-                    showQrScannerWithFallback("qr_scanner_approve_$pkg") { executeApprove() }
-                } else {
-                    executeApprove()
-                }
-            }
-
-            rejectBtn.setOnClickListener {
-                approveBtn.isEnabled = false
-                rejectBtn.isEnabled = false
-                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                    try {
-                        ApprovalRepository.getInstance(ctx.applicationContext).recordRejection(pkg, "SELF")
-                        withContext(Dispatchers.Main) {
-                            if (isAdded && view != null) loadPendingApprovals()
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed rejecting package $pkg", e)
-                        withContext(Dispatchers.Main) {
-                            if (isAdded && view != null) {
-                                approveBtn.isEnabled = true
-                                rejectBtn.isEnabled = true
-                                Toast.makeText(ctx, R.string.toast_self_policy_save_failed, Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                }
-            }
-
-            btnRow.addView(approveBtn)
-            btnRow.addView(rejectBtn)
-            cardInner.addView(btnRow)
-            card.addView(cardInner)
-            containerLayout.addView(card)
         }
     }
 
@@ -978,6 +883,7 @@ class SelfControlFragment : Fragment() {
         actvTimezonePicker = null
         tvTimezonePreview = null
         btnResetToMakkah = null
+        btnAutoDetectTimezone = null
         tilDnsHost = null
         etDnsHost = null
         btnPresetAdguard = null
@@ -992,11 +898,15 @@ class SelfControlFragment : Fragment() {
         btnManageBrowserUrls = null
         layoutPendingApps = null
         tvNoPendingApps = null
+        approvalsViewBinder = null
         btnSaveSelfControlChanges = null
         switchQrLockEnabled = null
         layoutQrActionButtons = null
         btnShowQrCode = null
         btnRegenerateQrCode = null
+        cardPendingApps = null
+        tileLocalAppManager = null
+        cardBrowserUrlFilter = null
         super.onDestroyView()
     }
 

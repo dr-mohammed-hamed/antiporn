@@ -67,50 +67,22 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var cardOfflineBanner: MaterialCardView
     private lateinit var tvOfflineStatus: TextView
     private lateinit var btnRetryLoadPolicy: MaterialButton
-    private lateinit var cardBreakoutAlertBanner: MaterialCardView
-    private lateinit var tvBreakoutAlertTitle: TextView
-    private lateinit var tvBreakoutAlertMsg: TextView
-    private lateinit var btnRejectBreakout: MaterialButton
+    private lateinit var alertsViewBinder: GuardianAlertsViewBinder
+    private lateinit var curfewViewBinder: GuardianCurfewViewBinder
 
     // Self-Control Permission
-    private lateinit var cardSelfControlAlertBanner: MaterialCardView
-    private lateinit var tvSelfControlAlertTitle: TextView
-    private lateinit var tvSelfControlAlertMsg: TextView
-    private lateinit var btnRevertSelfControlChanges: MaterialButton
-    private lateinit var btnDismissSelfControlAlert: MaterialButton
     private lateinit var cardSelfControlPermission: MaterialCardView
     private lateinit var switchAllowSelfControl: MaterialSwitch
 
     // Curfew controls
     private lateinit var switchCurfewMaster: MaterialSwitch
-    private lateinit var tvCurfewStartTime: TextView
-    private lateinit var tvCurfewEndTime: TextView
-    private lateinit var btnChangeStartTime: MaterialButton
-    private lateinit var btnChangeEndTime: MaterialButton
-
-    // Weekend curfew controls
     private lateinit var switchWeekendCurfew: MaterialSwitch
-    private lateinit var tvWeekendStartTime: TextView
-    private lateinit var tvWeekendEndTime: TextView
-    private lateinit var btnChangeWeekendStartTime: MaterialButton
-    private lateinit var btnChangeWeekendEndTime: MaterialButton
 
     // Date & Time Lock control
     private lateinit var switchLockDateTime: MaterialSwitch
 
     // Timezone controls
-    private lateinit var cardTimezoneControl: MaterialCardView
-    private lateinit var layoutTimezoneHeader: View
-    private lateinit var tvTimezoneTitle: TextView
-    private lateinit var tvTimezoneSubtitle: TextView
-    private lateinit var tvTimezoneBadge: TextView
-    private lateinit var ivTimezoneExpand: ImageView
-    private lateinit var layoutTimezoneContent: LinearLayout
-    private lateinit var tilTimezonePicker: TextInputLayout
-    private lateinit var actvTimezonePicker: MaterialAutoCompleteTextView
-    private lateinit var tvTimezonePreview: TextView
-    private lateinit var btnResetToMakkah: MaterialButton
-    private lateinit var btnAutoDetectTimezone: MaterialButton
+    private lateinit var timezoneViewBinder: GuardianTimezoneViewBinder
 
     // Enforcement & Security controls
     private lateinit var switchVpnBlackhole: MaterialSwitch
@@ -154,8 +126,6 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var approvalsViewBinder: GuardianApprovalsViewBinder
     private var hasLoadedInitialPolicy = false
     private var lastEditNameClickTime = 0L
-    private var lastRejectBreakoutClickTime = 0L
-    private var lastAutoDetectClickTime = 0L
     private val policyRepo by lazy { PolicyRepository.getInstance(applicationContext) }
     private var lastSaveClickTime = 0L
     private var approvalsListener: ListenerRegistration? = null
@@ -267,54 +237,70 @@ class GuardianControlActivity : AppCompatActivity() {
         cardOfflineBanner = findViewById(R.id.cardOfflineBanner)
         tvOfflineStatus = findViewById(R.id.tvOfflineStatus)
         btnRetryLoadPolicy = findViewById(R.id.btnRetryLoadPolicy)
-        cardBreakoutAlertBanner = findViewById(R.id.cardBreakoutAlertBanner)
-        tvBreakoutAlertTitle = findViewById(R.id.tvBreakoutAlertTitle)
-        tvBreakoutAlertMsg = findViewById(R.id.tvBreakoutAlertMsg)
-        btnRejectBreakout = findViewById(R.id.btnRejectBreakout)
+        alertsViewBinder = GuardianAlertsViewBinder(
+            activity = this,
+            cardSelfControlAlertBanner = findViewById(R.id.cardSelfControlAlertBanner),
+            tvSelfControlAlertMsg = findViewById(R.id.tvSelfControlAlertMsg),
+            btnRevertSelfControlChanges = findViewById(R.id.btnRevertSelfControlChanges),
+            btnDismissSelfControlAlert = findViewById(R.id.btnDismissSelfControlAlert),
+            cardBreakoutAlertBanner = findViewById(R.id.cardBreakoutAlertBanner),
+            tvBreakoutAlertMsg = findViewById(R.id.tvBreakoutAlertMsg),
+            btnRejectBreakout = findViewById(R.id.btnRejectBreakout),
+            wardNameProvider = { wardName },
+            wardIdProvider = { wardId },
+            policyProvider = { currentPolicy },
+            isSelfControlAllowedProvider = { switchAllowSelfControl.isChecked },
+            onPolicyReverted = { reverted ->
+                currentPolicy = reverted
+                populateUiFromPolicy(reverted)
+                initialPolicySnapshot = reverted.copy()
+            },
+            onPolicyAcknowledged = { acknowledged ->
+                currentPolicy = acknowledged
+                initialPolicySnapshot = acknowledged.copy()
+            }
+        )
 
-        // Self-Control Permission
-        cardSelfControlAlertBanner = findViewById(R.id.cardSelfControlAlertBanner)
-        tvSelfControlAlertTitle = findViewById(R.id.tvSelfControlAlertTitle)
-        tvSelfControlAlertMsg = findViewById(R.id.tvSelfControlAlertMsg)
-        btnRevertSelfControlChanges = findViewById(R.id.btnRevertSelfControlChanges)
-        btnDismissSelfControlAlert = findViewById(R.id.btnDismissSelfControlAlert)
         cardSelfControlPermission = findViewById(R.id.cardSelfControlPermission)
         switchAllowSelfControl = findViewById(R.id.switchAllowSelfControl)
 
-        // Master Curfew & Weekday
+        // Curfew controls
         switchCurfewMaster = findViewById(R.id.switchCurfewMaster)
-        tvCurfewStartTime = findViewById(R.id.tvCurfewStartTime)
-        tvCurfewEndTime = findViewById(R.id.tvCurfewEndTime)
-        btnChangeStartTime = findViewById(R.id.btnChangeStartTime)
-        btnChangeEndTime = findViewById(R.id.btnChangeEndTime)
-
-        // Weekend Curfew
         switchWeekendCurfew = findViewById(R.id.switchWeekendCurfew)
-        tvWeekendStartTime = findViewById(R.id.tvWeekendStartTime)
-        tvWeekendEndTime = findViewById(R.id.tvWeekendEndTime)
-        btnChangeWeekendStartTime = findViewById(R.id.btnChangeWeekendStartTime)
-        btnChangeWeekendEndTime = findViewById(R.id.btnChangeWeekendEndTime)
+
+        curfewViewBinder = GuardianCurfewViewBinder(
+            activity = this,
+            tvCurfewStartTime = findViewById(R.id.tvCurfewStartTime),
+            tvCurfewEndTime = findViewById(R.id.tvCurfewEndTime),
+            btnChangeStartTime = findViewById(R.id.btnChangeStartTime),
+            btnChangeEndTime = findViewById(R.id.btnChangeEndTime),
+            tvWeekendStartTime = findViewById(R.id.tvWeekendStartTime),
+            tvWeekendEndTime = findViewById(R.id.tvWeekendEndTime),
+            btnChangeWeekendStartTime = findViewById(R.id.btnChangeWeekendStartTime),
+            btnChangeWeekendEndTime = findViewById(R.id.btnChangeWeekendEndTime)
+        )
 
         // Date & Time Lock control
         switchLockDateTime = findViewById(R.id.switchLockDateTime)
 
         // Timezone controls
-        cardTimezoneControl = findViewById(R.id.cardTimezoneControl)
-        layoutTimezoneHeader = findViewById(R.id.layoutTimezoneHeader)
-        tvTimezoneTitle = findViewById(R.id.tvTimezoneTitle)
-        tvTimezoneSubtitle = findViewById(R.id.tvTimezoneSubtitle)
-        tvTimezoneBadge = findViewById(R.id.tvTimezoneBadge)
-        ivTimezoneExpand = findViewById(R.id.ivTimezoneExpand)
-        layoutTimezoneContent = findViewById(R.id.layoutTimezoneContent)
-        tilTimezonePicker = findViewById(R.id.tilTimezonePicker)
-        actvTimezonePicker = findViewById(R.id.actvTimezonePicker)
-        tvTimezonePreview = findViewById(R.id.tvTimezonePreview)
-        btnResetToMakkah = findViewById(R.id.btnResetToMakkah)
-        btnAutoDetectTimezone = findViewById(R.id.btnAutoDetectTimezone)
-
-        val timezoneOptions = IslamicTimeZoneRegistry.getAllOptions()
-        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, timezoneOptions)
-        actvTimezonePicker.setAdapter(adapter)
+        timezoneViewBinder = GuardianTimezoneViewBinder(
+            activity = this,
+            layoutTimezoneHeader = findViewById(R.id.layoutTimezoneHeader),
+            ivTimezoneExpand = findViewById(R.id.ivTimezoneExpand),
+            layoutTimezoneContent = findViewById(R.id.layoutTimezoneContent),
+            tvTimezoneBadge = findViewById(R.id.tvTimezoneBadge),
+            tilTimezonePicker = findViewById(R.id.tilTimezonePicker),
+            actvTimezonePicker = findViewById(R.id.actvTimezonePicker),
+            tvTimezonePreview = findViewById(R.id.tvTimezonePreview),
+            btnResetToMakkah = findViewById(R.id.btnResetToMakkah),
+            btnAutoDetectTimezone = findViewById(R.id.btnAutoDetectTimezone),
+            onTimezoneChanged = { newTz ->
+                selectedTimeZoneId = newTz
+                updateTimezoneViews()
+                updateSaveButtonState()
+            }
+        )
 
         // Enforcement & Zero Trust
         switchVpnBlackhole = findViewById(R.id.switchVpnBlackhole)
@@ -349,17 +335,16 @@ class GuardianControlActivity : AppCompatActivity() {
             onReloadRequested = { loadPendingApprovals() }
         )
 
+        updateTimingLabels()
         setInputsEnabled(false)
     }
 
     private fun setInputsEnabled(enabled: Boolean) {
+        alertsViewBinder.setInputsEnabled(enabled)
         switchAllowSelfControl.isEnabled = enabled
         switchCurfewMaster.isEnabled = enabled
-        btnChangeStartTime.isEnabled = enabled
-        btnChangeEndTime.isEnabled = enabled
+        curfewViewBinder.setInputsEnabled(enabled)
         switchWeekendCurfew.isEnabled = enabled
-        btnChangeWeekendStartTime.isEnabled = enabled
-        btnChangeWeekendEndTime.isEnabled = enabled
         switchVpnBlackhole.isEnabled = enabled
         switchInstantInternetKill.isEnabled = enabled
         switchIncognitoBlocked.isEnabled = enabled
@@ -367,15 +352,14 @@ class GuardianControlActivity : AppCompatActivity() {
         switchLockDateTime.isEnabled = enabled
         btnOpenAppManager.isEnabled = enabled
         btnManageBrowserUrls.isEnabled = enabled
+        findViewById<View>(R.id.cardAppManager)?.isEnabled = enabled
+        findViewById<View>(R.id.cardBrowserUrlFilter)?.isEnabled = enabled
         etDnsHost.isEnabled = enabled
         btnPresetAdguard.isEnabled = enabled
         btnPresetCloudflare.isEnabled = enabled
         btnPresetNextDns.isEnabled = enabled
         btnRetryLoadPolicy.isEnabled = enabled
-        tilTimezonePicker.isEnabled = enabled
-        actvTimezonePicker.isEnabled = enabled
-        btnResetToMakkah.isEnabled = enabled
-        btnAutoDetectTimezone.isEnabled = enabled
+        timezoneViewBinder.setInputsEnabled(enabled)
         updateSaveButtonState()
     }
 
@@ -443,235 +427,45 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
-        btnRevertSelfControlChanges.setOnClickListener {
-            if (isFinishing || isDestroyed) return@setOnClickListener
-            val snapshotJson = currentPolicy.guardianPolicySnapshot
-            if (snapshotJson.isNullOrBlank()) {
-                cardSelfControlAlertBanner.visibility = View.GONE
-                return@setOnClickListener
-            }
-            btnRevertSelfControlChanges.isEnabled = false
-            lifecycleScope.launch {
-                try {
-                    val snapshotPolicy = DevicePolicyBundle.fromJson(snapshotJson)
-                    val myUid = AccountabilityRepository.getInstance(applicationContext).getCachedUid()
-                    val myName = AccountabilityRepository.getInstance(applicationContext).getMyDisplayName()
-                    val revertedPolicy = snapshotPolicy.copy(
-                        guardianUid = currentPolicy.guardianUid?.takeIf { it.isNotBlank() } ?: myUid,
-                        guardianName = currentPolicy.guardianName?.takeIf { it.isNotBlank() } ?: myName,
-                        isSupervised = true,
-                        isSelfControlAllowed = switchAllowSelfControl.isChecked,
-                        guardianPolicySnapshot = null,
-                        lastSelfModifiedAt = null,
-                        version = currentPolicy.version + 1,
-                        updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(applicationContext)
-                    )
-                    val success = policyRepo.pushPolicyToWard(wardId, revertedPolicy)
-                    if (isFinishing || isDestroyed) return@launch
-                    if (success) {
-                        currentPolicy = revertedPolicy
-                        populateUiFromPolicy(revertedPolicy)
-                        initialPolicySnapshot = revertedPolicy.copy()
-                        cardSelfControlAlertBanner.visibility = View.GONE
-                        Toast.makeText(this@GuardianControlActivity, R.string.toast_self_control_reverted, Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@GuardianControlActivity, R.string.toast_policy_push_failed, Toast.LENGTH_LONG).show()
-                    }
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    Log.e(TAG, "Error reverting self-control policy", e)
-                } finally {
-                    if (!isFinishing && !isDestroyed) {
-                        btnRevertSelfControlChanges.isEnabled = true
-                    }
-                }
-            }
-        }
-
-        btnDismissSelfControlAlert.setOnClickListener {
-            if (isFinishing || isDestroyed) return@setOnClickListener
-            btnDismissSelfControlAlert.isEnabled = false
-            lifecycleScope.launch {
-                try {
-                    val myUid = AccountabilityRepository.getInstance(applicationContext).getCachedUid()
-                    val myName = AccountabilityRepository.getInstance(applicationContext).getMyDisplayName()
-                    val acknowledgedPolicy = currentPolicy.copy(
-                        guardianUid = currentPolicy.guardianUid?.takeIf { it.isNotBlank() } ?: myUid,
-                        guardianName = currentPolicy.guardianName?.takeIf { it.isNotBlank() } ?: myName,
-                        isSupervised = true,
-                        guardianPolicySnapshot = null,
-                        lastSelfModifiedAt = null,
-                        version = currentPolicy.version + 1,
-                        updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(applicationContext)
-                    )
-                    val success = policyRepo.pushPolicyToWard(wardId, acknowledgedPolicy)
-                    if (isFinishing || isDestroyed) return@launch
-                    if (success) {
-                        currentPolicy = acknowledgedPolicy
-                        initialPolicySnapshot = acknowledgedPolicy.copy()
-                        cardSelfControlAlertBanner.visibility = View.GONE
-                        Toast.makeText(this@GuardianControlActivity, R.string.toast_self_control_dismissed, Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@GuardianControlActivity, R.string.toast_policy_push_failed, Toast.LENGTH_LONG).show()
-                    }
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    Log.e(TAG, "Error dismissing self-control alert", e)
-                } finally {
-                    if (!isFinishing && !isDestroyed) {
-                        btnDismissSelfControlAlert.isEnabled = true
-                    }
-                }
-            }
-        }
-
-        btnRejectBreakout.setOnClickListener {
-            if (isFinishing || isDestroyed) return@setOnClickListener
-            val now = android.os.SystemClock.elapsedRealtime()
-            if (now - lastRejectBreakoutClickTime < 1000L) return@setOnClickListener
-            lastRejectBreakoutClickTime = now
-            btnRejectBreakout.isEnabled = false
-            lifecycleScope.launch {
-                try {
-                    val result = com.drmohammed.antiporn.data.repository.AccountabilityRepository.getInstance(applicationContext).rejectEmergencyBreakout(wardId)
-                    if (isFinishing || isDestroyed) return@launch
-                    result.fold(
-                        onSuccess = {
-                            Toast.makeText(this@GuardianControlActivity, R.string.toast_breakout_rejected, Toast.LENGTH_SHORT).show()
-                            cardBreakoutAlertBanner.visibility = View.GONE
-                        },
-                        onFailure = { err ->
-                            Toast.makeText(this@GuardianControlActivity, err.localizedMessage ?: getString(R.string.error_unknown), Toast.LENGTH_LONG).show()
-                        }
-                    )
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    Log.e(TAG, "Error rejecting breakout", e)
-                } finally {
-                    if (!isFinishing && !isDestroyed) {
-                        btnRejectBreakout.isEnabled = true
-                    }
-                }
-            }
-        }
-
-        btnChangeStartTime.setOnClickListener {
-            if (isFinishing || isDestroyed) return@setOnClickListener
-            if (supportFragmentManager.findFragmentByTag("start_time_picker") != null) return@setOnClickListener
-            val picker = MaterialTimePicker.Builder()
-                .setTimeFormat(TimeFormat.CLOCK_24H)
-                .setHour(selectedStartHour)
-                .setMinute(selectedStartMinute)
-                .setTitleText(R.string.guardian_curfew_start_label)
-                .build()
-
-            picker.addOnPositiveButtonClickListener {
-                selectedStartHour = picker.hour
-                selectedStartMinute = picker.minute
+        alertsViewBinder.setupListeners()
+        curfewViewBinder.setupListeners(
+            getStartHour = { selectedStartHour },
+            getStartMinute = { selectedStartMinute },
+            onStartTimeChanged = { h, m ->
+                selectedStartHour = h
+                selectedStartMinute = m
+                updateTimingLabels()
+                updateSaveButtonState()
+            },
+            getEndHour = { selectedEndHour },
+            getEndMinute = { selectedEndMinute },
+            onEndTimeChanged = { h, m ->
+                selectedEndHour = h
+                selectedEndMinute = m
+                updateTimingLabels()
+                updateSaveButtonState()
+            },
+            getWeekendStartHour = { selectedWeekendStartHour },
+            getWeekendStartMinute = { selectedWeekendStartMinute },
+            onWeekendStartTimeChanged = { h, m ->
+                selectedWeekendStartHour = h
+                selectedWeekendStartMinute = m
+                updateTimingLabels()
+                updateSaveButtonState()
+            },
+            getWeekendEndHour = { selectedWeekendEndHour },
+            getWeekendEndMinute = { selectedWeekendEndMinute },
+            onWeekendEndTimeChanged = { h, m ->
+                selectedWeekendEndHour = h
+                selectedWeekendEndMinute = m
                 updateTimingLabels()
                 updateSaveButtonState()
             }
-            picker.show(supportFragmentManager, "start_time_picker")
-        }
+        )
 
-        btnChangeEndTime.setOnClickListener {
-            if (isFinishing || isDestroyed) return@setOnClickListener
-            if (supportFragmentManager.findFragmentByTag("end_time_picker") != null) return@setOnClickListener
-            val picker = MaterialTimePicker.Builder()
-                .setTimeFormat(TimeFormat.CLOCK_24H)
-                .setHour(selectedEndHour)
-                .setMinute(selectedEndMinute)
-                .setTitleText(R.string.guardian_curfew_end_label)
-                .build()
-
-            picker.addOnPositiveButtonClickListener {
-                selectedEndHour = picker.hour
-                selectedEndMinute = picker.minute
-                updateTimingLabels()
-                updateSaveButtonState()
-            }
-            picker.show(supportFragmentManager, "end_time_picker")
-        }
-
-        btnChangeWeekendStartTime.setOnClickListener {
-            if (isFinishing || isDestroyed) return@setOnClickListener
-            if (supportFragmentManager.findFragmentByTag("weekend_start_time_picker") != null) return@setOnClickListener
-            val picker = MaterialTimePicker.Builder()
-                .setTimeFormat(TimeFormat.CLOCK_24H)
-                .setHour(selectedWeekendStartHour)
-                .setMinute(selectedWeekendStartMinute)
-                .setTitleText(R.string.guardian_weekend_curfew_start_label)
-                .build()
-
-            picker.addOnPositiveButtonClickListener {
-                selectedWeekendStartHour = picker.hour
-                selectedWeekendStartMinute = picker.minute
-                updateTimingLabels()
-                updateSaveButtonState()
-            }
-            picker.show(supportFragmentManager, "weekend_start_time_picker")
-        }
-
-        btnChangeWeekendEndTime.setOnClickListener {
-            if (isFinishing || isDestroyed) return@setOnClickListener
-            if (supportFragmentManager.findFragmentByTag("weekend_end_time_picker") != null) return@setOnClickListener
-            val picker = MaterialTimePicker.Builder()
-                .setTimeFormat(TimeFormat.CLOCK_24H)
-                .setHour(selectedWeekendEndHour)
-                .setMinute(selectedWeekendEndMinute)
-                .setTitleText(R.string.guardian_weekend_curfew_end_label)
-                .build()
-
-            picker.addOnPositiveButtonClickListener {
-                selectedWeekendEndHour = picker.hour
-                selectedWeekendEndMinute = picker.minute
-                updateTimingLabels()
-                updateSaveButtonState()
-            }
-            picker.show(supportFragmentManager, "weekend_end_time_picker")
-        }
-
-        layoutTimezoneHeader.setOnClickListener {
-            val isExpanded = layoutTimezoneContent.isVisible
-            if (isExpanded) {
-                layoutTimezoneContent.visibility = View.GONE
-                ivTimezoneExpand.animate().rotation(0f).setDuration(200).start()
-            } else {
-                layoutTimezoneContent.visibility = View.VISIBLE
-                ivTimezoneExpand.animate().rotation(180f).setDuration(200).start()
-            }
-        }
-
-        actvTimezonePicker.setOnItemClickListener { parent, _, position, _ ->
-            val option = parent.getItemAtPosition(position) as? IslamicTimeZoneRegistry.TimeZoneOption
-            if (option != null && option.id != selectedTimeZoneId) {
-                selectedTimeZoneId = option.id
-                updateTimezoneViews()
-                updateSaveButtonState()
-            }
-        }
-
-        btnAutoDetectTimezone.setOnClickListener {
-            if (isFinishing || isDestroyed) return@setOnClickListener
-            val now = android.os.SystemClock.elapsedRealtime()
-            if (now - lastAutoDetectClickTime < 1000L) return@setOnClickListener
-            lastAutoDetectClickTime = now
-            val detected = IslamicTimeZoneRegistry.detectCurrentDeviceOption()
-            if (selectedTimeZoneId != detected.id) {
-                selectedTimeZoneId = detected.id
-                updateTimezoneViews()
-                updateSaveButtonState()
-            }
-            android.widget.Toast.makeText(this, getString(R.string.timezone_detected_toast, detected.displayText), android.widget.Toast.LENGTH_SHORT).show()
-        }
-
-        btnResetToMakkah.setOnClickListener {
-            if (selectedTimeZoneId != CurfewConfig.MAKKAH_TIMEZONE_ID) {
-                selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
-                updateTimezoneViews()
-                updateSaveButtonState()
-            }
-        }
+        timezoneViewBinder.setupListeners(
+            getTimeZoneId = { selectedTimeZoneId }
+        )
 
         val switchListener = { _: View, _: Boolean -> updateSaveButtonState() }
         switchAllowSelfControl.setOnCheckedChangeListener(switchListener)
@@ -712,6 +506,7 @@ class GuardianControlActivity : AppCompatActivity() {
             }
             appManagerLauncher.launch(intent)
         }
+        findViewById<View>(R.id.cardAppManager)?.setOnClickListener { if (btnOpenAppManager.isEnabled) btnOpenAppManager.performClick() }
 
         var lastBrowserFilterClickTime = 0L
         btnManageBrowserUrls.setOnClickListener {
@@ -726,6 +521,7 @@ class GuardianControlActivity : AppCompatActivity() {
             }
             browserFilterLauncher.launch(intent)
         }
+        findViewById<View>(R.id.cardBrowserUrlFilter)?.setOnClickListener { if (btnManageBrowserUrls.isEnabled) btnManageBrowserUrls.performClick() }
 
         btnPresetAdguard.setOnClickListener {
             etDnsHost.setText(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST)
@@ -761,35 +557,20 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun updateTimingLabels() {
-        tvCurfewStartTime.text = getString(R.string.guardian_curfew_time_format, selectedStartHour, selectedStartMinute)
-        tvCurfewEndTime.text = getString(R.string.guardian_curfew_time_format, selectedEndHour, selectedEndMinute)
-        tvWeekendStartTime.text = getString(R.string.guardian_curfew_time_format, selectedWeekendStartHour, selectedWeekendStartMinute)
-        tvWeekendEndTime.text = getString(R.string.guardian_curfew_time_format, selectedWeekendEndHour, selectedWeekendEndMinute)
+        curfewViewBinder.updateTimingLabels(
+            startHour = selectedStartHour,
+            startMinute = selectedStartMinute,
+            endHour = selectedEndHour,
+            endMinute = selectedEndMinute,
+            weekendStartHour = selectedWeekendStartHour,
+            weekendStartMinute = selectedWeekendStartMinute,
+            weekendEndHour = selectedWeekendEndHour,
+            weekendEndMinute = selectedWeekendEndMinute
+        )
     }
 
     private fun updateTimezoneViews() {
-        val option = IslamicTimeZoneRegistry.findByIanaId(selectedTimeZoneId)
-        val cityName = option.majorCities.split("/").firstOrNull()?.trim() ?: option.majorCities
-        tvTimezoneBadge.text = getString(R.string.guardian_timezone_badge_format, option.getLiveOffsetLabel(), cityName)
-        actvTimezonePicker.setText(option.displayText, false)
-
-        try {
-            val tz = TimeZone.getTimeZone(option.ianaTimeZoneId)
-            val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault()).apply {
-                timeZone = tz
-            }
-            val formattedTime = sdf.format(Date())
-            val timeWithOffset = getString(R.string.guardian_timezone_preview_time_format, formattedTime, option.getLiveOffsetLabel())
-            tvTimezonePreview.text = getString(
-                R.string.guardian_timezone_preview_format,
-                timeWithOffset
-            )
-        } catch (e: Exception) {
-            tvTimezonePreview.text = getString(
-                R.string.guardian_timezone_preview_format,
-                option.gmtOffsetLabel
-            )
-        }
+        timezoneViewBinder.updateTimezoneViews(selectedTimeZoneId)
     }
 
     private fun populateUiFromPolicy(policy: DevicePolicyBundle) {
@@ -829,30 +610,7 @@ class GuardianControlActivity : AppCompatActivity() {
                 getString(R.string.browser_filter_status_off)
         }
 
-        if (!policy.guardianPolicySnapshot.isNullOrBlank() || policy.lastSelfModifiedAt != null) {
-            cardSelfControlAlertBanner.visibility = View.VISIBLE
-            val formattedTime = if (policy.lastSelfModifiedAt != null) {
-                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-                sdf.format(java.util.Date(policy.lastSelfModifiedAt))
-            } else {
-                ""
-            }
-            tvSelfControlAlertMsg.text = getString(R.string.guardian_self_control_alert_msg, wardName, formattedTime)
-        } else {
-            cardSelfControlAlertBanner.visibility = View.GONE
-        }
-
-        if (policy.breakoutStatus == DevicePolicyBundle.BREAKOUT_STATUS_PENDING && policy.breakoutUnlockAt != null) {
-            cardBreakoutAlertBanner.visibility = View.VISIBLE
-            val nowTrusted = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(applicationContext)
-            val remainingMs = (policy.breakoutUnlockAt - nowTrusted).coerceAtLeast(0L)
-            val hours = remainingMs / (1000 * 3600)
-            val mins = (remainingMs % (1000 * 3600)) / (1000 * 60)
-            val timeStr = String.format(Locale.US, "%02d:%02d", hours, mins)
-            tvBreakoutAlertMsg.text = getString(R.string.guardian_breakout_alert_msg, wardName, timeStr)
-        } else {
-            cardBreakoutAlertBanner.visibility = View.GONE
-        }
+        alertsViewBinder.renderPolicyAlerts(policy)
     }
 
     private fun loadWardPolicy() {
@@ -1145,7 +903,7 @@ class GuardianControlActivity : AppCompatActivity() {
                 val success = policyRepo.pushPolicyToWard(wardId, updatedPolicy)
                 if (isFinishing || isDestroyed) return@launch
                 if (success) {
-                    cardSelfControlAlertBanner.visibility = View.GONE
+                    alertsViewBinder.hideSelfControlAlert()
                     initialPolicySnapshot = updatedPolicy.copy()
                     backPressedCallback.isEnabled = false
                     Toast.makeText(this@GuardianControlActivity, R.string.toast_policy_saved, Toast.LENGTH_LONG).show()
