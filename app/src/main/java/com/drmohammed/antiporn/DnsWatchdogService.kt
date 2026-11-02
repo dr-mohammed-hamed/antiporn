@@ -133,7 +133,7 @@ class DnsWatchdogService : Service() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent == null) return
             val action = intent.action ?: return
-            val packageName = intent.data?.schemeSpecificPart ?: return
+            val packageName = intent.data?.schemeSpecificPart?.takeIf { it.isNotBlank() } ?: return
             Log.w(TAG, "⚡⚡⚡ [DYNAMIC_WATCHDOG_RECEIVER] onReceive: action=$action | package=$packageName")
             when (action) {
                 Intent.ACTION_PACKAGE_ADDED -> {
@@ -146,9 +146,15 @@ class DnsWatchdogService : Service() {
                     )
                 }
                 Intent.ACTION_PACKAGE_REMOVED -> {
+                    val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+                    if (isReplacing) {
+                        Log.i(TAG, "⏩ [DYNAMIC_WATCHDOG_RECEIVER] Package $packageName is being replaced/updated (EXTRA_REPLACING=true). Ignoring temporary removal.")
+                        return
+                    }
                     PackageChangeHandler.handlePackageRemoved(
                         context = applicationContext,
                         packageName = packageName,
+                        isReplacing = isReplacing,
                         source = "Dynamic_Watchdog"
                     )
                 }
