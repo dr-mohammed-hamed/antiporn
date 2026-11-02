@@ -3,8 +3,14 @@ package com.drmohammed.antiporn
 import android.app.Application
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher
+import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
 import com.drmohammed.antiporn.data.repository.PolicyRepository
+import com.drmohammed.antiporn.telemetry.GlobalCrashHandler
 import com.google.android.material.color.DynamicColors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Custom Application class for AntiPorn.
@@ -14,6 +20,10 @@ import com.google.android.material.color.DynamicColors
 class AntiPornApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        // 1. Install Global Crash Handler immediately before any subsystem initializes
+        GlobalCrashHandler.install(this)
+
         if (DynamicColors.isDynamicColorAvailable()) {
             DynamicColors.applyToActivitiesIfAvailable(this)
         }
@@ -32,5 +42,17 @@ class AntiPornApplication : Application() {
 
         // Synchronize Zero-Trust active foreground watcher state on startup
         ZeroTrustForegroundWatcher.syncWatcherState(this)
+
+        // Prune diagnostic events older than 7 days in background (non-blocking)
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            try {
+                val pruned = AntiPornDatabase.getInstance(this@AntiPornApplication).pruneDiagnosticEventsOlderThan(7)
+                if (pruned > 0) {
+                    android.util.Log.i("AntiPornApp", "Pruned $pruned old diagnostic events (> 7 days)")
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("AntiPornApp", "Failed to prune diagnostic events", e)
+            }
+        }
     }
 }

@@ -8,9 +8,11 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
+import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.drmohammed.antiporn.data.local.db.entity.PendingApprovalEntity
+import com.drmohammed.antiporn.telemetry.DiagnosticEventDto
 
 /**
  * Embedded SQLite database for AntiPorn.
@@ -34,7 +36,7 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
     companion object {
         private const val TAG = "AntiPorn_Database"
         const val DATABASE_NAME = "antiporn_guard.db"
-        const val DATABASE_VERSION = 2
+        const val DATABASE_VERSION = 3
 
         // Table Device Policies
         const val TABLE_DEVICE_POLICIES = "device_policies"
@@ -62,6 +64,17 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
         const val COL_APPROVAL_DECIDED_BY = "decided_by"
         const val COL_APPROVAL_DECIDED_AT = "decided_at"
         const val COL_APPROVAL_IS_SYNCED = "is_synced"
+
+        // Table Diagnostic Events
+        const val TABLE_DIAGNOSTIC_EVENTS = "diagnostic_events"
+        const val COL_DIAG_ID = "id"
+        const val COL_DIAG_TIMESTAMP = "timestamp"
+        const val COL_DIAG_TAG = "tag"
+        const val COL_DIAG_ACTION_NAME = "action_name"
+        const val COL_DIAG_EXECUTION_TIME_MS = "execution_time_ms"
+        const val COL_DIAG_IS_SUCCESS = "is_success"
+        const val COL_DIAG_ERROR_DETAILS = "error_details"
+        const val COL_DIAG_CONTEXT_METADATA = "context_metadata"
 
         @Volatile
         private var instance: AntiPornDatabase? = null
@@ -123,9 +136,26 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 """.trimIndent()
             )
 
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS $TABLE_DIAGNOSTIC_EVENTS (
+                    $COL_DIAG_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    $COL_DIAG_TIMESTAMP INTEGER NOT NULL,
+                    $COL_DIAG_TAG TEXT NOT NULL,
+                    $COL_DIAG_ACTION_NAME TEXT NOT NULL,
+                    $COL_DIAG_EXECUTION_TIME_MS INTEGER NOT NULL,
+                    $COL_DIAG_IS_SUCCESS INTEGER NOT NULL,
+                    $COL_DIAG_ERROR_DETAILS TEXT,
+                    $COL_DIAG_CONTEXT_METADATA TEXT
+                )
+                """.trimIndent()
+            )
+
             // Dedicated indexes for query performance
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_partners_role ON $TABLE_PARTNERS ($COL_PARTNER_ROLE)")
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_pending_approvals_status ON $TABLE_PENDING_APPROVALS ($COL_APPROVAL_STATUS)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_timestamp ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TIMESTAMP)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_tag ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TAG)")
 
             // Seed default policy if empty
             val defaultBundle = DevicePolicyBundle.defaultPolicy()
@@ -160,6 +190,29 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_pending_approvals_status ON $TABLE_PENDING_APPROVALS ($COL_APPROVAL_STATUS)")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed creating upgrade indexes", e)
+            }
+        }
+        if (oldVersion < 3) {
+            try {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS $TABLE_DIAGNOSTIC_EVENTS (
+                        $COL_DIAG_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                        $COL_DIAG_TIMESTAMP INTEGER NOT NULL,
+                        $COL_DIAG_TAG TEXT NOT NULL,
+                        $COL_DIAG_ACTION_NAME TEXT NOT NULL,
+                        $COL_DIAG_EXECUTION_TIME_MS INTEGER NOT NULL,
+                        $COL_DIAG_IS_SUCCESS INTEGER NOT NULL,
+                        $COL_DIAG_ERROR_DETAILS TEXT,
+                        $COL_DIAG_CONTEXT_METADATA TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_timestamp ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TIMESTAMP)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_tag ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TAG)")
+                Log.i(TAG, "Successfully upgraded AntiPornDatabase to version 3 (added $TABLE_DIAGNOSTIC_EVENTS)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed creating diagnostic_events table during upgrade to version 3", e)
             }
         }
     }
@@ -509,6 +562,125 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
         } catch (e: Exception) {
             Log.e(TAG, "Error deleting pending approval from SQLite", e)
             0
+        }
+    }
+
+    // ==========================================
+    // Diagnostic & Telemetry Operations
+    // ==========================================
+
+    @Synchronized
+    fun insertDiagnosticEvent(
+        tag: String,
+        actionName: String,
+        executionTimeMs: Long,
+        isSuccess: Boolean,
+        errorDetails: String? = null,
+        contextMetadata: String? = null,
+        timestamp: Long = TrustedTimeProvider.currentTimeMillis()
+    ): Long {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(COL_DIAG_TIMESTAMP, timestamp)
+            put(COL_DIAG_TAG, tag)
+            put(COL_DIAG_ACTION_NAME, actionName)
+            put(COL_DIAG_EXECUTION_TIME_MS, executionTimeMs)
+            put(COL_DIAG_IS_SUCCESS, if (isSuccess) 1 else 0)
+            put(COL_DIAG_ERROR_DETAILS, errorDetails)
+            put(COL_DIAG_CONTEXT_METADATA, contextMetadata)
+        }
+        return try {
+            db.insert(TABLE_DIAGNOSTIC_EVENTS, null, values)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error inserting diagnostic event [$actionName]", e)
+            -1L
+        }
+    }
+
+    @Synchronized
+    fun getRecentDiagnosticEvents(limit: Int = 50): List<DiagnosticEventDto> {
+        val db = readableDatabase
+        val events = mutableListOf<DiagnosticEventDto>()
+        var cursor: Cursor? = null
+        try {
+            cursor = db.query(
+                TABLE_DIAGNOSTIC_EVENTS,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "$COL_DIAG_TIMESTAMP DESC",
+                limit.toString()
+            )
+            if (cursor.moveToFirst()) {
+                val idIdx = cursor.getColumnIndexOrThrow(COL_DIAG_ID)
+                val timeIdx = cursor.getColumnIndexOrThrow(COL_DIAG_TIMESTAMP)
+                val tagIdx = cursor.getColumnIndexOrThrow(COL_DIAG_TAG)
+                val actionIdx = cursor.getColumnIndexOrThrow(COL_DIAG_ACTION_NAME)
+                val execIdx = cursor.getColumnIndexOrThrow(COL_DIAG_EXECUTION_TIME_MS)
+                val successIdx = cursor.getColumnIndexOrThrow(COL_DIAG_IS_SUCCESS)
+                val errIdx = cursor.getColumnIndexOrThrow(COL_DIAG_ERROR_DETAILS)
+                val metaIdx = cursor.getColumnIndexOrThrow(COL_DIAG_CONTEXT_METADATA)
+
+                do {
+                    events.add(
+                        DiagnosticEventDto(
+                            id = cursor.getLong(idIdx),
+                            timestamp = cursor.getLong(timeIdx),
+                            tag = cursor.getString(tagIdx),
+                            actionName = cursor.getString(actionIdx),
+                            executionTimeMs = cursor.getLong(execIdx),
+                            isSuccess = cursor.getInt(successIdx) == 1,
+                            errorDetails = cursor.getString(errIdx),
+                            contextMetadata = cursor.getString(metaIdx)
+                        )
+                    )
+                } while (cursor.moveToNext())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error reading recent diagnostic events", e)
+        } finally {
+            cursor?.close()
+        }
+        return events
+    }
+
+    @Synchronized
+    fun pruneDiagnosticEventsOlderThan(days: Int = 7): Int {
+        if (days <= 0) return 0
+        val cutoffTimestamp = TrustedTimeProvider.currentTimeMillis() - (days.toLong() * 24 * 60 * 60 * 1000L)
+        val db = writableDatabase
+        return try {
+            val deletedRows = db.delete(
+                TABLE_DIAGNOSTIC_EVENTS,
+                "$COL_DIAG_TIMESTAMP < ?",
+                arrayOf(cutoffTimestamp.toString())
+            )
+            if (deletedRows > 0) {
+                Log.i(TAG, "Pruned $deletedRows diagnostic events older than $days days")
+            }
+            deletedRows
+        } catch (e: Exception) {
+            Log.e(TAG, "Error pruning old diagnostic events", e)
+            0
+        }
+    }
+
+    @Synchronized
+    fun getDiagnosticEventsCount(): Long {
+        val db = readableDatabase
+        var cursor: Cursor? = null
+        return try {
+            cursor = db.rawQuery("SELECT COUNT(*) FROM $TABLE_DIAGNOSTIC_EVENTS", null)
+            if (cursor.moveToFirst()) {
+                cursor.getLong(0)
+            } else 0L
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting diagnostic events count", e)
+            0L
+        } finally {
+            cursor?.close()
         }
     }
 }
