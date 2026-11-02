@@ -25,7 +25,7 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in telegramPackages) {
-            assertTrue("Expected Telegram package $pkg to be blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertFalse("Under Unified Zero-Trust, package is not permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
             assertEquals("Telegram", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -51,7 +51,7 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in socialPackages) {
-            assertTrue("Expected open social package $pkg to be blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertFalse("Under Unified Zero-Trust, package is not permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
             assertEquals("Open Social Network", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -76,7 +76,7 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in browsers) {
-            assertTrue("Expected proxy browser $pkg to be blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertFalse("Under Unified Zero-Trust, package is not permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
             assertEquals("Proxy Browser", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -95,7 +95,7 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in chatApps) {
-            assertTrue("Expected random chat app $pkg to be blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertFalse("Under Unified Zero-Trust, package is not permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
             assertEquals("Random Chat App", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -113,7 +113,7 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in tikTokApps) {
-            assertTrue("Expected TikTok package $pkg to be blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertFalse("Under Unified Zero-Trust, package is not permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
             assertEquals("TikTok", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -182,6 +182,7 @@ class AppSuspensionShieldTest {
             AppSuspensionShield.TIKTOK_PACKAGES.size
 
         assertEquals(51, totalExpected)
-        assertEquals(51, AppSuspensionShield.BLACKLISTED_PACKAGES.size)
+        // Under Unified Zero-Trust, BLACKLISTED_PACKAGES is empty to prevent silent uninstalls
+        assertEquals(0, AppSuspensionShield.BLACKLISTED_PACKAGES.size)
     }
 }

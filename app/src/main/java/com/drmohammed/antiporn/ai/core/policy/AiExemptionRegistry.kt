@@ -77,10 +77,16 @@ object AiExemptionRegistry {
      * المتاجر (Play والعينية) هدف عمداً لمنع ثغرة التثبيت الجانبي وقت التجربة.
      */
     fun isTarget(packageName: String): Boolean {
+        val lower = packageName.lowercase(Locale.ROOT)
         if (AppPolicyRegistry.isRestrictedBrowser(packageName)) return true
         if (AppPolicyRegistry.isPermanentlyBlacklisted(packageName)) return true
         if (AppPolicyRegistry.isAppStore(packageName)) return true
-        if (SOCIAL_FEED_PACKAGES.contains(packageName.lowercase(Locale.ROOT))) return true
+        if (SOCIAL_FEED_PACKAGES.contains(lower)) return true
+        if (com.drmohammed.antiporn.shields.AppSuspensionShield.TELEGRAM_PACKAGES.contains(lower)) return true
+        if (com.drmohammed.antiporn.shields.AppSuspensionShield.OPEN_SOCIAL_NETWORKS.contains(lower)) return true
+        if (com.drmohammed.antiporn.shields.AppSuspensionShield.PROXY_BROWSERS.contains(lower)) return true
+        if (com.drmohammed.antiporn.shields.AppSuspensionShield.RANDOM_CHAT_APPS.contains(lower)) return true
+        if (com.drmohammed.antiporn.shields.AppSuspensionShield.TIKTOK_PACKAGES.contains(lower)) return true
         // يوتيوب الرسمي هدف (ريلز وشورتس) حتى لو كان معفياً من الحظر الليلي إعلامياً
         if (packageName.equals("com.google.android.youtube", ignoreCase = true)) return true
         return false
@@ -91,7 +97,6 @@ object AiExemptionRegistry {
      */
     fun isExempt(packageName: String): Boolean {
         if (isTarget(packageName)) return false
-        if (AppPolicyRegistry.isPermanentlyBlacklisted(packageName)) return false
         return STRICT_SYSTEM_EXEMPT.contains(packageName.lowercase(Locale.ROOT))
     }
 
