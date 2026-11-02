@@ -82,6 +82,12 @@ class MainActivity : AppCompatActivity(),
     private var lastProtectionState: ProtectionUiState? = null
     private var lastDeniedToastTime = 0L
 
+    private val backPressedCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            navigateToTab(R.id.nav_home)
+        }
+    }
+
     private val aiRefreshRunnable = Runnable {
         if (!isFinishing && !isDestroyed) {
             settingsFragment.updateAiUi()
@@ -160,16 +166,7 @@ class MainActivity : AppCompatActivity(),
             }
         }
 
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (activeFragment != homeFragment) {
-                    navigateToTab(R.id.nav_home)
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
-                }
-            }
-        })
+        onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
         setupFragments(savedInstanceState)
         setupNavigation()
@@ -218,6 +215,7 @@ class MainActivity : AppCompatActivity(),
                 }
             }
             tx.commit()
+            backPressedCallback.isEnabled = (activeFragment != homeFragment)
         }
     }
 
@@ -296,6 +294,7 @@ class MainActivity : AppCompatActivity(),
             .commit()
 
         activeFragment = target
+        backPressedCallback.isEnabled = (target != homeFragment)
 
         if (target == homeFragment) {
             lastProtectionState?.let { homeFragment.updateProtectionState(it) }
@@ -433,6 +432,7 @@ class MainActivity : AppCompatActivity(),
             try {
                 val googleAuthManager = com.drmohammed.antiporn.cloud.auth.GoogleAuthManager.getInstance(applicationContext)
                 val result = googleAuthManager.signInOrLinkWithGoogle(this@MainActivity)
+                if (isFinishing || isDestroyed) return@launch
                 result.fold(
                     onSuccess = {
                         Toast.makeText(this@MainActivity, R.string.toast_account_secured_success, Toast.LENGTH_SHORT).show()

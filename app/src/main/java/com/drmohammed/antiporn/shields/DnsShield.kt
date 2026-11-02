@@ -55,6 +55,7 @@ object DnsShield : ProtectionShield {
         val targetHost = getEffectiveDnsHost(context)
 
         try {
+            // Constitutional Law (Article 2): Primary protection is enforced encrypted DNS (DoT) via DPM
             // Check-Before-Write: Only set if not already matching target host and mode
             val currentMode = try { dpm.getGlobalPrivateDnsMode(admin) } catch (e: Exception) { -1 }
             val currentHost = try { dpm.getGlobalPrivateDnsHost(admin) } catch (e: Exception) { null }
@@ -95,6 +96,13 @@ object DnsShield : ProtectionShield {
             }
             if (currentRestrictions?.getBoolean(UserManager.DISALLOW_NETWORK_RESET, false) != true) {
                 try { dpm.addUserRestriction(admin, UserManager.DISALLOW_NETWORK_RESET) } catch (e: Exception) { Log.w(TAG, "Lock network reset failed: ${e.message}") }
+            }
+
+            // Sync and activate Unified VPN in local DNS filtering mode
+            try {
+                com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.syncPolicy(context)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to sync Unified VPN policy from DnsShield", e)
             }
 
             val success = dnsSetResult == DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR
@@ -144,8 +152,9 @@ object DnsShield : ProtectionShield {
             val activeHost = hostFromDpm ?: globalSpecifier
             val isConfigured = (modeFromDpm == DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME && !hostFromDpm.isNullOrBlank()) ||
                     (globalMode == "hostname" && !globalSpecifier.isNullOrBlank())
+            val isHostMatching = activeHost.equals(targetHost, ignoreCase = true)
 
-            if (isConfigured && !activeHost.isNullOrBlank()) {
+            if (isConfigured && isHostMatching && !activeHost.isNullOrBlank()) {
                 ShieldStatus.Active(context.getString(R.string.card_nextdns_active, activeHost))
             } else {
                 val currentHostDisplay = activeHost ?: context.getString(R.string.default_dns_text)

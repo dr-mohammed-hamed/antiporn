@@ -175,8 +175,7 @@ class SelfControlActivity : AppCompatActivity() {
             if (hasUnsavedChanges()) {
                 showDiscardConfirmationDialog()
             } else {
-                isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
+                finish()
             }
         }
     }
@@ -976,7 +975,7 @@ class SelfControlActivity : AppCompatActivity() {
             .setPositiveButton(R.string.btn_discard_changes) { dialog, _ ->
                 dialog.dismiss()
                 backPressedCallback.isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
+                finish()
             }
             .show()
     }

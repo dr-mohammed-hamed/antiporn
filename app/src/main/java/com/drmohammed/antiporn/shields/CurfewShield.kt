@@ -3,12 +3,14 @@ package com.drmohammed.antiporn.shields
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
+import com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
@@ -77,7 +79,13 @@ object CurfewShield : ProtectionShield {
                 val isVpnBlackholeConfigured = CurfewConfig.isVpnBlackholeEnabled(context)
                 val isVpnEnforced = if (isVpnBlackholeConfigured) {
                     try {
-                        dpm.getAlwaysOnVpnPackage(admin) == context.packageName
+                        val isPkgMatch = dpm.getAlwaysOnVpnPackage(admin) == context.packageName
+                        val isLockdown = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            dpm.isAlwaysOnVpnLockdownEnabled(admin)
+                        } else {
+                            true
+                        }
+                        isPkgMatch && isLockdown
                     } catch (e: Exception) {
                         Log.w(TAG, "Failed to query always-on VPN package during curfew check", e)
                         false
@@ -93,15 +101,24 @@ object CurfewShield : ProtectionShield {
                     ShieldStatus.Active(context.getString(R.string.card_curfew_active_desc))
                 }
             } else {
-                val isVpnLingering = try {
-                    dpm.getAlwaysOnVpnPackage(admin) == context.packageName
+                val isLockdownLingering = try {
+                    val isBlackholeRunning = CurfewBlackholeVpnService.isRunning &&
+                            CurfewBlackholeVpnService.currentMode == CurfewBlackholeVpnService.VpnMode.CURFEW_BLACKHOLE
+                    val isVpnLingeringWhenIdle = CurfewBlackholeVpnService.evaluateRequiredMode(context) == CurfewBlackholeVpnService.VpnMode.IDLE &&
+                            dpm.getAlwaysOnVpnPackage(admin) == context.packageName
+                    val isLockdownActive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        dpm.isAlwaysOnVpnLockdownEnabled(admin)
+                    } else {
+                        false
+                    }
+                    isBlackholeRunning || isVpnLingeringWhenIdle || isLockdownActive
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to query always-on VPN package during release check", e)
+                    Log.w(TAG, "Failed to query always-on VPN lockdown during release check", e)
                     false
                 }
 
-                if (isVpnLingering) {
-                    Log.w(TAG, "Curfew is inactive but Blackhole VPN is still configured!")
+                if (isLockdownLingering) {
+                    Log.w(TAG, "Curfew is inactive but Blackhole VPN lockdown is still active!")
                     ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_inactive_desc))
                 } else {
                     ShieldStatus.Active(context.getString(R.string.card_curfew_scheduled_desc))

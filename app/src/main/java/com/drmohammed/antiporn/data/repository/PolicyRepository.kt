@@ -232,6 +232,19 @@ class PolicyRepository private constructor(context: Context) {
             return
         }
         _currentPolicyFlow.value = bundle
+        val wasSupervised = current.isSupervised
+        val isNowSupervised = bundle.isSupervised
+        if (wasSupervised && !isNowSupervised) {
+            Log.i(TAG, "Supervision revocation detected in updateLocalPolicyAndEnforce! Restoring standalone mode...")
+            repositoryScope.launch {
+                try {
+                    AccountabilityRepository.getInstance(appContext).onSupervisionRevokedLocally()
+                    ApprovalRepository.getInstance(appContext).stopApprovalsSync()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error cleaning up supervision state on revocation", e)
+                }
+            }
+        }
         database.saveDevicePolicy(DevicePolicyEntity.fromBundle(bundle))
         com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = bundle.isSelfControlAllowed
         applyPolicyToSystem(bundle, current)
@@ -419,6 +432,9 @@ class PolicyRepository private constructor(context: Context) {
 
                 // 5. Trigger inventory sync to cloud directly in coroutine
                 AppInventoryManager.getInstance(appContext).syncInventoryToCloud()
+
+                // 6. Synchronize Unified Local DNS Filter and Curfew VPN engine
+                com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.syncPolicy(appContext)
 
                 Log.i(TAG, "Successfully applied policy bundle v${bundle.version} to system engines")
             } catch (e: Exception) {

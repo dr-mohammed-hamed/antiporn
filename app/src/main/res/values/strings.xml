@@ -109,6 +109,7 @@
     <string name="shield_system_tamper_success">تم قفل التوقيت على مكة المكرمة (GMT+3) وحظر الفورمات وإلغاء التثبيت بنجاح</string>
 
     <string name="shield_dns_unsupported">ميزة Private DNS تتطلب أندرويد 10 (API 29) أو أحدث</string>
+    <string name="shield_dns_local_filter_active">فلترة محلية نشطة (DoT معطل ومقفل)</string>
 
     <string name="default_dns_text">تلقائي</string>
 
@@ -196,6 +197,7 @@
     <string name="curfew_vpn_notification_desc">تم قطع اتصال الإنترنت بالكامل حتى 07:00 ص. المكالمات ورسائل SMS تعمل بشكل طبيعي.</string>
 
     <string name="curfew_vpn_session_name">AntiPorn Curfew Blackhole</string>
+    <string name="curfew_vpn_dns_filter_session">فلترة حماية شبكة DNS المحلية</string>
 
     <!-- Unified Protection & Curfew Notification Strings -->
     <string name="protection_vpn_channel_name">عزل وحماية شبكة الحظر</string>

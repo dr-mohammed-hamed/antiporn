@@ -25,6 +25,7 @@ import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.data.model.InstalledAppDto
 import com.drmohammed.antiporn.data.repository.PolicyRepository
+import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -85,8 +86,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             if (hasUnsavedChanges()) {
                 showDiscardConfirmationDialog()
             } else {
-                isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
+                finish()
             }
         }
     }
@@ -222,6 +222,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
     }
 
     private fun showDiscardConfirmationDialog() {
+        if (isFinishing || isDestroyed) return
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_unsaved_changes_title)
             .setMessage(R.string.dialog_unsaved_changes_msg)
@@ -231,7 +232,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             .setPositiveButton(R.string.btn_discard_changes) { dialog, _ ->
                 dialog.dismiss()
                 backPressedCallback.isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
+                finish()
             }
             .show()
     }
@@ -386,7 +387,12 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         btnSaveAppManagerChanges.isEnabled = false
         progressBar.visibility = View.VISIBLE
 
+        val myUid = if (!isLocalMode) AccountabilityRepository.getInstance(applicationContext).getCachedUid() else null
+        val myName = if (!isLocalMode) AccountabilityRepository.getInstance(applicationContext).getMyDisplayName() else null
         val updatedPolicy = currentPolicy.copy(
+            guardianUid = if (!isLocalMode) (currentPolicy.guardianUid?.takeIf { it.isNotBlank() } ?: myUid) else currentPolicy.guardianUid,
+            guardianName = if (!isLocalMode) (currentPolicy.guardianName?.takeIf { it.isNotBlank() } ?: myName) else currentPolicy.guardianName,
+            isSupervised = if (!isLocalMode) true else currentPolicy.isSupervised,
             customBlacklistPackages = customBlacklistPackages.toSet(),
             customCurfewWhitelistPackages = customCurfewWhitelistPackages.toSet(),
             protectedAppPackages = protectedAppPackages.toSet(),

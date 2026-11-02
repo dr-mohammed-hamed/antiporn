@@ -32,6 +32,7 @@ import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.ui.browser.BrowserUrlFilterActivity
 import com.drmohammed.antiporn.core.network.DnsFilteringValidator
 import com.drmohammed.antiporn.data.repository.PolicyRepository
+import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -191,8 +192,7 @@ class GuardianControlActivity : AppCompatActivity() {
             if (hasUnsavedChanges()) {
                 showDiscardConfirmationDialog()
             } else {
-                isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
+                finish()
             }
         }
     }
@@ -437,7 +437,7 @@ class GuardianControlActivity : AppCompatActivity() {
             .setPositiveButton(R.string.btn_discard_changes) { dialog, _ ->
                 dialog.dismiss()
                 backPressedCallback.isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
+                finish()
             }
             .show()
     }
@@ -454,9 +454,11 @@ class GuardianControlActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 try {
                     val snapshotPolicy = DevicePolicyBundle.fromJson(snapshotJson)
+                    val myUid = AccountabilityRepository.getInstance(applicationContext).getCachedUid()
+                    val myName = AccountabilityRepository.getInstance(applicationContext).getMyDisplayName()
                     val revertedPolicy = snapshotPolicy.copy(
-                        guardianUid = currentPolicy.guardianUid,
-                        guardianName = currentPolicy.guardianName,
+                        guardianUid = currentPolicy.guardianUid?.takeIf { it.isNotBlank() } ?: myUid,
+                        guardianName = currentPolicy.guardianName?.takeIf { it.isNotBlank() } ?: myName,
                         isSupervised = true,
                         isSelfControlAllowed = switchAllowSelfControl.isChecked,
                         guardianPolicySnapshot = null,
@@ -491,7 +493,12 @@ class GuardianControlActivity : AppCompatActivity() {
             btnDismissSelfControlAlert.isEnabled = false
             lifecycleScope.launch {
                 try {
+                    val myUid = AccountabilityRepository.getInstance(applicationContext).getCachedUid()
+                    val myName = AccountabilityRepository.getInstance(applicationContext).getMyDisplayName()
                     val acknowledgedPolicy = currentPolicy.copy(
+                        guardianUid = currentPolicy.guardianUid?.takeIf { it.isNotBlank() } ?: myUid,
+                        guardianName = currentPolicy.guardianName?.takeIf { it.isNotBlank() } ?: myName,
+                        isSupervised = true,
                         guardianPolicySnapshot = null,
                         lastSelfModifiedAt = null,
                         version = currentPolicy.version + 1,
@@ -694,7 +701,11 @@ class GuardianControlActivity : AppCompatActivity() {
             showEditWardNameDialog()
         }
 
+        var lastOpenAppManagerClickTime = 0L
         btnOpenAppManager.setOnClickListener {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastOpenAppManagerClickTime < 800L) return@setOnClickListener
+            lastOpenAppManagerClickTime = now
             val intent = Intent(this@GuardianControlActivity, RemoteAppManagerActivity::class.java).apply {
                 putExtra(RemoteAppManagerActivity.EXTRA_WARD_ID, wardId)
                 putExtra(RemoteAppManagerActivity.EXTRA_WARD_NAME, wardName)
@@ -1099,7 +1110,12 @@ class GuardianControlActivity : AppCompatActivity() {
                     currentPolicy
                 }
 
+                val myUid = AccountabilityRepository.getInstance(applicationContext).getCachedUid()
+                val myName = AccountabilityRepository.getInstance(applicationContext).getMyDisplayName()
                 val updatedPolicy = latestPolicy.copy(
+                    guardianUid = latestPolicy.guardianUid?.takeIf { it.isNotBlank() } ?: myUid,
+                    guardianName = latestPolicy.guardianName?.takeIf { it.isNotBlank() } ?: myName,
+                    isSupervised = true,
                     curfewStartHour = selectedStartHour,
                     curfewStartMinute = selectedStartMinute,
                     curfewEndHour = selectedEndHour,

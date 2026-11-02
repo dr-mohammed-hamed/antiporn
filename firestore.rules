@@ -7,11 +7,12 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // Strict Single-Guardian check: only the verified guardian registered on the ward's policy document
+    // Strict Single-Guardian check: verified guardian registered on the ward's policy document
     function isGuardianOf(wardUid) {
-      return request.auth != null &&
+      return request.auth != null && (
         exists(/databases/$(database)/documents/policies/$(wardUid)) &&
-        get(/databases/$(database)/documents/policies/$(wardUid)).data.get('guardianUid', null) == request.auth.uid;
+        get(/databases/$(database)/documents/policies/$(wardUid)).data.get('guardianUid', null) == request.auth.uid
+      );
     }
 
     // 1. Pairings: Exchange and resolve 6-character alphanumeric pairing codes
@@ -28,34 +29,47 @@ service cloud.firestore {
     // 2. Policies: Unified protection policies with strict single-guardian lock, heartbeat & 24h emergency breakout
     match /policies/{wardUid} {
       allow read: if isOwner(wardUid) || isGuardianOf(wardUid);
-      allow create: if isOwner(wardUid) || (request.auth != null && request.resource.data.get('guardianUid', null) == request.auth.uid);
+      allow create: if isOwner(wardUid) || (request.auth != null && (request.resource.data.get('guardianUid', null) == request.auth.uid || isGuardianOf(wardUid)));
       allow update: if request.auth != null && (
         // Case 1: Guardian updates or revokes
+        isGuardianOf(wardUid) ||
         (resource.data.get('guardianUid', null) != null && resource.data.get('guardianUid', null) == request.auth.uid) ||
         // Case 2: Currently unsupervised -> Ward updates standalone OR new guardian claims guardianship
         (resource.data.get('guardianUid', null) == null && (
           (isOwner(wardUid) && request.resource.data.get('guardianUid', null) == null) ||
-          (request.resource.data.get('guardianUid', null) == request.auth.uid)
+          (
+            request.resource.data.get('guardianUid', null) == request.auth.uid &&
+            request.resource.data.get('pairingCode', null) != null &&
+            exists(/databases/$(database)/documents/pairings/$(request.resource.data.pairingCode)) &&
+            get(/databases/$(database)/documents/pairings/$(request.resource.data.pairingCode)).data.ownerUid == wardUid &&
+            get(/databases/$(database)/documents/pairings/$(request.resource.data.pairingCode)).data.status == 'LOCKED'
+          )
         )) ||
-        // Case 3: Ward updates heartbeat while supervised
+        // Case 3: Ward updates policy when supervised and self-control is explicitly allowed by guardian
+        (resource.data.get('guardianUid', null) != null && isOwner(wardUid) &&
+          resource.data.get('isSelfControlAllowed', false) == true &&
+          request.resource.data.get('guardianUid', null) == resource.data.get('guardianUid', null) &&
+          request.resource.data.get('isSupervised', null) == resource.data.get('isSupervised', null) &&
+          request.resource.data.get('isSelfControlAllowed', false) == resource.data.get('isSelfControlAllowed', false)) ||
+        // Case 4: Ward updates heartbeat while supervised
         (resource.data.get('guardianUid', null) != null && isOwner(wardUid) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastHeartbeat'])) ||
-        // Case 4: Ward initiates or cancels 24h emergency breakout while supervised (protection stays intact)
+        // Case 5: Ward initiates or cancels 24h emergency breakout while supervised (protection stays intact)
         (resource.data.get('guardianUid', null) != null && isOwner(wardUid) &&
           request.resource.data.get('guardianUid', null) == resource.data.get('guardianUid', null) &&
           request.resource.data.get('isSupervised', null) == resource.data.get('isSupervised', null) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['breakoutStatus', 'breakoutRequestedAt', 'breakoutUnlockAt', 'updatedAt']) &&
           (
-            // Subcase 4a: Initiating breakout -> Must enforce minimum 24 hours (with 15-minute clock drift tolerance)
+            // Subcase 5a: Initiating breakout -> Must enforce minimum 24 hours (with 15-minute clock drift tolerance)
             (request.resource.data.get('breakoutStatus', null) == 'PENDING' &&
              request.resource.data.get('breakoutUnlockAt', 0) >= request.time.toMillis() + 85500000 &&
              request.resource.data.get('breakoutRequestedAt', 0) <= request.time.toMillis() + 900000) ||
-            // Subcase 4b: Cancelling breakout
+            // Subcase 5b: Cancelling breakout
             (request.resource.data.get('breakoutStatus', null) == 'CANCELLED' &&
              request.resource.data.get('breakoutUnlockAt', null) == null)
           )
         ) ||
-        // Case 5: Ward executes emergency breakout AFTER 24h grace period has legitimately passed on server clock
+        // Case 6: Ward executes emergency breakout AFTER 24h grace period has legitimately passed on server clock
         (resource.data.get('guardianUid', null) != null && isOwner(wardUid) &&
           resource.data.get('breakoutStatus', null) == 'PENDING' &&
           resource.data.get('breakoutUnlockAt', 0) > 0 &&

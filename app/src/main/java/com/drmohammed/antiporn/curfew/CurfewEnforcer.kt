@@ -206,7 +206,16 @@ object CurfewEnforcer {
             try {
                 val currentVpn = dpm.getAlwaysOnVpnPackage(admin)
                 val bypassedPackages = CurfewConfig.getVpnBypassedPackages(context)
-                if (currentVpn != context.packageName) {
+                val isLockdownActive = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    try {
+                        dpm.isAlwaysOnVpnLockdownEnabled(admin)
+                    } catch (e: Exception) {
+                        false
+                    }
+                } else {
+                    false
+                }
+                if (currentVpn != context.packageName || !isLockdownActive) {
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                         dpm.setAlwaysOnVpnPackage(admin, context.packageName, true, bypassedPackages)
                     } else {
@@ -220,10 +229,19 @@ object CurfewEnforcer {
             }
         } else {
             try {
-                CurfewBlackholeVpnService.forceReleaseVpn(context)
-                if (dpm.getAlwaysOnVpnPackage(admin) == context.packageName) {
-                    dpm.setAlwaysOnVpnPackage(admin, null, false)
-                    Log.i(TAG, "Always-on Blackhole VPN released")
+                val requiredMode = CurfewBlackholeVpnService.evaluateRequiredMode(context)
+                if (requiredMode == CurfewBlackholeVpnService.VpnMode.DNS_FILTERING_ONLY) {
+                    CurfewBlackholeVpnService.syncPolicy(context)
+                    if (dpm.getAlwaysOnVpnPackage(admin) == context.packageName) {
+                        dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
+                        Log.i(TAG, "Always-on VPN transitioned to DNS-only filtering mode (lockdown=false)")
+                    }
+                } else {
+                    CurfewBlackholeVpnService.forceReleaseVpn(context)
+                    if (dpm.getAlwaysOnVpnPackage(admin) == context.packageName) {
+                        dpm.setAlwaysOnVpnPackage(admin, null, false)
+                        Log.i(TAG, "Always-on Blackhole VPN released")
+                    }
                 }
                 Log.i(TAG, "VPN Blackhole is disabled and network is released.")
             } catch (e: Exception) {
@@ -487,6 +505,7 @@ object CurfewEnforcer {
     /**
      * Handles newly installed package. If curfew is currently active, freezes and hides it immediately.
      */
+    @Synchronized
     fun handlePackageAdded(context: Context, packageName: String) {
         val appContext = context.applicationContext
         val isCurfewRunning = isEffectiveBlockActive(appContext)

@@ -282,4 +282,28 @@ class DevicePolicyBundleTest {
         val mapExplicitTrue = mapOf("isSelfControlAllowed" to true)
         assertTrue(DevicePolicyBundle.fromMap(mapExplicitTrue).isSelfControlAllowed)
     }
+
+    @Test
+    fun testGuardianPolicyConstruction_ensuresSupervisionInvariants() {
+        val baseDefault = DevicePolicyBundle.defaultPolicy()
+        assertFalse(baseDefault.isSupervised)
+        org.junit.Assert.assertNull(baseDefault.guardianUid)
+
+        val myUid = "guardian_uid_123"
+        val myName = "Guardian Device"
+        val configuredPolicy = baseDefault.copy(
+            guardianUid = baseDefault.guardianUid?.takeIf { it.isNotBlank() } ?: myUid,
+            guardianName = baseDefault.guardianName?.takeIf { it.isNotBlank() } ?: myName,
+            isSupervised = true
+        )
+
+        assertTrue(configuredPolicy.isSupervised)
+        assertEquals("guardian_uid_123", configuredPolicy.guardianUid)
+        assertEquals("Guardian Device", configuredPolicy.guardianName)
+
+        val serializedMap = configuredPolicy.toMap()
+        assertEquals(true, serializedMap["isSupervised"])
+        assertEquals("guardian_uid_123", serializedMap["guardianUid"])
+        assertEquals("Guardian Device", serializedMap["guardianName"])
+    }
 }

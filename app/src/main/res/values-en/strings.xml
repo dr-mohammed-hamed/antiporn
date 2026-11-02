@@ -14,6 +14,7 @@
     <string name="watchdog_notification_desc">Hisn app is active.</string>
     <string name="admin_disable_warning">Security Warning: Hisn protection cannot be disabled to prevent bypass!</string>
     <string name="curfew_vpn_session_name">Hisn Curfew Blackhole</string>
+    <string name="curfew_vpn_dns_filter_session">Hisn Local DNS Filter</string>
     <string name="curfew_vpn_channel_name">Curfew Network Blackhole</string>
     <string name="curfew_vpn_channel_desc">Notification channel for full internet blackout during sleep hours</string>
     <string name="curfew_vpn_notification_title">Night Curfew Active: Internet Isolated</string>
@@ -442,6 +443,7 @@
     <string name="shield_browser_success">Browser restrictions enforced successfully.</string>
     <string name="shield_system_tamper_success">System tamper restrictions enforced successfully.</string>
     <string name="shield_dns_unsupported">Private DNS not supported on this Android version.</string>
+    <string name="shield_dns_local_filter_active">Local DNS filtering active (DoT disabled and locked)</string>
     <string name="default_dns_text">Default Family DNS</string>
     <string name="card_app_suspension_title">App Suspension Shield</string>
     <string name="card_app_suspension_active">Blacklisted applications are suspended.</string>

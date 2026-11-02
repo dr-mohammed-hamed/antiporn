@@ -11,7 +11,10 @@ import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.security.SecureRandom
@@ -30,6 +33,7 @@ class AccountabilityRepository private constructor(context: Context) {
     private val firestore = FirebaseFirestore.getInstance()
 
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val syncPartnersMutex = Mutex()
 
     suspend fun getOrCreateCurrentUid(): String = withContext(Dispatchers.IO) {
         val user = auth.currentUser
@@ -67,9 +71,14 @@ class AccountabilityRepository private constructor(context: Context) {
     }
 
     fun persistUid(uid: String) {
-        if (uid.isNotBlank() && prefs.getString(KEY_PERSISTED_UID, null) != uid) {
+        val oldUid = prefs.getString(KEY_PERSISTED_UID, null)
+        if (uid.isNotBlank() && oldUid != uid) {
             prefs.edit().putString(KEY_PERSISTED_UID, uid).apply()
             Log.i(TAG, "Persisted synchronized UID: $uid")
+            if (!oldUid.isNullOrBlank()) {
+                Log.i(TAG, "UID transitioned from $oldUid to $uid. Invalidating old cached pairing code.")
+                prefs.edit().remove(KEY_MY_PAIRING_CODE).apply()
+            }
         }
     }
 
@@ -84,6 +93,7 @@ class AccountabilityRepository private constructor(context: Context) {
     /**
      * Gets or generates the device's persistent 6-character pairing code.
      * If the device is currently supervised, returns LOCKED and hides code from cloud discovery.
+     * Automatically resolves collisions and self-heals permissions if the code belongs to another UID.
      */
     suspend fun getOrCreateMyPairingCode(): String = withContext(Dispatchers.IO) {
         val currentPolicy = database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
@@ -91,31 +101,75 @@ class AccountabilityRepository private constructor(context: Context) {
             return@withContext CODE_LOCKED
         }
 
+        val uid = getOrCreateCurrentUid()
+        if (uid.startsWith("dev_") && auth.currentUser == null) {
+            Log.w(TAG, "Device currently unauthenticated; skipping pairing code cloud publication")
+            var offlineCode = prefs.getString(KEY_MY_PAIRING_CODE, null)
+            if (offlineCode.isNullOrBlank()) {
+                offlineCode = generateRandomCode()
+                prefs.edit().putString(KEY_MY_PAIRING_CODE, offlineCode).apply()
+            }
+            return@withContext offlineCode
+        }
+
         var code = prefs.getString(KEY_MY_PAIRING_CODE, null)
-        if (code.isNullOrBlank()) {
-            code = generateRandomCode()
-            prefs.edit().putString(KEY_MY_PAIRING_CODE, code).apply()
+        var registered = false
+        var attempts = 0
+        val deviceName = getMyDisplayName()
+
+        while (!registered && attempts < 3) {
+            attempts++
+            if (code.isNullOrBlank()) {
+                code = generateRandomCode()
+            }
+
+            try {
+                val existingDoc = firestore.collection("pairings").document(code).get().await()
+                if (existingDoc.exists()) {
+                    val existingOwner = existingDoc.getString("ownerUid")
+                    if (!existingOwner.isNullOrBlank() && existingOwner != uid) {
+                        Log.w(TAG, "Pairing code $code already owned by $existingOwner (not current $uid). Rotating...")
+                        prefs.edit().remove(KEY_MY_PAIRING_CODE).apply()
+                        code = null
+                        continue
+                    }
+                }
+
+                val pairingDoc = mapOf(
+                    "pairingCode" to code,
+                    "ownerUid" to uid,
+                    "ownerName" to deviceName,
+                    "status" to "ACTIVE",
+                    "createdAt" to (existingDoc.getLong("createdAt") ?: System.currentTimeMillis())
+                )
+                firestore.collection("pairings").document(code).set(pairingDoc).await()
+                prefs.edit().putString(KEY_MY_PAIRING_CODE, code).apply()
+                registered = true
+                Log.i(TAG, "Successfully registered pairing code $code for UID $uid (name: $deviceName)")
+
+                // Proactively ensure base policy exists in Firestore under /policies/$uid
+                try {
+                    val currentLocalPolicy = database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
+                    firestore.collection("policies").document(uid).set(currentLocalPolicy.toMap(), com.google.firebase.firestore.SetOptions.merge()).await()
+                    Log.d(TAG, "Ensured base policy document in Firestore for UID $uid")
+                } catch (policyEx: Exception) {
+                    Log.w(TAG, "Non-critical: base policy document seed skipped: ${policyEx.message}")
+                }
+
+                AppInventoryManager.getInstance(appContext).syncInventoryToCloudAsync()
+            } catch (e: Exception) {
+                if (e is FirebaseFirestoreException && e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                    Log.w(TAG, "Permission denied for pairing code $code (stale or conflicting ownership). Rotating...")
+                    prefs.edit().remove(KEY_MY_PAIRING_CODE).apply()
+                    code = null
+                } else {
+                    Log.e(TAG, "Error publishing pairing code to Firestore", e)
+                    break
+                }
+            }
         }
 
-        // Publish/refresh code in Firestore /pairings/{code}
-        try {
-            val uid = getOrCreateCurrentUid()
-            val deviceName = getMyDisplayName()
-            val pairingDoc = mapOf(
-                "pairingCode" to code,
-                "ownerUid" to uid,
-                "ownerName" to deviceName,
-                "status" to "ACTIVE",
-                "createdAt" to System.currentTimeMillis()
-            )
-            firestore.collection("pairings").document(code).set(pairingDoc).await()
-            Log.i(TAG, "Successfully registered pairing code $code for UID $uid (name: $deviceName)")
-            AppInventoryManager.getInstance(appContext).syncInventoryToCloudAsync()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error publishing pairing code to Firestore", e)
-        }
-
-        code
+        code ?: (prefs.getString(KEY_MY_PAIRING_CODE, null) ?: generateRandomCode())
     }
 
     /**
@@ -147,16 +201,21 @@ class AccountabilityRepository private constructor(context: Context) {
 
             if (role == PartnerEntity.ROLE_WARD) {
                 // I am protecting targetUid (targetUid is my WARD, I am their GUARDIAN)
-                val policyDoc = firestore.collection("policies").document(targetUid).get().await()
-                val existingGuardianUid = policyDoc.getString("guardianUid")
-                val isAlreadySupervised = policyDoc.getBoolean("isSupervised") ?: (!existingGuardianUid.isNullOrBlank())
+                val policyDoc = try {
+                    firestore.collection("policies").document(targetUid).get().await()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Ward policy doc not readable or doesn't exist yet before pairing: ${e.message}")
+                    null
+                }
+                val existingGuardianUid = policyDoc?.getString("guardianUid")
+                val isAlreadySupervised = policyDoc?.getBoolean("isSupervised") ?: (!existingGuardianUid.isNullOrBlank())
 
                 if (isAlreadySupervised && !existingGuardianUid.isNullOrBlank() && existingGuardianUid != myUid) {
                     return@withContext Result.failure(IllegalStateException(appContext.getString(R.string.error_ward_already_has_guardian)))
                 }
 
-                val currentVersion = policyDoc.getLong("version") ?: 1L
-                val basePolicy = if (policyDoc.exists() && policyDoc.data != null) {
+                val currentVersion = policyDoc?.getLong("version") ?: 1L
+                val basePolicy = if (policyDoc != null && policyDoc.exists() && policyDoc.data != null) {
                     DevicePolicyBundle.fromMap(policyDoc.data!!)
                 } else {
                     DevicePolicyBundle.defaultPolicy()
@@ -169,8 +228,6 @@ class AccountabilityRepository private constructor(context: Context) {
                     version = currentVersion + 1,
                     updatedAt = System.currentTimeMillis()
                 )
-                firestore.collection("policies").document(targetUid).set(updatedPolicy.toMap()).await()
-
                 try {
                     firestore.collection("pairings").document(cleanCode).update(
                         mapOf("status" to "LOCKED", "pairedGuardianUid" to myUid)
@@ -178,21 +235,31 @@ class AccountabilityRepository private constructor(context: Context) {
                 } catch (e: Exception) {
                     Log.w(TAG, "Pairing code lock status warning: ${e.message}")
                 }
+
+                val policyMap = updatedPolicy.toMap().toMutableMap().apply {
+                    put("pairingCode", cleanCode)
+                }
+                firestore.collection("policies").document(targetUid).set(policyMap).await()
             } else if (role == PartnerEntity.ROLE_GUARDIAN) {
                 // Target is protecting ME (Target is my GUARDIAN, I am their WARD)
-                val myPolicyDoc = firestore.collection("policies").document(myUid).get().await()
-                val existingGuardian = myPolicyDoc.getString("guardianUid")
-                val isAlreadySupervised = myPolicyDoc.getBoolean("isSupervised") ?: (!existingGuardian.isNullOrBlank())
+                val myPolicyDoc = try {
+                    firestore.collection("policies").document(myUid).get().await()
+                } catch (e: Exception) {
+                    Log.w(TAG, "My policy doc not readable or doesn't exist yet: ${e.message}")
+                    null
+                }
+                val existingGuardian = myPolicyDoc?.getString("guardianUid")
+                val isAlreadySupervised = myPolicyDoc?.getBoolean("isSupervised") ?: (!existingGuardian.isNullOrBlank())
 
                 if (isAlreadySupervised && !existingGuardian.isNullOrBlank() && existingGuardian != targetUid) {
                     return@withContext Result.failure(IllegalStateException(appContext.getString(R.string.error_already_supervised)))
                 }
 
-                val currentVersion = myPolicyDoc.getLong("version") ?: 1L
-                val basePolicy = if (myPolicyDoc.exists() && myPolicyDoc.data != null) {
+                val currentVersion = myPolicyDoc?.getLong("version") ?: 1L
+                val basePolicy = if (myPolicyDoc != null && myPolicyDoc.exists() && myPolicyDoc.data != null) {
                     DevicePolicyBundle.fromMap(myPolicyDoc.data!!)
                 } else {
-                    DevicePolicyBundle.defaultPolicy()
+                    database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
                 }
 
                 val updatedMyPolicy = basePolicy.copy(
@@ -344,95 +411,98 @@ class AccountabilityRepository private constructor(context: Context) {
      * Synchronizes all partner relationships from Firestore into the local SQLite database.
      * Restores supervised wards and guardians automatically when switching devices or reinstalling.
      * Also migrates any local partners to cloud under current authenticated UID if needed.
+     * Guarded with syncPartnersMutex to eliminate duplicate simultaneous cloud restore loops.
      */
     suspend fun syncPartnersFromCloud(): Result<List<PartnerEntity>> = withContext(Dispatchers.IO) {
-        try {
-            val myUid = getOrCreateCurrentUid()
-            if (myUid.startsWith("dev_") && auth.currentUser == null) {
-                Log.d(TAG, "Unauthenticated device UID ($myUid), skipping cloud partner restore")
-                return@withContext Result.success(database.getAllPartners())
-            }
-
-            Log.i(TAG, "Initiating cloud partners restore for UID: $myUid...")
-
-            // 1. Fetch all partners registered under /users/{myUid}/partners
-            val cloudPartnersSnapshot = firestore.collection("users").document(myUid)
-                .collection("partners").get().await()
-
-            for (doc in cloudPartnersSnapshot.documents) {
-                val partnerUid = doc.getString("partnerUid") ?: doc.id
-                val partnerName = doc.getString("partnerName") ?: "Partner"
-                val role = doc.getString("role") ?: PartnerEntity.ROLE_WARD
-                val pairingCode = doc.getString("pairingCode") ?: CODE_LOCKED
-                val pairedAt = doc.getLong("pairedAt") ?: System.currentTimeMillis()
-
-                val partnerEntity = PartnerEntity(
-                    id = partnerUid,
-                    pairingCode = pairingCode,
-                    displayName = partnerName,
-                    role = role,
-                    status = PartnerEntity.STATUS_ACTIVE,
-                    createdAt = pairedAt,
-                    lastSyncAt = System.currentTimeMillis()
-                )
-                database.savePartner(partnerEntity)
-                Log.d(TAG, "Restored cloud partner to SQLite: $partnerName ($partnerUid, role=$role)")
-            }
-
-            // 2. Self-heal Guardian from /policies/{myUid} if supervised
+        syncPartnersMutex.withLock {
             try {
-                val myPolicyDoc = firestore.collection("policies").document(myUid).get().await()
-                if (myPolicyDoc.exists()) {
-                    val isSupervised = myPolicyDoc.getBoolean("isSupervised") ?: false
-                    val guardianUid = myPolicyDoc.getString("guardianUid")
-                    val guardianName = myPolicyDoc.getString("guardianName")
-                    if (isSupervised && !guardianUid.isNullOrBlank()) {
-                        val guardian = PartnerEntity(
-                            id = guardianUid,
-                            pairingCode = CODE_LOCKED,
-                            displayName = guardianName ?: appContext.getString(R.string.guardian_default_name),
-                            role = PartnerEntity.ROLE_GUARDIAN,
-                            status = PartnerEntity.STATUS_ACTIVE,
-                            createdAt = myPolicyDoc.getLong("updatedAt") ?: System.currentTimeMillis(),
-                            lastSyncAt = System.currentTimeMillis()
-                        )
-                        database.savePartner(guardian)
-                        Log.i(TAG, "Restored Guardian from cloud policy: ${guardian.displayName} ($guardianUid)")
+                val myUid = getOrCreateCurrentUid()
+                if (myUid.startsWith("dev_") && auth.currentUser == null) {
+                    Log.d(TAG, "Unauthenticated device UID ($myUid), skipping cloud partner restore")
+                    return@withLock Result.success(database.getAllPartners())
+                }
+
+                Log.i(TAG, "Initiating cloud partners restore for UID: $myUid...")
+
+                // 1. Fetch all partners registered under /users/{myUid}/partners
+                val cloudPartnersSnapshot = firestore.collection("users").document(myUid)
+                    .collection("partners").get().await()
+
+                for (doc in cloudPartnersSnapshot.documents) {
+                    val partnerUid = doc.getString("partnerUid") ?: doc.id
+                    val partnerName = doc.getString("partnerName") ?: "Partner"
+                    val role = doc.getString("role") ?: PartnerEntity.ROLE_WARD
+                    val pairingCode = doc.getString("pairingCode") ?: CODE_LOCKED
+                    val pairedAt = doc.getLong("pairedAt") ?: System.currentTimeMillis()
+
+                    val partnerEntity = PartnerEntity(
+                        id = partnerUid,
+                        pairingCode = pairingCode,
+                        displayName = partnerName,
+                        role = role,
+                        status = PartnerEntity.STATUS_ACTIVE,
+                        createdAt = pairedAt,
+                        lastSyncAt = System.currentTimeMillis()
+                    )
+                    database.savePartner(partnerEntity)
+                    Log.d(TAG, "Restored cloud partner to SQLite: $partnerName ($partnerUid, role=$role)")
+                }
+
+                // 2. Self-heal Guardian from /policies/{myUid} if supervised
+                try {
+                    val myPolicyDoc = firestore.collection("policies").document(myUid).get().await()
+                    if (myPolicyDoc.exists()) {
+                        val isSupervised = myPolicyDoc.getBoolean("isSupervised") ?: false
+                        val guardianUid = myPolicyDoc.getString("guardianUid")
+                        val guardianName = myPolicyDoc.getString("guardianName")
+                        if (isSupervised && !guardianUid.isNullOrBlank()) {
+                            val guardian = PartnerEntity(
+                                id = guardianUid,
+                                pairingCode = CODE_LOCKED,
+                                displayName = guardianName ?: appContext.getString(R.string.guardian_default_name),
+                                role = PartnerEntity.ROLE_GUARDIAN,
+                                status = PartnerEntity.STATUS_ACTIVE,
+                                createdAt = myPolicyDoc.getLong("updatedAt") ?: System.currentTimeMillis(),
+                                lastSyncAt = System.currentTimeMillis()
+                            )
+                            database.savePartner(guardian)
+                            Log.i(TAG, "Restored Guardian from cloud policy: ${guardian.displayName} ($guardianUid)")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Non-critical: Failed to verify guardian from /policies/$myUid: ${e.message}")
+                }
+
+                // 3. Migrate any local partners to cloud /users/{myUid}/partners if missing from cloud
+                val localPartners = database.getAllPartners()
+                for (local in localPartners) {
+                    if (cloudPartnersSnapshot.documents.none { it.id == local.id }) {
+                        try {
+                            val relationData = mapOf(
+                                "partnerUid" to local.id,
+                                "partnerName" to local.displayName,
+                                "role" to local.role,
+                                "pairingCode" to local.pairingCode,
+                                "pairedAt" to local.createdAt
+                            )
+                            firestore.collection("users").document(myUid)
+                                .collection("partners").document(local.id)
+                                .set(relationData, com.google.firebase.firestore.SetOptions.merge())
+                                .await()
+                            Log.i(TAG, "Migrated local partner ${local.displayName} (${local.id}) to cloud /users/$myUid/partners")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed migrating local partner ${local.id} to cloud: ${e.message}")
+                        }
                     }
                 }
+
+                val finalPartners = database.getAllPartners()
+                Log.i(TAG, "Cloud partners sync completed successfully: ${finalPartners.size} total partners in SQLite")
+                Result.success(finalPartners)
             } catch (e: Exception) {
-                Log.w(TAG, "Non-critical: Failed to verify guardian from /policies/$myUid: ${e.message}")
+                Log.e(TAG, "Error syncing partners from cloud", e)
+                Result.failure(e)
             }
-
-            // 3. Migrate any local partners to cloud /users/{myUid}/partners if missing from cloud
-            val localPartners = database.getAllPartners()
-            for (local in localPartners) {
-                if (cloudPartnersSnapshot.documents.none { it.id == local.id }) {
-                    try {
-                        val relationData = mapOf(
-                            "partnerUid" to local.id,
-                            "partnerName" to local.displayName,
-                            "role" to local.role,
-                            "pairingCode" to local.pairingCode,
-                            "pairedAt" to local.createdAt
-                        )
-                        firestore.collection("users").document(myUid)
-                            .collection("partners").document(local.id)
-                            .set(relationData, com.google.firebase.firestore.SetOptions.merge())
-                            .await()
-                        Log.i(TAG, "Migrated local partner ${local.displayName} (${local.id}) to cloud /users/$myUid/partners")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed migrating local partner ${local.id} to cloud: ${e.message}")
-                    }
-                }
-            }
-
-            val finalPartners = database.getAllPartners()
-            Log.i(TAG, "Cloud partners sync completed successfully: ${finalPartners.size} total partners in SQLite")
-            Result.success(finalPartners)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error syncing partners from cloud", e)
-            Result.failure(e)
         }
     }
 

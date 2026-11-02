@@ -86,6 +86,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
     private var lastCancelBreakoutClickTime = 0L
     private var lastCompleteBreakoutClickTime = 0L
     private var isPairingInProgress = false
+    private var loadPartnersJob: kotlinx.coroutines.Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -339,6 +340,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
     }
 
     private fun showEmergencyBreakoutDialog() {
+        if (isFinishing || isDestroyed) return
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_breakout_title)
             .setMessage(R.string.dialog_breakout_msg)
@@ -451,7 +453,8 @@ class AccountabilityHubActivity : AppCompatActivity() {
     }
 
     private fun loadPartners() {
-        lifecycleScope.launch(Dispatchers.IO) {
+        if (loadPartnersJob?.isActive == true) return
+        loadPartnersJob = lifecycleScope.launch(Dispatchers.IO) {
             if (isFinishing || isDestroyed) return@launch
             try {
                 var wards = accountabilityRepo.getWards()
@@ -736,6 +739,7 @@ class AccountabilityHubActivity : AppCompatActivity() {
     }
 
     private fun showAddPartnerDialog() {
+        if (isFinishing || isDestroyed) return
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_partner, null)
         val tilCode = dialogView.findViewById<TextInputLayout>(R.id.tilPartnerCode)
         val etCode = dialogView.findViewById<EditText>(R.id.etPartnerCode)

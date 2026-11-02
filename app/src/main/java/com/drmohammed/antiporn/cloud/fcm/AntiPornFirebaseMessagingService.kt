@@ -70,7 +70,7 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
                     PolicyRepository.getInstance(applicationContext).getCurrentPolicy().customBlacklistPackages.contains(packageName)
                 val actuallyApproved = isApproved && !isPermanentlyBlocked
 
-                if (isApproved) {
+                if (actuallyApproved) {
                     ApprovalRepository.getInstance(applicationContext).unsuspendAndApprove(packageName, decidedBy)
                 } else {
                     // Stays suspended and record rejection in local SQLite
@@ -129,6 +129,7 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
         private const val TAG = "AntiPorn_FCM"
         const val PREFS_NAME = "antiporn_fcm_prefs"
         const val KEY_FCM_TOKEN = "key_fcm_token"
+        const val KEY_LAST_SYNCED_TOKEN_UID = "key_last_synced_token_uid"
         const val ACTION_POLICY_UPDATE = "POLICY_UPDATE"
         const val ACTION_APPROVAL_RESPONSE = "APPROVAL_RESPONSE"
         const val ACTION_OTA_CHECK_UPDATE = "OTA_CHECK_UPDATE"
@@ -148,6 +149,12 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
         fun syncPersistedToken(context: Context, uid: String) {
             val token = getPersistedToken(context) ?: return
             val appContext = context.applicationContext
+            val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val currentPairKey = "$uid:$token"
+            if (prefs.getString(KEY_LAST_SYNCED_TOKEN_UID, null) == currentPairKey) {
+                // Token already synced to Firestore for this UID; skip redundant cloud write
+                return
+            }
             CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
                 try {
                     FirebaseFirestore.getInstance().collection("users").document(uid)
@@ -155,6 +162,7 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
                             mapOf("fcmToken" to token, "tokenUpdatedAt" to System.currentTimeMillis()),
                             SetOptions.merge()
                         ).await()
+                    prefs.edit().putString(KEY_LAST_SYNCED_TOKEN_UID, currentPairKey).apply()
                     Log.i(TAG, "Uploaded persisted FCM token to Firestore for UID $uid")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error uploading persisted FCM token to Firestore", e)
