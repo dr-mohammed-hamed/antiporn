@@ -1,29 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/scrollHome"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:clipToPadding="false"
-    android:fillViewport="true">
+    android:orientation="vertical">
 
-    <LinearLayout
+    <!-- Fixed Pinned Top App Bar Header (Never clipped or overlapped by status bar) -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarHome"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
-        android:paddingHorizontal="24dp"
-        android:paddingTop="20dp"
-        android:paddingBottom="32dp">
+        android:background="?attr/colorSurface"
+        app:elevation="0dp">
 
-        <!-- Header Branding -->
         <LinearLayout
             android:id="@+id/layoutBrandHeader"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingHorizontal="24dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="10dp">
 
             <TextView
                 android:id="@+id/tvHeaderTitle"
@@ -41,248 +40,273 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:fontFamily="@font/tajawal"
-                android:text="@string/header_ayah_quran"
+                android:text="@string/header_subtitle_slogan"
                 android:textColor="?attr/colorOutline"
                 android:textSize="13sp" />
         </LinearLayout>
 
-        <!-- Hero Al-Hosn Shield Section (Tap reveals Active Shields BottomSheet) -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:alpha="0.2"
+            android:background="?attr/colorOutlineVariant" />
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <ScrollView
+        android:id="@+id/scrollHome"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:fillViewport="true">
+
         <LinearLayout
-            android:id="@+id/layoutHeroShield"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
+            android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:paddingHorizontal="24dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="32dp">
 
-            <!-- Glowing Emblem Frame -->
-            <FrameLayout
-                android:id="@+id/frameHeroShieldGlow"
-                android:layout_width="128dp"
-                android:layout_height="128dp"
-                android:background="@drawable/bg_hero_shield_glow">
-
-                <ImageView
-                    android:id="@+id/ivHeroShieldLogo"
-                    android:layout_width="88dp"
-                    android:layout_height="88dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/app_name"
-                    android:src="@drawable/ic_hisn_shield_emblem" />
-            </FrameLayout>
-
-            <!-- Status Badge Pill -->
-            <TextView
-                android:id="@+id/tvHeroShieldStatus"
-                android:layout_width="wrap_content"
+            <!-- Hero Al-Hosn Shield Section (Tap reveals Active Shields BottomSheet) -->
+            <LinearLayout
+                android:id="@+id/layoutHeroShield"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:background="@drawable/bg_shield_status_badge"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="7dp"
-                android:text="@string/home_shield_active"
-                android:textColor="@color/shield_emerald_radiant"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <!-- Subtitle Hint -->
-            <TextView
-                android:id="@+id/tvHeroShieldTapHint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/home_shield_tap_hint"
-                android:textColor="?attr/colorOutline"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- Center Screen: 1-Hour Nap Hero Section -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardHeroNapSection"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            app:cardBackgroundColor="?attr/colorSurfaceContainer"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="8dp">
 
-                <!-- Nap Hero Action Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnHeroNapStart"
-                    style="@style/Widget.Material3.Button"
-                    android:layout_width="match_parent"
-                    android:layout_height="60dp"
-                    android:text="@string/btn_hero_nap_start"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="18dp"
-                    app:icon="@drawable/ic_shield_curfew"
-                    app:iconGravity="textStart"
-                    app:iconPadding="10dp"
-                    app:iconSize="22dp" />
+                <!-- Glowing Emblem Frame -->
+                <FrameLayout
+                    android:id="@+id/frameHeroShieldGlow"
+                    android:layout_width="128dp"
+                    android:layout_height="128dp"
+                    android:background="@drawable/bg_hero_shield_glow">
 
-                <!-- Active Nap Live Countdown & Controls (Shown when Nap is Active) -->
-                <LinearLayout
-                    android:id="@+id/layoutNapActiveControls"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:visibility="gone">
+                    <ImageView
+                        android:id="@+id/ivHeroShieldLogo"
+                        android:layout_width="88dp"
+                        android:layout_height="88dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@string/app_name"
+                        android:src="@drawable/ic_hisn_shield_emblem" />
+                </FrameLayout>
 
-                    <TextView
-                        android:id="@+id/tvHeroNapCountdown"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_active_shields_pill"
-                        android:gravity="center"
-                        android:paddingHorizontal="14dp"
-                        android:paddingVertical="8dp"
-                        android:textColor="@color/status_green"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        tools:text="قيلولة نشطة (59:45)" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnHeroNapExtend"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:text="@string/btn_hero_nap_extend"
-                        android:textSize="12sp"
-                        app:cornerRadius="12dp" />
-                </LinearLayout>
-
+                <!-- Status Badge Pill -->
                 <TextView
-                    android:id="@+id/tvNapSubtext"
+                    android:id="@+id/tvHeroShieldStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/card_nap_subtext"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_shield_status_badge"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="7dp"
+                    android:text="@string/home_shield_active"
+                    android:textColor="@color/shield_emerald_radiant"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <!-- Subtitle Hint -->
+                <TextView
+                    android:id="@+id/tvHeroShieldTapHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/home_shield_tap_hint"
                     android:textColor="?attr/colorOutline"
                     android:textSize="12sp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnGrantUsageAccess"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/btn_grant_usage_access"
-                    android:textColor="@color/status_orange"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
 
-        <!-- Status Card (Shown if enforcement needed or not Device Owner) -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardHomeNotice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:visibility="gone"
-            app:cardBackgroundColor="?attr/colorSurfaceContainer"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="@color/shield_amber_calm"
-            app:strokeWidth="1.5dp">
-
-            <LinearLayout
+            <!-- Center Screen: 1-Hour Nap Hero Section -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardHeroNapSection"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:layout_marginTop="28dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
-                <TextView
-                    android:id="@+id/tvHomeNoticeTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_shield_status_badge_amber"
-                    android:paddingHorizontal="12dp"
-                    android:paddingVertical="4dp"
-                    android:text="@string/status_need_enforce_title"
-                    android:textColor="@color/shield_amber_calm"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvHomeNoticeDesc"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:lineSpacingExtra="2dp"
-                    android:text="@string/status_need_enforce_desc"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="13sp" />
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="20dp">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnEnforceNow"
-                    style="@style/Widget.Material3.Button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/btn_enforce_now"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="12dp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+                    <!-- Nap Hero Action Button -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnHeroNapStart"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="60dp"
+                        android:text="@string/btn_hero_nap_start"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="18dp"
+                        app:icon="@drawable/ic_shield_curfew"
+                        app:iconGravity="textStart"
+                        app:iconPadding="10dp"
+                        app:iconSize="22dp" />
 
-        <!-- ADB Setup Warning (Only if NOT device owner) -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardAdbHelp"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:visibility="gone"
-            app:cardBackgroundColor="?attr/colorSurfaceContainer"
-            app:cardCornerRadius="18dp"
-            app:cardElevation="0dp"
-            app:strokeColor="@color/status_orange"
-            app:strokeWidth="1dp">
+                    <!-- Active Nap Live Countdown & Controls (Shown when Nap is Active) -->
+                    <LinearLayout
+                        android:id="@+id/layoutNapActiveControls"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
 
-            <LinearLayout
+                        <TextView
+                            android:id="@+id/tvHeroNapCountdown"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_active_shields_pill"
+                            android:gravity="center"
+                            android:paddingHorizontal="14dp"
+                            android:paddingVertical="8dp"
+                            android:textColor="@color/status_green"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            tools:text="قيلولة نشطة (59:45)" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnHeroNapExtend"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:text="@string/btn_hero_nap_extend"
+                            android:textSize="12sp"
+                            app:cornerRadius="12dp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvNapSubtext"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/card_nap_subtext"
+                        android:textColor="?attr/colorOutline"
+                        android:textSize="12sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnGrantUsageAccess"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/btn_grant_usage_access"
+                        android:textColor="@color/status_orange"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Status Card (Shown if auxiliary enforcement needed) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardHomeNotice"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:layout_marginTop="16dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/shield_amber_calm"
+                app:strokeWidth="1.5dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/card_adb_help_title"
-                    android:textColor="@color/status_orange"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvAdbHelpCmd"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:fontFamily="monospace"
-                    android:text="@string/card_adb_help_cmd"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="12sp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-    </LinearLayout>
-</ScrollView>
+                    <TextView
+                        android:id="@+id/tvHomeNoticeTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_shield_status_badge_amber"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="4dp"
+                        android:text="@string/status_need_enforce_title"
+                        android:textColor="@color/shield_amber_calm"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvHomeNoticeDesc"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:lineSpacingExtra="2dp"
+                        android:text="@string/status_need_enforce_desc"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="13sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnEnforceNow"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/btn_enforce_now"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="12dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ADB Setup Warning (Only if NOT device owner) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardAdbHelp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:cardCornerRadius="18dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/status_orange"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/card_adb_help_title"
+                        android:textColor="@color/status_orange"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvAdbHelpCmd"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:fontFamily="monospace"
+                        android:text="@string/card_adb_help_cmd"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

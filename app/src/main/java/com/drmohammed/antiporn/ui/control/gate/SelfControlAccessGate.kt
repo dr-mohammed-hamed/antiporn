@@ -48,7 +48,7 @@ object OpenAccessGate : SelfControlAccessGate {
             val policy = try {
                 com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(activity.applicationContext).getCurrentPolicy()
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to retrieve local policy in requestAccess", e)
+                Log.w(TAG, "[SelfControlDiag] Failed to retrieve local policy in requestAccess", e)
                 null
             }
             val msgRes = if (policy?.isSupervised == true && !policy.isSelfControlAllowed) {
@@ -84,27 +84,42 @@ object SelfControlAccessGateRegistry {
         val policy = try {
             com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context.applicationContext).getCurrentPolicy()
         } catch (e: Exception) {
-            Log.w(TAG, "Failed retrieving local policy in isSelfControlPermitted", e)
+            Log.w(TAG, "[SelfControlDiag] Failed retrieving local policy in isSelfControlPermitted", e)
             null
         }
 
-        val isSupervised = (policy?.isSupervised == true) || try {
+        val hasGuardianPartner = try {
+            com.drmohammed.antiporn.data.local.db.AntiPornDatabase.getInstance(context.applicationContext)
+                .getPartnersByRole(com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN)
+                .any { it.status == com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.STATUS_ACTIVE }
+        } catch (e: Exception) {
+            false
+        }
+
+        val hasGuardianUid = !policy?.guardianUid.isNullOrBlank()
+
+        val isSupervised = (policy?.isSupervised == true) || hasGuardianUid || hasGuardianPartner || try {
             com.drmohammed.antiporn.data.repository.AccountabilityRepository.getInstance(context.applicationContext).isSupervised()
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to check accountability supervision in isSelfControlPermitted", e)
+            Log.w(TAG, "[SelfControlDiag] Failed to check accountability supervision in isSelfControlPermitted", e)
             true
         }
 
-        if (isSupervised) {
+        val isAllowed = policy?.isSelfControlAllowed ?: true
+
+        val permitted = if (isSupervised) {
             if (policy == null) {
-                Log.w(TAG, "Precautionary lockout: policy cannot be retrieved on supervised device")
-                return false
+                Log.w(TAG, "[SelfControlDiag] Precautionary lockout: policy cannot be retrieved on supervised device")
+                false
+            } else {
+                isAllowed
             }
-            if (!policy.isSelfControlAllowed) {
-                return false
-            }
+        } else {
+            true
         }
-        return true
+
+        Log.i(TAG, "[SelfControlDiag] isSelfControlPermitted evaluated: isSupervised=$isSupervised (policySupervised=${policy?.isSupervised}, hasGuardianUid=$hasGuardianUid, hasGuardianPartner=$hasGuardianPartner), isSelfControlAllowed=$isAllowed => PERMITTED=$permitted")
+        return permitted
     }
 
     fun getActiveGate(): SelfControlAccessGate {
@@ -114,16 +129,20 @@ object SelfControlAccessGateRegistry {
             override val displayNameResId: Int get() = delegate.displayNameResId
 
             override fun canAccess(context: Context): Boolean {
-                if (!isSelfControlPermitted(context)) return false
-                return delegate.canAccess(context)
+                val permitted = isSelfControlPermitted(context)
+                val delegateAllowed = if (permitted) delegate.canAccess(context) else false
+                Log.i(TAG, "[SelfControlDiag] Gate (${delegate.gateId}) canAccess: permitted=$permitted, delegateAllowed=$delegateAllowed")
+                return permitted && delegateAllowed
             }
 
             override fun requestAccess(activity: Activity, onGranted: () -> Unit) {
-                if (!isSelfControlPermitted(activity)) {
+                val permitted = isSelfControlPermitted(activity)
+                Log.i(TAG, "[SelfControlDiag] Gate (${delegate.gateId}) requestAccess: permitted=$permitted")
+                if (!permitted) {
                     val policy = try {
                         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(activity.applicationContext).getCurrentPolicy()
                     } catch (e: Exception) {
-                        Log.w(TAG, "Failed to retrieve local policy in requestAccess", e)
+                        Log.w(TAG, "[SelfControlDiag] Failed to retrieve local policy in requestAccess", e)
                         null
                     }
                     val msgRes = if (policy?.isSupervised == true && !policy.isSelfControlAllowed) {
@@ -143,4 +162,3 @@ object SelfControlAccessGateRegistry {
         activeGate = gate
     }
 }
-

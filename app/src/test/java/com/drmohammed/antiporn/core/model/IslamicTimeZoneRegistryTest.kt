@@ -15,11 +15,10 @@ class IslamicTimeZoneRegistryTest {
         assertEquals(11, options.size)
 
         val defaultOption = IslamicTimeZoneRegistry.getDefaultOption()
-        assertEquals("Asia/Riyadh", defaultOption.ianaTimeZoneId)
-        assertEquals("GMT+3", defaultOption.gmtOffsetLabel)
-        assertTrue(defaultOption.majorCities.contains("مكة المكرمة"))
-        assertTrue(defaultOption.majorCities.contains("المدينة المنورة"))
-        assertTrue(defaultOption.majorCities.contains("الرياض"))
+        assertEquals("Africa/Cairo", defaultOption.ianaTimeZoneId)
+        assertEquals("GMT+2", defaultOption.gmtOffsetLabel)
+        assertTrue(defaultOption.majorCities.contains("القاهرة"))
+        assertTrue(defaultOption.majorCities.contains("القدس الشريف"))
     }
 
     @Test

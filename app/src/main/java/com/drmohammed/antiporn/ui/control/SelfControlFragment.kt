@@ -1,5 +1,7 @@
 package com.drmohammed.antiporn.ui.control
 
+import com.drmohammed.antiporn.core.network.DnsFilteringValidator
+
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
@@ -138,7 +140,7 @@ class SelfControlFragment : Fragment() {
     private var selectedWeekendStartMinute = 30
     private var selectedWeekendEndHour = 7
     private var selectedWeekendEndMinute = 0
-    private var selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
+    private var selectedTimeZoneId = CurfewConfig.DEFAULT_TIMEZONE_ID
 
     private var isSavingPolicy = false
 
@@ -203,11 +205,14 @@ class SelfControlFragment : Fragment() {
         if (!isAdded) return
         val ctx = context ?: return
         val gate = SelfControlAccessGateRegistry.getActiveGate()
-        if (!gate.canAccess(ctx)) {
+        val canAccess = gate.canAccess(ctx)
+        Log.i(TAG, "[SelfControlDiag] SelfControlFragment checkGateAndRefresh: canAccess=$canAccess")
+        if (!canAccess) {
+            Log.w(TAG, "[SelfControlDiag] SelfControlFragment: ACCESS DENIED in checkGateAndRefresh! Redirecting to nav_home.")
             val policy = try {
                 PolicyRepository.getInstance(ctx.applicationContext).getCurrentPolicy()
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to retrieve local policy in checkGateAndRefresh", e)
+                Log.w(TAG, "[SelfControlDiag] Failed to retrieve local policy in checkGateAndRefresh", e)
                 null
             }
             val msgRes = if (policy?.isSupervised == true && !policy.isSelfControlAllowed) {
@@ -533,8 +538,8 @@ class SelfControlFragment : Fragment() {
             }
         }
         btnResetToMakkah?.setOnClickListener {
-            if (selectedTimeZoneId != CurfewConfig.MAKKAH_TIMEZONE_ID) {
-                selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
+            if (selectedTimeZoneId != CurfewConfig.DEFAULT_TIMEZONE_ID) {
+                selectedTimeZoneId = CurfewConfig.DEFAULT_TIMEZONE_ID
                 updateTimezoneViews()
                 updateSaveButtonState()
             }
@@ -636,7 +641,7 @@ class SelfControlFragment : Fragment() {
         selectedWeekendStartMinute = policy.weekendCurfewStartMinute
         selectedWeekendEndHour = policy.weekendCurfewEndHour
         selectedWeekendEndMinute = policy.weekendCurfewEndMinute
-        selectedTimeZoneId = policy.timeZoneId.ifBlank { CurfewConfig.MAKKAH_TIMEZONE_ID }
+        selectedTimeZoneId = policy.timeZoneId.ifBlank { CurfewConfig.DEFAULT_TIMEZONE_ID }
 
         switchCurfewMaster?.isChecked = policy.isCurfewEnabled
         switchWeekendCurfew?.isChecked = policy.isWeekendCurfewEnabled
@@ -784,7 +789,7 @@ class SelfControlFragment : Fragment() {
                 selectedWeekendStartMinute != snapshot.weekendCurfewStartMinute ||
                 selectedWeekendEndHour != snapshot.weekendCurfewEndHour ||
                 selectedWeekendEndMinute != snapshot.weekendCurfewEndMinute ||
-                selectedTimeZoneId != snapshot.timeZoneId.ifBlank { CurfewConfig.MAKKAH_TIMEZONE_ID } ||
+                selectedTimeZoneId != snapshot.timeZoneId.ifBlank { CurfewConfig.DEFAULT_TIMEZONE_ID } ||
                 switchCurfewMaster?.isChecked != snapshot.isCurfewEnabled ||
                 switchWeekendCurfew?.isChecked != snapshot.isWeekendCurfewEnabled ||
                 switchVpnBlackhole?.isChecked != snapshot.isVpnBlackholeEnabled ||
@@ -805,6 +810,14 @@ class SelfControlFragment : Fragment() {
         if (isSavingPolicy || !hasUnsavedChanges()) return
 
         val ctx = context?.applicationContext ?: return
+        val gate = SelfControlAccessGateRegistry.getActiveGate()
+        val canAccess = gate.canAccess(ctx)
+        Log.i(TAG, "[SelfControlDiag] SelfControlFragment: User clicked Save Changes. canAccess=$canAccess")
+        if (!canAccess) {
+            Log.w(TAG, "[SelfControlDiag] SelfControlFragment: Save Changes BLOCKED because access is denied!")
+            Toast.makeText(context ?: ctx, R.string.gate_access_denied_by_guardian, Toast.LENGTH_SHORT).show()
+            return
+        }
         val qrManager = com.drmohammed.antiporn.ui.control.qr.SelfControlQrManager.getInstance(ctx)
 
         val executeSave = {
@@ -835,6 +848,25 @@ class SelfControlFragment : Fragment() {
             )
 
             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                val validationResult = DnsFilteringValidator.validateDnsHost(dnsToSave)
+                if (validationResult is DnsFilteringValidator.ValidationResult.UnfilteredPorn) {
+                    withContext(Dispatchers.Main) {
+                        if (!isAdded || view == null) return@withContext
+                        isSavingPolicy = false
+                        btnSaveSelfControlChanges?.isEnabled = true
+                        tilDnsHost?.error = getString(R.string.dns_probe_error_not_blocking)
+                        etDnsHost?.requestFocus()
+                        context?.let { c ->
+                            com.google.android.material.dialog.MaterialAlertDialogBuilder(c)
+                                .setTitle(R.string.dns_probe_dialog_failed_title)
+                                .setMessage(getString(R.string.dns_probe_error_not_blocking_detail, validationResult.domain, validationResult.resolvedIp))
+                                .setPositiveButton(android.R.string.ok, null)
+                                .show()
+                        }
+                    }
+                    return@launch
+                }
+
                 val success = PolicyRepository.getInstance(ctx).saveAndEnforceSelfPolicy(updatedPolicy)
                 withContext(Dispatchers.Main) {
                     if (!isAdded || view == null) return@withContext

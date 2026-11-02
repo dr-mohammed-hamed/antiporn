@@ -174,7 +174,7 @@ data class DevicePolicyBundle(
 
         fun reconcileLegacyV1(policy: DevicePolicyBundle): DevicePolicyBundle {
             return if (policy.timeZoneId.isBlank()) {
-                policy.copy(timeZoneId = com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID)
+                policy.copy(timeZoneId = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_TIMEZONE_ID)
             } else {
                 policy
             }
@@ -207,14 +207,14 @@ data class DevicePolicyBundle(
             val customBlockedUrls = (map["customBlockedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
             val customAllowedUrls = (map["customAllowedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
-            val dns = (map["dnsHost"] as? String)?.takeIf { it.isNotBlank() } ?: LEGACY_DEFAULT_NEXTDNS_HOST
+            val dns = (map["dnsHost"] as? String)?.takeIf { it.isNotBlank() } ?: ADGUARD_FAMILY_DNS_HOST
 
             val gUid = (map["guardianUid"] as? String)?.takeIf { it.isNotBlank() }
             val gName = (map["guardianName"] as? String)?.takeIf { it.isNotBlank() }
             val supervised = (map["isSupervised"] as? Boolean) ?: (!gUid.isNullOrBlank())
             val isSelfControlAllowed = (map["isSelfControlAllowed"] as? Boolean) ?: true
             val isDateTimeLocked = (map["isDateTimeLocked"] as? Boolean) ?: false
-            val timeZoneId = (map["timeZoneId"] as? String)?.takeIf { it.isNotBlank() } ?: com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
+            val timeZoneId = (map["timeZoneId"] as? String)?.takeIf { it.isNotBlank() } ?: com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_TIMEZONE_ID
             val lastHeartbeat = (map["lastHeartbeat"] as? Number)?.toLong() ?: 0L
             val breakoutStatus = (map["breakoutStatus"] as? String)?.takeIf { it.isNotBlank() }
             val breakoutRequestedAt = (map["breakoutRequestedAt"] as? Number)?.toLong()
@@ -315,13 +315,13 @@ data class DevicePolicyBundle(
                     }
                 }
 
-                val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: LEGACY_DEFAULT_NEXTDNS_HOST
+                val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: ADGUARD_FAMILY_DNS_HOST
                 val gUid = json.optString("guardianUid", "").takeIf { it.isNotBlank() }
                 val gName = json.optString("guardianName", "").takeIf { it.isNotBlank() }
                 val supervised = json.optBoolean("isSupervised", !gUid.isNullOrBlank())
                 val isSelfControlAllowed = json.optBoolean("isSelfControlAllowed", true)
                 val isDateTimeLocked = json.optBoolean("isDateTimeLocked", false)
-                val timeZoneId = json.optString("timeZoneId", com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID).ifBlank { com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID }
+                val timeZoneId = json.optString("timeZoneId", com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_TIMEZONE_ID).ifBlank { com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_TIMEZONE_ID }
                 val lastHeartbeat = json.optLong("lastHeartbeat", 0L)
                 val breakoutStatus = json.optString("breakoutStatus", "").takeIf { it.isNotBlank() }
                 val breakoutRequestedAt = if (json.has("breakoutRequestedAt") && !json.isNull("breakoutRequestedAt")) json.optLong("breakoutRequestedAt") else null

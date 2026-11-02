@@ -82,8 +82,8 @@ class GuardianTimezoneViewBinder(
         }
 
         btnResetToMakkah.setOnClickListener {
-            if (getTimeZoneId() != CurfewConfig.MAKKAH_TIMEZONE_ID) {
-                onTimezoneChanged(CurfewConfig.MAKKAH_TIMEZONE_ID)
+            if (getTimeZoneId() != CurfewConfig.DEFAULT_TIMEZONE_ID) {
+                onTimezoneChanged(CurfewConfig.DEFAULT_TIMEZONE_ID)
             }
         }
     }

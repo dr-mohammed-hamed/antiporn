@@ -28,6 +28,7 @@ import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry
 import com.drmohammed.antiporn.curfew.CurfewConfig
+import com.drmohammed.antiporn.core.network.DnsFilteringValidator
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.ui.accountability.RemoteAppManagerActivity
@@ -143,7 +144,7 @@ class SelfControlActivity : AppCompatActivity() {
     private var selectedWeekendStartMinute = 30
     private var selectedWeekendEndHour = 7
     private var selectedWeekendEndMinute = 0
-    private var selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
+    private var selectedTimeZoneId = CurfewConfig.DEFAULT_TIMEZONE_ID
     private var isSavingPolicy = false
     private val appManagerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (isFinishing || isDestroyed) return@registerForActivityResult
@@ -190,8 +191,10 @@ class SelfControlActivity : AppCompatActivity() {
 
         // Check Pluggable Access Gate
         val gate = SelfControlAccessGateRegistry.getActiveGate()
-        if (!gate.canAccess(this)) {
-            Log.w(TAG, "Access denied by active gate (${gate.gateId})")
+        val canAccessOnCreate = gate.canAccess(this)
+        Log.i(TAG, "[SelfControlDiag] SelfControlActivity onCreate: canAccess=$canAccessOnCreate")
+        if (!canAccessOnCreate) {
+            Log.w(TAG, "[SelfControlDiag] SelfControlActivity: ACCESS DENIED in onCreate! Finishing activity.")
             val policy = try {
                 PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
             } catch (e: Exception) {
@@ -241,10 +244,13 @@ class SelfControlActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                PolicyRepository.getInstance(applicationContext).currentPolicyFlow.collect {
+                PolicyRepository.getInstance(applicationContext).currentPolicyFlow.collect { policy ->
                     if (isFinishing || isDestroyed) return@collect
                     val activeGate = SelfControlAccessGateRegistry.getActiveGate()
-                    if (!activeGate.canAccess(this@SelfControlActivity)) {
+                    val canAccess = activeGate.canAccess(this@SelfControlActivity)
+                    Log.i(TAG, "[SelfControlDiag] SelfControlActivity PolicyFlow received: v${policy.version}, isSupervised=${policy.isSupervised}, isSelfControlAllowed=${policy.isSelfControlAllowed}, canAccess=$canAccess")
+                    if (!canAccess) {
+                        Log.w(TAG, "[SelfControlDiag] SelfControlActivity: LIVE EJECTION! Finishing activity because guardian disabled self-control!")
                         val policy = try {
                             PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
                         } catch (e: Exception) {
@@ -268,7 +274,10 @@ class SelfControlActivity : AppCompatActivity() {
         super.onResume()
         if (isFinishing || isDestroyed) return
         val gate = SelfControlAccessGateRegistry.getActiveGate()
-        if (!gate.canAccess(this)) {
+        val canAccessOnResume = gate.canAccess(this)
+        Log.i(TAG, "[SelfControlDiag] SelfControlActivity onResume: canAccess=$canAccessOnResume")
+        if (!canAccessOnResume) {
+            Log.w(TAG, "[SelfControlDiag] SelfControlActivity: ACCESS DENIED in onResume! Finishing activity.")
             val policy = try {
                 PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
             } catch (e: Exception) {
@@ -498,8 +507,8 @@ class SelfControlActivity : AppCompatActivity() {
         }
 
         btnResetToMakkah.setOnClickListener {
-            if (selectedTimeZoneId != CurfewConfig.MAKKAH_TIMEZONE_ID) {
-                selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
+            if (selectedTimeZoneId != CurfewConfig.DEFAULT_TIMEZONE_ID) {
+                selectedTimeZoneId = CurfewConfig.DEFAULT_TIMEZONE_ID
                 updateTimezoneViews()
                 updateSaveButtonState()
             }
@@ -713,7 +722,7 @@ class SelfControlActivity : AppCompatActivity() {
             selectedWeekendStartMinute = policy.weekendCurfewStartMinute
             selectedWeekendEndHour = policy.weekendCurfewEndHour
             selectedWeekendEndMinute = policy.weekendCurfewEndMinute
-            selectedTimeZoneId = policy.timeZoneId.ifBlank { CurfewConfig.MAKKAH_TIMEZONE_ID }
+            selectedTimeZoneId = policy.timeZoneId.ifBlank { CurfewConfig.DEFAULT_TIMEZONE_ID }
             switchCurfewMaster.isChecked = policy.isCurfewEnabled
             switchWeekendCurfew.isChecked = policy.isWeekendCurfewEnabled
             switchVpnBlackhole.isChecked = policy.isVpnBlackholeEnabled
@@ -851,7 +860,7 @@ class SelfControlActivity : AppCompatActivity() {
                 selectedWeekendStartMinute != snapshot.weekendCurfewStartMinute ||
                 selectedWeekendEndHour != snapshot.weekendCurfewEndHour ||
                 selectedWeekendEndMinute != snapshot.weekendCurfewEndMinute ||
-                selectedTimeZoneId != snapshot.timeZoneId.ifBlank { CurfewConfig.MAKKAH_TIMEZONE_ID } ||
+                selectedTimeZoneId != snapshot.timeZoneId.ifBlank { CurfewConfig.DEFAULT_TIMEZONE_ID } ||
                 switchCurfewMaster.isChecked != snapshot.isCurfewEnabled ||
                 switchWeekendCurfew.isChecked != snapshot.isWeekendCurfewEnabled ||
                 switchVpnBlackhole.isChecked != snapshot.isVpnBlackholeEnabled ||
@@ -887,6 +896,14 @@ class SelfControlActivity : AppCompatActivity() {
 
     private fun saveChanges() {
         if (isSavingPolicy || !hasUnsavedChanges()) return
+        val gate = SelfControlAccessGateRegistry.getActiveGate()
+        val canAccess = gate.canAccess(this)
+        Log.i(TAG, "[SelfControlDiag] SelfControlActivity: User clicked Save Changes. canAccess=$canAccess")
+        if (!canAccess) {
+            Log.w(TAG, "[SelfControlDiag] SelfControlActivity: Save Changes BLOCKED because access is denied!")
+            Toast.makeText(this, R.string.gate_access_denied_by_guardian, Toast.LENGTH_SHORT).show()
+            return
+        }
         val hostInput = etDnsHost.text?.toString()?.trim().orEmpty()
         val dnsToSave = hostInput.ifBlank { DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST }
         val updatedPolicy = currentPolicy.copy(
@@ -931,6 +948,22 @@ class SelfControlActivity : AppCompatActivity() {
         isSavingPolicy = true
         btnSaveSelfControlChanges.isEnabled = false
         lifecycleScope.launch(Dispatchers.IO) {
+            val validationResult = DnsFilteringValidator.validateDnsHost(updatedPolicy.dnsHost)
+            if (validationResult is DnsFilteringValidator.ValidationResult.UnfilteredPorn) {
+                withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
+                    isSavingPolicy = false
+                    btnSaveSelfControlChanges.isEnabled = true
+                    tilDnsHost.error = getString(R.string.dns_probe_error_not_blocking)
+                    etDnsHost.requestFocus()
+                    MaterialAlertDialogBuilder(this@SelfControlActivity)
+                        .setTitle(R.string.dns_probe_dialog_failed_title)
+                        .setMessage(getString(R.string.dns_probe_error_not_blocking_detail, validationResult.domain, validationResult.resolvedIp))
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                }
+                return@launch
+            }
             var success = false
             try {
                 success = PolicyRepository.getInstance(applicationContext).saveAndEnforceSelfPolicy(updatedPolicy)

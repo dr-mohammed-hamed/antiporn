@@ -188,7 +188,7 @@ class DevicePolicyBundleTest {
     }
 
     @Test
-    fun testLegacyPolicyWithoutTimeZone_fallsBackToMakkah() {
+    fun testLegacyPolicyWithoutTimeZone_fallsBackToCairo() {
         val legacyJson = """
             {
                 "curfewStartHour": 20,
@@ -197,7 +197,7 @@ class DevicePolicyBundleTest {
             }
         """.trimIndent()
         val parsed = DevicePolicyBundle.fromJson(legacyJson)
-        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, parsed.timeZoneId)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_TIMEZONE_ID, parsed.timeZoneId)
         assertFalse(parsed.isDateTimeLocked)
         assertTrue(parsed.isSelfControlAllowed)
 
@@ -206,13 +206,13 @@ class DevicePolicyBundleTest {
             "curfewStartMinute" to 0
         )
         val fromMap = DevicePolicyBundle.fromMap(legacyMap)
-        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, fromMap.timeZoneId)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_TIMEZONE_ID, fromMap.timeZoneId)
         assertFalse(fromMap.isDateTimeLocked)
         assertTrue(fromMap.isSelfControlAllowed)
 
         val emptyTzPolicy = DevicePolicyBundle(timeZoneId = "")
         val reconciled = DevicePolicyBundle.reconcileLegacyV1(emptyTzPolicy)
-        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID, reconciled.timeZoneId)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_TIMEZONE_ID, reconciled.timeZoneId)
     }
 
     @Test

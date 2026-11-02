@@ -170,10 +170,11 @@ class PolicyRepository private constructor(context: Context) {
         }
         try {
             val firestore = FirebaseFirestore.getInstance()
+            Log.i(TAG, "[SelfControlDiag] attachPolicyListener: Attaching Firestore listener to /policies/$uid")
             firestoreListener = firestore.collection("policies").document(uid)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
-                        Log.w(TAG, "Error listening to cloud policy updates: ${error.message}")
+                        Log.e(TAG, "[SelfControlDiag] Firestore Snapshot ERROR on /policies/$uid: ${error.message} (code=${error.code})")
                         return@addSnapshotListener
                     }
                     if (snapshot != null && snapshot.exists()) {
@@ -184,8 +185,10 @@ class PolicyRepository private constructor(context: Context) {
                                     val cloudPolicy = DevicePolicyBundle.fromMap(data)
                                     val current = _currentPolicyFlow.value
                                     val statusChanged = cloudPolicy.breakoutStatus != current.breakoutStatus
-                                    if (cloudPolicy.version > current.version || (cloudPolicy.version == current.version && cloudPolicy.updatedAt > current.updatedAt) || statusChanged) {
-                                        Log.i(TAG, "Received policy update from cloud (v${cloudPolicy.version}, breakout=${cloudPolicy.breakoutStatus})")
+                                    val isVersionNewer = cloudPolicy.version > current.version || (cloudPolicy.version == current.version && cloudPolicy.updatedAt > current.updatedAt)
+                                    Log.i(TAG, "[SelfControlDiag] Cloud policy received on ward /policies/$uid: cloudPolicy(v${cloudPolicy.version}, supervised=${cloudPolicy.isSupervised}, allowed=${cloudPolicy.isSelfControlAllowed}, guardian='${cloudPolicy.guardianUid}') vs local(v${current.version}, supervised=${current.isSupervised}, allowed=${current.isSelfControlAllowed}), isVersionNewer=$isVersionNewer, statusChanged=$statusChanged")
+                                    if (isVersionNewer || statusChanged) {
+                                        Log.i(TAG, "[SelfControlDiag] Cloud policy ACCEPTED! Enforcing update on device...")
                                         val wasSupervised = current.isSupervised
                                         val isNowSupervised = cloudPolicy.isSupervised
 
@@ -226,6 +229,7 @@ class PolicyRepository private constructor(context: Context) {
      */
     fun updateLocalPolicyAndEnforce(bundle: DevicePolicyBundle) {
         val current = _currentPolicyFlow.value
+        Log.i(TAG, "[SelfControlDiag] updateLocalPolicyAndEnforce: v${bundle.version}, isSupervised=${bundle.isSupervised}, isSelfControlAllowed=${bundle.isSelfControlAllowed}")
         val isBreakoutStatusChange = bundle.breakoutStatus != current.breakoutStatus
         if (!isBreakoutStatusChange && (bundle.version < current.version || (bundle.version == current.version && bundle.updatedAt < current.updatedAt))) {
             Log.w(TAG, "Monotonic guard: rejected stale/out-of-order policy v${bundle.version}@${bundle.updatedAt} (current is v${current.version}@${current.updatedAt})")
@@ -284,7 +288,7 @@ class PolicyRepository private constructor(context: Context) {
                         val validTz = if (com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(bundle.timeZoneId)) {
                             bundle.timeZoneId
                         } else {
-                            com.drmohammed.antiporn.curfew.CurfewConfig.MAKKAH_TIMEZONE_ID
+                            com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_TIMEZONE_ID
                         }
                         try {
                             TimeZone.setDefault(null)
@@ -447,15 +451,16 @@ class PolicyRepository private constructor(context: Context) {
      * Saves policy to Firestore for a specific target ward UID (invoked from Guardian interface).
      */
     suspend fun pushPolicyToWard(wardUid: String, bundle: DevicePolicyBundle): Boolean {
+        Log.i(TAG, "[SelfControlDiag] pushPolicyToWard: writing to Firestore /policies/$wardUid: isSelfControlAllowed=${bundle.isSelfControlAllowed}, isSupervised=${bundle.isSupervised}, version=${bundle.version}")
         return try {
             val firestore = FirebaseFirestore.getInstance()
             firestore.collection("policies").document(wardUid)
                 .set(bundle.toMap())
                 .await()
-            Log.i(TAG, "Successfully pushed policy update to ward $wardUid")
+            Log.i(TAG, "[SelfControlDiag] pushPolicyToWard SUCCESS for wardUid=$wardUid (isSelfControlAllowed=${bundle.isSelfControlAllowed}, v${bundle.version})")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed pushing policy update to ward $wardUid", e)
+            Log.e(TAG, "[SelfControlDiag] pushPolicyToWard FAILED for wardUid=$wardUid: ${e.message}", e)
             false
         }
     }
@@ -473,9 +478,10 @@ class PolicyRepository private constructor(context: Context) {
                 Log.w(TAG, "Failed to query accountability supervision in saveAndEnforceSelfPolicy", e)
                 false
             }
+            Log.i(TAG, "[SelfControlDiag] saveAndEnforceSelfPolicy called: isSupervised=$isSupervised, current.isSelfControlAllowed=${current.isSelfControlAllowed}, bundle.isSelfControlAllowed=${bundle.isSelfControlAllowed}")
 
             if (isSupervised && (!current.isSelfControlAllowed || !bundle.isSelfControlAllowed)) {
-                Log.w(TAG, "saveAndEnforceSelfPolicy rejected: self-control is disabled by supervisor")
+                Log.w(TAG, "[SelfControlDiag] saveAndEnforceSelfPolicy REJECTED: self-control is disabled by supervisor! (current.allowed=${current.isSelfControlAllowed}, bundle.allowed=${bundle.isSelfControlAllowed})")
                 return@withContext false
             }
 

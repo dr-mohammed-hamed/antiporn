@@ -42,16 +42,16 @@ object IslamicTimeZoneRegistry {
 
     private val OPTIONS: List<TimeZoneOption> = listOf(
         TimeZoneOption(
-            id = "Asia/Riyadh",
-            gmtOffsetLabel = "GMT+3",
-            majorCities = "مكة المكرمة / المدينة المنورة / الرياض / إسطنبول / بغداد / صنعاء / الدوحة",
-            ianaTimeZoneId = "Asia/Riyadh"
-        ),
-        TimeZoneOption(
             id = "Africa/Cairo",
             gmtOffsetLabel = "GMT+2",
             majorCities = "القاهرة / القدس الشريف / طرابلس / الخرطوم / عمّان / بيروت / دمشق",
             ianaTimeZoneId = "Africa/Cairo"
+        ),
+        TimeZoneOption(
+            id = "Asia/Riyadh",
+            gmtOffsetLabel = "GMT+3",
+            majorCities = "مكة المكرمة / المدينة المنورة / الرياض / إسطنبول / بغداد / صنعاء / الدوحة",
+            ianaTimeZoneId = "Asia/Riyadh"
         ),
         TimeZoneOption(
             id = "Africa/Algiers",

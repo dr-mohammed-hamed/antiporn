@@ -14,7 +14,7 @@ import java.util.TimeZone
 class CurfewTest {
 
     private fun createCalendar(hourOfDay: Int, minute: Int, dayOfWeek: Int = Calendar.WEDNESDAY): Calendar {
-        return Calendar.getInstance(TimeZone.getTimeZone(CurfewConfig.MAKKAH_TIMEZONE_ID)).apply {
+        return Calendar.getInstance(TimeZone.getTimeZone(CurfewConfig.DEFAULT_TIMEZONE_ID)).apply {
             set(Calendar.DAY_OF_WEEK, dayOfWeek)
             set(Calendar.HOUR_OF_DAY, hourOfDay)
             set(Calendar.MINUTE, minute)

@@ -236,11 +236,10 @@ class HomeFragment : Fragment() {
                         cardHomeNotice?.visibility = View.VISIBLE
                         tvHomeNoticeTitle?.text = getString(R.string.status_need_enforce_title)
                         tvHomeNoticeDesc?.text = getString(R.string.status_need_enforce_desc)
-
                         tvHeroShieldStatus?.text = getString(R.string.home_shield_inactive)
                         tvHeroShieldStatus?.setTextColor(ContextCompat.getColor(ctx, R.color.shield_amber_calm))
                         tvHeroShieldStatus?.setBackgroundResource(R.drawable.bg_shield_status_badge_amber)
-                        frameHeroShieldGlow?.background = null
+                        frameHeroShieldGlow?.setBackgroundResource(R.drawable.bg_hero_shield_inactive)
                     }
                 } else {
                     cardAdbHelp?.visibility = View.VISIBLE
@@ -251,7 +250,7 @@ class HomeFragment : Fragment() {
                     tvHeroShieldStatus?.text = getString(R.string.home_shield_inactive)
                     tvHeroShieldStatus?.setTextColor(ContextCompat.getColor(ctx, R.color.shield_amber_calm))
                     tvHeroShieldStatus?.setBackgroundResource(R.drawable.bg_shield_status_badge_amber)
-                    frameHeroShieldGlow?.background = null
+                    frameHeroShieldGlow?.setBackgroundResource(R.drawable.bg_hero_shield_inactive)
                 }
             }
         }

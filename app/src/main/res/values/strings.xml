@@ -6,17 +6,18 @@
     <string name="header_title">حِصن</string>
     <string name="header_title_unified">حِصْن | HISN</string>
     <string name="header_ayah_quran">حِصْنُ الْمُسْلِمِ الرَّقْمِيُّ</string>
+    <string name="header_subtitle_slogan">حِصْنُ الْمُسْلِمِ الرَّقْمِيُّ</string>
     <string name="header_ayah_ref"></string>
 
     <string name="header_subtitle">درع الحماية المشفر بصلاحية Device Owner</string>
 
     <string name="status_active_title">الحماية نشطة ومقفولة</string>
 
-    <string name="status_active_desc">نظام NextDNS مفروض على كامل الجهاز مع حظر الـ VPN وقفل التصفح المتخفي وفرض البحث الآمن.</string>
+    <string name="status_active_desc">درع الـ DNS المضاد للإباحية والإعلانات مفروض على كامل الجهاز مع حظر الـ VPN وقفل التصفح المتخفي وفرض البحث الآمن.</string>
 
     <string name="status_need_enforce_title">الحماية بحاجة لتأكيد التطبيق</string>
 
-    <string name="status_need_enforce_desc">صلاحية Device Owner نشطة، اضغط على الزر أدناه لتطبيق وتثبيت إعدادات NextDNS وحماية المتصفحات.</string>
+    <string name="status_need_enforce_desc">صلاحية Device Owner نشطة، اضغط على الزر أدناه لتطبيق وتثبيت درع الـ DNS وحماية المتصفحات.</string>
 
     <string name="status_no_device_owner_title">صلاحية Device Owner غير مفعلة</string>
 
@@ -30,9 +31,9 @@
 
     <string name="card_device_owner_inactive">غير مفعلة (مطلوب أمر ADB)</string>
 
-    <string name="card_nextdns_title">خادم NextDNS الإجباري المشفر</string>
+    <string name="card_nextdns_title">درع فلترة الـ DNS وحظر الإباحية والإعلانات</string>
 
-    <string name="card_nextdns_default">family.cloudflare-dns.com (مفروض ومقفل)</string>
+    <string name="card_nextdns_default">family.adguard-dns.com (مفروض ومقفل)</string>
 
     <string name="card_nextdns_active">%1$s (مفروض ومقفل)</string>
 
@@ -74,9 +75,10 @@
 
     <string name="btn_enforcing">جاري تطبيق الإعدادات&#8230;</string>
 
-    <string name="toast_enforce_success">تم فرض NextDNS (%1$s) وحظر الـ VPN وقفل التصفح المتخفي بنجاح!</string>
+    <string name="toast_enforce_success">تم تفعيل درع الـ DNS المشفر (%1$s) وحظر الـ VPN وقفل التصفح المتخفي بنجاح!</string>
 
-    <string name="toast_enforce_status_code">تم إرسال إعدادات NextDNS برمز حالة: %1$d</string>
+    <string name="toast_enforce_status_code">تم تفعيل درع الـ DNS بنجاح</string>
+    <string name="shield_dns_fallback_active">تم تفعيل درع الـ DNS بنجاح عبر مسار الحماية البديل</string>
 
     <string name="toast_dpm_missing">فشل الوصول لخدمة DevicePolicyManager</string>
 
@@ -92,7 +94,7 @@
 
     <string name="card_system_tamper_title">حماية النظام ومنع الالتفاف (Anti-Tamper)</string>
 
-    <string name="card_system_tamper_active">قفل التوقيت بمكة (GMT+3)، ومنع الوضع الآمن والفورمات وإلغاء التثبيت</string>
+    <string name="card_system_tamper_active">قفل التوقيت المعتمد، ومنع الوضع الآمن والفورمات وإلغاء التثبيت</string>
 
     <string name="card_system_tamper_inactive">غير مفعلة (يتطلب صلاحية Device Owner)</string>
 
@@ -106,7 +108,7 @@
 
     <string name="shield_browser_success">تم قفل التصفح المتخفي وفرض البحث الآمن بنجاح</string>
 
-    <string name="shield_system_tamper_success">تم قفل التوقيت على مكة المكرمة (GMT+3) وحظر الفورمات وإلغاء التثبيت بنجاح</string>
+    <string name="shield_system_tamper_success">تم قفل التوقيت وحظر الفورمات وإلغاء التثبيت بنجاح</string>
 
     <string name="shield_dns_unsupported">ميزة Private DNS تتطلب أندرويد 10 (API 29) أو أحدث</string>
     <string name="shield_dns_local_filter_active">فلترة محلية نشطة (DoT معطل ومقفل)</string>
@@ -475,10 +477,10 @@
     <string name="guardian_timezone_preview_format">الوقت المقدر الآن في هاتف المكفول: %s</string>
     <string name="guardian_timezone_badge_format">%1$s (%2$s)</string>
     <string name="guardian_timezone_preview_time_format">%1$s (%2$s)</string>
-    <string name="btn_reset_to_makkah">استعادة توقيت مكة المكرمة (الافتراضي)</string>
+    <string name="btn_reset_to_makkah">استعادة توقيت القاهرة (الافتراضي)</string>
     <string name="btn_auto_detect_timezone">كشف التوقيت الحالي تلقائياً</string>
     <string name="timezone_detected_toast">تم ضبط المنطقة الزمنية تلقائياً على: %s</string>
-    <string name="timezone_auto_detect_failed">تعذر الكشف التلقائي، تم استخدام توقيت مكة المكرمة</string>
+    <string name="timezone_auto_detect_failed">تعذر الكشف التلقائي، تم استخدام توقيت القاهرة (الافتراضي)</string>
     <string name="section_timing_and_security_title">إعدادات التوقيت والأمان</string>
     <string name="date_time_lock_standalone_desc">قفل شاشة ضبط الوقت في إعدادات هاتف أندرويد لمنع التلاعب بساعات الحظر</string>
 
@@ -741,7 +743,7 @@
     <string name="shield_active_browser_title">درع قفل التصفح المتخفي والبحث الآمن</string>
     <string name="shield_active_browser_desc">معطل تماماً على جميع المتصفحات مع فرض Google SafeSearch الصارم.</string>
     <string name="shield_active_time_title">درع منع تغيير الوقت والتلاعب</string>
-    <string name="shield_active_time_desc">مقفول بالكامل ومربوط بتوقيت مكة المكرمة ومنع تغيير إعدادات الوقت والتاريخ.</string>
+    <string name="shield_active_time_desc">مقفول بالكامل ومربوط بالتوقيت المعتمد ومنع تغيير إعدادات الوقت والتاريخ.</string>
     <string name="shield_active_freeze_title">درع تجميد التطبيقات الجديدة</string>
     <string name="shield_active_freeze_desc">تجميد وحظر فوري لأي تطبيق يتم تثبيته حتى مراجعته والموافقة عليه.</string>
     <string name="shield_active_vpn_title">درع حظر شبكات الـ VPN</string>

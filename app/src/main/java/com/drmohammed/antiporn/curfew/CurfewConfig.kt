@@ -10,15 +10,17 @@ import java.util.TimeZone
 /**
  * Configuration and immutable constants for the Scheduled Night Curfew system.
  * Curfew window: 20:00 (8:00 PM) to 07:00 (7:00 AM) every day.
- * Timezone: Asia/Riyadh (Makkah Al-Mukarramah, UTC+3).
+ * Default Timezone: Africa/Cairo (Cairo, Egypt).
  */
 object CurfewConfig {
 
+    const val DEFAULT_TIMEZONE_ID = "Africa/Cairo"
+    const val CAIRO_TIMEZONE_ID = "Africa/Cairo"
     const val MAKKAH_TIMEZONE_ID = "Asia/Riyadh"
 
     /**
      * Resolves the default fallback timezone dynamically from the device's system timezone,
-     * validated against known IANA identifiers. Falls back to Makkah (Asia/Riyadh) if unresolvable.
+     * validated against known IANA identifiers. Falls back to Cairo (Africa/Cairo) if unresolvable.
      */
     fun getDefaultFallbackTimeZone(): String {
         return try {
@@ -26,10 +28,10 @@ object CurfewConfig {
             if (!localId.isNullOrBlank() && com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(localId)) {
                 localId
             } else {
-                MAKKAH_TIMEZONE_ID
+                DEFAULT_TIMEZONE_ID
             }
         } catch (_: Exception) {
-            MAKKAH_TIMEZONE_ID
+            DEFAULT_TIMEZONE_ID
         }
     }
 

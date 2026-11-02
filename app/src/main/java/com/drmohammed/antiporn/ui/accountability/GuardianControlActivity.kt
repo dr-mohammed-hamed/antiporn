@@ -121,7 +121,7 @@ class GuardianControlActivity : AppCompatActivity() {
     private var selectedWeekendStartMinute = 30
     private var selectedWeekendEndHour = 7
     private var selectedWeekendEndMinute = 0
-    private var selectedTimeZoneId = CurfewConfig.MAKKAH_TIMEZONE_ID
+    private var selectedTimeZoneId = CurfewConfig.DEFAULT_TIMEZONE_ID
 
     private lateinit var approvalsViewBinder: GuardianApprovalsViewBinder
     private var hasLoadedInitialPolicy = false
@@ -468,7 +468,10 @@ class GuardianControlActivity : AppCompatActivity() {
         )
 
         val switchListener = { _: View, _: Boolean -> updateSaveButtonState() }
-        switchAllowSelfControl.setOnCheckedChangeListener(switchListener)
+        switchAllowSelfControl.setOnCheckedChangeListener { _, isChecked ->
+            Log.i(TAG, "[SelfControlDiag] Guardian toggled switchAllowSelfControl: isChecked=$isChecked")
+            updateSaveButtonState()
+        }
         switchCurfewMaster.setOnCheckedChangeListener(switchListener)
         switchWeekendCurfew.setOnCheckedChangeListener(switchListener)
         switchVpnBlackhole.setOnCheckedChangeListener(switchListener)
@@ -870,6 +873,7 @@ class GuardianControlActivity : AppCompatActivity() {
 
                 val myUid = AccountabilityRepository.getInstance(applicationContext).getCachedUid()
                 val myName = AccountabilityRepository.getInstance(applicationContext).getMyDisplayName()
+                Log.i(TAG, "[SelfControlDiag] Guardian saving policy for wardId='$wardId': isSelfControlAllowed=${switchAllowSelfControl.isChecked}, version=${latestPolicy.version + 1}, myUid='$myUid'")
                 val updatedPolicy = latestPolicy.copy(
                     guardianUid = latestPolicy.guardianUid?.takeIf { it.isNotBlank() } ?: myUid,
                     guardianName = latestPolicy.guardianName?.takeIf { it.isNotBlank() } ?: myName,
@@ -901,6 +905,7 @@ class GuardianControlActivity : AppCompatActivity() {
                     updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(applicationContext)
                 )
                 val success = policyRepo.pushPolicyToWard(wardId, updatedPolicy)
+                Log.i(TAG, "[SelfControlDiag] pushPolicyToWard finished: success=$success for wardId='$wardId'")
                 if (isFinishing || isDestroyed) return@launch
                 if (success) {
                     alertsViewBinder.hideSelfControlAlert()

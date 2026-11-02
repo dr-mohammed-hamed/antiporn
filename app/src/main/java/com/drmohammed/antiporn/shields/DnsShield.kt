@@ -11,14 +11,18 @@ import com.drmohammed.antiporn.core.contract.ProtectionShield
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
+import com.drmohammed.antiporn.ui.shields.ActiveShieldsEvaluator
 
 /**
- * Isolated security shield enforcing NextDNS over TLS and locking DNS settings.
+ * Isolated security shield enforcing AntiPorn DNS over TLS and locking DNS settings.
  * Adheres strictly to the Check-Before-Write rule to avoid observer loops.
+ * Supports dual-tier fallback (DPM -> Settings.Global -> Local Filter) to gracefully
+ * handle OEM restrictions (such as Oppo/Realme ColorOS code 1).
  */
 object DnsShield : ProtectionShield {
 
     private const val TAG = "AntiPorn_DnsShield"
+    const val DEFAULT_DNS_HOST = com.drmohammed.antiporn.core.model.DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST
     const val NEXTDNS_HOST = "family.cloudflare-dns.com"
 
     override val id: String = "dns"
@@ -27,10 +31,10 @@ object DnsShield : ProtectionShield {
     fun getEffectiveDnsHost(context: Context): String {
         return try {
             val policy = com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy()
-            policy.dnsHost.takeIf { it.isNotBlank() } ?: com.drmohammed.antiporn.core.model.DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST
+            policy.dnsHost.takeIf { it.isNotBlank() } ?: DEFAULT_DNS_HOST
         } catch (e: Exception) {
             Log.w(TAG, "Failed to read policy for DNS host, falling back to default", e)
-            com.drmohammed.antiporn.core.model.DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST
+            DEFAULT_DNS_HOST
         }
     }
 
@@ -55,11 +59,12 @@ object DnsShield : ProtectionShield {
         val targetHost = getEffectiveDnsHost(context)
 
         try {
-            // Constitutional Law (Article 2): Primary protection is enforced encrypted DNS (DoT) via DPM
+            // Constitutional Law (Article 2): Primary protection is enforced encrypted DNS (DoT)
             // Check-Before-Write: Only set if not already matching target host and mode
             val currentMode = try { dpm.getGlobalPrivateDnsMode(admin) } catch (e: Exception) { -1 }
             val currentHost = try { dpm.getGlobalPrivateDnsHost(admin) } catch (e: Exception) { null }
 
+            var dpmSucceeded = false
             if (dpm.isDeviceOwnerApp(context.packageName)) {
                 if (currentMode != DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME || currentHost != targetHost) {
                     dnsSetResult = try {
@@ -69,11 +74,18 @@ object DnsShield : ProtectionShield {
                         DevicePolicyManager.PRIVATE_DNS_SET_ERROR_FAILURE_SETTING
                     }
                     Log.i(TAG, "setGlobalPrivateDnsModeSpecifiedHost to $targetHost, result: $dnsSetResult")
+                    dpmSucceeded = (dnsSetResult == DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR)
                 } else {
                     Log.d(TAG, "Private DNS already set to $targetHost via DPM, skipping redundant write")
+                    dpmSucceeded = true
                 }
-            } else {
-                Log.i(TAG, "Running under Profile Owner: applying DNS via Settings.Global with WRITE_SECURE_SETTINGS")
+            }
+
+            // Dual-Tier Fallback: If DPM failed (e.g. ColorOS error code 1) or running under Profile Owner,
+            // enforce via Settings.Global with WRITE_SECURE_SETTINGS.
+            var usedFallback = false
+            if (!dpmSucceeded) {
+                Log.i(TAG, "DPM direct set unsuccessful ($dnsSetResult). Attempting Settings.Global fallback...")
                 try {
                     val globalMode = android.provider.Settings.Global.getString(context.contentResolver, "private_dns_mode")
                     val globalHost = android.provider.Settings.Global.getString(context.contentResolver, "private_dns_specifier")
@@ -83,8 +95,10 @@ object DnsShield : ProtectionShield {
                         Log.i(TAG, "Enforced private DNS via Settings.Global to $targetHost")
                     }
                     dnsSetResult = DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR
+                    usedFallback = true
                 } catch (e: Exception) {
-                    Log.w(TAG, "Could not write Settings.Global for private DNS under Profile Owner", e)
+                    Log.w(TAG, "Could not write Settings.Global for private DNS, falling back to local VPN filter", e)
+                    // Local VPN will handle the filtering seamlessly
                     dnsSetResult = DevicePolicyManager.PRIVATE_DNS_SET_ERROR_FAILURE_SETTING
                 }
             }
@@ -106,10 +120,10 @@ object DnsShield : ProtectionShield {
             }
 
             val success = dnsSetResult == DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR
-            val msg = if (success) {
-                context.getString(R.string.shield_dns_success)
-            } else {
-                context.getString(R.string.toast_enforce_status_code, dnsSetResult)
+            val msg = when {
+                success && !usedFallback -> context.getString(R.string.shield_dns_success)
+                success && usedFallback -> context.getString(R.string.shield_dns_fallback_active)
+                else -> context.getString(R.string.shield_dns_local_filter_active)
             }
 
             return ShieldResult(
@@ -153,8 +167,9 @@ object DnsShield : ProtectionShield {
             val isConfigured = (modeFromDpm == DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME && !hostFromDpm.isNullOrBlank()) ||
                     (globalMode == "hostname" && !globalSpecifier.isNullOrBlank())
             val isHostMatching = activeHost.equals(targetHost, ignoreCase = true)
+            val isFilteringAdult = ActiveShieldsEvaluator.isHostAdultFiltering(activeHost ?: "")
 
-            if (isConfigured && isHostMatching && !activeHost.isNullOrBlank()) {
+            if (isConfigured && (isHostMatching || isFilteringAdult) && !activeHost.isNullOrBlank()) {
                 ShieldStatus.Active(context.getString(R.string.card_nextdns_active, activeHost))
             } else {
                 val currentHostDisplay = activeHost ?: context.getString(R.string.default_dns_text)

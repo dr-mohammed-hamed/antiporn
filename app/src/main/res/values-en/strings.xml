@@ -5,9 +5,10 @@
     <string name="header_title">Hisn</string>
     <string name="header_title_unified">Hisn | حِصن</string>
     <string name="header_ayah_quran">The Muslim\'s Digital Fortress</string>
+    <string name="header_subtitle_slogan">The Muslim\'s Digital Fortress</string>
     <string name="header_ayah_ref"></string>
     <string name="header_subtitle">Encrypted Shield with Device Owner Authority</string>
-    <string name="card_nextdns_title">Family Content Filter &amp; Security (DNS)</string>
+    <string name="card_nextdns_title">AntiPorn &amp; AdBlock DNS Shield</string>
     <string name="card_nextdns_default">Family Filter Server (Enforced &amp; Locked)</string>
     <string name="card_nextdns_locked">Device DNS settings are locked and tamper-proof.</string>
     <string name="watchdog_notification_title">Hisn app is active.</string>
@@ -69,10 +70,10 @@
     <string name="guardian_timezone_preview_format">Estimated current time on chargee\'s phone: %s</string>
     <string name="guardian_timezone_badge_format">%1$s (%2$s)</string>
     <string name="guardian_timezone_preview_time_format">%1$s (%2$s)</string>
-    <string name="btn_reset_to_makkah">Reset to Makkah Time (Default)</string>
+    <string name="btn_reset_to_makkah">Reset to Cairo Time (Default)</string>
     <string name="btn_auto_detect_timezone">Auto-Detect Current Timezone</string>
     <string name="timezone_detected_toast">Timezone automatically set to: %s</string>
-    <string name="timezone_auto_detect_failed">Auto-detection unavailable, used Makkah time</string>
+    <string name="timezone_auto_detect_failed">Auto-detection unavailable, used Cairo time</string>
     <string name="section_timing_and_security_title">Timing &amp; Security Settings</string>
     <string name="date_time_lock_standalone_desc">Lock date and time in Android phone settings to prevent tampering with curfew</string>
 
@@ -314,7 +315,7 @@
     <string name="shield_active_browser_title">Incognito Lock &amp; SafeSearch Shield</string>
     <string name="shield_active_browser_desc">Disabled across all browsers with strict Google SafeSearch enforced.</string>
     <string name="shield_active_time_title">Time Tamper Prevention Shield</string>
-    <string name="shield_active_time_desc">Locked completely, synced to Makkah timezone with time/date settings frozen.</string>
+    <string name="shield_active_time_desc">Locked completely, synced to policy timezone with time/date settings frozen.</string>
     <string name="shield_active_freeze_title">New App Freeze Shield</string>
     <string name="shield_active_freeze_desc">Instant freezing and restriction of any new install until supervisor approval.</string>
     <string name="shield_active_vpn_title">VPN Restriction Shield</string>
@@ -429,8 +430,9 @@
     <string name="card_adb_help_cmd">adb shell dpm set-device-owner com.drmohammed.antiporn/.AdminReceiver</string>
     <string name="btn_enforce_now">Enforce Protection Now</string>
     <string name="btn_enforcing">Enforcing Shields...</string>
-    <string name="toast_enforce_success">Enforced NextDNS (%1$s), blocked VPN &amp; private browsing successfully!</string>
-    <string name="toast_enforce_status_code">Enforcement status code: %1$d</string>
+    <string name="toast_enforce_success">Enforced AntiPorn DNS (%1$s), blocked VPN &amp; private browsing successfully!</string>
+    <string name="toast_enforce_status_code">DNS shield applied successfully</string>
+    <string name="shield_dns_fallback_active">DNS shield applied successfully via fallback path</string>
     <string name="toast_dpm_missing">DevicePolicyManager service is unavailable.</string>
     <string name="toast_not_device_owner">App does not have Device Owner authority.</string>
     <string name="toast_error_applying">Error applying protection: %1$s</string>

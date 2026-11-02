@@ -228,10 +228,14 @@ class MainActivity : AppCompatActivity(),
                 }
                 R.id.nav_self_control -> {
                     val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
-                    if (!gate.canAccess(this)) {
+                    val canAccess = gate.canAccess(this)
+                    Log.i(TAG, "[SelfControlDiag] MainActivity: BottomNav nav_self_control clicked. canAccess=$canAccess")
+                    if (!canAccess) {
+                        Log.w(TAG, "[SelfControlDiag] MainActivity: ACCESS DENIED to Self-Control tab! Showing toast.")
                         showSelfControlAccessDeniedMessage()
                         false
                     } else {
+                        Log.i(TAG, "[SelfControlDiag] MainActivity: ACCESS GRANTED to Self-Control tab. Switching fragment.")
                         switchFragment(selfControlFragment)
                         true
                     }
@@ -252,9 +256,12 @@ class MainActivity : AppCompatActivity(),
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(applicationContext).currentPolicyFlow.collect { policy ->
                     if (isFinishing || isDestroyed) return@collect
+                    val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
+                    val canAccess = gate.canAccess(this@MainActivity)
+                    Log.i(TAG, "[SelfControlDiag] MainActivity: PolicyFlow received: v${policy.version}, isSupervised=${policy.isSupervised}, isSelfControlAllowed=${policy.isSelfControlAllowed}, activeFragment=${activeFragment.javaClass.simpleName}, canAccess=$canAccess")
                     if (activeFragment == selfControlFragment) {
-                        val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
-                        if (!gate.canAccess(this@MainActivity)) {
+                        if (!canAccess) {
+                            Log.w(TAG, "[SelfControlDiag] MainActivity: LIVE EJECTION! Ejecting from SelfControl tab to nav_home because guardian disabled self-control!")
                             showSelfControlAccessDeniedMessage()
                             bottomNav.selectedItemId = R.id.nav_home
                         }
@@ -310,7 +317,10 @@ class MainActivity : AppCompatActivity(),
 
     override fun onNavigateToSelfControl() {
         val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
-        if (!gate.canAccess(this)) {
+        val canAccess = gate.canAccess(this)
+        Log.i(TAG, "[SelfControlDiag] MainActivity: onNavigateToSelfControl invoked. canAccess=$canAccess")
+        if (!canAccess) {
+            Log.w(TAG, "[SelfControlDiag] MainActivity: ACCESS DENIED in onNavigateToSelfControl! Showing toast.")
             showSelfControlAccessDeniedMessage()
             return
         }

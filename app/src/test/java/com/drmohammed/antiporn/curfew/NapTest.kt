@@ -11,7 +11,7 @@ import java.util.TimeZone
 class NapTest {
 
     private fun napCalendar(hourOfDay: Int, minute: Int): Calendar =
-        Calendar.getInstance(TimeZone.getTimeZone(CurfewConfig.MAKKAH_TIMEZONE_ID)).apply {
+        Calendar.getInstance(TimeZone.getTimeZone(CurfewConfig.DEFAULT_TIMEZONE_ID)).apply {
             set(Calendar.HOUR_OF_DAY, hourOfDay)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
