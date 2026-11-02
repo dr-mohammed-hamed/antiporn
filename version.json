@@ -1,11 +1,11 @@
 {
-  "versionCode": 7,
-  "versionName": "1.6",
+  "versionCode": 8,
+  "versionName": "1.7",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 41913075,
+  "fileSizeBytes": 41986859,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.6: اعتماد نظام الرقابة الصارم (Zero-Trust) لحظر تشغيل التطبيقات غير المصرح بها مسبقاً من المشرف، تفعيل منظومة حظر وتصفية المواقع عبر VPN المشفر ومخدمات DNS المحلية، وتحسين استقرار شاشات لوحة التحكم وتجنب التجميد.",
+  "releaseNotes": "إصدار 1.7: إضافة نظام الفحص والتشخيص اللحظي (AI Telemetry & Diagnostics)، وبوابة تنفيذ أوامر الحماية المؤسسية الآمنة (SafeDpmGateway)، ومعالج الانهيارات الشامل (GlobalCrashHandler)، وإمكانية مشاركة تقرير الفحص والتشخيص للذكاء الاصطناعي مباشرة من الإعدادات.",
   "releaseDate": "2026-11-02"
 }
