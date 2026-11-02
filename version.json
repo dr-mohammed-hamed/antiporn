@@ -1,11 +1,11 @@
 {
-  "versionCode": 6,
-  "versionName": "1.5",
+  "versionCode": 7,
+  "versionName": "1.6",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 41904883,
+  "fileSizeBytes": 41913075,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.5: كشف وضبط التوقيت الزمني تلقائياً بدقة عالية مع حفظ توقيت مكة المكرمة كافتراضي، فصل قفل التاريخ والوقت عن المنطقة الزمنية، نظام التنبيهات والاستعادة الذاتية للمشرف (Guardian Self-Control Rollback Banner)، وتشديد بوابات الأمان والتحكم اللحظي.",
-  "releaseDate": "2026-11-01"
+  "releaseNotes": "إصدار 1.6: اعتماد نظام الرقابة الصارم (Zero-Trust) لحظر تشغيل التطبيقات غير المصرح بها مسبقاً من المشرف، تفعيل منظومة حظر وتصفية المواقع عبر VPN المشفر ومخدمات DNS المحلية، وتحسين استقرار شاشات لوحة التحكم وتجنب التجميد.",
+  "releaseDate": "2026-11-02"
 }
