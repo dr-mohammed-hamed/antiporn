@@ -24,23 +24,27 @@ class AppPolicyRegistryTest {
 
     @Test
     fun testPermanentBlacklist_strictHierarchy() {
-        // Telegram
-        assertTrue(AppPolicyRegistry.isPermanentlyBlacklisted("org.telegram.messenger"))
+        // Under Unified Zero-Trust architecture, no package is permanently blacklisted or silently uninstalled.
+        // Instead, all applications are subject to the supervisor Zero-Trust approval workflow.
+        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("org.telegram.messenger"))
         assertFalse(AppPolicyRegistry.isExemptFromCurfew("org.telegram.messenger"))
-        assertTrue(AppPolicyRegistry.isPermanentlyBlacklisted("org.telegram.messenger.web"))
+        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("org.telegram.messenger.web"))
         assertFalse(AppPolicyRegistry.isExemptFromCurfew("org.telegram.messenger.web"))
 
         // TikTok
-        assertTrue(AppPolicyRegistry.isPermanentlyBlacklisted("com.zhiliaoapp.musically"))
+        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("com.zhiliaoapp.musically"))
         assertFalse(AppPolicyRegistry.isExemptFromCurfew("com.zhiliaoapp.musically"))
 
         // Proxy Browsers
-        assertTrue(AppPolicyRegistry.isPermanentlyBlacklisted("org.torproject.torbrowser"))
-        assertTrue(AppPolicyRegistry.isPermanentlyBlacklisted("org.mozilla.firefox"))
-        assertTrue(AppPolicyRegistry.isPermanentlyBlacklisted("com.duckduckgo.mobile.android"))
+        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("org.torproject.torbrowser"))
+        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("org.mozilla.firefox"))
+        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("com.duckduckgo.mobile.android"))
 
         // Random Chat
-        assertTrue(AppPolicyRegistry.isPermanentlyBlacklisted("chat.ometv"))
+        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("chat.ometv"))
+
+        // Blacklist set must be empty
+        assertTrue(AppPolicyRegistry.getBlacklistedPackages().isEmpty())
     }
 
     @Test

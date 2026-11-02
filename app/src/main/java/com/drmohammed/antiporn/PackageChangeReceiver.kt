@@ -70,29 +70,24 @@ object PackageChangeHandler {
         try {
             bgExecutor.execute {
                 try {
-                    if (AppSuspensionShield.isBlacklisted(packageName)) {
-                        Log.w(TAG, "🚫 [BLACKLIST_DETECTED] Package $packageName is permanently blacklisted. Enforcing instant freeze & silent uninstall...")
-                        AppSuspensionShield.handlePackageAdded(appContext, packageName)
-                    } else {
-                        val approvalRepo = ApprovalRepository.getInstance(appContext)
-                        val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any { it.packageName == packageName && it.isApproved }
-                        val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
+                    val approvalRepo = ApprovalRepository.getInstance(appContext)
+                    val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any { it.packageName == packageName && it.isApproved }
+                    val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
 
-                        Log.w(TAG, "🔍 [ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved")
+                    Log.w(TAG, "🔍 [ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved")
 
-                        if (policy.lockNewInstallsUntilApproved && !isReplacing && !isAlreadyApproved) {
-                            val isImmune = CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)
-                            if (isImmune) {
-                                Log.w(TAG, "🛡️ [IMMUNE_SKIP] Package $packageName is critical system component, launcher, dialer, or keyboard. Skipping freeze.")
-                            } else {
-                                Log.w(TAG, "❄️❄️❄️ [ZERO_TRUST_FREEZE] Strict Zero-Trust active: Freezing new install $packageName in 0ms and submitting approval ticket")
-                                val frozen = approvalRepo.freezeAndSubmitApprovalLocal(packageName)
-                                Log.w(TAG, "❄️❄️❄️ [FREEZE_STATUS] Result of local freeze for $packageName: $frozen")
-                            }
+                    if (policy.lockNewInstallsUntilApproved && !isAlreadyApproved) {
+                        val isImmune = CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)
+                        if (isImmune) {
+                            Log.w(TAG, "🛡️ [IMMUNE_SKIP] Package $packageName is critical system component, launcher, dialer, or keyboard. Skipping freeze.")
                         } else {
-                            Log.w(TAG, "⚖️ [CURFEW_EVAL] Package $packageName not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")
-                            CurfewEnforcer.handlePackageAdded(appContext, packageName)
+                            Log.w(TAG, "❄️❄️❄️ [ZERO_TRUST_FREEZE] Strict Zero-Trust active: Freezing unapproved package $packageName (isReplacing=$isReplacing) in 0ms and submitting approval ticket")
+                            val frozen = approvalRepo.freezeAndSubmitApprovalLocal(packageName)
+                            Log.w(TAG, "❄️❄️❄️ [FREEZE_STATUS] Result of local freeze for $packageName: $frozen")
                         }
+                    } else {
+                        Log.w(TAG, "⚖️ [CURFEW_EVAL] Package $packageName approved or not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")
+                        CurfewEnforcer.handlePackageAdded(appContext, packageName)
                     }
 
                     if (AppPolicyRegistry.isRestrictedBrowser(packageName)) {
@@ -144,9 +139,16 @@ object PackageChangeHandler {
     fun handlePackageRemoved(
         context: Context,
         packageName: String,
+        isReplacing: Boolean = false,
         source: String,
         onComplete: (() -> Unit)? = null
     ) {
+        if (isReplacing) {
+            Log.i(TAG, "⏩ [PACKAGE_UPDATING] Package $packageName is being replaced/updated. Preserving approval records & watcher state.")
+            onComplete?.invoke()
+            return
+        }
+
         val now = SystemClock.elapsedRealtime()
         if (handledRemoveEvents.size > 100) {
             handledRemoveEvents.entries.removeIf { now - it.value > 600_000L }
@@ -223,10 +225,16 @@ class PackageChangeReceiver : BroadcastReceiver() {
 
             Intent.ACTION_PACKAGE_REMOVED -> {
                 if (packageName.isNullOrBlank()) return
+                val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+                if (isReplacing) {
+                    Log.i(TAG, "⏩ [STATIC_RECEIVER] Package $packageName is being replaced/updated (EXTRA_REPLACING=true). Ignoring temporary removal.")
+                    return
+                }
                 val pendingResult = goAsync()
                 PackageChangeHandler.handlePackageRemoved(
                     context = context,
                     packageName = packageName,
+                    isReplacing = isReplacing,
                     source = "Static_Manifest",
                     onComplete = { pendingResult.finish() }
                 )

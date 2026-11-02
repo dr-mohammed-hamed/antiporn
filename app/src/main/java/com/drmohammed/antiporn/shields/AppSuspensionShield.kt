@@ -182,27 +182,8 @@ object AppSuspensionShield : ProtectionShield {
 
     @SuppressLint("MissingPermission")
     fun uninstallSilently(context: Context, packageName: String) {
-        try {
-            val packageInstaller = context.packageManager?.packageInstaller ?: run {
-                Log.e(TAG, "PackageInstaller not available for $packageName")
-                return
-            }
-            val intent = Intent(ACTION_UNINSTALL_STATUS).apply {
-                setPackage(context.packageName)
-                putExtra(PackageInstaller.EXTRA_PACKAGE_NAME, packageName)
-            }
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
-            }
-            val requestCode = Math.abs(packageName.hashCode())
-            val pendingIntent = PendingIntent.getBroadcast(context, requestCode, intent, flags)
-            packageInstaller.uninstall(packageName, pendingIntent.intentSender)
-            Log.i(TAG, "Requested silent uninstallation for $packageName")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to request silent uninstall for $packageName", e)
-        }
+        Log.w(TAG, "Silent uninstallation is permanently disabled under Unified Zero-Trust architecture. Skipping uninstall for $packageName")
+        return
     }
 
     fun freezeAndUninstall(context: Context, dpm: DevicePolicyManager, admin: ComponentName, packageName: String) {
