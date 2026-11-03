@@ -49,6 +49,7 @@ class AppInventoryManager private constructor(context: Context) {
         }
 
         val customCurfewWhitelist = policy?.customCurfewWhitelistPackages ?: emptySet()
+        val curfewVpnBypass = policy?.curfewVpnBypassPackages ?: emptySet()
         val customBlacklist = policy?.customBlacklistPackages ?: emptySet()
         val protectedPackages = policy?.protectedAppPackages ?: emptySet()
 
@@ -118,6 +119,7 @@ class AppInventoryManager private constructor(context: Context) {
 
                 val isSuspended = isDpmSuspended || customBlacklist.contains(pkg)
                 val isCurfewWhitelisted = customCurfewWhitelist.contains(pkg)
+                val isCurfewVpnBypassed = curfewVpnBypass.contains(pkg)
                 val isProtected = protectedPackages.contains(pkg)
 
                 InstalledAppDto(
@@ -126,6 +128,7 @@ class AppInventoryManager private constructor(context: Context) {
                     isSystem = isSystem,
                     isSuspended = isSuspended,
                     isCurfewWhitelisted = isCurfewWhitelisted,
+                    isCurfewVpnBypassed = isCurfewVpnBypassed,
                     isProtected = isProtected,
                     updatedAt = System.currentTimeMillis()
                 )

@@ -76,6 +76,27 @@
             tools:visibility="visible" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchAllowCurfewInternet"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/remote_app_manager_curfew_internet_switch"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvCurfewInternetDisabledHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="-4dp"
+            android:layout_marginBottom="4dp"
+            android:text="@string/remote_app_manager_curfew_internet_disabled_hint"
+            android:textColor="@color/status_orange"
+            android:textSize="11sp"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/switchProtect"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

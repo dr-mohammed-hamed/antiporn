@@ -169,7 +169,15 @@ object CurfewConfig {
     fun getVpnBypassedPackages(context: Context): Set<String> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val custom = prefs.getStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, emptySet())?.toSet() ?: emptySet()
-        return custom + context.packageName
+        val policyPackages = try {
+            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context)
+                .getCurrentPolicy().curfewVpnBypassPackages
+        } catch (e: Exception) {
+            android.util.Log.w("AntiPorn_CurfewConfig", "Failed to retrieve policy curfew VPN bypass packages, falling back to prefs", e)
+            null
+        }
+        val effectivePackages = policyPackages ?: custom
+        return effectivePackages + context.packageName
     }
 
     fun setVpnBypassedPackages(context: Context, packages: Set<String>) {

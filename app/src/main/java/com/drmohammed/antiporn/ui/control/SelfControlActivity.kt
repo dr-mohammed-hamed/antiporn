@@ -750,11 +750,13 @@ class SelfControlActivity : AppCompatActivity() {
         currentPolicy = currentPolicy.copy(
             customBlacklistPackages = latestPolicy.customBlacklistPackages,
             customCurfewWhitelistPackages = latestPolicy.customCurfewWhitelistPackages,
+            curfewVpnBypassPackages = latestPolicy.curfewVpnBypassPackages,
             protectedAppPackages = latestPolicy.protectedAppPackages
         )
         initialPolicySnapshot = initialPolicySnapshot?.copy(
             customBlacklistPackages = latestPolicy.customBlacklistPackages,
             customCurfewWhitelistPackages = latestPolicy.customCurfewWhitelistPackages,
+            curfewVpnBypassPackages = latestPolicy.curfewVpnBypassPackages,
             protectedAppPackages = latestPolicy.protectedAppPackages
         )
         updateSaveButtonState()

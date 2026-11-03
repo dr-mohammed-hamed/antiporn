@@ -28,6 +28,7 @@ class DevicePolicyBundleTest {
         assertTrue(policy.lockNewInstallsUntilApproved)
         assertTrue(policy.customBlacklistPackages.isEmpty())
         assertTrue(policy.customCurfewWhitelistPackages.isEmpty())
+        assertTrue(policy.curfewVpnBypassPackages.isEmpty())
         assertTrue(policy.protectedAppPackages.isEmpty())
         assertEquals(DevicePolicyBundle.BROWSER_FILTER_OFF, policy.browserFilterMode)
         assertTrue(policy.customBlockedUrls.isEmpty())
@@ -60,6 +61,7 @@ class DevicePolicyBundleTest {
             isDateTimeLocked = true,
             customBlacklistPackages = setOf("com.bad.app1", "com.bad.app2"),
             customCurfewWhitelistPackages = setOf("com.work.app1"),
+            curfewVpnBypassPackages = setOf("com.bypass.app1"),
             protectedAppPackages = setOf("com.vital.app1", "com.vital.app2"),
             browserFilterMode = DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST,
             customBlockedUrls = setOf("badsite.com", "gambling.org"),
@@ -97,6 +99,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.isDateTimeLocked, restored.isDateTimeLocked)
         assertEquals(original.customBlacklistPackages, restored.customBlacklistPackages)
         assertEquals(original.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
+        assertEquals(original.curfewVpnBypassPackages, restored.curfewVpnBypassPackages)
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
         assertEquals(original.browserFilterMode, restored.browserFilterMode)
         assertEquals(original.customBlockedUrls, restored.customBlockedUrls)
@@ -134,6 +137,7 @@ class DevicePolicyBundleTest {
             isDateTimeLocked = true,
             customBlacklistPackages = setOf("pkg.a"),
             customCurfewWhitelistPackages = setOf("pkg.b"),
+            curfewVpnBypassPackages = setOf("pkg.vpn.bypass"),
             protectedAppPackages = setOf("pkg.c"),
             browserFilterMode = DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY,
             customBlockedUrls = setOf("blocked1.com", "blocked2.com"),
@@ -171,6 +175,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.isDateTimeLocked, restored.isDateTimeLocked)
         assertEquals(original.customBlacklistPackages, restored.customBlacklistPackages)
         assertEquals(original.customCurfewWhitelistPackages, restored.customCurfewWhitelistPackages)
+        assertEquals(original.curfewVpnBypassPackages, restored.curfewVpnBypassPackages)
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
         assertEquals(original.browserFilterMode, restored.browserFilterMode)
         assertEquals(original.customBlockedUrls, restored.customBlockedUrls)

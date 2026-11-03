@@ -70,10 +70,12 @@ class RemoteAppManagerActivity : AppCompatActivity() {
     private var currentPolicy = DevicePolicyBundle.defaultPolicy()
     private val customBlacklistPackages = mutableSetOf<String>()
     private val customCurfewWhitelistPackages = mutableSetOf<String>()
+    private val curfewVpnBypassPackages = mutableSetOf<String>()
     private val protectedAppPackages = mutableSetOf<String>()
 
     private var initialBlacklist = emptySet<String>()
     private var initialCurfewWhitelist = emptySet<String>()
+    private var initialCurfewVpnBypass = emptySet<String>()
     private var initialProtectedApps = emptySet<String>()
 
     private lateinit var adapter: RemoteAppsAdapter
@@ -179,8 +181,10 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         adapter = RemoteAppsAdapter(
             customBlacklist = customBlacklistPackages,
             customCurfewWhitelist = customCurfewWhitelistPackages,
+            curfewVpnBypass = curfewVpnBypassPackages,
             protectedApps = protectedAppPackages,
             getInitialCurfewWhitelist = { initialCurfewWhitelist },
+            getInitialCurfewVpnBypass = { initialCurfewVpnBypass },
             onFilterUpdated = { isEmpty ->
                 tvEmptyState.visibility = if (isEmpty) View.VISIBLE else View.GONE
                 rvAppsList.visibility = if (isEmpty) View.GONE else View.VISIBLE
@@ -211,6 +215,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
     private fun hasUnsavedChanges(): Boolean {
         return customBlacklistPackages != initialBlacklist ||
                 customCurfewWhitelistPackages != initialCurfewWhitelist ||
+                curfewVpnBypassPackages != initialCurfewVpnBypass ||
                 protectedAppPackages != initialProtectedApps
     }
 
@@ -255,11 +260,15 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                 customCurfewWhitelistPackages.clear()
                 customCurfewWhitelistPackages.addAll(policy.customCurfewWhitelistPackages)
 
+                curfewVpnBypassPackages.clear()
+                curfewVpnBypassPackages.addAll(policy.curfewVpnBypassPackages)
+
                 protectedAppPackages.clear()
                 protectedAppPackages.addAll(policy.protectedAppPackages)
 
                 initialBlacklist = customBlacklistPackages.toSet()
                 initialCurfewWhitelist = customCurfewWhitelistPackages.toSet()
+                initialCurfewVpnBypass = curfewVpnBypassPackages.toSet()
                 initialProtectedApps = protectedAppPackages.toSet()
 
                 val localApps = com.drmohammed.antiporn.data.repository.AppInventoryManager.getInstance(applicationContext).getInstalledApps()
@@ -313,11 +322,15 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             customCurfewWhitelistPackages.clear()
             customCurfewWhitelistPackages.addAll(currentPolicy.customCurfewWhitelistPackages)
 
+            curfewVpnBypassPackages.clear()
+            curfewVpnBypassPackages.addAll(currentPolicy.curfewVpnBypassPackages)
+
             protectedAppPackages.clear()
             protectedAppPackages.addAll(currentPolicy.protectedAppPackages)
 
             initialBlacklist = customBlacklistPackages.toSet()
             initialCurfewWhitelist = customCurfewWhitelistPackages.toSet()
+            initialCurfewVpnBypass = curfewVpnBypassPackages.toSet()
             initialProtectedApps = protectedAppPackages.toSet()
 
             // 2. Fetch inventory
@@ -343,7 +356,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
 
             // Merge any existing configured packages that may not be in inventory
             val existingPackages = parsedApps.map { it.packageName }.toSet()
-            val extraPackages = (customBlacklistPackages + customCurfewWhitelistPackages + protectedAppPackages)
+            val extraPackages = (customBlacklistPackages + customCurfewWhitelistPackages + curfewVpnBypassPackages + protectedAppPackages)
                 .filter { !existingPackages.contains(it) }
 
             for (orphan in extraPackages) {
@@ -353,6 +366,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                         appName = orphan,
                         isSuspended = customBlacklistPackages.contains(orphan),
                         isCurfewWhitelisted = customCurfewWhitelistPackages.contains(orphan),
+                        isCurfewVpnBypassed = curfewVpnBypassPackages.contains(orphan),
                         isProtected = protectedAppPackages.contains(orphan)
                     )
                 )
@@ -395,6 +409,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             isSupervised = if (!isLocalMode) true else currentPolicy.isSupervised,
             customBlacklistPackages = customBlacklistPackages.toSet(),
             customCurfewWhitelistPackages = customCurfewWhitelistPackages.toSet(),
+            curfewVpnBypassPackages = curfewVpnBypassPackages.toSet(),
             protectedAppPackages = protectedAppPackages.toSet(),
             version = currentPolicy.version + 1,
             updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(applicationContext)
@@ -414,6 +429,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                     if (success) {
                         initialBlacklist = customBlacklistPackages.toSet()
                         initialCurfewWhitelist = customCurfewWhitelistPackages.toSet()
+                        initialCurfewVpnBypass = curfewVpnBypassPackages.toSet()
                         initialProtectedApps = protectedAppPackages.toSet()
                         backPressedCallback.isEnabled = false
                         setResult(RESULT_OK)
@@ -476,7 +492,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         }.filter { it.packageName.isNotBlank() }.toMutableList()
 
         val existingPackages = parsedApps.map { it.packageName }.toSet()
-        val extraPackages = (customBlacklistPackages + customCurfewWhitelistPackages + protectedAppPackages)
+        val extraPackages = (customBlacklistPackages + customCurfewWhitelistPackages + curfewVpnBypassPackages + protectedAppPackages)
             .filter { !existingPackages.contains(it) }
 
         for (orphan in extraPackages) {
@@ -486,6 +502,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                     appName = orphan,
                     isSuspended = customBlacklistPackages.contains(orphan),
                     isCurfewWhitelisted = customCurfewWhitelistPackages.contains(orphan),
+                    isCurfewVpnBypassed = curfewVpnBypassPackages.contains(orphan),
                     isProtected = protectedAppPackages.contains(orphan)
                 )
             )
@@ -534,8 +551,10 @@ class RemoteAppManagerActivity : AppCompatActivity() {
     private class RemoteAppsAdapter(
         private val customBlacklist: MutableSet<String>,
         private val customCurfewWhitelist: MutableSet<String>,
+        private val curfewVpnBypass: MutableSet<String>,
         private val protectedApps: MutableSet<String>,
         private val getInitialCurfewWhitelist: () -> Set<String>,
+        private val getInitialCurfewVpnBypass: () -> Set<String>,
         private val onFilterUpdated: (isEmpty: Boolean) -> Unit,
         private val onStateChanged: () -> Unit
     ) : RecyclerView.Adapter<RemoteAppsAdapter.AppViewHolder>() {
@@ -576,6 +595,8 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             val switchFreeze247: MaterialSwitch = view.findViewById(R.id.switchFreeze247)
             val switchAllowInCurfew: MaterialSwitch = view.findViewById(R.id.switchAllowInCurfew)
             val tvCurfewDisabledHint: TextView = view.findViewById(R.id.tvCurfewDisabledHint)
+            val switchAllowCurfewInternet: MaterialSwitch = view.findViewById(R.id.switchAllowCurfewInternet)
+            val tvCurfewInternetDisabledHint: TextView = view.findViewById(R.id.tvCurfewInternetDisabledHint)
             val switchProtect: MaterialSwitch = view.findViewById(R.id.switchProtect)
         }
 
@@ -600,10 +621,13 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             // Clear listeners before toggling checked state to prevent recycler recycling bugs
             holder.switchFreeze247.setOnCheckedChangeListener(null)
             holder.switchAllowInCurfew.setOnCheckedChangeListener(null)
+            holder.switchAllowCurfewInternet.setOnCheckedChangeListener(null)
             holder.switchProtect.setOnCheckedChangeListener(null)
 
             val isFrozen = customBlacklist.contains(pkg)
             holder.switchFreeze247.isChecked = isFrozen
+
+            val isCurfewAllowed = !isFrozen && customCurfewWhitelist.contains(pkg)
 
             if (isFrozen) {
                 holder.switchAllowInCurfew.isChecked = false
@@ -617,17 +641,68 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                 holder.switchAllowInCurfew.isChecked = customCurfewWhitelist.contains(pkg)
             }
 
+            if (!isCurfewAllowed) {
+                holder.switchAllowCurfewInternet.isChecked = false
+                holder.switchAllowCurfewInternet.isEnabled = false
+                holder.switchAllowCurfewInternet.alpha = 0.4f
+                holder.tvCurfewInternetDisabledHint.visibility = View.VISIBLE
+            } else {
+                holder.switchAllowCurfewInternet.isEnabled = true
+                holder.switchAllowCurfewInternet.alpha = 1.0f
+                holder.tvCurfewInternetDisabledHint.visibility = View.GONE
+                holder.switchAllowCurfewInternet.isChecked = curfewVpnBypass.contains(pkg)
+            }
+
             holder.switchProtect.isChecked = protectedApps.contains(pkg)
+
+            fun bindCurfewInternetSwitchState(allowInCurfew: Boolean, restoreInitial: Boolean = false) {
+                holder.switchAllowCurfewInternet.setOnCheckedChangeListener(null)
+                if (!allowInCurfew) {
+                    curfewVpnBypass.remove(pkg)
+                    holder.switchAllowCurfewInternet.isChecked = false
+                    holder.switchAllowCurfewInternet.isEnabled = false
+                    holder.switchAllowCurfewInternet.alpha = 0.4f
+                    holder.tvCurfewInternetDisabledHint.visibility = View.VISIBLE
+                } else {
+                    holder.switchAllowCurfewInternet.isEnabled = true
+                    holder.switchAllowCurfewInternet.alpha = 1.0f
+                    holder.tvCurfewInternetDisabledHint.visibility = View.GONE
+                    val isChecked = if (restoreInitial) {
+                        val wasInitiallyInternetBypassed = getInitialCurfewVpnBypass().contains(pkg)
+                        if (wasInitiallyInternetBypassed) {
+                            curfewVpnBypass.add(pkg)
+                        } else {
+                            curfewVpnBypass.remove(pkg)
+                        }
+                        wasInitiallyInternetBypassed
+                    } else {
+                        curfewVpnBypass.contains(pkg)
+                    }
+                    holder.switchAllowCurfewInternet.isChecked = isChecked
+                    holder.switchAllowCurfewInternet.setOnCheckedChangeListener { _, isInternetChecked ->
+                        if (isInternetChecked) {
+                            curfewVpnBypass.add(pkg)
+                        } else {
+                            curfewVpnBypass.remove(pkg)
+                        }
+                        onStateChanged()
+                    }
+                }
+            }
 
             holder.switchFreeze247.setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
                     customBlacklist.add(pkg)
                     customCurfewWhitelist.remove(pkg)
+                    curfewVpnBypass.remove(pkg)
+
                     holder.switchAllowInCurfew.setOnCheckedChangeListener(null)
                     holder.switchAllowInCurfew.isChecked = false
                     holder.switchAllowInCurfew.isEnabled = false
                     holder.switchAllowInCurfew.alpha = 0.4f
                     holder.tvCurfewDisabledHint.visibility = View.VISIBLE
+
+                    bindCurfewInternetSwitchState(false)
                 } else {
                     customBlacklist.remove(pkg)
                     holder.switchAllowInCurfew.isEnabled = true
@@ -641,12 +716,15 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                         customCurfewWhitelist.add(pkg)
                     }
 
+                    bindCurfewInternetSwitchState(wasInitiallyWhitelisted, restoreInitial = true)
+
                     holder.switchAllowInCurfew.setOnCheckedChangeListener { _, isCurfewChecked ->
                         if (isCurfewChecked) {
                             customCurfewWhitelist.add(pkg)
                         } else {
                             customCurfewWhitelist.remove(pkg)
                         }
+                        bindCurfewInternetSwitchState(isCurfewChecked)
                         onStateChanged()
                     }
                 }
@@ -658,6 +736,16 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                     customCurfewWhitelist.add(pkg)
                 } else {
                     customCurfewWhitelist.remove(pkg)
+                }
+                bindCurfewInternetSwitchState(isChecked, restoreInitial = false)
+                onStateChanged()
+            }
+
+            holder.switchAllowCurfewInternet.setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
+                    curfewVpnBypass.add(pkg)
+                } else {
+                    curfewVpnBypass.remove(pkg)
                 }
                 onStateChanged()
             }

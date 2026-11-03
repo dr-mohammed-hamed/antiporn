@@ -55,6 +55,9 @@ class CurfewBlackholeVpnService : VpnService() {
     @Volatile
     private var currentMode: VpnMode = VpnMode.IDLE
 
+    @Volatile
+    private var lastBypassedPackages: Set<String>? = null
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         activeService = WeakReference(this)
         startForegroundNotification()
@@ -97,9 +100,18 @@ class CurfewBlackholeVpnService : VpnService() {
         }
 
         if (vpnInterface != null && currentMode == targetMode) {
-            Log.d(TAG, "VPN already in targetMode: $targetMode, updating in-memory filter cache only")
-            refreshBlockedUrlsCache()
-            return
+            if (targetMode == VpnMode.CURFEW_BLACKHOLE) {
+                val currentBypassed = CurfewConfig.getVpnBypassedPackages(this)
+                if (currentBypassed == lastBypassedPackages) {
+                    refreshBlockedUrlsCache()
+                    return
+                }
+                Log.i(TAG, "Curfew bypassed packages changed ($lastBypassedPackages -> $currentBypassed), refreshing blackhole tunnel")
+            } else {
+                Log.d(TAG, "VPN already in targetMode: $targetMode, updating in-memory filter cache only")
+                refreshBlockedUrlsCache()
+                return
+            }
         }
 
         val oldVpnInterface = vpnInterface
@@ -141,6 +153,17 @@ class CurfewBlackholeVpnService : VpnService() {
         // Extensible Curfew Bypass Packages
         if (targetMode == VpnMode.CURFEW_BLACKHOLE) {
             val bypassedPackages = CurfewConfig.getVpnBypassedPackages(this)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? android.app.admin.DevicePolicyManager
+                    val admin = android.content.ComponentName(this, com.drmohammed.antiporn.AdminReceiver::class.java)
+                    if (dpm != null && dpm.isDeviceOwnerApp(packageName)) {
+                        dpm.setAlwaysOnVpnPackage(admin, packageName, true, bypassedPackages)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not update Always-On VPN lockdown bypassed packages", e)
+                }
+            }
             for (pkg in bypassedPackages) {
                 if (pkg == packageName) continue
                 try {
@@ -171,6 +194,12 @@ class CurfewBlackholeVpnService : VpnService() {
             currentMode = targetMode
             Companion.currentMode = targetMode
             isRunning = true
+
+            if (targetMode == VpnMode.CURFEW_BLACKHOLE) {
+                lastBypassedPackages = CurfewConfig.getVpnBypassedPackages(this)
+            } else {
+                lastBypassedPackages = null
+            }
 
             refreshBlockedUrlsCache()
 
@@ -360,6 +389,7 @@ class CurfewBlackholeVpnService : VpnService() {
         isRunning = false
         currentMode = VpnMode.IDLE
         Companion.currentMode = VpnMode.IDLE
+        lastBypassedPackages = null
         stopActiveIoLoop()
         try {
             vpnInterface?.close()

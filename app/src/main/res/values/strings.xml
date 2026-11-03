@@ -505,6 +505,8 @@
     <string name="remote_app_manager_freeze_switch">تجميد دائم 24/7</string>
 
     <string name="remote_app_manager_curfew_switch">متاح في الحظر الليلي</string>
+    <string name="remote_app_manager_curfew_internet_switch">إتاحة الإنترنت أثناء الحظر الليلي</string>
+    <string name="remote_app_manager_curfew_internet_disabled_hint">يتطلب تفعيل الإتاحة في الحظر الليلي أولاً</string>
 
     <string name="remote_app_manager_protect_switch">منع الإلغاء والإيقاف</string>
 

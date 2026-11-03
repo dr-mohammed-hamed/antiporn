@@ -88,6 +88,8 @@
     <string name="remote_app_manager_empty">No inventoried apps found yet</string>
     <string name="remote_app_manager_freeze_switch">24/7 Freeze</string>
     <string name="remote_app_manager_curfew_switch">Allow in Curfew</string>
+    <string name="remote_app_manager_curfew_internet_switch">Allow Internet during Curfew</string>
+    <string name="remote_app_manager_curfew_internet_disabled_hint">Requires allowing app in curfew first</string>
     <string name="remote_app_manager_protect_switch">Prevent Uninstall/Stop</string>
     <string name="btn_save_app_manager_changes">Save Changes</string>
     <string name="toast_app_manager_saved">App policies successfully saved</string>

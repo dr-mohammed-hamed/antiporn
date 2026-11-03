@@ -355,8 +355,10 @@ class PolicyRepository private constructor(context: Context) {
                 // 2. Reschedule curfew alarms (using the newly updated timezone)
                 CurfewScheduler.scheduleNextAlarms(appContext)
 
-                // 3. Synchronize curfew enforcer with new timings and parameters
+                // 3. Synchronize curfew enforcer and VPN bypassed packages with new timings and parameters
+                com.drmohammed.antiporn.curfew.CurfewConfig.setVpnBypassedPackages(appContext, bundle.curfewVpnBypassPackages)
                 CurfewEnforcer.syncBlockState(appContext)
+                com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.syncPolicy(appContext)
 
                 // 4. Apply browser & DNS restrictions, custom blacklist suspension, and protected apps
                 if (isDeviceOwner && admin != null) {
