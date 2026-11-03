@@ -310,18 +310,41 @@ object CurfewEnforcer {
             }
 
             // Ensure any whitelisted or immune package that might have been previously suspended is immediately unsuspended
-            // strictly verifying it is NOT in permanent blacklist AND NOT in custom blacklist!
+            // strictly verifying it is NOT in permanent blacklist AND NOT in custom blacklist AND NOT pending/rejected by guardian!
+            var fetchPolicyFailed = false
             val customBlacklist = try {
                 PolicyRepository.getInstance(context).getCurrentPolicy().customBlacklistPackages
             } catch (e: Exception) {
                 Log.w(TAG, "Failed querying customBlacklistPackages during curfew enforcement", e)
+                fetchPolicyFailed = true
+                emptySet()
+            }
+            var fetchApprovalsFailed = false
+            val unapprovedPackages = try {
+                ApprovalRepository.getInstance(context).getLocalPendingApprovals()
+                    .filter { !it.isApproved }
+                    .map { it.packageName }
+                    .toSet()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching pending approvals for curfew enforcement - failing secure", e)
+                fetchApprovalsFailed = true
                 emptySet()
             }
             val immunePackages = CurfewAppResolver.resolveImmunePackages(context)
-            val immuneToUnsuspend = immunePackages.filter { pkg ->
-                !AppSuspensionShield.isBlacklisted(pkg) &&
-                !customBlacklist.contains(pkg) &&
-                try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+            val immuneToUnsuspend = if (fetchPolicyFailed || fetchApprovalsFailed) {
+                Log.w(TAG, "Fail-secure active: preserving suspended immune packages because policy blacklist or approvals could not be verified, but ensuring core critical packages remain unsuspended")
+                val coreCritical = CurfewAppResolver.resolveCoreSystemCriticalPackages(context)
+                coreCritical.filter { pkg ->
+                    !AppSuspensionShield.isBlacklisted(pkg) &&
+                    try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+                }
+            } else {
+                immunePackages.filter { pkg ->
+                    !AppSuspensionShield.isBlacklisted(pkg) &&
+                    !customBlacklist.contains(pkg) &&
+                    !unapprovedPackages.contains(pkg) &&
+                    try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+                }
             }
             if (immuneToUnsuspend.isNotEmpty()) {
                 try {
@@ -381,38 +404,51 @@ object CurfewEnforcer {
             val allInstalledTargets = CurfewAppResolver.getCurfewTargetPackages(context)
             val candidates = (recordedCurfewPackages + allInstalledTargets).toSet()
 
-            // Retrieve pending unapproved packages and custom blacklisted packages (Fail-Secure)
+            // Retrieve pending/rejected unapproved packages and custom blacklisted packages (Fail-Secure)
             var fetchApprovalsFailed = false
-            val pendingApprovalPackages = try {
+            val localApprovals = try {
                 ApprovalRepository.getInstance(context).getLocalPendingApprovals()
-                    .filter { it.isPending }
-                    .map { it.packageName }
-                    .toSet()
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching pending approvals for curfew release - failing secure", e)
                 fetchApprovalsFailed = true
-                emptySet()
+                emptyList()
             }
+            val approvedPackages = localApprovals.filter { it.isApproved }.map { it.packageName }.toSet()
+            val unapprovedPackages = localApprovals.filter { !it.isApproved }.map { it.packageName }.toSet()
 
             var fetchPolicyFailed = false
-            val customBlacklistPackages = try {
-                PolicyRepository.getInstance(context).getCurrentPolicy().customBlacklistPackages
+            val currentPolicy = try {
+                PolicyRepository.getInstance(context).getCurrentPolicy()
             } catch (e: Exception) {
-                Log.e(TAG, "Error fetching custom blacklisted packages for curfew release - failing secure", e)
+                Log.e(TAG, "Error fetching policy for curfew release - failing secure", e)
                 fetchPolicyFailed = true
-                emptySet()
+                null
             }
+            val customBlacklistPackages = currentPolicy?.customBlacklistPackages ?: emptySet()
+            val isZeroTrustActive = currentPolicy?.lockNewInstallsUntilApproved ?: true
 
             if (fetchApprovalsFailed || fetchPolicyFailed) {
                 Log.w(TAG, "Fail-secure active: preserving suspended packages because pending approvals or policy blacklist could not be verified")
                 return false
             }
 
-            // IRON RULE: NEVER unsuspend permanently blacklisted apps or pending unapproved apps or custom blacklists!
+            // IRON RULE: NEVER unsuspend permanently blacklisted apps or unapproved/rejected apps or custom blacklists!
+            // Under Zero-Trust, stray/unrecorded candidates must NOT be unsuspended unless explicitly approved or immune/store.
             val safeToUnsuspend = candidates.filter { pkg ->
-                !AppSuspensionShield.isBlacklisted(pkg) &&
-                !pendingApprovalPackages.contains(pkg) &&
-                !customBlacklistPackages.contains(pkg)
+                if (AppSuspensionShield.isBlacklisted(pkg)) return@filter false
+                if (customBlacklistPackages.contains(pkg)) return@filter false
+                if (unapprovedPackages.contains(pkg)) return@filter false
+
+                if (isZeroTrustActive) {
+                    val isApproved = approvedPackages.contains(pkg)
+                    val isImmuneOrStore = CurfewAppResolver.isSystemCriticalOrImmune(context, pkg) ||
+                        pkg == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE ||
+                        CurfewConfig.KNOWN_APP_STORES.contains(pkg)
+                    if (!isApproved && !isImmuneOrStore) {
+                        return@filter false
+                    }
+                }
+                true
             }.filter { pkg ->
                 try {
                     dpm.isPackageSuspended(admin, pkg)

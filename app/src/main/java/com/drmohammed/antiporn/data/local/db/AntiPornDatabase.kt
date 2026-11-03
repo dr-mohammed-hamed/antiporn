@@ -436,6 +436,7 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error reading pending approvals from SQLite", e)
+            throw e
         } finally {
             cursor?.close()
         }
@@ -476,6 +477,7 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error reading unsynced approvals from SQLite", e)
+            throw e
         } finally {
             cursor?.close()
         }

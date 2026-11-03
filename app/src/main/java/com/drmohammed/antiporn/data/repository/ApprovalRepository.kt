@@ -60,7 +60,8 @@ class ApprovalRepository private constructor(context: Context) {
      * writes the record to SQLite, and synchronizes the active Zero-Trust foreground watcher.
      * Operates completely offline in < 5ms without any network dependency.
      */
-    fun freezeAndSubmitApprovalLocal(packageName: String): Boolean {
+    @Synchronized
+    fun freezeAndSubmitApprovalLocal(packageName: String, showToast: Boolean = true): Boolean {
         if (com.drmohammed.antiporn.curfew.CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)) {
             Log.i(TAG, "IRON GUARD: Package $packageName is critical system / launcher / dialer / keyboard / immune. Skipping freeze.")
             return false
@@ -97,20 +98,7 @@ class ApprovalRepository private constructor(context: Context) {
         val finalStatus: String
         if (suspended) {
             finalStatus = PendingApprovalEntity.STATUS_PENDING
-            Log.w(TAG, "❄️ [FREEZE_SUCCESS] Instant 0ms freeze applied to package: $packageName")
-            // Show alert toast on main thread
-            try {
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    try {
-                        val alertMsg = appContext.getString(R.string.toast_app_suspended_by_guardian)
-                        android.widget.Toast.makeText(appContext, alertMsg, android.widget.Toast.LENGTH_LONG).show()
-                    } catch (te: Exception) {
-                        Log.w(TAG, "Failed showing toast alert: ${te.message}")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Error posting toast to main looper: ${e.message}")
-            }
+            Log.w(TAG, "❄️ [FREEZE_SUCCESS] Instant 0ms freeze applied to package: $packageName (showToast=$showToast)")
         } else {
             Log.w(TAG, "⚠️ [FREEZE_REJECTED] Device suspension rejected for $packageName. Executing Fail-Secure fallback (setApplicationHidden)...")
             val hidden = try {
@@ -126,6 +114,22 @@ class ApprovalRepository private constructor(context: Context) {
             } else {
                 Log.e(TAG, "❌ [TOTAL_ENFORCEMENT_FAILURE] Both setPackagesSuspended and setApplicationHidden failed for package $packageName")
                 return false
+            }
+        }
+
+        // Show alert toast on main thread ONLY when requested (avoids spamming toast during background reconciliation)
+        if (showToast) {
+            try {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    try {
+                        val alertMsg = appContext.getString(R.string.toast_app_suspended_by_guardian)
+                        android.widget.Toast.makeText(appContext, alertMsg, android.widget.Toast.LENGTH_LONG).show()
+                    } catch (te: Exception) {
+                        Log.w(TAG, "Failed showing toast alert: ${te.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error posting toast to main looper: ${e.message}")
             }
         }
 
@@ -537,7 +541,7 @@ class ApprovalRepository private constructor(context: Context) {
         val isDo = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)
 
         val installedPackages = try {
-            pm.getInstalledPackages(0)
+            pm.getInstalledPackages(0) ?: emptyList()
         } catch (e: Exception) {
             Log.w(TAG, "Failed retrieving installed packages for baseline seeding", e)
             emptyList()
@@ -631,6 +635,7 @@ class ApprovalRepository private constructor(context: Context) {
      * that escaped or bypassed the broadcast receiver due to OEM power management or install source.
      * Operates completely offline, skipping system criticals, immune apps, and pre-approved apps.
      */
+    @Synchronized
     fun reconcileUnapprovedInstalledApps() {
         if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) return
         val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
@@ -644,7 +649,7 @@ class ApprovalRepository private constructor(context: Context) {
         val pm = appContext.packageManager
 
         val installedPackages = try {
-            pm.getInstalledPackages(0)
+            pm.getInstalledPackages(0) ?: emptyList()
         } catch (e: Exception) {
             Log.w(TAG, "Failed retrieving installed packages for Zero-Trust reconciliation", e)
             emptyList()
@@ -653,7 +658,9 @@ class ApprovalRepository private constructor(context: Context) {
         val localApprovals = getLocalPendingApprovals()
         val approvedSet = localApprovals.filter { it.isApproved }.map { it.packageName }.toSet()
         val pendingSet = localApprovals.filter { it.isPending }.map { it.packageName }.toSet()
+        val rejectedSet = localApprovals.filter { it.isRejected }.map { it.packageName }.toSet()
 
+        var strayAppFrozen = false
         for (pkgInfo in installedPackages) {
             val pkg = pkgInfo.packageName ?: continue
             if (pkg == appContext.packageName) continue
@@ -672,6 +679,29 @@ class ApprovalRepository private constructor(context: Context) {
             if (AppSuspensionShield.isBlacklisted(pkg)) continue
             if (com.drmohammed.antiporn.curfew.CurfewAppResolver.isSystemCriticalOrImmune(appContext, pkg)) continue
 
+            // If it was already rejected by guardian, ensure it is suspended/hidden if active, but do NOT call freezeAndSubmitApprovalLocal or modify status to PENDING
+            if (rejectedSet.contains(pkg)) {
+                val isSuspended = try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+                val isHidden = try { dpm.isApplicationHidden(admin, pkg) } catch (e: Exception) { false }
+                if (!isSuspended && !isHidden) {
+                    Log.w(TAG, "🚨 [RECONCILE_REJECTED_APP] Rejected package '$pkg' was active. Enforcing suspension/hide!")
+                    val suspended = suspendWithGuardianMessage(
+                        dpm = dpm,
+                        admin = admin,
+                        packageName = pkg,
+                        message = appContext.getString(R.string.toast_app_suspended_by_guardian)
+                    )
+                    if (!suspended) {
+                        try {
+                            dpm.setApplicationHidden(admin, pkg, true)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to hide rejected package $pkg", e)
+                        }
+                    }
+                }
+                continue
+            }
+
             // If it's already recorded as pending and verified suspended/hidden, skip
             if (pendingSet.contains(pkg)) {
                 val isSuspended = try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
@@ -680,8 +710,20 @@ class ApprovalRepository private constructor(context: Context) {
             }
 
             // Unapproved package detected that is NOT suspended/hidden! Enforce instant freeze!
-            Log.w(TAG, "🚨 [RECONCILE_STRAY_APP] Found unapproved active package '$pkg' (escaped receiver). Freezing now!")
-            freezeAndSubmitApprovalLocal(pkg)
+            Log.w(TAG, "🚨 [RECONCILE_STRAY_APP] Found unapproved active package '$pkg' (escaped receiver). Freezing silently in background!")
+            if (freezeAndSubmitApprovalLocal(pkg, showToast = false)) {
+                strayAppFrozen = true
+            }
+        }
+
+        if (strayAppFrozen) {
+            scope.launch {
+                try {
+                    syncPendingApprovalsToCloud()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed syncing reconciled approvals to cloud", e)
+                }
+            }
         }
     }
 
