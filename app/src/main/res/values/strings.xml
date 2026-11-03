@@ -892,4 +892,11 @@
     <string name="browser_filter_btn_save">حفظ وتطبيق السياسة</string>
     <string name="browser_filter_info_title">سياسة تصفية عناوين الويب للمتصفحات</string>
     <string name="browser_filter_info_desc">يتم تطبيق هذه القواعد إجبارياً على مستوى نظام التشغيل (Device Owner) في كافة المتصفحات المتوافقة مثل Google Chrome، Brave، و Edge.</string>
+
+    <!-- Telemetry & Diagnostic Report -->
+    <string name="settings_telemetry_title">سجل الفحص والتشخيص</string>
+    <string name="settings_telemetry_desc">توليد ومشاركة تقرير تفصيلي للأخطاء وأداء النظام للذكاء الاصطناعي</string>
+    <string name="btn_share_telemetry">مشاركة السجل</string>
+    <string name="share_telemetry_chooser_title">مشاركة تقرير الفحص والتشخيص</string>
+    <string name="toast_telemetry_copied">تم نسخ تقرير الفحص للحافظة وجارٍ فتح نافذة المشاركة</string>
 </resources>

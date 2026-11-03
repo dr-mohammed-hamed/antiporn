@@ -13,6 +13,13 @@ import com.drmohammed.antiporn.ai.service.ScreenAiProjectionService
 import com.drmohammed.antiporn.cloud.auth.GoogleAuthManager
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
+import com.drmohammed.antiporn.telemetry.AiTelemetryReporter
+import android.content.Intent
+import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.progressindicator.LinearProgressIndicator
@@ -51,6 +58,8 @@ class SettingsFragment : Fragment() {
 
     // Device Owner Views
     private var tvDeviceOwnerStatus: TextView? = null
+    private var btnShareTelemetry: MaterialButton? = null
+    private var tvTelemetryStatus: TextView? = null
 
     private var lastOtaState: OtaUpdateState? = null
     private var currentVersionName: String = "1.1"
@@ -103,6 +112,8 @@ class SettingsFragment : Fragment() {
         btnLinkGoogle = root.findViewById(R.id.btnLinkGoogle)
 
         tvDeviceOwnerStatus = root.findViewById(R.id.tvDeviceOwnerStatus)
+        btnShareTelemetry = root.findViewById(R.id.btnShareTelemetry)
+        tvTelemetryStatus = root.findViewById(R.id.tvTelemetryStatus)
     }
 
     private fun setupListeners() {
@@ -119,6 +130,40 @@ class SettingsFragment : Fragment() {
 
         btnLinkGoogle?.setOnClickListener {
             actionListener?.onLinkGoogleRequested()
+        }
+
+        btnShareTelemetry?.setOnClickListener {
+            val ctx = context ?: return@setOnClickListener
+            val appContext = ctx.applicationContext
+            btnShareTelemetry?.isEnabled = false
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    val report = withContext(Dispatchers.IO) {
+                        AiTelemetryReporter.generateMarkdownReport(appContext)
+                    }
+                    if (!isAdded || view == null) return@launch
+
+                    // 1. Copy to clipboard automatically for convenient pasting
+                    AiTelemetryReporter.copyReportToClipboard(appContext, report)
+                    Toast.makeText(appContext, R.string.toast_telemetry_copied, Toast.LENGTH_SHORT).show()
+
+                    // 2. Open Android Native Share Sheet
+                    try {
+                        val sendIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_SUBJECT, "AntiPorn Diagnostic Report")
+                            putExtra(Intent.EXTRA_TEXT, report)
+                            type = "text/plain"
+                        }
+                        val chooser = Intent.createChooser(sendIntent, getString(R.string.share_telemetry_chooser_title))
+                        startActivity(chooser)
+                    } catch (e: Exception) {
+                        android.util.Log.e("SettingsFragment", "Error launching share chooser", e)
+                    }
+                } finally {
+                    btnShareTelemetry?.isEnabled = true
+                }
+            }
         }
     }
 
@@ -310,6 +355,8 @@ class SettingsFragment : Fragment() {
         tvGoogleAccountStatus = null
         btnLinkGoogle = null
         tvDeviceOwnerStatus = null
+        btnShareTelemetry = null
+        tvTelemetryStatus = null
         super.onDestroyView()
     }
 }
