@@ -44,4 +44,9 @@
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_hisn_splash_logo</item>
         <item name="postSplashScreenTheme">@style/Theme.Antiporn</item>
     </style>
+    <!-- 10dp Rounded Corner Appearance for App Icons -->
+    <style name="ShapeAppearance.Antiporn.RoundedAppIcon" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">10dp</item>
+    </style>
 </resources>
