@@ -6,8 +6,8 @@
     android:layout_height="match_parent">
 
     <!-- Fragment Host Container (Always positioned above Bottom Navigation) -->
-    <FrameLayout
-        android:id="@+id/fragmentContainer"
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/viewPagerMain"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_above="@+id/bottomNavigationView" />

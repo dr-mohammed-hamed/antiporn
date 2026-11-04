@@ -31,6 +31,8 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.viewpager2.adapter.FragmentStateAdapter
+import androidx.viewpager2.widget.ViewPager2
 import com.drmohammed.antiporn.ai.service.ScreenAiProjectionService
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
@@ -55,7 +57,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Main application dashboard activity hosting the Material 3 Bottom Navigation Hub.
- * Coordinates system services and manages the 4 primary tabs:
+ * Coordinates system services and manages the 4 primary tabs via ViewPager2:
  * 1. Home (Hero Shield & 1-Hour Nap)
  * 2. Self Control (Policies, Curfew, Restrictions)
  * 3. Accountability (Partner Hub & Pairing)
@@ -66,31 +68,35 @@ class MainActivity : AppCompatActivity(),
     SettingsFragment.SettingsActionListener,
     AccountabilityFragment.AccountabilityNavigationListener {
 
+    private lateinit var viewPager: ViewPager2
     private lateinit var bottomNav: BottomNavigationView
 
-    private var homeFragment = HomeFragment()
-    private var selfControlFragment = SelfControlFragment()
-    private var accountabilityFragment = AccountabilityFragment()
-    private var settingsFragment = SettingsFragment()
+    private val activeHomeFragment: HomeFragment?
+        get() = supportFragmentManager.findFragmentByTag("f0") as? HomeFragment
 
-    private var activeFragment: Fragment = homeFragment
+    private val activeSelfControlFragment: SelfControlFragment?
+        get() = supportFragmentManager.findFragmentByTag("f1") as? SelfControlFragment
+
+    private val activeSettingsFragment: SettingsFragment?
+        get() = supportFragmentManager.findFragmentByTag("f3") as? SettingsFragment
 
     private var splashController: SplashAnimationController? = null
     private val uiHandler = Handler(Looper.getMainLooper())
     private var lastAiToggleMs = 0L
     private var hasShownOtaPrompt = false
     private var lastProtectionState: ProtectionUiState? = null
-    private var lastDeniedToastTime = 0L
 
     private val backPressedCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
-            navigateToTab(R.id.nav_home)
+            if (viewPager.currentItem != 0) {
+                viewPager.setCurrentItem(0, true) // Smooth scroll back to Home tab as requested in /grill-me
+            }
         }
     }
 
     private val aiRefreshRunnable = Runnable {
         if (!isFinishing && !isDestroyed) {
-            settingsFragment.updateAiUi()
+            activeSettingsFragment?.updateAiUi()
         }
     }
 
@@ -108,7 +114,7 @@ class MainActivity : AppCompatActivity(),
             uiHandler.postDelayed(aiRefreshRunnable, 300)
         } else {
             Toast.makeText(this, R.string.ai_permission_denied, Toast.LENGTH_SHORT).show()
-            settingsFragment.updateAiUi()
+            activeSettingsFragment?.updateAiUi()
         }
     }
 
@@ -116,20 +122,19 @@ class MainActivity : AppCompatActivity(),
         override fun run() {
             if (!isFinishing && !isDestroyed) {
                 try {
-                    homeFragment.updateNapCountdown(NapController.remainingMs(this@MainActivity))
+                    activeHomeFragment?.updateNapCountdown(NapController.remainingMs(this@MainActivity))
                 } catch (e: Exception) {
                     Log.w(TAG, "Error updating nap countdown: ${e.message}")
                 }
                 try {
-                    if (activeFragment == settingsFragment) {
-                        settingsFragment.updateAiUi()
+                    if (::viewPager.isInitialized && viewPager.currentItem == 3) {
+                        activeSettingsFragment?.updateAiUi()
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Error updating settings AI UI: ${e.message}")
                 }
                 uiHandler.postDelayed(this, 1000L)
             }
-
         }
     }
 
@@ -152,24 +157,27 @@ class MainActivity : AppCompatActivity(),
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        viewPager = findViewById(R.id.viewPagerMain)
         bottomNav = findViewById(R.id.bottomNavigationView)
-        val fragmentContainer = findViewById<android.view.View>(R.id.fragmentContainer)
 
         findViewById<android.view.View>(R.id.layoutMainRoot)?.let { rootView ->
             ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, windowInsets ->
                 val insets = windowInsets.getInsets(
                     WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
                 )
-                fragmentContainer?.setPadding(insets.left, insets.top, insets.right, 0)
+                viewPager.setPadding(insets.left, insets.top, insets.right, 0)
                 bottomNav.setPadding(0, 0, 0, insets.bottom)
                 windowInsets
             }
         }
 
+        viewPager.adapter = MainPagerAdapter(this)
+        viewPager.offscreenPageLimit = 3
+        viewPager.isUserInputEnabled = true
+
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
-        setupFragments(savedInstanceState)
-        setupNavigation()
+        setupNavigation(savedInstanceState)
         setupOtaTracking()
 
         splashController = SplashAnimationController(this).apply {
@@ -177,80 +185,76 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    private fun setupFragments(savedInstanceState: Bundle?) {
-        val fm = supportFragmentManager
-        if (savedInstanceState == null) {
-            fm.beginTransaction()
-                .add(R.id.fragmentContainer, homeFragment, TAG_HOME)
-                .add(R.id.fragmentContainer, selfControlFragment, TAG_SELF_CONTROL).hide(selfControlFragment)
-                .add(R.id.fragmentContainer, accountabilityFragment, TAG_ACCOUNTABILITY).hide(accountabilityFragment)
-                .add(R.id.fragmentContainer, settingsFragment, TAG_SETTINGS).hide(settingsFragment)
-                .commit()
-            activeFragment = homeFragment
-        } else {
-            homeFragment = fm.findFragmentByTag(TAG_HOME) as? HomeFragment ?: homeFragment
-            selfControlFragment = fm.findFragmentByTag(TAG_SELF_CONTROL) as? SelfControlFragment ?: selfControlFragment
-            accountabilityFragment = fm.findFragmentByTag(TAG_ACCOUNTABILITY) as? AccountabilityFragment ?: accountabilityFragment
-            settingsFragment = fm.findFragmentByTag(TAG_SETTINGS) as? SettingsFragment ?: settingsFragment
+    private inner class MainPagerAdapter(activity: AppCompatActivity) : FragmentStateAdapter(activity) {
+        override fun getItemCount(): Int = 4
 
-            var restoredTabId = savedInstanceState?.getInt(KEY_SELECTED_TAB, R.id.nav_home) ?: R.id.nav_home
-            if (restoredTabId == R.id.nav_self_control) {
-                val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
-                if (!gate.canAccess(this)) {
-                    restoredTabId = R.id.nav_home
-                }
+        override fun createFragment(position: Int): Fragment {
+            return when (position) {
+                0 -> HomeFragment()
+                1 -> SelfControlFragment()
+                2 -> AccountabilityFragment()
+                3 -> SettingsFragment()
+                else -> throw IllegalArgumentException("Invalid pager position: $position")
             }
-            bottomNav.selectedItemId = restoredTabId
-            activeFragment = when (restoredTabId) {
-                R.id.nav_self_control -> selfControlFragment
-                R.id.nav_accountability -> accountabilityFragment
-                R.id.nav_settings -> settingsFragment
-                else -> homeFragment
-            }
-
-            val tx = fm.beginTransaction()
-            listOf(homeFragment, selfControlFragment, accountabilityFragment, settingsFragment).forEach { frag ->
-                if (frag.isAdded) {
-                    if (frag == activeFragment) tx.show(frag) else tx.hide(frag)
-                }
-            }
-            tx.commit()
-            backPressedCallback.isEnabled = (activeFragment != homeFragment)
         }
     }
 
-    private fun setupNavigation() {
-        bottomNav.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> {
-                    switchFragment(homeFragment)
-                    true
+    private fun positionToMenuId(position: Int): Int = when (position) {
+        0 -> R.id.nav_home
+        1 -> R.id.nav_self_control
+        2 -> R.id.nav_accountability
+        3 -> R.id.nav_settings
+        else -> R.id.nav_home
+    }
+
+    private fun menuIdToPosition(menuId: Int): Int = when (menuId) {
+        R.id.nav_home -> 0
+        R.id.nav_self_control -> 1
+        R.id.nav_accountability -> 2
+        R.id.nav_settings -> 3
+        else -> 0
+    }
+
+    private fun setupNavigation(savedInstanceState: Bundle?) {
+        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                super.onPageSelected(position)
+                val targetMenuId = positionToMenuId(position)
+                if (bottomNav.selectedItemId != targetMenuId) {
+                    bottomNav.selectedItemId = targetMenuId
                 }
-                R.id.nav_self_control -> {
-                    val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
-                    val canAccess = gate.canAccess(this)
-                    Log.i(TAG, "[SelfControlDiag] MainActivity: BottomNav nav_self_control clicked. canAccess=$canAccess")
-                    if (!canAccess) {
-                        Log.w(TAG, "[SelfControlDiag] MainActivity: ACCESS DENIED to Self-Control tab! Showing toast.")
-                        showSelfControlAccessDeniedMessage()
-                        false
-                    } else {
-                        Log.i(TAG, "[SelfControlDiag] MainActivity: ACCESS GRANTED to Self-Control tab. Switching fragment.")
-                        switchFragment(selfControlFragment)
-                        true
+                backPressedCallback.isEnabled = (position != 0)
+
+                when (position) {
+                    0 -> {
+                        lastProtectionState?.let { activeHomeFragment?.updateProtectionState(it) }
+                        activeHomeFragment?.updateNapCountdown(NapController.remainingMs(this@MainActivity))
+                    }
+                    1 -> {
+                        val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
+                        activeSelfControlFragment?.updateLockState(!gate.canAccess(this@MainActivity))
+                    }
+                    3 -> {
+                        activeSettingsFragment?.updateAllStates()
                     }
                 }
-                R.id.nav_accountability -> {
-                    switchFragment(accountabilityFragment)
-                    true
-                }
-                R.id.nav_settings -> {
-                    switchFragment(settingsFragment)
-                    true
-                }
-                else -> false
             }
+        })
+
+        bottomNav.setOnItemSelectedListener { item ->
+            val targetPosition = menuIdToPosition(item.itemId)
+            if (viewPager.currentItem != targetPosition) {
+                // Instant transition without intermediate sliding as requested by PM in /grill-me
+                viewPager.setCurrentItem(targetPosition, false)
+            }
+            true
         }
+
+        val restoredTabId = savedInstanceState?.getInt(KEY_SELECTED_TAB, R.id.nav_home) ?: R.id.nav_home
+        val targetPosition = menuIdToPosition(restoredTabId)
+        viewPager.setCurrentItem(targetPosition, false)
+        bottomNav.selectedItemId = restoredTabId
+        backPressedCallback.isEnabled = (targetPosition != 0)
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -258,73 +262,25 @@ class MainActivity : AppCompatActivity(),
                     if (isFinishing || isDestroyed) return@collect
                     val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
                     val canAccess = gate.canAccess(this@MainActivity)
-                    Log.i(TAG, "[SelfControlDiag] MainActivity: PolicyFlow received: v${policy.version}, isSupervised=${policy.isSupervised}, isSelfControlAllowed=${policy.isSelfControlAllowed}, activeFragment=${activeFragment.javaClass.simpleName}, canAccess=$canAccess")
-                    if (activeFragment == selfControlFragment) {
-                        if (!canAccess) {
-                            Log.w(TAG, "[SelfControlDiag] MainActivity: LIVE EJECTION! Ejecting from SelfControl tab to nav_home because guardian disabled self-control!")
-                            showSelfControlAccessDeniedMessage()
-                            bottomNav.selectedItemId = R.id.nav_home
-                        }
-                    }
+                    Log.i(TAG, "[SelfControlDiag] MainActivity: PolicyFlow received: v${policy.version}, isSupervised=${policy.isSupervised}, isSelfControlAllowed=${policy.isSelfControlAllowed}, canAccess=$canAccess")
+                    activeSelfControlFragment?.updateLockState(!canAccess)
                 }
             }
         }
     }
 
-    private fun showSelfControlAccessDeniedMessage() {
-        if (isFinishing || isDestroyed) return
-        val now = android.os.SystemClock.elapsedRealtime()
-        if (now - lastDeniedToastTime < 1500L) return
-        lastDeniedToastTime = now
-
-        val policy = try {
-            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to retrieve policy for access denied message", e)
-            null
-        }
-
-        val msgRes = if (policy?.isSupervised == true && !policy.isSelfControlAllowed) {
-            R.string.gate_access_denied_by_guardian
-        } else {
-            R.string.gate_access_denied
-        }
-        Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun switchFragment(target: Fragment) {
-        if (activeFragment == target) return
-
-        supportFragmentManager.beginTransaction()
-            .hide(activeFragment)
-            .show(target)
-            .commit()
-
-        activeFragment = target
-        backPressedCallback.isEnabled = (target != homeFragment)
-
-        if (target == homeFragment) {
-            lastProtectionState?.let { homeFragment.updateProtectionState(it) }
-            homeFragment.updateNapCountdown(NapController.remainingMs(this))
-        } else if (target == settingsFragment) {
-            settingsFragment.updateAllStates()
-        }
-    }
-
     fun navigateToTab(tabId: Int) {
-        bottomNav.selectedItemId = tabId
+        val targetPosition = menuIdToPosition(tabId)
+        if (viewPager.currentItem != targetPosition) {
+            viewPager.setCurrentItem(targetPosition, false)
+        }
+        if (bottomNav.selectedItemId != tabId) {
+            bottomNav.selectedItemId = tabId
+        }
     }
 
     override fun onNavigateToSelfControl() {
-        val gate = com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.getActiveGate()
-        val canAccess = gate.canAccess(this)
-        Log.i(TAG, "[SelfControlDiag] MainActivity: onNavigateToSelfControl invoked. canAccess=$canAccess")
-        if (!canAccess) {
-            Log.w(TAG, "[SelfControlDiag] MainActivity: ACCESS DENIED in onNavigateToSelfControl! Showing toast.")
-            showSelfControlAccessDeniedMessage()
-            return
-        }
-        bottomNav.selectedItemId = R.id.nav_self_control
+        navigateToTab(R.id.nav_self_control)
     }
 
     override fun onStart() {
@@ -351,8 +307,8 @@ class MainActivity : AppCompatActivity(),
             com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).reconcileUnapprovedInstalledAppsAsync()
         }
         refreshUi(isEnforcing = false)
-        settingsFragment.updateAllStates()
-        homeFragment.updateNapCountdown(NapController.remainingMs(this))
+        activeSettingsFragment?.updateAllStates()
+        activeHomeFragment?.updateNapCountdown(NapController.remainingMs(this))
         AppInventoryManager.getInstance(this).syncInventoryToCloudAsync()
         uiHandler.post(uiTickerRunnable)
     }
@@ -401,7 +357,7 @@ class MainActivity : AppCompatActivity(),
                     )
                     startActivity(intent)
                     Toast.makeText(this, R.string.overlay_permission_prompt, Toast.LENGTH_LONG).show()
-                    settingsFragment.updateAiUi()
+                    activeSettingsFragment?.updateAiUi()
                     return
                 }
             }
@@ -411,7 +367,7 @@ class MainActivity : AppCompatActivity(),
                 projectionLauncher.launch(mpManager.createScreenCaptureIntent())
             } else {
                 Toast.makeText(this, R.string.ai_permission_denied, Toast.LENGTH_SHORT).show()
-                settingsFragment.updateAiUi()
+                activeSettingsFragment?.updateAiUi()
             }
         } else {
             val stopIntent = Intent(this, ScreenAiProjectionService::class.java)
@@ -446,7 +402,7 @@ class MainActivity : AppCompatActivity(),
                 result.fold(
                     onSuccess = {
                         Toast.makeText(this@MainActivity, R.string.toast_account_secured_success, Toast.LENGTH_SHORT).show()
-                        settingsFragment.updateGoogleUi()
+                        activeSettingsFragment?.updateGoogleUi()
                     },
                     onFailure = { err ->
                         if (err !is androidx.credentials.exceptions.GetCredentialCancellationException) {
@@ -455,7 +411,7 @@ class MainActivity : AppCompatActivity(),
                     }
                 )
             } finally {
-                settingsFragment.updateGoogleUi()
+                activeSettingsFragment?.updateGoogleUi()
             }
         }
     }
@@ -497,12 +453,12 @@ class MainActivity : AppCompatActivity(),
         val (verName, verCode) = getCurrentAppVersion()
         val otaRepo = OtaRepository.getInstance(applicationContext)
 
-        settingsFragment.bindOtaState(otaRepo.updateState.value, verName, verCode)
+        activeSettingsFragment?.bindOtaState(otaRepo.updateState.value, verName, verCode)
 
         lifecycleScope.launch {
             otaRepo.updateState.collect { state ->
                 if (!isFinishing && !isDestroyed) {
-                    settingsFragment.bindOtaState(state, verName, verCode)
+                    activeSettingsFragment?.bindOtaState(state, verName, verCode)
                     if (state is OtaUpdateState.UpdateAvailable && !hasShownOtaPrompt) {
                         hasShownOtaPrompt = true
                         showOtaUpdateDialog(state.info, otaRepo)
@@ -574,16 +530,12 @@ class MainActivity : AppCompatActivity(),
             isEnforcing = isEnforcing
         )
         lastProtectionState = state
-        homeFragment.updateProtectionState(state)
-        settingsFragment.updateDeviceOwnerUi()
+        activeHomeFragment?.updateProtectionState(state)
+        activeSettingsFragment?.updateDeviceOwnerUi()
     }
 
     companion object {
         private const val TAG = "AntiPorn_MainActivity"
-        private const val TAG_HOME = "TAB_HOME"
-        private const val TAG_SELF_CONTROL = "TAB_SELF_CONTROL"
-        private const val TAG_ACCOUNTABILITY = "TAB_ACCOUNTABILITY"
-        private const val TAG_SETTINGS = "TAB_SETTINGS"
         private const val KEY_SELECTED_TAB = "key_selected_tab"
     }
 }

@@ -625,4 +625,8 @@
     <string name="btn_share_telemetry">Share Log</string>
     <string name="share_telemetry_chooser_title">Share Telemetry &amp; Diagnostic Report</string>
     <string name="toast_telemetry_copied">Diagnostic report copied to clipboard. Opening share sheet...</string>
+    <!-- Self Control Locked Gate State -->
+    <string name="self_control_locked_title">Self-Control Locked</string>
+    <string name="self_control_locked_desc">Your accountability partner or supervisor has locked self-control settings to protect and support you.</string>
+    <string name="btn_go_to_accountability">Go to Accountability Partner</string>
 </resources>

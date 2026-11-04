@@ -20,7 +20,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry
@@ -44,6 +46,7 @@ import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -125,6 +128,13 @@ class SelfControlFragment : Fragment() {
     private var btnRegenerateQrCode: MaterialButton? = null
     private var isQrPolicyLoading = false
 
+    // Locked Gate UI
+    private var layoutSelfControlLocked: View? = null
+    private var btnGoToAccountability: View? = null
+    private var scrollSelfControl: View? = null
+    private var cardBottomBarSelfControl: View? = null
+    private var lastLockState: Boolean? = null
+
     // Bottom Bar
     private var btnSaveSelfControlChanges: MaterialButton? = null
 
@@ -184,8 +194,24 @@ class SelfControlFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        loadCurrentPolicy()
-        loadPendingApprovals()
+        val ctx = requireContext()
+        val gate = SelfControlAccessGateRegistry.getActiveGate()
+        val canAccess = gate.canAccess(ctx)
+        val isLocked = !canAccess
+        updateLockState(isLocked)
+
+        if (!isLocked) {
+            loadCurrentPolicy()
+            loadPendingApprovals()
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                PolicyRepository.getInstance(requireContext().applicationContext).currentPolicyFlow.collect {
+                    checkGateAndRefresh()
+                }
+            }
+        }
     }
 
     override fun onResume() {
@@ -207,29 +233,43 @@ class SelfControlFragment : Fragment() {
         val gate = SelfControlAccessGateRegistry.getActiveGate()
         val canAccess = gate.canAccess(ctx)
         Log.i(TAG, "[SelfControlDiag] SelfControlFragment checkGateAndRefresh: canAccess=$canAccess")
-        if (!canAccess) {
-            Log.w(TAG, "[SelfControlDiag] SelfControlFragment: ACCESS DENIED in checkGateAndRefresh! Redirecting to nav_home.")
-            val policy = try {
-                PolicyRepository.getInstance(ctx.applicationContext).getCurrentPolicy()
-            } catch (e: Exception) {
-                Log.w(TAG, "[SelfControlDiag] Failed to retrieve local policy in checkGateAndRefresh", e)
-                null
-            }
-            val msgRes = if (policy?.isSupervised == true && !policy.isSelfControlAllowed) {
-                R.string.gate_access_denied_by_guardian
-            } else {
-                R.string.gate_access_denied
-            }
-            Toast.makeText(ctx, msgRes, Toast.LENGTH_SHORT).show()
-            (activity as? com.drmohammed.antiporn.MainActivity)?.navigateToTab(R.id.nav_home)
-            return
+
+        updateLockState(isLocked = !canAccess)
+
+        if (canAccess) {
+            loadCurrentPolicy()
+            loadPendingApprovals()
         }
-        loadPendingApprovals()
+    }
+
+    fun updateLockState(isLocked: Boolean) {
+        lastLockState = isLocked
+        val lockedView = layoutSelfControlLocked ?: return
+        val scrollView = scrollSelfControl ?: return
+        val bottomBar = cardBottomBarSelfControl ?: return
+        if (isLocked) {
+            lockedView.visibility = View.VISIBLE
+            scrollView.visibility = View.GONE
+            bottomBar.visibility = View.GONE
+        } else {
+            lockedView.visibility = View.GONE
+            scrollView.visibility = View.VISIBLE
+            bottomBar.visibility = View.VISIBLE
+        }
     }
 
     private fun initViews(root: View) {
         toolbar = root.findViewById(R.id.toolbarSelfControl)
         toolbar?.navigationIcon = null
+
+        layoutSelfControlLocked = root.findViewById(R.id.layoutSelfControlLocked)
+        btnGoToAccountability = root.findViewById(R.id.btnGoToAccountability)
+        scrollSelfControl = root.findViewById(R.id.scrollSelfControl)
+        cardBottomBarSelfControl = root.findViewById(R.id.cardBottomBarSelfControl)
+
+        btnGoToAccountability?.setOnClickListener {
+            (activity as? com.drmohammed.antiporn.MainActivity)?.navigateToTab(R.id.nav_accountability)
+        }
 
         switchCurfewMaster = root.findViewById(R.id.switchCurfewMaster)
         tvCurfewStartTime = root.findViewById(R.id.tvCurfewStartTime)
@@ -895,6 +935,10 @@ class SelfControlFragment : Fragment() {
 
     override fun onDestroyView() {
         toolbar = null
+        layoutSelfControlLocked = null
+        btnGoToAccountability = null
+        scrollSelfControl = null
+        cardBottomBarSelfControl = null
         switchCurfewMaster = null
         tvCurfewStartTime = null
         tvCurfewEndTime = null
