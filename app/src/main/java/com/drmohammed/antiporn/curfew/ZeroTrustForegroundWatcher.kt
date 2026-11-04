@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * unapproved Zero-Trust applications exist in the local SQLite database waiting for supervisor permission.
  *
  * Battery-Protection Guarantees:
- * 1. ZERO BACKGROUND POLLING: If no applications are in STATUS_PENDING, the 250ms loop is completely STOPPED,
+ * 1. ZERO BACKGROUND POLLING: If no applications are in STATUS_PENDING, the 1s loop is completely STOPPED,
  *    its executor is shut down, and it consumes 0 CPU cycles.
  * 2. Active only when a package is installed and pending approval, until approved or rejected.
  * 3. Screen-off gate: If screen is turned off (powerManager.isInteractive == false), cycles are skipped.
@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 object ZeroTrustForegroundWatcher {
 
     private const val TAG = "AntiPorn_ZeroTrustWatcher"
-    private const val POLL_INTERVAL_MS = 250L
+    private const val POLL_INTERVAL_MS = 1000L // 1 ثانية لتخفيف استهلاك المعالج
     private const val TOAST_COOLDOWN_MS = 2500L
     private const val INITIAL_LOOKBACK_MS = 60000L // 60s lookback on startup
     private const val CACHE_REFRESH_INTERVAL_MS = 3000L

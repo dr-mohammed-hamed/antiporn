@@ -236,11 +236,8 @@ class AccountabilityRepository private constructor(context: Context) {
                 }
 
                 val currentVersion = policyDoc?.getLong("version") ?: 1L
-                val basePolicy = if (policyDoc != null && policyDoc.exists() && policyDoc.data != null) {
-                    DevicePolicyBundle.fromMap(policyDoc.data!!)
-                } else {
-                    DevicePolicyBundle.defaultPolicy()
-                }
+                val basePolicy = policyDoc?.data?.let { DevicePolicyBundle.fromMap(it) }
+                    ?: DevicePolicyBundle.defaultPolicy()
 
                 val updatedPolicy = basePolicy.copy(
                     guardianUid = myUid,
@@ -277,11 +274,9 @@ class AccountabilityRepository private constructor(context: Context) {
                 }
 
                 val currentVersion = myPolicyDoc?.getLong("version") ?: 1L
-                val basePolicy = if (myPolicyDoc != null && myPolicyDoc.exists() && myPolicyDoc.data != null) {
-                    DevicePolicyBundle.fromMap(myPolicyDoc.data!!)
-                } else {
-                    database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
-                }
+                val basePolicy = myPolicyDoc?.data?.let { DevicePolicyBundle.fromMap(it) }
+                    ?: database.getDevicePolicy()?.toBundle()
+                    ?: DevicePolicyBundle.defaultPolicy()
 
                 val updatedMyPolicy = basePolicy.copy(
                     guardianUid = targetUid,
@@ -469,8 +464,9 @@ class AccountabilityRepository private constructor(context: Context) {
             }
 
             val cloudSnapshot = firestore.collection("policies").document(uid).get().await()
-            if (cloudSnapshot.exists() && cloudSnapshot.data != null) {
-                val cloudPolicy = DevicePolicyBundle.fromMap(cloudSnapshot.data!!)
+            val cloudData = cloudSnapshot.data
+            if (cloudSnapshot.exists() && cloudData != null) {
+                val cloudPolicy = DevicePolicyBundle.fromMap(cloudData)
                 val isCloudSupervised = cloudPolicy.isSupervised && !cloudPolicy.guardianUid.isNullOrBlank()
 
                 if (!isCloudSupervised) {
@@ -921,8 +917,9 @@ class AccountabilityRepository private constructor(context: Context) {
     suspend fun fetchWardPolicy(wardUid: String): DevicePolicyBundle? = withContext(Dispatchers.IO) {
         try {
             val snapshot = firestore.collection("policies").document(wardUid).get().await()
-            if (snapshot.exists() && snapshot.data != null) {
-                DevicePolicyBundle.fromMap(snapshot.data!!)
+            val data = snapshot.data
+            if (snapshot.exists() && data != null) {
+                DevicePolicyBundle.fromMap(data)
             } else null
         } catch (e: Exception) {
             Log.w(TAG, "Failed fetching ward policy for $wardUid: ${e.message}")

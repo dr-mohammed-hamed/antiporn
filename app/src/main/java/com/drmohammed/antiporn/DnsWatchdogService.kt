@@ -43,7 +43,12 @@ class DnsWatchdogService : Service() {
         const val NOTIFICATION_ID = 1001
         private const val DEBOUNCE_DELAY_MS = 500L
         private const val SCREEN_DEBOUNCE_DELAY_MS = 500L
-        private const val HEARTBEAT_INTERVAL_MS = 60_000L
+        // صمام أمان دوري مريح للبطارية (15 دقيقة):
+        // التعدي على الـ DNS يُرصد لحظياً عبر dnsObserver (ContentObserver)،
+        // وتثبيت التطبيقات يرصد فورياً عبر packageReceiver (ACTION_PACKAGE_ADDED)،
+        // وفتح/قفل الشاشة يرصد لحظياً عبر screenReceiver،
+        // وبالتالي فإن النبضة الدورية لا تحتاج لإيقاظ المعالج كل دقيقة.
+        private const val HEARTBEAT_INTERVAL_MS = 15 * 60_000L // 15 دقيقة كصمام أمان دوري مريح للبطارية
         private const val CLOUD_HEARTBEAT_INTERVAL_MS = 12 * 3600 * 1000L
         private const val OTA_UPDATE_CHECK_INTERVAL_MS = 12 * 3600 * 1000L
 
@@ -90,7 +95,7 @@ class DnsWatchdogService : Service() {
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
-            Log.d(TAG, "Layer 3 - Periodic heartbeat (60s): cleaning stray apps & verifying shields")
+            Log.d(TAG, "Layer 3 - Periodic heartbeat (15m): cleaning stray apps & verifying shields")
             AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
             checkAndEnforceProtection()
             TrustedTimeProvider.syncNowAsync(applicationContext)

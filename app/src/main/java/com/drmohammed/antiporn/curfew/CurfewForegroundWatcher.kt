@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 object CurfewForegroundWatcher {
 
     private const val TAG = "AntiPorn_CurfewWatcher"
-    private const val POLL_INTERVAL_MS = 300L
+    private const val POLL_INTERVAL_MS = 1000L // 1 ثانية لتخفيف استهلاك المعالج
     private const val TOAST_COOLDOWN_MS = 3000L
     private const val INITIAL_LOOKBACK_MS = 5000L
 

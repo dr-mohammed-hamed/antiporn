@@ -11,6 +11,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import com.drmohammed.antiporn.di.appModule
+import org.koin.android.ext.koin.androidContext
+import org.koin.android.ext.koin.androidLogger
+import org.koin.core.context.GlobalContext
+import org.koin.core.context.startKoin
+import org.koin.core.logger.Level
 
 /**
  * Custom Application class for AntiPorn.
@@ -20,6 +26,15 @@ import kotlinx.coroutines.launch
 class AntiPornApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        // Initialize Koin Dependency Injection
+        if (GlobalContext.getOrNull() == null) {
+            startKoin {
+                androidLogger(Level.ERROR)
+                androidContext(this@AntiPornApplication)
+                modules(appModule)
+            }
+        }
 
         // 1. Install Global Crash Handler immediately before any subsystem initializes
         GlobalCrashHandler.install(this)

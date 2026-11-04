@@ -5,7 +5,36 @@ plugins {
 import java.util.Properties
 import java.io.FileInputStream
 
-
+val googleServicesFile = file("google-services.json")
+if (!googleServicesFile.exists()) {
+    googleServicesFile.writeText("""
+        {
+          "project_info": {
+            "project_number": "1234567890",
+            "project_id": "antiporn-mock",
+            "storage_bucket": "antiporn-mock.appspot.com"
+          },
+          "client": [
+            {
+              "client_info": {
+                "mobilesdk_app_id": "1:1234567890:android:mockappiddrmohammed",
+                "android_client_info": {
+                  "package_name": "com.drmohammed.antiporn"
+                }
+              },
+              "oauth_client": [],
+              "api_key": [
+                {
+                  "current_key": "fake_api_key_for_debug_builds"
+                }
+              ],
+              "services": {}
+            }
+          ],
+          "configuration_version": "1"
+        }
+    """.trimIndent())
+}
 
 android {
     namespace = "com.drmohammed.antiporn"
@@ -90,6 +119,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+    buildFeatures {
+        viewBinding = true
+    }
+
     androidResources {
         noCompress += "tflite"
         noCompress += "onnx"
@@ -130,9 +163,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
 
-    // Local Data Layer
-    implementation(libs.androidx.room.runtime)
-
     // Wireless ADB & Device Owner Provisioning
     implementation(libs.adb.kt)
 
@@ -144,12 +174,15 @@ dependencies {
     implementation(libs.mlkit.barcode.scanning)
     implementation("androidx.print:print:1.0.0")
 
+    // Dependency Injection (Koin)
+    implementation(libs.koin.android)
+    testImplementation(libs.koin.test)
+
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }
-
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {

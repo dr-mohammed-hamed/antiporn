@@ -80,10 +80,28 @@ object SystemTamperShield : ProtectionShield {
                 Log.w(TAG, "Could not set uninstall blocked", e)
             }
 
+            // 4.1 Prevent clearing application data for self package (Requires DO)
+            if (isDo) {
+                try {
+                    // Invoked via reflection to support OEM/extended DPM APIs without breaking public SDK compilation
+                    val method = dpm.javaClass.getMethod(
+                        "setClearApplicationUserDataBlocked",
+                        ComponentName::class.java,
+                        String::class.java,
+                        Boolean::class.javaPrimitiveType
+                    )
+                    method.invoke(dpm, admin, context.packageName, true)
+                    Log.i(TAG, "Application data clearing blocked successfully for self package")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not setClearApplicationUserDataBlocked: ${e.message}")
+                }
+            }
+
             // 5. Block Date & Time tampering (Requires DO and isDateTimeLocked policy enabled by supervisor)
             val isDateTimeLocked = try {
                 com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isDateTimeLocked
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to query isDateTimeLocked policy: ${e.message}", e)
                 false
             }
 
@@ -222,22 +240,40 @@ object SystemTamperShield : ProtectionShield {
             val targetTz = TimeZone.getTimeZone(targetTzId)
             TimeZone.setDefault(null) // Invalidate JVM cached default timezone to query fresh OS status
             val currentTz = TimeZone.getDefault()
+            val nowMs = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(context)
             val isTargetTz = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 currentTz.id == targetTzId || currentTz.hasSameRules(targetTz) ||
-                    currentTz.getOffset(System.currentTimeMillis()) == targetTz.getOffset(System.currentTimeMillis())
+                    currentTz.getOffset(nowMs) == targetTz.getOffset(nowMs)
             } else {
                 true // API < 28 cannot set system timezone via DPM
             }
 
             val isDateTimeLocked = try {
                 com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isDateTimeLocked
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to query isDateTimeLocked policy during evaluation: ${e.message}", e)
                 false
             }
 
             val isDo = dpm.isDeviceOwnerApp(context.packageName)
+            val isClearDataBlocked = if (isDo) {
+                try {
+                    val method = dpm.javaClass.getMethod(
+                        "isClearApplicationUserDataBlocked",
+                        ComponentName::class.java,
+                        String::class.java
+                    )
+                    (method.invoke(dpm, admin, context.packageName) as? Boolean) ?: true
+                } catch (e: Exception) {
+                    Log.d(TAG, "isClearApplicationUserDataBlocked reflection fallback: ${e.message}")
+                    true // If not supported directly by SDK/OEM, covered via DISALLOW_APPS_CONTROL
+                }
+            } else {
+                true
+            }
+
             val isFullyProtected = if (isDo) {
-                val baseProtected = isSafeBootBlocked && isFactoryResetBlocked && isAddUserBlocked && isUninstallBlocked
+                val baseProtected = isSafeBootBlocked && isFactoryResetBlocked && isAddUserBlocked && isUninstallBlocked && isClearDataBlocked
                 if (isDateTimeLocked) {
                     baseProtected && isDateTimeBlocked && isTargetTz
                 } else {

@@ -4,7 +4,7 @@
     android:viewportWidth="24"
     android:viewportHeight="24"
     android:tint="?attr/colorOnSurface">
-    <!-- Monochrome silhouette for status-bar smallIcon (CodeRabbit MAJOR-16). -->
+    <!-- Monochrome silhouette for status-bar smallIcon. -->
     <path
         android:fillColor="@android:color/white"
         android:pathData="M12,2L4,5v6c0,5 3.4,9.7 8,11 4.6,-1.3 8,-6 8,-11V5L12,2zM10,17l-4,-4 1.4,-1.4L10,14.2l6.6,-6.6L18,9l-8,8z" />
