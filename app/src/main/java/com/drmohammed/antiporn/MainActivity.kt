@@ -296,7 +296,6 @@ class MainActivity : AppCompatActivity(),
             DnsWatchdogService.startService(this)
             CurfewScheduler.scheduleNextAlarms(this)
             CurfewEnforcer.syncBlockStateAsync(this) {
-                CurfewEnforcer.repairStuckSuspendedApps(this)
                 if (!isFinishing && !isDestroyed) {
                     refreshUi(isEnforcing = false)
                 }

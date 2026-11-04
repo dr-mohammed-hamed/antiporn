@@ -602,6 +602,7 @@ object CurfewEnforcer {
      * Rescues and unsuspends any application that was inadvertently stuck in suspended state
      * (e.g. system apps, whitelisted apps, or pre-existing apps) during daytime when no curfew is active.
      */
+    @Synchronized
     fun repairStuckSuspendedApps(context: Context): Int {
         val appContext = context.applicationContext
         val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return 0
@@ -611,21 +612,35 @@ object CurfewEnforcer {
         val pm = appContext.packageManager ?: return 0
         val isCurfewRunning = isEffectiveBlockActive(appContext)
 
+        var fetchPolicyFailed = false
         val policy = try {
             PolicyRepository.getInstance(appContext).getCurrentPolicy()
         } catch (e: Exception) {
+            Log.e(TAG, "Failed fetching policy for stuck app repair - failing secure", e)
+            fetchPolicyFailed = true
             null
         }
         val customBlacklist = policy?.customBlacklistPackages ?: emptySet()
+        val isZeroTrustActive = policy?.lockNewInstallsUntilApproved ?: true
         val immunePackages = CurfewAppResolver.resolveImmunePackages(appContext)
-        val unapproved = try {
+
+        var fetchApprovalsFailed = false
+        val localApprovals = try {
             ApprovalRepository.getInstance(appContext).getLocalPendingApprovals()
-                .filter { !it.isApproved }
-                .map { it.packageName }
-                .toSet()
         } catch (e: Exception) {
-            emptySet()
+            Log.e(TAG, "Failed fetching approvals for stuck app repair - failing secure", e)
+            fetchApprovalsFailed = true
+            emptyList()
         }
+
+        // FAIL-SECURE: If policy or approvals could not be verified, never unsuspend arbitrary apps
+        if (fetchPolicyFailed || fetchApprovalsFailed) {
+            Log.w(TAG, "Fail-secure active: Aborting repairStuckSuspendedApps to protect device")
+            return 0
+        }
+
+        val approved = localApprovals.filter { it.isApproved }.map { it.packageName }.toSet()
+        val unapproved = localApprovals.filter { !it.isApproved }.map { it.packageName }.toSet()
 
         val installed = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -648,6 +663,18 @@ object CurfewEnforcer {
 
             // If curfew is running, only unsuspend if immune/whitelisted
             if (isCurfewRunning && !immunePackages.contains(pkg)) continue
+
+            // Under Zero-Trust, do NOT unsuspend unless explicitly approved, immune, or a pre-installed system app
+            if (isZeroTrustActive) {
+                val isImmune = immunePackages.contains(pkg) ||
+                    pkg == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE ||
+                    CurfewConfig.KNOWN_APP_STORES.contains(pkg)
+                val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM != 0) ||
+                    (app.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0)
+                if (!approved.contains(pkg) && !isImmune && !isSystem) {
+                    continue
+                }
+            }
 
             val isSuspended = try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
             if (isSuspended) {

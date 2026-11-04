@@ -12,6 +12,7 @@ import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.CurfewAppResolver
+import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
 import com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher
@@ -468,9 +469,25 @@ class PolicyRepository private constructor(context: Context) {
                     val newlyWhitelisted = bundle.customCurfewWhitelistPackages
                     val isBlockActive = CurfewEnforcer.isEffectiveBlockActive(appContext)
                     if (!isBlockActive && newlyWhitelisted.isNotEmpty()) {
+                        val isZeroTrustActive = bundle.lockNewInstallsUntilApproved
+                        val approvedPackages = if (isZeroTrustActive) {
+                            try {
+                                ApprovalRepository.getInstance(appContext).getLocalPendingApprovals()
+                                    .filter { it.isApproved }
+                                    .map { it.packageName }
+                                    .toSet()
+                            } catch (e: Exception) {
+                                emptySet()
+                            }
+                        } else emptySet()
+                        val immunePackages = if (isZeroTrustActive) {
+                            CurfewAppResolver.resolveImmunePackages(appContext)
+                        } else emptySet()
+
                         val whitelistedToUnsuspend = newlyWhitelisted.filter { pkg ->
                             !currentBlacklist.contains(pkg) &&
                             !AppSuspensionShield.isBlacklisted(pkg) &&
+                            (!isZeroTrustActive || approvedPackages.contains(pkg) || immunePackages.contains(pkg) || pkg == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE || CurfewConfig.KNOWN_APP_STORES.contains(pkg)) &&
                             try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
                         }.toTypedArray()
                         if (whitelistedToUnsuspend.isNotEmpty()) {
