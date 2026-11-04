@@ -3,6 +3,8 @@ package com.drmohammed.antiporn.data.repository
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.UserManager
 import android.util.Log
@@ -484,16 +486,30 @@ class PolicyRepository private constructor(context: Context) {
                             CurfewAppResolver.resolveImmunePackages(appContext)
                         } else emptySet()
 
+                        val pm = appContext.packageManager
                         val whitelistedToUnsuspend = newlyWhitelisted.filter { pkg ->
+                            val isSystemOrUpdatedApp = try {
+                                val ai = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    pm.getApplicationInfo(pkg, PackageManager.ApplicationInfoFlags.of(0))
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    pm.getApplicationInfo(pkg, 0)
+                                }
+                                (ai.flags and ApplicationInfo.FLAG_SYSTEM != 0) || (ai.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0)
+                            } catch (e: Exception) {
+                                false
+                            }
+
                             !currentBlacklist.contains(pkg) &&
                             !AppSuspensionShield.isBlacklisted(pkg) &&
-                            (!isZeroTrustActive || approvedPackages.contains(pkg) || immunePackages.contains(pkg) || pkg == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE || CurfewConfig.KNOWN_APP_STORES.contains(pkg)) &&
+                            (!isZeroTrustActive || approvedPackages.contains(pkg) || immunePackages.contains(pkg) || isSystemOrUpdatedApp || pkg == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE || CurfewConfig.KNOWN_APP_STORES.contains(pkg)) &&
                             try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
                         }.toTypedArray()
                         if (whitelistedToUnsuspend.isNotEmpty()) {
                             try {
                                 dpm.setPackagesSuspended(admin, whitelistedToUnsuspend, false)
                                 Log.i(TAG, "Unsuspended ${whitelistedToUnsuspend.size} newly whitelisted packages during daytime: ${whitelistedToUnsuspend.joinToString()}")
+                                AppInventoryManager.getInstance(appContext).syncInventoryToCloudAsync(force = true)
                             } catch (e: Exception) {
                                 Log.e(TAG, "Failed unsuspending newly whitelisted packages", e)
                             }

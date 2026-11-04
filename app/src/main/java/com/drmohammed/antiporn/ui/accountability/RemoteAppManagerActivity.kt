@@ -521,19 +521,34 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                     }
                 }
             } else {
+                val updatedBlacklist = customBlacklistPackages - pkg
+                val updatedCurfewWhitelist = customCurfewWhitelistPackages + pkg
+                val myUid = AccountabilityRepository.getInstance(applicationContext).getCachedUid()
                 val myName = AccountabilityRepository.getInstance(applicationContext).getMyDisplayName()
                     ?: getString(R.string.guardian_default_name)
-                val success = ApprovalRepository.getInstance(applicationContext).resolveWardApproval(
-                    wardUid = wardId,
-                    packageName = pkg,
-                    approve = true,
-                    guardianName = myName
+
+                val updatedPolicy = currentPolicy.copy(
+                    guardianUid = currentPolicy.guardianUid?.takeIf { it.isNotBlank() } ?: myUid,
+                    guardianName = currentPolicy.guardianName?.takeIf { it.isNotBlank() } ?: myName,
+                    isSupervised = true,
+                    customBlacklistPackages = updatedBlacklist,
+                    customCurfewWhitelistPackages = updatedCurfewWhitelist,
+                    updatedAt = System.currentTimeMillis()
                 )
+
+                val success = PolicyRepository.getInstance(applicationContext).pushPolicyToWard(wardId, updatedPolicy)
 
                 withContext(Dispatchers.Main) {
                     if (isFinishing || isDestroyed) return@withContext
                     progressBar.visibility = View.GONE
                     if (success) {
+                        customBlacklistPackages.remove(pkg)
+                        customCurfewWhitelistPackages.add(pkg)
+                        currentPolicy = updatedPolicy
+                        initialBlacklist = customBlacklistPackages.toSet()
+                        initialCurfewWhitelist = customCurfewWhitelistPackages.toSet()
+                        updateSaveButtonState()
+
                         Toast.makeText(
                             this@RemoteAppManagerActivity,
                             getString(R.string.toast_quick_unsuspend_remote_sent, displayName, wardName),
