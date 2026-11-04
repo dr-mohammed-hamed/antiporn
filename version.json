@@ -1,11 +1,11 @@
 {
-  "versionCode": 9,
-  "versionName": "1.71",
+  "versionCode": 10,
+  "versionName": "1.72",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 41995051,
+  "fileSizeBytes": 42015531,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.71: دعم استثناء تطبيقات محددة من حظر الإنترنت أثناء حظر التجوال (Curfew App Bypass)، تحصين إنهاء حظر التجوال الفوري وحماية تطبيق الطوارئ، إضافة شارة المزامنة اللحظية (Live Sync Badge) وتأكيد استلام السياسات فورياً بين المراقب والمستفيد.",
-  "releaseDate": "2026-11-03"
+  "releaseNotes": "إصدار 1.72: دعم السحب الأفقي السلس بين الشاشات والتبويبات الرئيسية (WhatsApp-Style Swiping)، إضافة بوابة قفل الحماية الذاتية (SelfControl Gate) لتعزيز الالتزام ومنع التعديل أثناء الحظر، وتحصين استثناءات حظر التجوال وحفظ حالة السياسات تلقائياً.",
+  "releaseDate": "2026-11-04"
 }
