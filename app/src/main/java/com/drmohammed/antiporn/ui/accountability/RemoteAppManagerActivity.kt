@@ -7,6 +7,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -179,6 +180,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
 
         rvAppsList.layoutManager = LinearLayoutManager(this)
         adapter = RemoteAppsAdapter(
+            isLocalMode = isLocalMode,
             customBlacklist = customBlacklistPackages,
             customCurfewWhitelist = customCurfewWhitelistPackages,
             curfewVpnBypass = curfewVpnBypassPackages,
@@ -533,6 +535,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
     override fun onDestroy() {
         inventoryListener?.remove()
         inventoryListener = null
+        AppIconResolver.clear()
         super.onDestroy()
     }
 
@@ -549,6 +552,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
      * Enforces mutual exclusivity: 24/7 freeze disables curfew exception.
      */
     private class RemoteAppsAdapter(
+        private val isLocalMode: Boolean,
         private val customBlacklist: MutableSet<String>,
         private val customCurfewWhitelist: MutableSet<String>,
         private val curfewVpnBypass: MutableSet<String>,
@@ -590,6 +594,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         }
 
         class AppViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val ivAppIcon: ImageView = view.findViewById(R.id.ivAppIcon)
             val tvAppName: TextView = view.findViewById(R.id.tvAppName)
             val tvPackageName: TextView = view.findViewById(R.id.tvPackageName)
             val switchFreeze247: MaterialSwitch = view.findViewById(R.id.switchFreeze247)
@@ -611,12 +616,25 @@ class RemoteAppManagerActivity : AppCompatActivity() {
 
         override fun getItemCount(): Int = displayedApps.size
 
+        override fun onViewRecycled(holder: AppViewHolder) {
+            super.onViewRecycled(holder)
+            AppIconResolver.cancelLoad(holder.ivAppIcon)
+        }
+
         override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
             val app = displayedApps[position]
             val pkg = app.packageName
+            val displayName = app.appName.ifBlank { pkg }
 
-            holder.tvAppName.text = app.appName.ifBlank { pkg }
+            holder.tvAppName.text = displayName
             holder.tvPackageName.text = pkg
+
+            AppIconResolver.loadIcon(
+                imageView = holder.ivAppIcon,
+                packageName = pkg,
+                appName = displayName,
+                isLocalMode = isLocalMode
+            )
 
             // Clear listeners before toggling checked state to prevent recycler recycling bugs
             holder.switchFreeze247.setOnCheckedChangeListener(null)
