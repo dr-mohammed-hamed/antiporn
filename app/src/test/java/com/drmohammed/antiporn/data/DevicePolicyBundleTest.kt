@@ -27,7 +27,7 @@ class DevicePolicyBundleTest {
         assertTrue(policy.isIncognitoBlocked)
         assertTrue(policy.lockNewInstallsUntilApproved)
         assertTrue(policy.customBlacklistPackages.isEmpty())
-        assertTrue(policy.customCurfewWhitelistPackages.isEmpty())
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST, policy.customCurfewWhitelistPackages)
         assertTrue(policy.curfewVpnBypassPackages.isEmpty())
         assertTrue(policy.protectedAppPackages.isEmpty())
         assertEquals(DevicePolicyBundle.BROWSER_FILTER_OFF, policy.browserFilterMode)
@@ -218,6 +218,34 @@ class DevicePolicyBundleTest {
         val emptyTzPolicy = DevicePolicyBundle(timeZoneId = "")
         val reconciled = DevicePolicyBundle.reconcileLegacyV1(emptyTzPolicy)
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_TIMEZONE_ID, reconciled.timeZoneId)
+    }
+
+    @Test
+    fun testCurfewWhitelist_intentionalEmptyVsMissing() {
+        val missingJson = """
+            {
+                "version": 1
+            }
+        """.trimIndent()
+        val parsedMissing = DevicePolicyBundle.fromJson(missingJson)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST, parsedMissing.customCurfewWhitelistPackages)
+
+        val explicitEmptyJson = """
+            {
+                "version": 1,
+                "customCurfewWhitelistPackages": []
+            }
+        """.trimIndent()
+        val parsedEmpty = DevicePolicyBundle.fromJson(explicitEmptyJson)
+        assertTrue(parsedEmpty.customCurfewWhitelistPackages.isEmpty())
+
+        val missingMap = emptyMap<String, Any?>()
+        val parsedMissingMap = DevicePolicyBundle.fromMap(missingMap)
+        assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST, parsedMissingMap.customCurfewWhitelistPackages)
+
+        val explicitEmptyMap = mapOf<String, Any?>("customCurfewWhitelistPackages" to emptyList<String>())
+        val parsedEmptyMap = DevicePolicyBundle.fromMap(explicitEmptyMap)
+        assertTrue(parsedEmptyMap.customCurfewWhitelistPackages.isEmpty())
     }
 
     @Test

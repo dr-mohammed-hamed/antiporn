@@ -365,10 +365,10 @@ object CurfewEnforcer {
             // 4. Start foreground watcher for instant auto-kickout if Play Store UI is launched
             CurfewForegroundWatcher.start(context)
 
-            // Save set of curfew-suspended packages
+            // Save set of curfew-suspended packages (only apps actually suspended during this enforcement cycle)
             val savedSet = prefs.getStringSet(CurfewConfig.KEY_CURFEW_SUSPENDED_PACKAGES, emptySet())?.toMutableSet()
                 ?: mutableSetOf()
-            savedSet.addAll(targets)
+            savedSet.addAll(toSuspend)
             prefs.edit().putStringSet(CurfewConfig.KEY_CURFEW_SUSPENDED_PACKAGES, savedSet).apply()
             true
         } else {
@@ -444,7 +444,8 @@ object CurfewEnforcer {
                     val isImmuneOrStore = CurfewAppResolver.isSystemCriticalOrImmune(context, pkg) ||
                         pkg == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE ||
                         CurfewConfig.KNOWN_APP_STORES.contains(pkg)
-                    if (!isApproved && !isImmuneOrStore) {
+                    val wasSuspendedByCurfew = recordedCurfewPackages.contains(pkg)
+                    if (!isApproved && !isImmuneOrStore && !wasSuspendedByCurfew) {
                         return@filter false
                     }
                 }

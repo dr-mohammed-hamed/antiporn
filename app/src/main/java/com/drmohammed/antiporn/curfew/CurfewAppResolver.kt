@@ -119,29 +119,17 @@ object CurfewAppResolver {
     }
 
     /**
-     * Dynamically identifies if an application is classified as a game by the Android system.
-     */
-    fun isGameApp(appInfo: ApplicationInfo): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (appInfo.category == ApplicationInfo.CATEGORY_GAME) return true
-        }
-        @Suppress("DEPRECATION")
-        return (appInfo.flags and ApplicationInfo.FLAG_IS_GAME) != 0
-    }
-
-    /**
-     * Resolves all system immune packages dynamically (keyboards, launcher, dialer, camera, SMS, contacts, Quran, Audiobooks, Medical apps, and Games).
+     * Resolves all system immune packages dynamically (keyboards, launcher, dialer, camera, SMS, contacts, clock, and whitelisted/exempt packages).
      */
     fun resolveImmunePackages(context: Context): Set<String> {
         val immune = mutableSetOf<String>()
         val pm = context.packageManager
 
-        // 1. Static Critical & User Whitelist
+        // 1. Static Critical & Self Package
         immune.addAll(CurfewConfig.SYSTEM_CRITICAL_PACKAGES)
-        immune.addAll(CurfewConfig.STATIC_WHITELIST)
         immune.add(context.packageName)
 
-        // Custom Curfew Whitelist from Policy (excluding any custom blacklisted packages)
+        // 2. User Curfew Whitelist from Policy (authoritative Single Source of Truth)
         val customBlacklist = try {
             com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context)
                 .getCurrentPolicy().customBlacklistPackages
@@ -155,25 +143,8 @@ object CurfewAppResolver {
                 .getCurrentPolicy().customCurfewWhitelistPackages
             immune.addAll(customWhitelist - customBlacklist)
         } catch (e: Exception) {
-            Log.w(TAG, "Error querying customCurfewWhitelistPackages", e)
-        }
-
-        // 2. Dynamic Discovery of ALL Quran, Islamic, Audiobook, Podcast, Medical, and Game apps installed on the phone
-        try {
-            val installedApps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                pm.getInstalledApplications(0)
-            }
-            for (app in installedApps) {
-                if (AppPolicyRegistry.isExemptFromCurfew(app.packageName) || isIslamicOrQuranApp(pm, app) || isAudiobookOrPodcastApp(pm, app) || isMedicalOrStudyApp(pm, app) || isMediaOrAlternativePlayerApp(pm, app) || isGameApp(app)) {
-                    immune.add(app.packageName)
-                    Log.i(TAG, "Exempted Whitelist app dynamically: ${app.packageName}")
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Error scanning installed apps for whitelisted packages", e)
+            Log.w(TAG, "Error querying customCurfewWhitelistPackages, falling back to static whitelist", e)
+            immune.addAll(CurfewConfig.STATIC_WHITELIST - customBlacklist)
         }
 
         // 3. Default Home Launcher
@@ -262,21 +233,38 @@ object CurfewAppResolver {
             Log.w(TAG, "Error resolving contacts packages", e)
         }
 
-        // 9. Calculator, Clock, and Recorder
+        // 9. Clocks & Alarms (Unconditionally immune to guarantee morning wakeups and alarms)
         try {
-            immune.addAll(CurfewConfig.KNOWN_CALCULATOR_PACKAGES)
             immune.addAll(CurfewConfig.KNOWN_CLOCK_PACKAGES)
-            immune.addAll(CurfewConfig.KNOWN_RECORDER_PACKAGES)
-
-            // Dynamic Calculator
-            val calcIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALCULATOR)
-            pm.resolveActivity(calcIntent, 0)?.activityInfo?.packageName?.let { immune.add(it) }
-
-            // Dynamic Clock
             val clockIntent = Intent(AlarmClock.ACTION_SHOW_ALARMS)
-            pm.resolveActivity(clockIntent, 0)?.activityInfo?.packageName?.let { immune.add(it) }
+            val clockResolveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.resolveActivity(clockIntent, PackageManager.ResolveInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.resolveActivity(clockIntent, 0)
+            }
+            clockResolveInfo?.activityInfo?.packageName?.let { immune.add(it) }
         } catch (e: Exception) {
-            Log.w(TAG, "Error resolving utility packages", e)
+            Log.w(TAG, "Error resolving clock packages", e)
+        }
+
+        // 10. Check installed packages against AppPolicyRegistry.isExemptFromCurfew(pkg)
+        // to ensure wildcard rules (e.g. "com.dr.tech.*", "org.schabi.newpipe.*") and policy exemptions are respected
+        try {
+            val installedApps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getInstalledApplications(0)
+            }
+            for (app in installedApps) {
+                val pkg = app.packageName
+                if (AppPolicyRegistry.isExemptFromCurfew(pkg)) {
+                    immune.add(pkg)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error checking installed packages for curfew exemption", e)
         }
 
         // Strictly ensure no blacklisted, custom blacklisted, app store, or curfew search loophole package ever gains immunity
