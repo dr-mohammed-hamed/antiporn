@@ -278,7 +278,8 @@ class ApprovalRepository private constructor(context: Context) {
 
         val isBlockActive = CurfewEnforcer.isEffectiveBlockActive(appContext)
         val isWhitelisted = CurfewConfig.STATIC_WHITELIST.contains(packageName) ||
-                CurfewAppResolver.resolveImmunePackages(appContext).contains(packageName)
+                CurfewAppResolver.resolveImmunePackages(appContext).contains(packageName) ||
+                policy.customCurfewWhitelistPackages.contains(packageName)
 
         if (isBlockActive && !isWhitelisted) {
             Log.i(TAG, "Package $packageName approved by $decidedBy, but kept suspended until curfew wakeup")
@@ -330,6 +331,7 @@ class ApprovalRepository private constructor(context: Context) {
                 Log.i(TAG, "Unfrozen and approved package: $packageName")
                 ZeroTrustForegroundWatcher.syncWatcherState(appContext)
                 syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
+                AppInventoryManager.getInstance(appContext).syncInventoryToCloudAsync(force = true)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed unfreezing package $packageName", e)

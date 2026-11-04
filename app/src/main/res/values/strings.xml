@@ -521,6 +521,14 @@
     <string name="toast_app_manager_save_failed">فشل حفظ سياسات التطبيقات</string>
 
     <string name="status_currently_suspended">مجمد حالياً على الهاتف</string>
+    <string name="btn_quick_unsuspend">فك التجميد الآن</string>
+    <string name="dialog_quick_unsuspend_title">فك تجميد التطبيق</string>
+    <string name="dialog_quick_unsuspend_msg_local">هل تريد فك تجميد تطبيق %1$s فوراً على هاتفك؟</string>
+    <string name="dialog_quick_unsuspend_msg_remote">هل تريد إرسال أمر فك تجميد فوري لتطبيق %1$s على هاتف %2$s؟</string>
+    <string name="toast_quick_unsuspend_local_success">تم فك تجميد %1$s بنجاح</string>
+    <string name="toast_quick_unsuspend_remote_sent">تم إرسال أمر فك التجميد لتطبيق %1$s إلى هاتف %2$s بنجاح</string>
+    <string name="toast_quick_unsuspend_failed">تعذر فك تجميد التطبيق: %1$s</string>
+    <string name="btn_unsuspend_action">فك التجميد</string>
     <string name="btn_repair_stuck_apps">إصلاح وفك تجميد التطبيقات المعلقة</string>
     <string name="toast_repair_stuck_apps_success">تم فك تجميد %1$d تطبيق معلق بنجاح</string>
     <string name="toast_no_stuck_apps">جميع التطبيقات في حالتها الطبيعية ولا توجد تطبيقات معلقة</string>

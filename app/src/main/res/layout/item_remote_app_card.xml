@@ -64,19 +64,40 @@
                     android:textSize="11sp"
                     tools:text="com.android.chrome" />
 
-                <TextView
-                    android:id="@+id/tvPhysicalStatus"
+                <LinearLayout
+                    android:id="@+id/layoutPhysicalSuspensionAlert"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/bg_shield_status_badge_amber"
-                    android:paddingHorizontal="6dp"
-                    android:paddingVertical="2dp"
-                    android:text="@string/status_currently_suspended"
-                    android:textColor="@color/shield_amber_calm"
-                    android:textSize="10sp"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
                     android:visibility="gone"
-                    tools:visibility="visible" />
+                    tools:visibility="visible">
+
+                    <TextView
+                        android:id="@+id/tvPhysicalStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_shield_status_badge_amber"
+                        android:paddingHorizontal="6dp"
+                        android:paddingVertical="2dp"
+                        android:text="@string/status_currently_suspended"
+                        android:textColor="@color/shield_amber_calm"
+                        android:textSize="10sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnQuickUnsuspend"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="8dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:paddingHorizontal="10dp"
+                        android:paddingVertical="0dp"
+                        android:text="@string/btn_quick_unsuspend"
+                        android:textSize="11sp" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
 

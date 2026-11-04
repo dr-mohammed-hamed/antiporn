@@ -95,6 +95,14 @@
     <string name="toast_app_manager_saved">App policies successfully saved</string>
     <string name="toast_app_manager_save_failed">Failed to save app policies</string>
     <string name="status_currently_suspended">Currently Suspended on Device</string>
+    <string name="btn_quick_unsuspend">Unfreeze Now</string>
+    <string name="dialog_quick_unsuspend_title">Unfreeze Application</string>
+    <string name="dialog_quick_unsuspend_msg_local">Do you want to immediately unfreeze %1$s on your device?</string>
+    <string name="dialog_quick_unsuspend_msg_remote">Do you want to send an instant unfreeze command for %1$s to %2$s\'s device?</string>
+    <string name="toast_quick_unsuspend_local_success">Successfully unfrozen %1$s</string>
+    <string name="toast_quick_unsuspend_remote_sent">Instant unfreeze command for %1$s sent to %2$s</string>
+    <string name="toast_quick_unsuspend_failed">Failed to unfreeze application: %1$s</string>
+    <string name="btn_unsuspend_action">Unfreeze</string>
     <string name="btn_repair_stuck_apps">Fix &amp; Unfreeze Stuck Apps</string>
     <string name="toast_repair_stuck_apps_success">Successfully unsuspended %1$d stuck apps</string>
     <string name="toast_no_stuck_apps">All apps are in normal state, no stuck apps found</string>

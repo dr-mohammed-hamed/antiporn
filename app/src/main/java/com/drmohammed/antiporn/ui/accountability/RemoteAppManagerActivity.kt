@@ -27,6 +27,9 @@ import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.data.model.InstalledAppDto
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
+import android.content.ComponentName
+import com.drmohammed.antiporn.AdminReceiver
+import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -206,6 +209,9 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             },
             onStateChanged = {
                 updateSaveButtonState()
+            },
+            onQuickUnsuspendClicked = { app ->
+                confirmAndExecuteQuickUnsuspend(app)
             }
         )
         rvAppsList.adapter = adapter
@@ -443,6 +449,109 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         }
     }
 
+    private fun confirmAndExecuteQuickUnsuspend(app: InstalledAppDto) {
+        if (isFinishing || isDestroyed) return
+        val pkg = app.packageName
+        val displayName = app.appName.ifBlank { pkg }
+
+        val title = getString(R.string.dialog_quick_unsuspend_title)
+        val message = if (isLocalMode) {
+            getString(R.string.dialog_quick_unsuspend_msg_local, displayName)
+        } else {
+            getString(R.string.dialog_quick_unsuspend_msg_remote, displayName, wardName)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setNegativeButton(android.R.string.cancel) { dialog, _ ->
+                dialog.dismiss()
+            }
+            .setPositiveButton(R.string.btn_unsuspend_action) { dialog, _ ->
+                dialog.dismiss()
+                executeQuickUnsuspend(app)
+            }
+            .show()
+    }
+
+    private fun executeQuickUnsuspend(app: InstalledAppDto) {
+        if (isFinishing || isDestroyed) return
+        val pkg = app.packageName
+        val displayName = app.appName.ifBlank { pkg }
+
+        progressBar.visibility = View.VISIBLE
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            if (isLocalMode) {
+                val dpm = getSystemService(DEVICE_POLICY_SERVICE) as? android.app.admin.DevicePolicyManager
+                val admin = ComponentName(applicationContext, AdminReceiver::class.java)
+                val isDo = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(applicationContext)
+
+                var success = false
+                var errorMsg: String? = null
+
+                if (isDo && dpm != null) {
+                    try {
+                        val failed = dpm.setPackagesSuspended(admin, arrayOf(pkg), false)
+                        success = failed.isEmpty()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error unsuspending package locally: $pkg", e)
+                        errorMsg = e.message
+                    }
+                } else {
+                    errorMsg = "Device Owner not active"
+                }
+
+                withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
+                    progressBar.visibility = View.GONE
+                    if (success) {
+                        Toast.makeText(
+                            this@RemoteAppManagerActivity,
+                            getString(R.string.toast_quick_unsuspend_local_success, displayName),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        adapter.updateAppSuspensionState(pkg, false)
+                    } else {
+                        Toast.makeText(
+                            this@RemoteAppManagerActivity,
+                            getString(R.string.toast_quick_unsuspend_failed, errorMsg ?: ""),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } else {
+                val myName = AccountabilityRepository.getInstance(applicationContext).getMyDisplayName()
+                    ?: getString(R.string.guardian_default_name)
+                val success = ApprovalRepository.getInstance(applicationContext).resolveWardApproval(
+                    wardUid = wardId,
+                    packageName = pkg,
+                    approve = true,
+                    guardianName = myName
+                )
+
+                withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
+                    progressBar.visibility = View.GONE
+                    if (success) {
+                        Toast.makeText(
+                            this@RemoteAppManagerActivity,
+                            getString(R.string.toast_quick_unsuspend_remote_sent, displayName, wardName),
+                            Toast.LENGTH_LONG
+                        ).show()
+                        adapter.updateAppSuspensionState(pkg, false)
+                    } else {
+                        Toast.makeText(
+                            this@RemoteAppManagerActivity,
+                            getString(R.string.toast_quick_unsuspend_failed, "Network error"),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+        }
+    }
+
     private fun saveChanges() {
         if (isSaving || !hasUnsavedChanges()) return
         isSaving = true
@@ -606,7 +715,8 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         private val getInitialCurfewWhitelist: () -> Set<String>,
         private val getInitialCurfewVpnBypass: () -> Set<String>,
         private val onFilterUpdated: (isEmpty: Boolean) -> Unit,
-        private val onStateChanged: () -> Unit
+        private val onStateChanged: () -> Unit,
+        private val onQuickUnsuspendClicked: (InstalledAppDto) -> Unit
     ) : RecyclerView.Adapter<RemoteAppsAdapter.AppViewHolder>() {
 
         private var allApps: List<InstalledAppDto> = emptyList()
@@ -639,11 +749,23 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             onFilterUpdated(displayedApps.isEmpty())
         }
 
+        fun updateAppSuspensionState(packageName: String, isSuspended: Boolean) {
+            allApps = allApps.map {
+                if (it.packageName == packageName) it.copy(isSuspended = isSuspended) else it
+            }
+            displayedApps = displayedApps.map {
+                if (it.packageName == packageName) it.copy(isSuspended = isSuspended) else it
+            }
+            notifyDataSetChanged()
+        }
+
         class AppViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val ivAppIcon: ImageView = view.findViewById(R.id.ivAppIcon)
             val tvAppName: TextView = view.findViewById(R.id.tvAppName)
             val tvPackageName: TextView = view.findViewById(R.id.tvPackageName)
+            val layoutPhysicalSuspensionAlert: View = view.findViewById(R.id.layoutPhysicalSuspensionAlert)
             val tvPhysicalStatus: TextView = view.findViewById(R.id.tvPhysicalStatus)
+            val btnQuickUnsuspend: MaterialButton = view.findViewById(R.id.btnQuickUnsuspend)
             val switchFreeze247: MaterialSwitch = view.findViewById(R.id.switchFreeze247)
             val switchAllowInCurfew: MaterialSwitch = view.findViewById(R.id.switchAllowInCurfew)
             val tvCurfewDisabledHint: TextView = view.findViewById(R.id.tvCurfewDisabledHint)
@@ -693,10 +815,21 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             holder.switchFreeze247.isChecked = isFrozen
 
             val isPhysicallySuspended = app.isSuspended
-            if (isPhysicallySuspended && !isFrozen) {
-                holder.tvPhysicalStatus.visibility = View.VISIBLE
+            val canQuickUnsuspend = isPhysicallySuspended && !isFrozen && !com.drmohammed.antiporn.shields.AppSuspensionShield.isBlacklisted(pkg)
+
+            if (canQuickUnsuspend) {
+                holder.layoutPhysicalSuspensionAlert.visibility = View.VISIBLE
+                holder.btnQuickUnsuspend.visibility = View.VISIBLE
+                holder.btnQuickUnsuspend.setOnClickListener {
+                    onQuickUnsuspendClicked(app)
+                }
+            } else if (isPhysicallySuspended && !isFrozen) {
+                holder.layoutPhysicalSuspensionAlert.visibility = View.VISIBLE
+                holder.btnQuickUnsuspend.visibility = View.GONE
+                holder.btnQuickUnsuspend.setOnClickListener(null)
             } else {
-                holder.tvPhysicalStatus.visibility = View.GONE
+                holder.layoutPhysicalSuspensionAlert.visibility = View.GONE
+                holder.btnQuickUnsuspend.setOnClickListener(null)
             }
 
             val isCurfewAllowed = !isFrozen && customCurfewWhitelist.contains(pkg)
