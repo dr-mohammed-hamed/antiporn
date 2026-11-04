@@ -1,11 +1,11 @@
 {
-  "versionCode": 10,
-  "versionName": "1.72",
+  "versionCode": 11,
+  "versionName": "1.73",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 42015531,
+  "fileSizeBytes": 42027961,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.72: دعم السحب الأفقي السلس بين الشاشات والتبويبات الرئيسية (WhatsApp-Style Swiping)، إضافة بوابة قفل الحماية الذاتية (SelfControl Gate) لتعزيز الالتزام ومنع التعديل أثناء الحظر، وتحصين استثناءات حظر التجوال وحفظ حالة السياسات تلقائياً.",
+  "releaseNotes": "إصدار 1.73: إصلاح جذري لعطل تعليق تطبيقات جوجل والنظام (الخرائط، اليوتيوب، الدرايف، التقويم، الصور)، تفعيل فك التجميد التلقائي اللحظي فور انتهاء الحظر أو الاستثناء نهاراً، إضافة شارة الحالة الحقيقية وزر الإنقاذ الذاتي لإصلاح التطبيقات المعلقة بنقرة واحدة.",
   "releaseDate": "2026-11-04"
 }

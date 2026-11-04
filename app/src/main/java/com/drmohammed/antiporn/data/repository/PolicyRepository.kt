@@ -464,6 +464,25 @@ class PolicyRepository private constructor(context: Context) {
                         }
                     }
 
+                    // Immediately unsuspend packages added to curfew whitelist or immune if curfew is inactive
+                    val newlyWhitelisted = bundle.customCurfewWhitelistPackages
+                    val isBlockActive = CurfewEnforcer.isEffectiveBlockActive(appContext)
+                    if (!isBlockActive && newlyWhitelisted.isNotEmpty()) {
+                        val whitelistedToUnsuspend = newlyWhitelisted.filter { pkg ->
+                            !currentBlacklist.contains(pkg) &&
+                            !AppSuspensionShield.isBlacklisted(pkg) &&
+                            try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+                        }.toTypedArray()
+                        if (whitelistedToUnsuspend.isNotEmpty()) {
+                            try {
+                                dpm.setPackagesSuspended(admin, whitelistedToUnsuspend, false)
+                                Log.i(TAG, "Unsuspended ${whitelistedToUnsuspend.size} newly whitelisted packages during daytime: ${whitelistedToUnsuspend.joinToString()}")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed unsuspending newly whitelisted packages", e)
+                            }
+                        }
+                    }
+
                     // App Protection (bundle.protectedAppPackages)
                     for (pkg in bundle.protectedAppPackages) {
                         try {

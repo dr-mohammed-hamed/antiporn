@@ -540,8 +540,19 @@ class ApprovalRepository private constructor(context: Context) {
         val admin = ComponentName(appContext, AdminReceiver::class.java)
         val isDo = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)
 
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            PackageManager.MATCH_UNINSTALLED_PACKAGES or PackageManager.MATCH_DISABLED_COMPONENTS
+        } else {
+            @Suppress("DEPRECATION")
+            PackageManager.GET_UNINSTALLED_PACKAGES or PackageManager.GET_DISABLED_COMPONENTS
+        }
         val installedPackages = try {
-            pm.getInstalledPackages(0) ?: emptyList()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(flags.toLong())) ?: emptyList()
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getInstalledPackages(flags) ?: emptyList()
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Failed retrieving installed packages for baseline seeding", e)
             emptyList()

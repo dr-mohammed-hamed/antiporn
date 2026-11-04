@@ -520,6 +520,11 @@
 
     <string name="toast_app_manager_save_failed">فشل حفظ سياسات التطبيقات</string>
 
+    <string name="status_currently_suspended">مجمد حالياً على الهاتف</string>
+    <string name="btn_repair_stuck_apps">إصلاح وفك تجميد التطبيقات المعلقة</string>
+    <string name="toast_repair_stuck_apps_success">تم فك تجميد %1$d تطبيق معلق بنجاح</string>
+    <string name="toast_no_stuck_apps">جميع التطبيقات في حالتها الطبيعية ولا توجد تطبيقات معلقة</string>
+
     <!-- Unsaved Changes & Dialog Clarifications -->
     <string name="dialog_unsaved_changes_title">تعديلات غير محفوظة</string>
 

@@ -3,6 +3,9 @@ package com.drmohammed.antiporn.curfew
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.UserManager
@@ -402,7 +405,8 @@ object CurfewEnforcer {
             // 4. Unsuspend curfew targets
             val recordedCurfewPackages = prefs.getStringSet(CurfewConfig.KEY_CURFEW_SUSPENDED_PACKAGES, emptySet()) ?: emptySet()
             val allInstalledTargets = CurfewAppResolver.getCurfewTargetPackages(context)
-            val candidates = (recordedCurfewPackages + allInstalledTargets).toSet()
+            val immunePackages = CurfewAppResolver.resolveImmunePackages(context)
+            val candidates = (recordedCurfewPackages + allInstalledTargets + immunePackages).toSet()
 
             // Retrieve pending/rejected unapproved packages and custom blacklisted packages (Fail-Secure)
             var fetchApprovalsFailed = false
@@ -433,7 +437,7 @@ object CurfewEnforcer {
             }
 
             // IRON RULE: NEVER unsuspend permanently blacklisted apps or unapproved/rejected apps or custom blacklists!
-            // Under Zero-Trust, stray/unrecorded candidates must NOT be unsuspended unless explicitly approved or immune/store.
+            // Under Zero-Trust, stray/unrecorded candidates must NOT be unsuspended unless explicitly approved, immune/store, or pre-installed system apps.
             val safeToUnsuspend = candidates.filter { pkg ->
                 if (AppSuspensionShield.isBlacklisted(pkg)) return@filter false
                 if (customBlacklistPackages.contains(pkg)) return@filter false
@@ -442,10 +446,24 @@ object CurfewEnforcer {
                 if (isZeroTrustActive) {
                     val isApproved = approvedPackages.contains(pkg)
                     val isImmuneOrStore = CurfewAppResolver.isSystemCriticalOrImmune(context, pkg) ||
+                        immunePackages.contains(pkg) ||
                         pkg == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE ||
                         CurfewConfig.KNOWN_APP_STORES.contains(pkg)
+                    val isSystemOrUpdatedApp = try {
+                        val pm = context.packageManager
+                        val ai = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            pm.getApplicationInfo(pkg, PackageManager.ApplicationInfoFlags.of(0))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            pm.getApplicationInfo(pkg, 0)
+                        }
+                        (ai.flags and ApplicationInfo.FLAG_SYSTEM != 0) ||
+                        (ai.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0)
+                    } catch (e: Exception) {
+                        false
+                    }
                     val wasSuspendedByCurfew = recordedCurfewPackages.contains(pkg)
-                    if (!isApproved && !isImmuneOrStore && !wasSuspendedByCurfew) {
+                    if (!isApproved && !isImmuneOrStore && !isSystemOrUpdatedApp && !wasSuspendedByCurfew) {
                         return@filter false
                     }
                 }
@@ -578,5 +596,73 @@ object CurfewEnforcer {
         } catch (e: Exception) {
             Log.e(TAG, "Error suspending newly installed package $packageName", e)
         }
+    }
+
+    /**
+     * Rescues and unsuspends any application that was inadvertently stuck in suspended state
+     * (e.g. system apps, whitelisted apps, or pre-existing apps) during daytime when no curfew is active.
+     */
+    fun repairStuckSuspendedApps(context: Context): Int {
+        val appContext = context.applicationContext
+        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return 0
+        val admin = ComponentName(appContext, AdminReceiver::class.java)
+        if (!dpm.isDeviceOwnerApp(appContext.packageName)) return 0
+
+        val pm = appContext.packageManager ?: return 0
+        val isCurfewRunning = isEffectiveBlockActive(appContext)
+
+        val policy = try {
+            PolicyRepository.getInstance(appContext).getCurrentPolicy()
+        } catch (e: Exception) {
+            null
+        }
+        val customBlacklist = policy?.customBlacklistPackages ?: emptySet()
+        val immunePackages = CurfewAppResolver.resolveImmunePackages(appContext)
+        val unapproved = try {
+            ApprovalRepository.getInstance(appContext).getLocalPendingApprovals()
+                .filter { !it.isApproved }
+                .map { it.packageName }
+                .toSet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+
+        val installed = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getInstalledApplications(0)
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+
+        val stuckToUnsuspend = mutableListOf<String>()
+        for (app in installed) {
+            val pkg = app.packageName
+            if (pkg == appContext.packageName) continue
+            if (AppSuspensionShield.isBlacklisted(pkg)) continue
+            if (customBlacklist.contains(pkg)) continue
+            if (unapproved.contains(pkg)) continue
+
+            // If curfew is running, only unsuspend if immune/whitelisted
+            if (isCurfewRunning && !immunePackages.contains(pkg)) continue
+
+            val isSuspended = try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+            if (isSuspended) {
+                stuckToUnsuspend.add(pkg)
+            }
+        }
+
+        if (stuckToUnsuspend.isNotEmpty()) {
+            try {
+                dpm.setPackagesSuspended(admin, stuckToUnsuspend.toTypedArray(), false)
+                Log.i(TAG, "🔧 [REPAIR_STUCK_APPS] Successfully unsuspended ${stuckToUnsuspend.size} stuck apps: $stuckToUnsuspend")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed repairing stuck apps via DPM", e)
+            }
+        }
+        return stuckToUnsuspend.size
     }
 }
