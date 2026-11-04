@@ -169,6 +169,7 @@ data class DevicePolicyBundle(
             browserFilterMode = BROWSER_FILTER_OFF,
             customBlockedUrls = emptySet(),
             customAllowedUrls = emptySet(),
+            customCurfewWhitelistPackages = com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST,
             dnsHost = ADGUARD_FAMILY_DNS_HOST,
             guardianUid = null,
             guardianName = null,
@@ -204,7 +205,11 @@ data class DevicePolicyBundle(
             val lockNew = (map["lockNewInstallsUntilApproved"] as? Boolean) ?: true
 
             val blacklist = (map["customBlacklistPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
-            val whitelist = (map["customCurfewWhitelistPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
+            val whitelist = if (!map.containsKey("customCurfewWhitelistPackages")) {
+                com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST
+            } else {
+                (map["customCurfewWhitelistPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
+            }
             val vpnBypass = (map["curfewVpnBypassPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
             val protectedApps = (map["protectedAppPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
 
@@ -284,18 +289,22 @@ data class DevicePolicyBundle(
                 }
 
                 val whitelist = mutableSetOf<String>()
-                val whitelistArr = json.optJSONArray("customCurfewWhitelistPackages")
+                if (json.has("customCurfewWhitelistPackages")) {
+                    val whitelistArr = json.optJSONArray("customCurfewWhitelistPackages")
+                    if (whitelistArr != null) {
+                        for (i in 0 until whitelistArr.length()) {
+                            whitelist.add(whitelistArr.getString(i))
+                        }
+                    }
+                } else {
+                    whitelist.addAll(com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST)
+                }
 
                 val vpnBypass = mutableSetOf<String>()
                 val vpnBypassArr = json.optJSONArray("curfewVpnBypassPackages")
                 if (vpnBypassArr != null) {
                     for (i in 0 until vpnBypassArr.length()) {
                         vpnBypass.add(vpnBypassArr.getString(i))
-                    }
-                }
-                if (whitelistArr != null) {
-                    for (i in 0 until whitelistArr.length()) {
-                        whitelist.add(whitelistArr.getString(i))
                     }
                 }
 

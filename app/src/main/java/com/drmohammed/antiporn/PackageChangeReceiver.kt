@@ -10,6 +10,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import com.drmohammed.antiporn.curfew.CurfewAppResolver
+import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher
 import com.drmohammed.antiporn.data.repository.AppInventoryManager
@@ -21,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -88,6 +90,47 @@ object PackageChangeHandler {
                     } else {
                         Log.w(TAG, "⚖️ [CURFEW_EVAL] Package $packageName approved or not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")
                         CurfewEnforcer.handlePackageAdded(appContext, packageName)
+                    }
+
+                    // Auto-whitelist Islamic/Quran, productive, or essential applications in curfew policy
+                    // Strictly prevent rogue app/browser/store curfew bypasses and respect Zero-Trust locking
+                    val isZeroTrustBlocked = policy.lockNewInstallsUntilApproved && !isAlreadyApproved
+                    val isBypassTarget = AppPolicyRegistry.isRestrictedBrowser(packageName) ||
+                        CurfewConfig.KNOWN_APP_STORES.contains(packageName) ||
+                        CurfewConfig.CURFEW_SEARCH_APPS.contains(packageName) ||
+                        policy.customBlacklistPackages.contains(packageName) ||
+                        AppSuspensionShield.isBlacklisted(packageName)
+
+                    if (!isZeroTrustBlocked && !isBypassTarget) {
+                        try {
+                            val isExplicitlyExempt = AppPolicyRegistry.isExemptFromCurfew(packageName)
+                            val pm = appContext.packageManager
+                            val appInfo = try {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                    pm.getApplicationInfo(packageName, android.content.pm.PackageManager.ApplicationInfoFlags.of(0))
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    pm.getApplicationInfo(packageName, 0)
+                                }
+                            } catch (e: Exception) {
+                                null
+                            }
+
+                            val isEligible = isExplicitlyExempt || (appInfo != null && (
+                                CurfewAppResolver.isIslamicOrQuranApp(pm, appInfo) ||
+                                CurfewAppResolver.isAudiobookOrPodcastApp(pm, appInfo) ||
+                                CurfewAppResolver.isMedicalOrStudyApp(pm, appInfo) ||
+                                CurfewAppResolver.isMediaOrAlternativePlayerApp(pm, appInfo)
+                            ))
+
+                            if (isEligible) {
+                                runBlocking {
+                                    PolicyRepository.getInstance(appContext).addAppToCurfewWhitelist(packageName)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error checking auto-whitelist eligibility for $packageName", e)
+                        }
                     }
 
                     if (AppPolicyRegistry.isRestrictedBrowser(packageName)) {

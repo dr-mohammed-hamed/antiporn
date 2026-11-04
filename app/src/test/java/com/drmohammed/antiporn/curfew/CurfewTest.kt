@@ -341,6 +341,42 @@ class CurfewTest {
         assertEquals(0, bundle.weekendCurfewEndMinute)
         assertEquals(CurfewConfig.getDefaultFallbackTimeZone(), bundle.timeZoneId)
         assertTrue(bundle.protectedAppPackages.isEmpty())
+        assertEquals(CurfewConfig.STATIC_WHITELIST, bundle.customCurfewWhitelistPackages)
+    }
+
+    @Test
+    fun testDefaultPolicy_seedsCurfewWhitelistWithWhatsAppAndRequiredApps() {
+        val bundle = com.drmohammed.antiporn.core.model.DevicePolicyBundle.defaultPolicy()
+        assertTrue("WhatsApp must be seeded in customCurfewWhitelistPackages by default",
+            bundle.customCurfewWhitelistPackages.contains("com.whatsapp"))
+        assertTrue("Daftar Al-Bahr must be seeded in customCurfewWhitelistPackages by default",
+            bundle.customCurfewWhitelistPackages.contains("com.dr.tech.daftar_albahr"))
+        assertTrue("Moshafy Quran must be seeded in customCurfewWhitelistPackages by default",
+            bundle.customCurfewWhitelistPackages.contains("com.islamicapp.moshafy"))
+        assertTrue("NewPipe must be seeded in customCurfewWhitelistPackages by default",
+            bundle.customCurfewWhitelistPackages.contains("org.schabi.newpipe"))
+    }
+
+    @Test
+    fun testCurfewWhitelist_preservesIntentionalEmptySet() {
+        val policyWithEmpty = com.drmohammed.antiporn.core.model.DevicePolicyBundle.defaultPolicy().copy(
+            customCurfewWhitelistPackages = emptySet()
+        )
+        val reconciled = com.drmohammed.antiporn.core.model.DevicePolicyBundle.reconcileLegacyV1(policyWithEmpty)
+        assertTrue("Reconciled legacy policy must preserve intentional empty customCurfewWhitelistPackages",
+            reconciled.customCurfewWhitelistPackages.isEmpty())
+    }
+
+    @Test
+    fun testLegacyPayloadWithoutCurfewWhitelist_seedsStaticWhitelist() {
+        val legacyJson = """
+            {
+                "curfewStartHour": 20,
+                "version": 1
+            }
+        """.trimIndent()
+        val parsed = com.drmohammed.antiporn.core.model.DevicePolicyBundle.fromJson(legacyJson)
+        assertEquals(CurfewConfig.STATIC_WHITELIST, parsed.customCurfewWhitelistPackages)
     }
 
     @Test
@@ -372,5 +408,18 @@ class CurfewTest {
         assertEquals(20, nextOccurrence.get(Calendar.HOUR_OF_DAY))
         assertEquals(0, nextOccurrence.get(Calendar.MINUTE))
         assertTrue(nextOccurrence.timeInMillis > cairoCal.timeInMillis)
+    }
+
+    @Test
+    fun testAppPolicyRegistry_wildcardCurfewExemptions() {
+        // Test wildcard matching com.dr.tech.*, org.schabi.newpipe.*, com.mxtech.videoplayer.*
+        assertTrue(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("com.dr.tech.pos_scanner"))
+        assertTrue(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("org.schabi.newpipe.nightly"))
+        assertTrue(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("com.mxtech.videoplayer.custom"))
+
+        // Blacklisted / rogue apps must NEVER be exempt
+        assertFalse(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("org.telegram.messenger"))
+        assertFalse(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("com.android.chrome"))
+        assertFalse(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("com.heytap.market"))
     }
 }

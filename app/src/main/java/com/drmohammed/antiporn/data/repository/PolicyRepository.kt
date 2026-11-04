@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
@@ -48,6 +50,9 @@ class PolicyRepository private constructor(context: Context) {
     val currentPolicyFlow: StateFlow<DevicePolicyBundle> = _currentPolicyFlow.asStateFlow()
 
     private var firestoreListener: ListenerRegistration? = null
+    private val firestoreSyncMutex = Mutex()
+    @Volatile
+    private var lastSyncedCloudVersion: Long = 0L
 
     init {
         com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = _currentPolicyFlow.value.isSelfControlAllowed
@@ -82,23 +87,24 @@ class PolicyRepository private constructor(context: Context) {
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed reconciling missing guardian in SQLite", e)
                     }
-                    loaded
-                } else if (!hasGuardians && loaded.version == 1L && loaded.isVpnBlackholeEnabled != com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED) {
-                    val reconciled = loaded.copy(
-                        isVpnBlackholeEnabled = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED,
-                        updatedAt = System.currentTimeMillis()
-                    )
+                }
+
+                var workingPolicy = loaded
+                var needsSave = false
+
+                if (!hasGuardians && workingPolicy.version == 1L && workingPolicy.isVpnBlackholeEnabled != com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED) {
+                    workingPolicy = workingPolicy.copy(isVpnBlackholeEnabled = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED)
+                    needsSave = true
+                }
+
+                if (needsSave) {
+                    val reconciled = workingPolicy.copy(updatedAt = TrustedTimeProvider.currentTimeMillis(appContext))
                     repositoryScope.launch {
                         try {
-                            val current = _currentPolicyFlow.value
-                            if (current.version == 1L && current.isVpnBlackholeEnabled == reconciled.isVpnBlackholeEnabled) {
-                                database.saveDevicePolicy(com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity.fromBundle(reconciled))
-                                Log.i(TAG, "Reconciled standalone device policy asynchronously with DEFAULT_VPN_BLACKHOLE_ENABLED=${com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED}")
-                            } else {
-                                Log.i(TAG, "Skipping async reconcile save: policy already superseded by v${current.version}")
-                            }
+                            database.saveDevicePolicy(com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity.fromBundle(reconciled))
+                            Log.i(TAG, "Reconciled standalone device policy on cold boot (version=${reconciled.version})")
                         } catch (e: Exception) {
-                            Log.e(TAG, "Failed saving reconciled standalone policy", e)
+                            Log.e(TAG, "Failed saving reconciled policy", e)
                         }
                     }
                     reconciled
@@ -277,6 +283,7 @@ class PolicyRepository private constructor(context: Context) {
     /**
      * Updates policy locally, saves to SQLite, and enforces on the device.
      */
+    @Synchronized
     fun updateLocalPolicyAndEnforce(bundle: DevicePolicyBundle) {
         val current = _currentPolicyFlow.value
         Log.i(TAG, "[SelfControlDiag] updateLocalPolicyAndEnforce: v${bundle.version}, isSupervised=${bundle.isSupervised}, isSelfControlAllowed=${bundle.isSelfControlAllowed}")
@@ -285,7 +292,11 @@ class PolicyRepository private constructor(context: Context) {
             Log.w(TAG, "Monotonic guard: rejected stale/out-of-order policy v${bundle.version}@${bundle.updatedAt} (current is v${current.version}@${current.updatedAt})")
             return
         }
+
+        database.saveDevicePolicy(DevicePolicyEntity.fromBundle(bundle))
         _currentPolicyFlow.value = bundle
+        com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = bundle.isSelfControlAllowed
+
         val wasSupervised = current.isSupervised
         val isNowSupervised = bundle.isSupervised
         if (wasSupervised && !isNowSupervised) {
@@ -299,8 +310,6 @@ class PolicyRepository private constructor(context: Context) {
                 }
             }
         }
-        database.saveDevicePolicy(DevicePolicyEntity.fromBundle(bundle))
-        com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = bundle.isSelfControlAllowed
         applyPolicyToSystem(bundle, current)
     }
 
@@ -530,27 +539,48 @@ class PolicyRepository private constructor(context: Context) {
         }
     }
 
+    private fun syncPolicyToCloudAsync(uid: String, bundle: DevicePolicyBundle) {
+        if (uid.isBlank()) return
+        repositoryScope.launch {
+            firestoreSyncMutex.withLock {
+                try {
+                    if (bundle.version >= lastSyncedCloudVersion) {
+                        FirebaseFirestore.getInstance().collection("policies").document(uid)
+                            .set(bundle.toMap())
+                            .await()
+                        lastSyncedCloudVersion = bundle.version
+                        Log.i(TAG, "Successfully synced policy v${bundle.version} to cloud ($uid)")
+                    } else {
+                        Log.d(TAG, "Skipping cloud sync for stale policy v${bundle.version} (already at v$lastSyncedCloudVersion)")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Policy cloud sync deferred (offline or error): ${e.message}")
+                }
+            }
+        }
+    }
+
     /**
      * Saves updated policy bundle directly for the local device, enforcing immediately
      * in SQLite and system engines (DPM), with asynchronous background cloud sync to Firestore.
      */
     suspend fun saveAndEnforceSelfPolicy(bundle: DevicePolicyBundle): Boolean = withContext(Dispatchers.IO) {
         try {
-            val current = _currentPolicyFlow.value
-            val isSupervised = current.isSupervised || bundle.isSupervised || try {
-                AccountabilityRepository.getInstance(appContext).isSupervised()
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to query accountability supervision in saveAndEnforceSelfPolicy", e)
-                false
-            }
-            Log.i(TAG, "[SelfControlDiag] saveAndEnforceSelfPolicy called: isSupervised=$isSupervised, current.isSelfControlAllowed=${current.isSelfControlAllowed}, bundle.isSelfControlAllowed=${bundle.isSelfControlAllowed}")
-
-            if (isSupervised && (!current.isSelfControlAllowed || !bundle.isSelfControlAllowed)) {
-                Log.w(TAG, "[SelfControlDiag] saveAndEnforceSelfPolicy REJECTED: self-control is disabled by supervisor! (current.allowed=${current.isSelfControlAllowed}, bundle.allowed=${bundle.isSelfControlAllowed})")
-                return@withContext false
-            }
-
             val updated = synchronized(this@PolicyRepository) {
+                val current = _currentPolicyFlow.value
+                val isSupervised = current.isSupervised || bundle.isSupervised || try {
+                    AccountabilityRepository.getInstance(appContext).isSupervised()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to query accountability supervision in saveAndEnforceSelfPolicy", e)
+                    false
+                }
+                Log.i(TAG, "[SelfControlDiag] saveAndEnforceSelfPolicy called: isSupervised=$isSupervised, current.isSelfControlAllowed=${current.isSelfControlAllowed}, bundle.isSelfControlAllowed=${bundle.isSelfControlAllowed}")
+
+                if (isSupervised && (!current.isSelfControlAllowed || !bundle.isSelfControlAllowed)) {
+                    Log.w(TAG, "[SelfControlDiag] saveAndEnforceSelfPolicy REJECTED: self-control is disabled by supervisor! (current.allowed=${current.isSelfControlAllowed}, bundle.allowed=${bundle.isSelfControlAllowed})")
+                    return@withContext false
+                }
+
                 val newPolicy = bundle.copy(
                     guardianUid = current.guardianUid,
                     guardianName = current.guardianName,
@@ -567,21 +597,49 @@ class PolicyRepository private constructor(context: Context) {
 
             // Asynchronously sync to cloud document if a synchronized UID exists
             val myUid = AccountabilityRepository.getInstance(appContext).getCachedUid()
-            if (myUid.isNotBlank()) {
-                repositoryScope.launch {
-                    try {
-                        FirebaseFirestore.getInstance().collection("policies").document(myUid)
-                            .set(updated.toMap())
-                            .await()
-                        Log.i(TAG, "Successfully synced self-control policy update to cloud ($myUid)")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Self-control policy cloud sync deferred (offline or error): ${e.message}")
-                    }
-                }
-            }
+            syncPolicyToCloudAsync(myUid, updated)
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error in saveAndEnforceSelfPolicy", e)
+            false
+        }
+    }
+
+    /**
+     * Dynamically adds a verified productive, Quran, or Islamic application to the curfew whitelist.
+     * Synchronized to prevent lost updates when multiple applications are updated simultaneously.
+     */
+    suspend fun addAppToCurfewWhitelist(packageName: String): Boolean = withContext(Dispatchers.IO) {
+        if (packageName.isBlank()) return@withContext false
+        try {
+            val updated = synchronized(this@PolicyRepository) {
+                val current = _currentPolicyFlow.value
+                if (current.customCurfewWhitelistPackages.contains(packageName)) {
+                    return@withContext true
+                }
+                if (AppPolicyRegistry.isRestrictedBrowser(packageName) ||
+                    com.drmohammed.antiporn.curfew.CurfewConfig.KNOWN_APP_STORES.contains(packageName) ||
+                    com.drmohammed.antiporn.curfew.CurfewConfig.CURFEW_SEARCH_APPS.contains(packageName) ||
+                    AppSuspensionShield.isBlacklisted(packageName) ||
+                    current.customBlacklistPackages.contains(packageName)) {
+                    Log.w(TAG, "Refusing to add restricted or blacklisted package to curfew whitelist: $packageName")
+                    return@withContext false
+                }
+                val newPolicy = current.copy(
+                    customCurfewWhitelistPackages = current.customCurfewWhitelistPackages + packageName,
+                    version = current.version + 1,
+                    updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
+                )
+                updateLocalPolicyAndEnforce(newPolicy)
+                newPolicy
+            }
+
+            val myUid = AccountabilityRepository.getInstance(appContext).getCachedUid()
+            syncPolicyToCloudAsync(myUid, updated)
+            Log.i(TAG, "Auto-whitelisted new Islamic/productive app in curfew: $packageName")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed auto-whitelisting app $packageName in curfew", e)
             false
         }
     }
