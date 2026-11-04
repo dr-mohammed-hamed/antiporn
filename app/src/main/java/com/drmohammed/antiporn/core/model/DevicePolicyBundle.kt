@@ -1,5 +1,6 @@
 package com.drmohammed.antiporn.core.model
 
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -150,6 +151,7 @@ data class DevicePolicyBundle(
     }
 
     companion object {
+        private const val TAG = "AntiPorn_PolicyBundle"
         const val BROWSER_FILTER_OFF = 0
         const val BROWSER_FILTER_BLOCKLIST = 1
         const val BROWSER_FILTER_BLOCKLIST_ONLY = 1
@@ -394,9 +396,9 @@ data class DevicePolicyBundle(
                 )
             } catch (e: Exception) {
                 try {
-                    android.util.Log.e("AntiPorn_PolicyBundle", "Error parsing DevicePolicyBundle from JSON: ${e.message}")
+                    Log.w(TAG, "Error parsing DevicePolicyBundle from JSON: ${e.message}")
                 } catch (_: Throwable) {
-                    System.err.println("Error parsing DevicePolicyBundle from JSON: ${e.message}")
+                    /* safe fallback for unit tests */
                 }
                 defaultPolicy()
             }

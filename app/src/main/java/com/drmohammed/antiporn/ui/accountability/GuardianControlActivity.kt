@@ -670,8 +670,9 @@ class GuardianControlActivity : AppCompatActivity() {
                     }
                 }
 
-                if (snapshot != null && snapshot.exists() && snapshot.data != null) {
-                    currentPolicy = DevicePolicyBundle.fromMap(snapshot.data!!)
+                val snapshotData = snapshot?.data
+                if (snapshot != null && snapshot.exists() && snapshotData != null) {
+                    currentPolicy = DevicePolicyBundle.fromMap(snapshotData)
                 } else {
                     currentPolicy = DevicePolicyBundle.defaultPolicy()
                 }

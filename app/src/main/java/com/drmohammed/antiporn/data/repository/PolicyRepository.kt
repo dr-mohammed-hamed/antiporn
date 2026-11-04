@@ -520,12 +520,10 @@ class PolicyRepository private constructor(context: Context) {
                         }
                     }
 
-                    if (bundle.protectedAppPackages.isNotEmpty()) {
-                        dpm.addUserRestriction(admin, UserManager.DISALLOW_APPS_CONTROL)
-                        Log.i(TAG, "Added DISALLOW_APPS_CONTROL restriction for ${bundle.protectedAppPackages.size} protected packages")
-                    } else {
-                        dpm.clearUserRestriction(admin, UserManager.DISALLOW_APPS_CONTROL)
-                    }
+                    // Always enforce DISALLOW_APPS_CONTROL to protect Hisn itself (and any protected packages)
+                    // from Force Stop, clearing data/cache, or disabling via system application settings.
+                    dpm.addUserRestriction(admin, UserManager.DISALLOW_APPS_CONTROL)
+                    Log.i(TAG, "Enforced DISALLOW_APPS_CONTROL restriction for self-protection and ${bundle.protectedAppPackages.size} protected packages")
                 }
 
                 // 4. Synchronize Zero-Trust active foreground watcher state

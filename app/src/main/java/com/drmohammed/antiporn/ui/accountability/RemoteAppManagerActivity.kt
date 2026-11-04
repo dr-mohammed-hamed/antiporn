@@ -325,8 +325,9 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                 }
             }
 
-            if (policySnapshot != null && policySnapshot.exists() && policySnapshot.data != null) {
-                currentPolicy = DevicePolicyBundle.fromMap(policySnapshot.data!!)
+            val policyData = policySnapshot?.data
+            if (policySnapshot != null && policySnapshot.exists() && policyData != null) {
+                currentPolicy = DevicePolicyBundle.fromMap(policyData)
             } else {
                 currentPolicy = DevicePolicyBundle.defaultPolicy()
             }

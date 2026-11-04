@@ -214,24 +214,26 @@ class ScreenBlurOverlayManager(
         }
 
         private fun logI(tag: String, msg: String) {
-            try { Log.i(tag, msg) } catch (e: Throwable) { System.err.println("[$tag] $msg") }
+            try {
+                Log.i(tag, msg)
+            } catch (t: Throwable) {
+                println("[$tag] $msg")
+            }
         }
 
         private fun logW(tag: String, msg: String, tr: Throwable? = null) {
             try {
                 if (tr != null) Log.w(tag, msg, tr) else Log.w(tag, msg)
-            } catch (e: Throwable) {
-                System.err.println("[$tag] $msg")
-                tr?.printStackTrace()
+            } catch (t: Throwable) {
+                println("[$tag] WARN: $msg ${tr?.message ?: ""}")
             }
         }
 
         private fun logE(tag: String, msg: String, tr: Throwable? = null) {
             try {
                 if (tr != null) Log.e(tag, msg, tr) else Log.e(tag, msg)
-            } catch (e: Throwable) {
-                System.err.println("[$tag] $msg")
-                tr?.printStackTrace()
+            } catch (t: Throwable) {
+                System.err.println("[$tag] ERROR: $msg ${tr?.message ?: ""}")
             }
         }
     }

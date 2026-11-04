@@ -53,7 +53,7 @@ class AccountabilityIdentityMigrator(
             try {
                 val oldPolicyDoc = firestore.collection("policies").document(oldUid).get().await()
                 if (oldPolicyDoc.exists() && oldPolicyDoc.data != null) {
-                    val oldPolicyData = oldPolicyDoc.data!!
+                    val oldPolicyData = oldPolicyDoc.data ?: run { Log.w(TAG, "oldPolicyDoc data is null"); return@withContext }
                     val oldVersion = oldPolicyDoc.getLong("version") ?: 1L
 
                     val newPolicyDoc = try {

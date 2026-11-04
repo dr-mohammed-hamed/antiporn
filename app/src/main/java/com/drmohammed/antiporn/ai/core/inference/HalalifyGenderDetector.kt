@@ -96,19 +96,26 @@ class HalalifyGenderDetector(
         const val MAX_DETECTIONS = 100
 
         private fun safeLogI(msg: String) {
-            try { Log.i(TAG, msg) } catch (e: Throwable) { System.err.println("Fallback log: $msg") }
+            try {
+                Log.i(TAG, msg)
+            } catch (t: Throwable) {
+                println("[$TAG] $msg")
+            }
         }
 
         private fun safeLogW(msg: String) {
-            try { Log.w(TAG, msg) } catch (e: Throwable) { System.err.println("Fallback log: $msg") }
+            try {
+                Log.w(TAG, msg)
+            } catch (t: Throwable) {
+                println("[$TAG] WARN: $msg")
+            }
         }
 
         private fun safeLogE(msg: String, tr: Throwable? = null) {
             try {
                 if (tr != null) Log.e(TAG, msg, tr) else Log.e(TAG, msg)
-            } catch (e: Throwable) {
-                System.err.println("Fallback log: $msg")
-                tr?.printStackTrace()
+            } catch (t: Throwable) {
+                System.err.println("[$TAG] ERROR: $msg ${tr?.message ?: ""}")
             }
         }
     }

@@ -30,7 +30,7 @@ import java.io.File
  * Coordinates version checking, background streaming downloads, cryptographic verification,
  * seamless package installer submission, user notifications, and reactive UI state publication.
  */
-class OtaRepository private constructor(private val appContext: Context) {
+class OtaRepository(private val appContext: Context) {
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val downloadMutex = Mutex()

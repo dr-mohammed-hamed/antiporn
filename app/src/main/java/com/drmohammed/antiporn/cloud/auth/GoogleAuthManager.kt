@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
  * Seamlessly upgrades anonymous accounts to persistent Google-backed cloud accounts
  * while preserving the identical Firebase UID and all active supervision policies.
  */
-class GoogleAuthManager private constructor(context: Context) {
+class GoogleAuthManager(context: Context) {
 
     private val appContext = context.applicationContext
     private val auth = FirebaseAuth.getInstance()

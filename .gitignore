@@ -1,12 +1,7 @@
 *.iml
 .gradle
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+.idea/
 .DS_Store
 /build
 /Halalify-kotlin/
@@ -22,16 +17,16 @@ app/google-services.json
 google-services.json
 *.jpg
 
-# Release Keystores & Credentials
+# Keystores & Credentials
+*.p12
 *.jks
 *.keystore
 key.properties
-app/keystore/*.jks
-app/keystore/*.bin
+app/keystore/*
+!app/keystore/testkey.p12
 
 # Assets & Heavy Backups
 app/src/main/assets_backup/
 
 # Cloudflare Wrangler Cache
 .wrangler/
-

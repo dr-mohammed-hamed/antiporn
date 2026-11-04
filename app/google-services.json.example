@@ -1,0 +1,25 @@
+{
+  "project_info": {
+    "project_number": "1234567890",
+    "project_id": "antiporn-template",
+    "storage_bucket": "antiporn-template.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1234567890:android:mockappiddrmohammed",
+        "android_client_info": {
+          "package_name": "com.drmohammed.antiporn"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "YOUR_FIREBASE_API_KEY_HERE"
+        }
+      ],
+      "services": {}
+    }
+  ],
+  "configuration_version": "1"
+}
