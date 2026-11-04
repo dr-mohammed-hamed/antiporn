@@ -333,6 +333,31 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
     }
 
     @Synchronized
+    fun getPartnerById(id: String): PartnerEntity? {
+        val db = readableDatabase
+        var cursor: Cursor? = null
+        try {
+            cursor = db.query(
+                TABLE_PARTNERS,
+                null,
+                "$COL_PARTNER_ID = ?",
+                arrayOf(id),
+                null,
+                null,
+                null
+            )
+            if (cursor.moveToFirst()) {
+                return cursorToPartner(cursor)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error reading partner by ID from SQLite", e)
+        } finally {
+            cursor?.close()
+        }
+        return null
+    }
+
+    @Synchronized
     fun savePartner(partner: PartnerEntity) {
         val db = writableDatabase
         val values = ContentValues().apply {

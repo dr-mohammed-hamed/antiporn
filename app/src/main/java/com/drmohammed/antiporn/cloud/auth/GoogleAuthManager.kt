@@ -115,8 +115,18 @@ class GoogleAuthManager private constructor(context: Context) {
                 val finalUid = resolvedUser.uid
                 val accountabilityRepo = AccountabilityRepository.getInstance(appContext)
                 accountabilityRepo.persistUid(finalUid)
-                PolicyRepository.getInstance(appContext).startFirestoreSync()
-                accountabilityRepo.syncPartnersFromCloud()
+
+                try {
+                    PolicyRepository.getInstance(appContext).startFirestoreSync()
+                } catch (syncEx: Exception) {
+                    Log.w(TAG, "Non-critical: startFirestoreSync after Google sign-in failed: ${syncEx.message}")
+                }
+
+                try {
+                    accountabilityRepo.syncPartnersFromCloud()
+                } catch (partnerEx: Exception) {
+                    Log.w(TAG, "Non-critical: syncPartnersFromCloud after Google sign-in failed: ${partnerEx.message}")
+                }
 
                 Log.i(TAG, "Google authentication successful for UID $finalUid (email: ${resolvedUser.email})")
                 Result.success(resolvedUser)

@@ -546,6 +546,10 @@
     <string name="toast_partner_deleted">Partner removed successfully.</string>
     <string name="btn_retry">Retry</string>
     <string name="guardian_offline_banner_desc">Device is offline. Changes will sync when reconnected.</string>
+
+    <string name="guardian_sync_applied">Applied &amp; synced on ward device</string>
+    <string name="guardian_sync_pending">Waiting for ward sync...</string>
+    <string name="guardian_sync_offline_minutes">Offline since %1$d min</string>
     <string name="toast_offline_policy_edit_note">Offline changes saved locally and queued for sync.</string>
     <string name="pairing_code_locked_badge">Pairing Code Locked</string>
     <string name="status_supervised_banner_title">Device Supervised</string>

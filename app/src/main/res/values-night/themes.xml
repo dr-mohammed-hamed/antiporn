@@ -13,6 +13,9 @@
         <item name="colorSecondaryContainer">@color/md_theme_dark_secondaryContainer</item>
         <item name="colorOnSecondaryContainer">@color/md_theme_dark_onSecondaryContainer</item>
 
+        <!-- Tertiary Palette (Pending / Warning / Live Sync) -->
+        <item name="colorTertiary">@color/md_theme_dark_tertiary</item>
+
         <!-- Surfaces & Canvas (Modern Deep Slate) -->
         <item name="colorSurface">@color/md_theme_dark_surface</item>
         <item name="colorOnSurface">@color/md_theme_dark_onSurface</item>

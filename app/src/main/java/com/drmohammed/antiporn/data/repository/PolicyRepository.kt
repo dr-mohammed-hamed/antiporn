@@ -136,6 +136,7 @@ class PolicyRepository private constructor(context: Context) {
                             ApprovalRepository.getInstance(appContext).startApprovalsSync(uid)
                             repositoryScope.launch {
                                 AccountabilityRepository.getInstance(appContext).syncPartnersFromCloud()
+                                AccountabilityRepository.getInstance(appContext).checkAndSelfHealSupervisionStatus()
                             }
                         }
                     }
@@ -144,6 +145,9 @@ class PolicyRepository private constructor(context: Context) {
                         val fallbackUid = AccountabilityRepository.getInstance(appContext).getCachedUid()
                         attachPolicyListener(fallbackUid)
                         ApprovalRepository.getInstance(appContext).startApprovalsSync(fallbackUid)
+                        repositoryScope.launch {
+                            AccountabilityRepository.getInstance(appContext).checkAndSelfHealSupervisionStatus()
+                        }
                     }
             } else {
                 AccountabilityRepository.getInstance(appContext).persistUid(user.uid)
@@ -152,6 +156,7 @@ class PolicyRepository private constructor(context: Context) {
                 ApprovalRepository.getInstance(appContext).startApprovalsSync(user.uid)
                 repositoryScope.launch {
                     AccountabilityRepository.getInstance(appContext).syncPartnersFromCloud()
+                    AccountabilityRepository.getInstance(appContext).checkAndSelfHealSupervisionStatus()
                 }
             }
         } catch (e: Exception) {
@@ -184,11 +189,37 @@ class PolicyRepository private constructor(context: Context) {
                                 try {
                                     val cloudPolicy = DevicePolicyBundle.fromMap(data)
                                     val current = _currentPolicyFlow.value
+                                    val isFromGuardian = cloudPolicy.isSupervised && !cloudPolicy.guardianUid.isNullOrBlank()
+                                    val supervisoryChanged = isFromGuardian && (
+                                        cloudPolicy.isSelfControlAllowed != current.isSelfControlAllowed ||
+                                        cloudPolicy.isCurfewEnabled != current.isCurfewEnabled ||
+                                        cloudPolicy.curfewStartHour != current.curfewStartHour ||
+                                        cloudPolicy.curfewStartMinute != current.curfewStartMinute ||
+                                        cloudPolicy.curfewEndHour != current.curfewEndHour ||
+                                        cloudPolicy.curfewEndMinute != current.curfewEndMinute ||
+                                        cloudPolicy.isWeekendCurfewEnabled != current.isWeekendCurfewEnabled ||
+                                        cloudPolicy.weekendCurfewStartHour != current.weekendCurfewStartHour ||
+                                        cloudPolicy.weekendCurfewStartMinute != current.weekendCurfewStartMinute ||
+                                        cloudPolicy.weekendCurfewEndHour != current.weekendCurfewEndHour ||
+                                        cloudPolicy.weekendCurfewEndMinute != current.weekendCurfewEndMinute ||
+                                        cloudPolicy.isVpnBlackholeEnabled != current.isVpnBlackholeEnabled ||
+                                        cloudPolicy.isInstantInternetKillEnabled != current.isInstantInternetKillEnabled ||
+                                        cloudPolicy.isIncognitoBlocked != current.isIncognitoBlocked ||
+                                        cloudPolicy.lockNewInstallsUntilApproved != current.lockNewInstallsUntilApproved ||
+                                        cloudPolicy.isDateTimeLocked != current.isDateTimeLocked ||
+                                        cloudPolicy.dnsHost != current.dnsHost ||
+                                        cloudPolicy.browserFilterMode != current.browserFilterMode ||
+                                        cloudPolicy.customBlockedUrls != current.customBlockedUrls ||
+                                        cloudPolicy.customAllowedUrls != current.customAllowedUrls ||
+                                        cloudPolicy.guardianUid != current.guardianUid
+                                    )
                                     val statusChanged = cloudPolicy.breakoutStatus != current.breakoutStatus
-                                    val isVersionNewer = cloudPolicy.version > current.version || (cloudPolicy.version == current.version && cloudPolicy.updatedAt > current.updatedAt)
-                                    Log.i(TAG, "[SelfControlDiag] Cloud policy received on ward /policies/$uid: cloudPolicy(v${cloudPolicy.version}, supervised=${cloudPolicy.isSupervised}, allowed=${cloudPolicy.isSelfControlAllowed}, guardian='${cloudPolicy.guardianUid}') vs local(v${current.version}, supervised=${current.isSupervised}, allowed=${current.isSelfControlAllowed}), isVersionNewer=$isVersionNewer, statusChanged=$statusChanged")
-                                    if (isVersionNewer || statusChanged) {
-                                        Log.i(TAG, "[SelfControlDiag] Cloud policy ACCEPTED! Enforcing update on device...")
+                                    val isTimeNewer = cloudPolicy.updatedAt > current.updatedAt
+                                    val isVersionNewer = cloudPolicy.version > current.version
+
+                                    Log.i(TAG, "[SelfControlDiag] Cloud policy received on ward /policies/$uid: cloudPolicy(v${cloudPolicy.version}, supervised=${cloudPolicy.isSupervised}, allowed=${cloudPolicy.isSelfControlAllowed}, guardian='${cloudPolicy.guardianUid}') vs local(v${current.version}, supervised=${current.isSupervised}, allowed=${current.isSelfControlAllowed}), isVersionNewer=$isVersionNewer, isTimeNewer=$isTimeNewer, supervisoryChanged=$supervisoryChanged, statusChanged=$statusChanged")
+
+                                    if (isVersionNewer || isTimeNewer || supervisoryChanged || statusChanged || (current.isSupervised != cloudPolicy.isSupervised)) {
                                         val wasSupervised = current.isSupervised
                                         val isNowSupervised = cloudPolicy.isSupervised
 
@@ -204,13 +235,32 @@ class PolicyRepository private constructor(context: Context) {
                                                 displayName = cloudPolicy.guardianName ?: appContext.getString(R.string.guardian_default_name),
                                                 role = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN,
                                                 status = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.STATUS_ACTIVE,
-                                                createdAt = System.currentTimeMillis(),
-                                                lastSyncAt = System.currentTimeMillis()
+                                                createdAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext),
+                                                lastSyncAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)
                                             )
                                             database.savePartner(partner)
                                         }
 
-                                        updateLocalPolicyAndEnforce(cloudPolicy)
+                                        val enforcedPolicy = cloudPolicy
+
+                                        Log.i(TAG, "[SelfControlDiag] Sovereign cloud policy ACCEPTED! Enforcing update on device... (v${enforcedPolicy.version}, isSelfControlAllowed=${enforcedPolicy.isSelfControlAllowed})")
+                                        updateLocalPolicyAndEnforce(enforcedPolicy)
+
+                                        if (isFromGuardian) {
+                                            repositoryScope.launch {
+                                                try {
+                                                    FirebaseFirestore.getInstance().collection("policies").document(uid).update(
+                                                        mapOf(
+                                                            "acknowledgedVersion" to cloudPolicy.version,
+                                                            "lastAcknowledgedAt" to com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)
+                                                        )
+                                                    ).await()
+                                                    Log.i(TAG, "[SelfControlDiag] Acknowledged policy v${cloudPolicy.version} back to Firestore /policies/$uid")
+                                                } catch (e: Exception) {
+                                                    Log.w(TAG, "Failed writing policy acknowledgment: ${e.message}")
+                                                }
+                                            }
+                                        }
                                     }
                                 } catch (e: Exception) {
                                     Log.e(TAG, "Error handling policy update from cloud", e)
@@ -453,15 +503,28 @@ class PolicyRepository private constructor(context: Context) {
      * Saves policy to Firestore for a specific target ward UID (invoked from Guardian interface).
      */
     suspend fun pushPolicyToWard(wardUid: String, bundle: DevicePolicyBundle): Boolean {
-        Log.i(TAG, "[SelfControlDiag] pushPolicyToWard: writing to Firestore /policies/$wardUid: isSelfControlAllowed=${bundle.isSelfControlAllowed}, isSupervised=${bundle.isSupervised}, version=${bundle.version}")
+        val firestore = FirebaseFirestore.getInstance()
+        val snap = try {
+            firestore.collection("policies").document(wardUid).get().await()
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            null
+        }
+        val cloudVersion = snap?.getLong("version") ?: 0L
+        val targetVersion = if (bundle.version > cloudVersion) bundle.version else cloudVersion + 1L
+        val policyToPush = bundle.copy(
+            version = targetVersion,
+            updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)
+        )
+        Log.i(TAG, "[SelfControlDiag] pushPolicyToWard: writing to Firestore /policies/$wardUid: isSelfControlAllowed=${policyToPush.isSelfControlAllowed}, version=$targetVersion")
         return try {
-            val firestore = FirebaseFirestore.getInstance()
             firestore.collection("policies").document(wardUid)
-                .set(bundle.toMap())
+                .set(policyToPush.toMap())
                 .await()
-            Log.i(TAG, "[SelfControlDiag] pushPolicyToWard SUCCESS for wardUid=$wardUid (isSelfControlAllowed=${bundle.isSelfControlAllowed}, v${bundle.version})")
+            Log.i(TAG, "[SelfControlDiag] pushPolicyToWard SUCCESS for wardUid=$wardUid (isSelfControlAllowed=${policyToPush.isSelfControlAllowed}, v$targetVersion)")
             true
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e(TAG, "[SelfControlDiag] pushPolicyToWard FAILED for wardUid=$wardUid: ${e.message}", e)
             false
         }

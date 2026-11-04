@@ -1,11 +1,11 @@
 {
-  "versionCode": 8,
-  "versionName": "1.7",
+  "versionCode": 9,
+  "versionName": "1.71",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 41986859,
+  "fileSizeBytes": 41995051,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.7: إضافة نظام الفحص والتشخيص اللحظي (AI Telemetry & Diagnostics)، وبوابة تنفيذ أوامر الحماية المؤسسية الآمنة (SafeDpmGateway)، ومعالج الانهيارات الشامل (GlobalCrashHandler)، وإمكانية مشاركة تقرير الفحص والتشخيص للذكاء الاصطناعي مباشرة من الإعدادات.",
-  "releaseDate": "2026-11-02"
+  "releaseNotes": "إصدار 1.71: دعم استثناء تطبيقات محددة من حظر الإنترنت أثناء حظر التجوال (Curfew App Bypass)، تحصين إنهاء حظر التجوال الفوري وحماية تطبيق الطوارئ، إضافة شارة المزامنة اللحظية (Live Sync Badge) وتأكيد استلام السياسات فورياً بين المراقب والمستفيد.",
+  "releaseDate": "2026-11-03"
 }

@@ -421,6 +421,10 @@
 
     <string name="guardian_offline_banner_desc">تعذر الاتصال بالخادم. يتم عرض السياسة المحلية/المؤقتة.</string>
 
+    <string name="guardian_sync_applied">مطبق ومحدث على هاتف المكفول الآن</string>
+    <string name="guardian_sync_pending">بانتظار مزامنة هاتف المكفول...</string>
+    <string name="guardian_sync_offline_minutes">غير متصل منذ %1$d دقيقة</string>
+
     <string name="toast_offline_policy_edit_note">تعذر الوصول إلى الخادم؛ يرجى التحقق من الاتصال بالإنترنت ثم إعادة المحاولة.</string>
 
     <string name="error_ward_already_has_guardian">هذا الجهاز مقيد بالفعل بمشرف آخر ولا يمكن ربطه!</string>

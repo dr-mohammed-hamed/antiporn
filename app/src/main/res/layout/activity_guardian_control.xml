@@ -66,6 +66,36 @@
                     app:iconSize="14dp" />
             </LinearLayout>
 
+            <!-- Live Sync & Delivery Badge -->
+            <LinearLayout
+                android:id="@+id/layoutLiveSyncBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <ImageView
+                    android:id="@+id/ivLiveSyncIcon"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_verified"
+                    app:tint="?attr/colorPrimary" />
+
+                <TextView
+                    android:id="@+id/tvLiveSyncText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:fontFamily="@font/tajawal"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp"
+                    tools:text="مطبق ومحدث على هاتف المكفول الآن" />
+            </LinearLayout>
+
             <!-- ============================================================== -->
             <!-- ALERTS & BANNERS (OFFLINE, BREAKOUT, SELF-CONTROL NOTIFICATIONS)-->
             <!-- ============================================================== -->

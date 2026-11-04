@@ -17,8 +17,8 @@ android {
         applicationId = "com.drmohammed.antiporn"
         minSdk = 24
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 9
+        versionName = "1.71"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += listOf("ar", "en")

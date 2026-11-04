@@ -12,6 +12,9 @@ import android.widget.TextView
 import android.widget.Toast
 import android.widget.ArrayAdapter
 import android.widget.ImageView
+import android.content.res.ColorStateList
+import androidx.core.content.ContextCompat
+import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
 import com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
@@ -64,6 +67,9 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var toolbar: MaterialToolbar
     private lateinit var tvWardName: TextView
     private lateinit var btnEditWardName: MaterialButton
+    private lateinit var layoutLiveSyncBadge: LinearLayout
+    private lateinit var ivLiveSyncIcon: ImageView
+    private lateinit var tvLiveSyncText: TextView
     private lateinit var cardOfflineBanner: MaterialCardView
     private lateinit var tvOfflineStatus: TextView
     private lateinit var btnRetryLoadPolicy: MaterialButton
@@ -124,11 +130,11 @@ class GuardianControlActivity : AppCompatActivity() {
     private var selectedTimeZoneId = CurfewConfig.DEFAULT_TIMEZONE_ID
 
     private lateinit var approvalsViewBinder: GuardianApprovalsViewBinder
+    private lateinit var liveSyncViewBinder: GuardianLiveSyncViewBinder
     private var hasLoadedInitialPolicy = false
     private var lastEditNameClickTime = 0L
     private val policyRepo by lazy { PolicyRepository.getInstance(applicationContext) }
     private var lastSaveClickTime = 0L
-    private var approvalsListener: ListenerRegistration? = null
 
     private val appManagerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -211,7 +217,8 @@ class GuardianControlActivity : AppCompatActivity() {
 
         initViews()
         setupListeners()
-        listenForPendingApprovals()
+        approvalsViewBinder.listenForPendingApprovals()
+        liveSyncViewBinder.listenForPolicyUpdates()
     }
 
     override fun onResume() {
@@ -221,7 +228,7 @@ class GuardianControlActivity : AppCompatActivity() {
             hasLoadedInitialPolicy = true
             loadWardPolicy()
         }
-        loadPendingApprovals()
+        approvalsViewBinder.loadPendingApprovals()
     }
 
     private fun initViews() {
@@ -233,6 +240,16 @@ class GuardianControlActivity : AppCompatActivity() {
         tvWardName = findViewById(R.id.tvWardName)
         tvWardName.text = getString(R.string.guardian_control_ward_name, wardName)
         btnEditWardName = findViewById(R.id.btnEditWardName)
+        layoutLiveSyncBadge = findViewById(R.id.layoutLiveSyncBadge)
+        ivLiveSyncIcon = findViewById(R.id.ivLiveSyncIcon)
+        tvLiveSyncText = findViewById(R.id.tvLiveSyncText)
+        liveSyncViewBinder = GuardianLiveSyncViewBinder(
+            activity = this,
+            layoutLiveSyncBadge = layoutLiveSyncBadge,
+            ivLiveSyncIcon = ivLiveSyncIcon,
+            tvLiveSyncText = tvLiveSyncText,
+            wardIdProvider = { wardId }
+        )
 
         cardOfflineBanner = findViewById(R.id.cardOfflineBanner)
         tvOfflineStatus = findViewById(R.id.tvOfflineStatus)
@@ -332,7 +349,7 @@ class GuardianControlActivity : AppCompatActivity() {
             layoutPendingApps = layoutPendingApps,
             tvNoPendingApps = tvNoPendingApps,
             wardIdProvider = { wardId },
-            onReloadRequested = { loadPendingApprovals() }
+            onReloadRequested = { approvalsViewBinder.loadPendingApprovals() }
         )
 
         updateTimingLabels()
@@ -554,8 +571,8 @@ class GuardianControlActivity : AppCompatActivity() {
         btnRetryLoadPolicy.setOnClickListener {
             btnRetryLoadPolicy.isEnabled = false
             loadWardPolicy()
-            loadPendingApprovals()
-            listenForPendingApprovals()
+            approvalsViewBinder.loadPendingApprovals()
+            approvalsViewBinder.listenForPendingApprovals()
         }
     }
 
@@ -617,12 +634,25 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun loadWardPolicy() {
-        if (approvalsListener == null) {
-            listenForPendingApprovals()
-        }
+        approvalsViewBinder.listenForPendingApprovals()
+        liveSyncViewBinder.listenForPolicyUpdates()
         setInputsEnabled(false)
         lifecycleScope.launch(Dispatchers.IO) {
             if (isFinishing || isDestroyed) return@launch
+
+            val database = AntiPornDatabase.getInstance(applicationContext)
+            val partner = database.getPartnerById(wardId)
+            val resolvedWardId = AccountabilityRepository.getInstance(applicationContext)
+                .resolveActivePartnerUid(wardId, partner?.pairingCode)
+            if (resolvedWardId.isNotBlank() && resolvedWardId != wardId) {
+                Log.i(TAG, "[UidMigration] GuardianControlActivity switched wardId from $wardId to $resolvedWardId")
+                withContext(Dispatchers.Main) {
+                    wardId = resolvedWardId
+                    approvalsViewBinder.listenForPendingApprovals()
+                    liveSyncViewBinder.listenForPolicyUpdates()
+                }
+            }
+
             var isOffline = false
             var snapshot: com.google.firebase.firestore.DocumentSnapshot? = null
             try {
@@ -646,11 +676,17 @@ class GuardianControlActivity : AppCompatActivity() {
                     currentPolicy = DevicePolicyBundle.defaultPolicy()
                 }
 
+                val version = snapshot?.getLong("version") ?: currentPolicy.version
+                val acknowledgedVersion = snapshot?.getLong("acknowledgedVersion") ?: 0L
+                val lastAcknowledgedAt = snapshot?.getLong("lastAcknowledgedAt") ?: 0L
+                val lastHeartbeat = snapshot?.getLong("lastHeartbeat") ?: 0L
+
                 withContext(Dispatchers.Main) {
                     if (isFinishing || isDestroyed) return@withContext
                     populateUiFromPolicy(currentPolicy)
                     cardOfflineBanner.visibility = if (isOffline) View.VISIBLE else View.GONE
                     btnRetryLoadPolicy.isEnabled = true
+                    liveSyncViewBinder.updateLiveSyncBadge(version, acknowledgedVersion, lastAcknowledgedAt, lastHeartbeat)
 
                     initialPolicySnapshot = currentPolicy.copy(
                         curfewStartHour = selectedStartHour,
@@ -682,6 +718,7 @@ class GuardianControlActivity : AppCompatActivity() {
                     populateUiFromPolicy(currentPolicy)
                     cardOfflineBanner.visibility = View.VISIBLE
                     btnRetryLoadPolicy.isEnabled = true
+                    liveSyncViewBinder.updateLiveSyncBadge(currentPolicy.version, 0L, 0L, 0L)
 
                     initialPolicySnapshot = currentPolicy.copy(
                         curfewStartHour = selectedStartHour,
@@ -706,74 +743,6 @@ class GuardianControlActivity : AppCompatActivity() {
                     Toast.makeText(this@GuardianControlActivity, R.string.toast_load_policy_failed, Toast.LENGTH_LONG).show()
                 }
             }
-        }
-    }
-
-    private fun loadPendingApprovals() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            if (isFinishing || isDestroyed) return@launch
-            try {
-                val firestore = FirebaseFirestore.getInstance()
-                val snapshot = firestore.collection("policies").document(wardId)
-                    .collection("approvals")
-                    .whereEqualTo("status", "PENDING")
-                    .get()
-                    .await()
-
-                val pendingList = mutableListOf<Pair<String, String>>()
-                for (doc in snapshot.documents) {
-                    val pkg = doc.getString("packageName") ?: doc.id
-                    val appName = doc.getString("appName") ?: pkg
-                    if (pkg.isNotBlank()) {
-                        pendingList.add(pkg to appName)
-                    }
-                }
-
-                withContext(Dispatchers.Main) {
-                    if (isFinishing || isDestroyed) return@withContext
-                    approvalsViewBinder.renderPendingApprovals(pendingList)
-                }
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                if (isFinishing || isDestroyed) return@launch
-                Log.e(TAG, "Error loading pending approvals for ward $wardId", e)
-                withContext(Dispatchers.Main) {
-                    if (isFinishing || isDestroyed) return@withContext
-                    approvalsViewBinder.renderError()
-                    Toast.makeText(this@GuardianControlActivity, R.string.error_loading_pending_apps, Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    private fun listenForPendingApprovals() {
-        if (wardId.isBlank()) return
-        approvalsListener?.remove()
-        try {
-            val firestore = FirebaseFirestore.getInstance()
-            approvalsListener = firestore.collection("policies").document(wardId)
-                .collection("approvals")
-                .whereEqualTo("status", "PENDING")
-                .addSnapshotListener { snapshot, error ->
-                    if (error != null) {
-                        Log.w(TAG, "Error in real-time approvals listener for ward $wardId", error)
-                        return@addSnapshotListener
-                    }
-                    if (isFinishing || isDestroyed) return@addSnapshotListener
-                    if (snapshot != null) {
-                        val pendingList = mutableListOf<Pair<String, String>>()
-                        for (doc in snapshot.documents) {
-                            val pkg = doc.getString("packageName") ?: doc.id
-                            val appName = doc.getString("appName") ?: pkg
-                            if (pkg.isNotBlank()) {
-                                pendingList.add(pkg to appName)
-                            }
-                        }
-                        approvalsViewBinder.renderPendingApprovals(pendingList)
-                    }
-                }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to attach real-time approvals listener for ward $wardId", e)
         }
     }
 
@@ -910,6 +879,12 @@ class GuardianControlActivity : AppCompatActivity() {
                 if (success) {
                     alertsViewBinder.hideSelfControlAlert()
                     initialPolicySnapshot = updatedPolicy.copy()
+                    liveSyncViewBinder.updateLiveSyncBadge(
+                        version = updatedPolicy.version,
+                        acknowledgedVersion = 0L,
+                        lastAcknowledgedAt = 0L,
+                        lastHeartbeat = 0L
+                    )
                     backPressedCallback.isEnabled = false
                     Toast.makeText(this@GuardianControlActivity, R.string.toast_policy_saved, Toast.LENGTH_LONG).show()
                     finish()
@@ -975,8 +950,8 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        approvalsListener?.remove()
-        approvalsListener = null
+        approvalsViewBinder.stopListening()
+        liveSyncViewBinder.stopListening()
         super.onDestroy()
     }
 
