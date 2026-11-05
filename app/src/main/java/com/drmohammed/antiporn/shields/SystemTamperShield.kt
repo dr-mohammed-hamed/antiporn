@@ -95,6 +95,14 @@ object SystemTamperShield : ProtectionShield {
                 } catch (e: Exception) {
                     Log.w(TAG, "Could not setClearApplicationUserDataBlocked: ${e.message}")
                 }
+
+                // 4.2 Prevent force stop & application tampering via settings UI
+                try {
+                    dpm.addUserRestriction(admin, UserManager.DISALLOW_APPS_CONTROL)
+                    Log.i(TAG, "DISALLOW_APPS_CONTROL restriction applied successfully")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not add DISALLOW_APPS_CONTROL: ${e.message}")
+                }
             }
 
             // 5. Block Date & Time tampering (Requires DO and isDateTimeLocked policy enabled by supervisor)
