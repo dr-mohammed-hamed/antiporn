@@ -15,9 +15,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
-import com.drmohammed.antiporn.ai.service.ScreenAiProjectionService
-import com.drmohammed.antiporn.cloud.auth.GoogleAuthManager
-import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.databinding.FragmentSettingsBinding
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
 import com.drmohammed.antiporn.telemetry.AiTelemetryReporter
@@ -30,14 +27,17 @@ import timber.log.Timber
 
 /**
  * Settings Fragment implementing modern Material 3 List Preference ergonomics:
- * Screen AI Shield inspection toggle, Google Identity protection,
- * OTA auto-update firmware installation, and operational telemetry export.
+ * 1. Screen AI content inspection toggle & live metrics.
+ * 2. OTA App update checker & download progress.
+ * 3. Google cloud account linking & sync state.
+ * 4. Device Owner system status.
+ * 5. Black Box Diagnostic Log Viewer & Telemetry export.
  */
 class SettingsFragment : Fragment() {
 
     interface SettingsActionListener {
-        fun onAiToggleRequested(enable: Boolean)
-        fun onCheckUpdateRequested()
+        fun onToggleAiRequested(enable: Boolean)
+        fun onCheckOtaRequested()
         fun onLinkGoogleRequested()
     }
 
@@ -48,6 +48,8 @@ class SettingsFragment : Fragment() {
 
     private val settingsViewModel: SettingsViewModel by viewModel()
     private val viewModel get() = settingsViewModel
+
+    private var lastViewLogsClickTime = 0L
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -74,7 +76,6 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupListeners()
         observeViewModel()
-        settingsViewModel.refreshAll()
     }
 
     override fun onResume() {
@@ -120,19 +121,24 @@ class SettingsFragment : Fragment() {
                 binding.tvAiStatusSubtext.setText(R.string.card_ai_shield_active_desc)
                 binding.tvAiStatusSubtext.setTextColor(ContextCompat.getColor(ctx, R.color.status_green))
             }
+
+            if (state.aiLastDetectionLabel.isNotEmpty()) {
+                val confPercent = (state.aiLastDetectionConfidence * 100).toInt()
+                val fpsText = getString(R.string.ai_fps_format, state.aiFps)
+                val detText = getString(R.string.ai_last_detection_format, state.aiLastDetectionLabel, confPercent)
+                val modelText = getString(R.string.ai_model_active_format, state.aiModelName)
+                binding.tvAiMetrics.text = getString(R.string.ai_metrics_full_format, fpsText, detText, modelText)
+                binding.tvAiMetrics.setTextColor(ContextCompat.getColor(ctx, R.color.status_orange))
+            } else {
+                val fpsText = getString(R.string.ai_fps_format, state.aiFps)
+                val modelText = getString(R.string.ai_model_active_format, state.aiModelName)
+                binding.tvAiMetrics.text = getString(R.string.ai_metrics_simple_format, fpsText, modelText)
+                val onSurfaceVariant = MaterialColors.getColor(binding.root, com.google.android.material.R.attr.colorOnSurfaceVariant)
+                binding.tvAiMetrics.setTextColor(onSurfaceVariant)
+            }
             binding.tvAiMetrics.visibility = View.VISIBLE
-            val fpsStr = "%.1f".format(state.aiFps)
-            val dropStr = state.aiDroppedFrames.toString()
-            val confPercent = (state.aiLastConfidence * 100).toInt()
-            binding.tvAiMetrics.text = getString(
-                R.string.ai_metrics_format,
-                fpsStr,
-                dropStr,
-                state.aiLastLabel.ifEmpty { "Idle" },
-                confPercent
-            )
         } else {
-            binding.tvAiStatusSubtext.setText(R.string.card_ai_shield_inactive_desc)
+            binding.tvAiStatusSubtext.setText(R.string.card_ai_shield_idle_desc)
             val onSurfaceVariant = MaterialColors.getColor(binding.root, com.google.android.material.R.attr.colorOnSurfaceVariant)
             binding.tvAiStatusSubtext.setTextColor(onSurfaceVariant)
             binding.tvAiMetrics.visibility = View.GONE
@@ -140,70 +146,75 @@ class SettingsFragment : Fragment() {
     }
 
     private fun renderOtaSection(state: SettingsUiState, ctx: Context) {
-        binding.tvOtaVersion.text = getString(R.string.ota_current_version_format, state.versionName, state.versionCode)
+        binding.tvOtaVersion.text = getString(R.string.card_ota_current_version, state.appVersionName, state.appVersionCode)
 
-        when (val otaState = state.otaState) {
+        when (val ota = state.otaState) {
             is OtaUpdateState.Idle -> {
-                binding.pbOtaProgress.visibility = View.GONE
                 binding.tvOtaStatus.visibility = View.GONE
+                binding.pbOtaProgress.visibility = View.GONE
                 binding.btnCheckUpdate.isEnabled = true
                 binding.btnCheckUpdate.setText(R.string.btn_check_update)
             }
             is OtaUpdateState.Checking -> {
+                binding.tvOtaStatus.setText(R.string.btn_checking_update)
+                binding.tvOtaStatus.visibility = View.VISIBLE
                 binding.pbOtaProgress.visibility = View.VISIBLE
                 binding.pbOtaProgress.isIndeterminate = true
-                binding.tvOtaStatus.visibility = View.VISIBLE
-                binding.tvOtaStatus.setText(R.string.ota_status_checking)
                 binding.btnCheckUpdate.isEnabled = false
+                binding.btnCheckUpdate.setText(R.string.btn_checking_update)
             }
-            is OtaUpdateState.Available -> {
+            is OtaUpdateState.NoUpdateAvailable -> {
+                binding.tvOtaStatus.setText(R.string.ota_up_to_date)
+                binding.tvOtaStatus.visibility = View.VISIBLE
                 binding.pbOtaProgress.visibility = View.GONE
-                binding.tvOtaStatus.visibility = View.VISIBLE
-                binding.tvOtaStatus.text = getString(R.string.ota_status_available, otaState.info.versionName)
-                binding.tvOtaStatus.setTextColor(ContextCompat.getColor(ctx, R.color.status_green))
-                binding.btnCheckUpdate.isEnabled = true
-                binding.btnCheckUpdate.setText(R.string.btn_update_now)
-            }
-            is OtaUpdateState.Downloading -> {
-                binding.pbOtaProgress.visibility = View.VISIBLE
-                binding.pbOtaProgress.isIndeterminate = false
-                binding.pbOtaProgress.progress = otaState.progress
-                binding.tvOtaStatus.visibility = View.VISIBLE
-                binding.tvOtaStatus.text = getString(R.string.ota_status_downloading, otaState.progress)
-                binding.btnCheckUpdate.isEnabled = false
-            }
-            is OtaUpdateState.Downloaded -> {
-                binding.pbOtaProgress.visibility = View.GONE
-                binding.tvOtaStatus.visibility = View.VISIBLE
-                binding.tvOtaStatus.setText(R.string.ota_status_ready_to_install)
-                binding.btnCheckUpdate.isEnabled = true
-                binding.btnCheckUpdate.setText(R.string.btn_install_update)
-            }
-            is OtaUpdateState.Installing -> {
-                binding.pbOtaProgress.visibility = View.VISIBLE
-                binding.pbOtaProgress.isIndeterminate = true
-                binding.tvOtaStatus.visibility = View.VISIBLE
-                binding.tvOtaStatus.setText(R.string.ota_status_installing)
-                binding.btnCheckUpdate.isEnabled = false
-            }
-            is OtaUpdateState.UpToDate -> {
-                binding.pbOtaProgress.visibility = View.GONE
-                binding.tvOtaStatus.visibility = View.VISIBLE
-                binding.tvOtaStatus.setText(R.string.ota_status_up_to_date)
                 binding.btnCheckUpdate.isEnabled = true
                 binding.btnCheckUpdate.setText(R.string.btn_check_update)
             }
-            is OtaUpdateState.Error -> {
-                binding.pbOtaProgress.visibility = View.GONE
+            is OtaUpdateState.UpdateAvailable -> {
+                binding.tvOtaStatus.text = getString(R.string.ota_update_available, ota.info.versionName)
                 binding.tvOtaStatus.visibility = View.VISIBLE
-                binding.tvOtaStatus.text = getString(R.string.ota_status_error, otaState.message)
-                binding.tvOtaStatus.setTextColor(ContextCompat.getColor(ctx, R.color.status_red))
-                binding.btnCheckUpdate.isEnabled = true
-                binding.btnCheckUpdate.setText(R.string.btn_retry_update)
-            }
-            else -> {
                 binding.pbOtaProgress.visibility = View.GONE
-                binding.tvOtaStatus.visibility = View.GONE
+                binding.btnCheckUpdate.isEnabled = true
+                binding.btnCheckUpdate.setText(R.string.btn_download_update)
+            }
+            is OtaUpdateState.Downloading -> {
+                binding.tvOtaStatus.text = getString(R.string.ota_downloading, ota.progressPercent)
+                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.pbOtaProgress.visibility = View.VISIBLE
+                binding.pbOtaProgress.isIndeterminate = ota.progressPercent < 0
+                if (ota.progressPercent >= 0) {
+                    binding.pbOtaProgress.progress = ota.progressPercent
+                }
+                binding.btnCheckUpdate.isEnabled = false
+                binding.btnCheckUpdate.setText(R.string.btn_download_update)
+            }
+            is OtaUpdateState.Verifying -> {
+                binding.tvOtaStatus.setText(R.string.ota_verifying)
+                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.pbOtaProgress.visibility = View.VISIBLE
+                binding.pbOtaProgress.isIndeterminate = true
+                binding.btnCheckUpdate.isEnabled = false
+                binding.btnCheckUpdate.setText(R.string.btn_verifying_update)
+            }
+            is OtaUpdateState.ReadyToInstall -> {
+                binding.tvOtaStatus.setText(R.string.ota_installing)
+                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.pbOtaProgress.visibility = View.GONE
+                binding.btnCheckUpdate.isEnabled = true
+                binding.btnCheckUpdate.setText(R.string.btn_download_update)
+            }
+            is OtaUpdateState.Installing -> {
+                binding.tvOtaStatus.setText(R.string.ota_installing)
+                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.pbOtaProgress.visibility = View.VISIBLE
+                binding.pbOtaProgress.isIndeterminate = true
+                binding.btnCheckUpdate.isEnabled = false
+                binding.btnCheckUpdate.setText(R.string.ota_installing)
+            }
+            is OtaUpdateState.Error -> {
+                binding.tvOtaStatus.text = ota.message
+                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.pbOtaProgress.visibility = View.GONE
                 binding.btnCheckUpdate.isEnabled = true
                 binding.btnCheckUpdate.setText(R.string.btn_check_update)
             }
@@ -211,14 +222,15 @@ class SettingsFragment : Fragment() {
     }
 
     private fun renderGoogleSection(state: SettingsUiState, ctx: Context) {
-        if (state.isGoogleLinked) {
-            val email = state.googleAccountEmail.ifEmpty { getString(R.string.account_status_secured) }
-            binding.tvGoogleAccountStatus.text = getString(R.string.account_secured_as, email)
-            binding.tvGoogleAccountStatus.setTextColor(ContextCompat.getColor(ctx, R.color.shield_emerald_radiant))
+        if (state.isGoogleLinked && !state.googleAccountEmail.isNullOrBlank()) {
+            binding.tvGoogleAccountStatus.text = getString(R.string.settings_google_linked, state.googleAccountEmail)
+            binding.tvGoogleAccountStatus.setTextColor(ContextCompat.getColor(ctx, R.color.status_green))
             binding.btnLinkGoogle.visibility = View.GONE
         } else {
-            binding.tvGoogleAccountStatus.setText(R.string.account_status_unsecured)
-            binding.tvGoogleAccountStatus.setTextColor(ContextCompat.getColor(ctx, R.color.shield_amber_calm))
+            binding.tvGoogleAccountStatus.setText(R.string.settings_google_unlinked)
+            binding.tvGoogleAccountStatus.setTextColor(
+                MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, ContextCompat.getColor(ctx, R.color.shield_hero_desc))
+            )
             binding.btnLinkGoogle.visibility = View.VISIBLE
             binding.btnLinkGoogle.setText(R.string.btn_secure_with_google)
         }
@@ -234,16 +246,15 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    private var lastViewLogsClickTime = 0L
-
     private fun setupListeners() {
-        binding.switchAiShield.setOnClickListener {
-            val targetState = binding.switchAiShield.isChecked
-            actionListener?.onAiToggleRequested(targetState)
+        binding.switchAiShield.setOnCheckedChangeListener { _, isChecked ->
+            if (binding.switchAiShield.isPressed) {
+                actionListener?.onToggleAiRequested(isChecked)
+            }
         }
 
         binding.btnCheckUpdate.setOnClickListener {
-            actionListener?.onCheckUpdateRequested()
+            actionListener?.onCheckOtaRequested()
         }
 
         binding.btnLinkGoogle.setOnClickListener {
@@ -266,18 +277,24 @@ class SettingsFragment : Fragment() {
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
                     val report = withContext(Dispatchers.IO) {
-                        AiTelemetryReporter.buildFullTelemetryReport(appContext)
+                        AiTelemetryReporter.generateMarkdownReport(appContext)
                     }
-                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_SUBJECT, getString(R.string.share_telemetry_subject))
-                        putExtra(Intent.EXTRA_TEXT, report)
-                    }
+                    if (!isAdded || _binding == null) return@launch
+
+                    AiTelemetryReporter.copyReportToClipboard(appContext, report)
+                    Toast.makeText(appContext, R.string.toast_telemetry_copied, Toast.LENGTH_SHORT).show()
+
                     try {
+                        val sendIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_SUBJECT, "AntiPorn Diagnostic Report")
+                            putExtra(Intent.EXTRA_TEXT, report)
+                            type = "text/plain"
+                        }
                         val chooser = Intent.createChooser(sendIntent, getString(R.string.share_telemetry_chooser_title))
                         startActivity(chooser)
                     } catch (e: Exception) {
-                        Timber.e(e, "Error launching share chooser")
+                        Log.e(TAG, "Error launching share chooser", e)
                     }
                 } finally {
                     _binding?.btnShareTelemetry?.isEnabled = true
@@ -286,6 +303,7 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    // Public legacy update hooks for backward compatibility
     fun updateAllStates() {
         settingsViewModel.refreshAll()
     }
@@ -294,8 +312,8 @@ class SettingsFragment : Fragment() {
         settingsViewModel.refreshAiState()
     }
 
-    fun updateGoogleAccountUi() {
-        settingsViewModel.refreshGoogleAccountState()
+    fun updateGoogleUi() {
+        settingsViewModel.refreshGoogleState()
     }
 
     fun updateDeviceOwnerUi() {
@@ -303,7 +321,7 @@ class SettingsFragment : Fragment() {
     }
 
     fun bindOtaState(state: OtaUpdateState, versionName: String, versionCode: Long) {
-        settingsViewModel.updateOtaState(state, versionName, versionCode)
+        settingsViewModel.refreshAll()
     }
 
     override fun onDestroyView() {
