@@ -1,11 +1,11 @@
 {
-  "versionCode": 11,
-  "versionName": "1.73",
+  "versionCode": 13,
+  "versionName": "1.75",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 42027961,
+  "fileSizeBytes": 42056801,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.73: إصلاح جذري لعطل تعليق تطبيقات جوجل والنظام (الخرائط، اليوتيوب، الدرايف، التقويم، الصور)، تفعيل فك التجميد التلقائي اللحظي فور انتهاء الحظر أو الاستثناء نهاراً، إضافة شارة الحالة الحقيقية وزر الإنقاذ الذاتي لإصلاح التطبيقات المعلقة بنقرة واحدة.",
-  "releaseDate": "2026-11-04"
+  "releaseNotes": "إصدار 1.75: القضاء على مشكلة الحراس الأشباح (Ghost Guardians)، فرض محرك الوقت الموثوق لجميع عمليات الاقتران، وتزويد الصندوق الأسود بتتبع دقيق لأحداث الاقتران والربط السحابي.",
+  "releaseDate": "2026-11-05"
 }
