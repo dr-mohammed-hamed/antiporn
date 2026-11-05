@@ -34,6 +34,12 @@ class AccountabilityIdentityMigrator(
         if (oldUid.isBlank() || newUid.isBlank() || oldUid == newUid) return@withContext
         try {
             Log.i(TAG, "[UidMigration] Starting identity migration from $oldUid to $newUid")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordIdentity(
+                appContext,
+                "IDENTITY_MIGRATION_STARTED",
+                isSuccess = true,
+                details = "from=$oldUid, to=$newUid"
+            )
 
             // 1. Write forwarding record to /uid_mappings/$oldUid
             val forwardingRecord = mapOf(
@@ -52,8 +58,8 @@ class AccountabilityIdentityMigrator(
             // 2. Policy Migration: check /policies/$oldUid and copy to /policies/$newUid
             try {
                 val oldPolicyDoc = firestore.collection("policies").document(oldUid).get().await()
-                if (oldPolicyDoc.exists() && oldPolicyDoc.data != null) {
-                    val oldPolicyData = oldPolicyDoc.data ?: run { Log.w(TAG, "oldPolicyDoc data is null"); return@withContext }
+                val oldPolicyData = oldPolicyDoc.data
+                if (oldPolicyDoc.exists() && oldPolicyData != null) {
                     val oldVersion = oldPolicyDoc.getLong("version") ?: 1L
 
                     val newPolicyDoc = try {
@@ -153,6 +159,12 @@ class AccountabilityIdentityMigrator(
                     return@withContext partnerUid
                 }
                 Log.i(TAG, "[UidMigration] Partner UID resolved from $partnerUid to $resolvedUid")
+                com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordIdentity(
+                    appContext,
+                    "PARTNER_UID_RESOLVED",
+                    isSuccess = true,
+                    details = "partnerUid switched from $partnerUid to $resolvedUid"
+                )
                 val localPartner = database.getPartnerById(partnerUid)
                 if (localPartner != null) {
                     val updatedPartner = localPartner.copy(id = resolvedUid)

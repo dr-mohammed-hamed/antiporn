@@ -87,7 +87,7 @@ object SafeDpmGateway {
         action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
     ): DpmExecutionResult<T> {
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            Log.w(TAG, "⚠️ WARNING: SafeDpmGateway.executeBlocking called on Main Thread for action [$actionName]. Consider migrating to suspend execute()!")
+            Log.w(TAG, "[WARN] SafeDpmGateway.executeBlocking called on Main Thread for action [$actionName]. Consider migrating to suspend execute()!")
         }
         return executeInternal(context, tag, actionName, metadata, requireDeviceOwner, action)
     }
@@ -180,7 +180,7 @@ object SafeDpmGateway {
             val duration = SystemClock.elapsedRealtime() - startTime
 
             recordTelemetry(appContext, tag, actionName, duration, true, null, metadata)
-            Log.d(TAG, "✅ DPM Action [$actionName] executed successfully in ${duration}ms")
+            Log.d(TAG, "[SUCCESS] DPM Action [$actionName] executed successfully in ${duration}ms")
 
             DpmExecutionResult.Success(
                 data = result,
@@ -190,7 +190,7 @@ object SafeDpmGateway {
         } catch (e: SecurityException) {
             val duration = SystemClock.elapsedRealtime() - startTime
             val errMsg = "SecurityException: ${e.message}"
-            Log.e(TAG, "❌ DPM Action [$actionName] failed with SecurityException (${duration}ms)", e)
+            Log.e(TAG, "[FAILURE] DPM Action [$actionName] failed with SecurityException (${duration}ms)", e)
             recordTelemetry(appContext, tag, actionName, duration, false, errMsg, metadata)
 
             DpmExecutionResult.Failure(
@@ -203,7 +203,7 @@ object SafeDpmGateway {
         } catch (e: IllegalArgumentException) {
             val duration = SystemClock.elapsedRealtime() - startTime
             val errMsg = "IllegalArgumentException: ${e.message}"
-            Log.e(TAG, "❌ DPM Action [$actionName] failed with IllegalArgumentException (${duration}ms)", e)
+            Log.e(TAG, "[FAILURE] DPM Action [$actionName] failed with IllegalArgumentException (${duration}ms)", e)
             recordTelemetry(appContext, tag, actionName, duration, false, errMsg, metadata)
 
             DpmExecutionResult.Failure(
@@ -216,7 +216,7 @@ object SafeDpmGateway {
         } catch (e: IllegalStateException) {
             val duration = SystemClock.elapsedRealtime() - startTime
             val errMsg = "IllegalStateException: ${e.message}"
-            Log.e(TAG, "❌ DPM Action [$actionName] failed with IllegalStateException (${duration}ms)", e)
+            Log.e(TAG, "[FAILURE] DPM Action [$actionName] failed with IllegalStateException (${duration}ms)", e)
             recordTelemetry(appContext, tag, actionName, duration, false, errMsg, metadata)
 
             DpmExecutionResult.Failure(
@@ -229,7 +229,7 @@ object SafeDpmGateway {
         } catch (t: Throwable) {
             val duration = SystemClock.elapsedRealtime() - startTime
             val errMsg = "${t.javaClass.simpleName}: ${t.message}"
-            Log.e(TAG, "❌ DPM Action [$actionName] failed with unexpected exception (${duration}ms)", t)
+            Log.e(TAG, "[FAILURE] DPM Action [$actionName] failed with unexpected exception (${duration}ms)", t)
             recordTelemetry(appContext, tag, actionName, duration, false, errMsg, metadata)
 
             DpmExecutionResult.Failure(
@@ -255,13 +255,14 @@ object SafeDpmGateway {
         contextMetadata: String?
     ) {
         try {
-            AntiPornDatabase.getInstance(context).insertDiagnosticEvent(
+            BlackBoxRecorder.record(
+                context = context,
                 tag = tag,
                 actionName = actionName,
-                executionTimeMs = executionTimeMs,
                 isSuccess = isSuccess,
+                executionTimeMs = executionTimeMs,
                 errorDetails = errorDetails,
-                contextMetadata = contextMetadata
+                metadata = contextMetadata
             )
         } catch (e: Exception) {
             Log.w(TAG, "Failed recording telemetry in SafeDpmGateway", e)

@@ -920,4 +920,25 @@
     <string name="self_control_locked_title">التحكم الذاتي مقفل</string>
     <string name="self_control_locked_desc">قام المشرف أو شريك التعافي بقفل إعدادات التحكم الذاتي لحمايتك وضمان ثباتك.</string>
     <string name="btn_go_to_accountability">الانتقال إلى شريك التعافي</string>
+
+    <!-- Black Box Diagnostic Log Viewer -->
+    <string name="title_log_viewer">سجل الصندوق الأسود</string>
+    <string name="btn_view_logs">عرض السجلات</string>
+    <string name="filter_chip_all">الكل</string>
+    <string name="filter_chip_curfew">الحظر والليلي</string>
+    <string name="filter_chip_cloud">المزامنة والسحابة</string>
+    <string name="filter_chip_time">التوقيت</string>
+    <string name="filter_chip_dpm">أوامر النظام</string>
+    <string name="menu_clear_logs">مسح السجلات</string>
+    <string name="dialog_clear_logs_title">تأكيد مسح السجلات</string>
+    <string name="dialog_clear_logs_msg">هل أنت متأكد من رغبتك في مسح كافة سجلات الصندوق الأسود من الهاتف؟ لا يمكن التراجع عن هذا الإجراء.</string>
+    <string name="toast_logs_cleared">تم مسح جميع السجلات بنجاح</string>
+    <string name="empty_logs_text">لا توجد سجلات تشخيصية مسجلة حتى الآن.</string>
+    <string name="total_events_count_format">عرض %1$d من أصل %2$d حدث</string>
+    <string name="btn_delete">مسح</string>
+    <string name="status_curfew_active">الحظر نشط</string>
+    <string name="status_curfew_normal">طبيعي</string>
+    <string name="policy_summary_format">v%1$d | %2$s (%3$02d:%4$02d)</string>
+    <string name="log_latency_format">%1$d ms</string>
+    <string name="telemetry_share_subject">تقرير تشخيص حِصْن</string>
 </resources>

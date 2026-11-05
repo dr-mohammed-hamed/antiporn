@@ -230,6 +230,7 @@ object CurfewScheduler {
             }
             val pi = PendingIntent.getBroadcast(context, REQUEST_CODE_SNOOZE, intent, flags)
             alarmManager.cancel(pi)
+            pi.cancel()
             Log.i(TAG, "Cancelled curfew snooze alarm")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to cancel curfew snooze alarm", e)

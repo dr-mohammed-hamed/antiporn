@@ -228,6 +228,13 @@ class PolicyRepository private constructor(context: Context) {
 
                                     Log.i(TAG, "[SelfControlDiag] Cloud policy received on ward /policies/$uid: cloudPolicy(v${cloudPolicy.version}, supervised=${cloudPolicy.isSupervised}, allowed=${cloudPolicy.isSelfControlAllowed}, guardian='${cloudPolicy.guardianUid}') vs local(v${current.version}, supervised=${current.isSupervised}, allowed=${current.isSelfControlAllowed}), isVersionNewer=$isVersionNewer, isTimeNewer=$isTimeNewer, supervisoryChanged=$supervisoryChanged, statusChanged=$statusChanged")
 
+                                    com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
+                                        appContext,
+                                        "POLICY_RECEIVED",
+                                        isSuccess = true,
+                                        details = "uid=$uid, v${cloudPolicy.version}, isSupervised=${cloudPolicy.isSupervised}, curfew=${cloudPolicy.isCurfewEnabled}(${cloudPolicy.curfewStartHour}:${cloudPolicy.curfewStartMinute}), isVersionNewer=$isVersionNewer, isTimeNewer=$isTimeNewer"
+                                    )
+
                                     if (isVersionNewer || isTimeNewer || supervisoryChanged || statusChanged || (current.isSupervised != cloudPolicy.isSupervised)) {
                                         val wasSupervised = current.isSupervised
                                         val isNowSupervised = cloudPolicy.isSupervised
@@ -265,6 +272,12 @@ class PolicyRepository private constructor(context: Context) {
                                                         )
                                                     ).await()
                                                     Log.i(TAG, "[SelfControlDiag] Acknowledged policy v${cloudPolicy.version} back to Firestore /policies/$uid")
+                                                    com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
+                                                        appContext,
+                                                        "POLICY_ACKNOWLEDGED",
+                                                        isSuccess = true,
+                                                        details = "acknowledgedVersion=${cloudPolicy.version} on /policies/$uid"
+                                                    )
                                                 } catch (e: Exception) {
                                                     Log.w(TAG, "Failed writing policy acknowledgment: ${e.message}")
                                                 }
@@ -293,12 +306,25 @@ class PolicyRepository private constructor(context: Context) {
         val isBreakoutStatusChange = bundle.breakoutStatus != current.breakoutStatus
         if (!isBreakoutStatusChange && (bundle.version < current.version || (bundle.version == current.version && bundle.updatedAt < current.updatedAt))) {
             Log.w(TAG, "Monotonic guard: rejected stale/out-of-order policy v${bundle.version}@${bundle.updatedAt} (current is v${current.version}@${current.updatedAt})")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
+                appContext,
+                "POLICY_REJECTED_STALE",
+                isSuccess = false,
+                error = "Monotonic guard reject: incoming v${bundle.version}@${bundle.updatedAt} < current v${current.version}@${current.updatedAt}"
+            )
             return
         }
 
         database.saveDevicePolicy(DevicePolicyEntity.fromBundle(bundle))
         _currentPolicyFlow.value = bundle
         com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = bundle.isSelfControlAllowed
+
+        com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
+            appContext,
+            "POLICY_ENFORCED_LOCALLY",
+            isSuccess = true,
+            details = "v${bundle.version}, curfew=${bundle.isCurfewEnabled}(${bundle.curfewStartHour}:${bundle.curfewStartMinute}-${bundle.curfewEndHour}:${bundle.curfewEndMinute}), weekend=${bundle.isWeekendCurfewEnabled}(${bundle.weekendCurfewStartHour}:${bundle.weekendCurfewStartMinute}), vpn=${bundle.isVpnBlackholeEnabled}, dns=${bundle.dnsHost}, supervised=${bundle.isSupervised}"
+        )
 
         val wasSupervised = current.isSupervised
         val isNowSupervised = bundle.isSupervised
@@ -576,15 +602,34 @@ class PolicyRepository private constructor(context: Context) {
             updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)
         )
         Log.i(TAG, "[SelfControlDiag] pushPolicyToWard: writing to Firestore /policies/$wardUid: isSelfControlAllowed=${policyToPush.isSelfControlAllowed}, version=$targetVersion")
+        com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
+            appContext,
+            "PUSH_TO_WARD_INITIATED",
+            isSuccess = true,
+            details = "wardUid=$wardUid, version=$targetVersion, cloudVersion=$cloudVersion, curfew=${policyToPush.isCurfewEnabled}(${policyToPush.curfewStartHour}:${policyToPush.curfewStartMinute})"
+        )
         return try {
             firestore.collection("policies").document(wardUid)
                 .set(policyToPush.toMap())
                 .await()
             Log.i(TAG, "[SelfControlDiag] pushPolicyToWard SUCCESS for wardUid=$wardUid (isSelfControlAllowed=${policyToPush.isSelfControlAllowed}, v$targetVersion)")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
+                appContext,
+                "PUSH_TO_WARD_SUCCESS",
+                isSuccess = true,
+                details = "wardUid=$wardUid, version=$targetVersion"
+            )
             true
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e(TAG, "[SelfControlDiag] pushPolicyToWard FAILED for wardUid=$wardUid: ${e.message}", e)
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
+                appContext,
+                "PUSH_TO_WARD_FAILED",
+                isSuccess = false,
+                error = e.message,
+                details = "wardUid=$wardUid, version=$targetVersion"
+            )
             false
         }
     }
@@ -628,6 +673,12 @@ class PolicyRepository private constructor(context: Context) {
 
                 if (isSupervised && (!current.isSelfControlAllowed || !bundle.isSelfControlAllowed)) {
                     Log.w(TAG, "[SelfControlDiag] saveAndEnforceSelfPolicy REJECTED: self-control is disabled by supervisor! (current.allowed=${current.isSelfControlAllowed}, bundle.allowed=${bundle.isSelfControlAllowed})")
+                    com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordGate(
+                        appContext,
+                        "SELF_CONTROL_SAVE_REJECTED",
+                        isSuccess = false,
+                        error = "Access denied: self-control is disabled by supervisor"
+                    )
                     return@withContext false
                 }
 
@@ -642,6 +693,12 @@ class PolicyRepository private constructor(context: Context) {
                     updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
                 )
                 updateLocalPolicyAndEnforce(newPolicy)
+                com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordGate(
+                    appContext,
+                    "SELF_CONTROL_POLICY_SAVED",
+                    isSuccess = true,
+                    details = "v${newPolicy.version}, curfew=${newPolicy.isCurfewEnabled}(${newPolicy.curfewStartHour}:${newPolicy.curfewStartMinute})"
+                )
                 newPolicy
             }
 

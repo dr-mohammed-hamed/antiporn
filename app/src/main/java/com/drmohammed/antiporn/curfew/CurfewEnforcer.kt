@@ -196,6 +196,12 @@ object CurfewEnforcer {
         val isCurfewEffective = CurfewConfig.isCurfewEnabled(context) && isCurfewActive(context, calendar)
         if (!activate && !isSnoozeActive(context) && (isCurfewEffective || NapController.isNapActive(context))) {
             Log.w(TAG, "Security Alert: Block release rejected - night curfew window or active nap still holds!")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCurfew(
+                context,
+                "RELEASE_REJECTED",
+                isSuccess = false,
+                error = "Security invariant: release rejected - curfew window or active nap holds (effective=$isCurfewEffective, nap=${NapController.isNapActive(context)})"
+            )
             return true
         }
 
@@ -262,6 +268,12 @@ object CurfewEnforcer {
         return if (activate) {
             val targets = CurfewAppResolver.getCurfewTargetPackages(context)
             Log.i(TAG, "Enforcing Curfew ON for ${targets.size} targeted packages")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCurfew(
+                context,
+                "CURFEW_ACTIVATED",
+                isSuccess = true,
+                details = "targets=${targets.size}, vpnEnabled=$vpnEnabled, instantKill=$instantKill, nap=${NapController.isNapActive(context)}"
+            )
 
             // 1. Lockdown OEM App Stores & Search loophole apps completely (Hide from launcher and apps list)
             val packagesToHide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
@@ -377,6 +389,12 @@ object CurfewEnforcer {
         } else {
             // Wakeup: Restore daytime apps and stores
             Log.i(TAG, "Enforcing Curfew OFF: Releasing daytime apps and stores")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCurfew(
+                context,
+                "CURFEW_RELEASED",
+                isSuccess = true,
+                details = "Daytime apps and stores released"
+            )
 
             // 1. Restore OEM App Stores & Search apps (Unhide)
             val packagesToUnhide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
@@ -685,7 +703,7 @@ object CurfewEnforcer {
         if (stuckToUnsuspend.isNotEmpty()) {
             try {
                 dpm.setPackagesSuspended(admin, stuckToUnsuspend.toTypedArray(), false)
-                Log.i(TAG, "🔧 [REPAIR_STUCK_APPS] Successfully unsuspended ${stuckToUnsuspend.size} stuck apps: $stuckToUnsuspend")
+                Log.i(TAG, "[REPAIR] [REPAIR_STUCK_APPS] Successfully unsuspended ${stuckToUnsuspend.size} stuck apps: $stuckToUnsuspend")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed repairing stuck apps via DPM", e)
             }

@@ -20,7 +20,13 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context == null || intent == null) return
         val action = intent.action ?: return
-        Log.i(TAG, "CurfewAlarmReceiver triggered with action: $action")
+        Log.i(TAG, "CurfewAlarmReceiver triggered with action: $action")
+        com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCurfew(
+            context,
+            "ALARM_ACTION_RECEIVED",
+            isSuccess = true,
+            details = "action=$action"
+        )
 
 
         val appContext = context.applicationContext

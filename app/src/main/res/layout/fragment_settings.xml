@@ -261,7 +261,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="@string/settings_google_unlinked"
-                            android:textColor="?attr/colorOutline"
+                            android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="12sp" />
                     </LinearLayout>
 
@@ -322,9 +322,20 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="@string/settings_telemetry_desc"
-                            android:textColor="?attr/colorOutline"
+                            android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="12sp" />
                     </LinearLayout>
+
+                    <!-- View Logs Button -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnViewLogs"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/btn_view_logs"
+                        android:textSize="12sp"
+                        app:cornerRadius="10dp" />
 
                     <!-- Share Log Button -->
                     <com.google.android.material.button.MaterialButton

@@ -128,6 +128,10 @@ android {
         noCompress += "onnx"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = true
@@ -177,6 +181,8 @@ dependencies {
     // Dependency Injection (Koin)
     implementation(libs.koin.android)
     testImplementation(libs.koin.test)
+
+    implementation("com.jakewharton.timber:timber:5.0.1")
 
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")

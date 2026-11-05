@@ -43,19 +43,50 @@ object AiTelemetryReporter {
         // Device & Environment Info
         val env = collectEnvironmentInfo(appContext)
 
+        // Active Policy & Account State
+        val currentPolicy = try {
+            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(appContext).getCurrentPolicy()
+        } catch (e: Exception) {
+            null
+        }
+
+        val cachedUid = try {
+            com.drmohammed.antiporn.data.repository.AccountabilityRepository.getInstance(appContext).getCachedUid()
+        } catch (e: Exception) {
+            "Unknown"
+        }
+
+        val isEffectiveBlock = try {
+            com.drmohammed.antiporn.curfew.CurfewEnforcer.isEffectiveBlockActive(appContext)
+        } catch (e: Exception) {
+            false
+        }
+
         // Read Latest Crash Dump if present
         val latestCrash = getLatestCrashDump(appContext)
 
-        // Read Recent Diagnostic Events from SQLite
-        val recentEvents = try {
-            AntiPornDatabase.getInstance(appContext).getRecentDiagnosticEvents(50)
+        // Read Categorized Diagnostic Events from SQLite
+        val db = AntiPornDatabase.getInstance(appContext)
+        val cloudEvents = try {
+            db.getDiagnosticEvents(30, BlackBoxRecorder.TAG_CLOUD_SYNC) + db.getDiagnosticEvents(15, BlackBoxRecorder.TAG_IDENTITY)
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching diagnostic events for AI report", e)
+            emptyList()
+        }.sortedByDescending { it.timestamp }
+
+        val curfewEvents = try {
+            db.getDiagnosticEvents(40, BlackBoxRecorder.TAG_CURFEW)
+        } catch (e: Exception) {
+            emptyList()
+        }
+
+        val dpmEvents = try {
+            db.getDiagnosticEvents(30, BlackBoxRecorder.TAG_DPM)
+        } catch (e: Exception) {
             emptyList()
         }
 
         val totalEventsCount = try {
-            AntiPornDatabase.getInstance(appContext).getDiagnosticEventsCount()
+            db.getDiagnosticEventsCount()
         } catch (e: Exception) {
             Log.w(TAG, "Error querying diagnostic events count", e)
             -1L
@@ -64,12 +95,35 @@ object AiTelemetryReporter {
         val sb = StringBuilder()
 
         // 1. Report Header
-        sb.appendLine("# 🛡️ AntiPorn Guard — In-App Diagnostic & Telemetry Report")
+        sb.appendLine("# 🛡️ AntiPorn Guard — Black Box Diagnostic Report")
         sb.appendLine("> Generated on: `$formattedDate` | App Version: `${env.appVersionName} (${env.appVersionCode})`")
         sb.appendLine()
 
-        // 2. Environment Summary
-        sb.appendLine("## 📱 1. Device & Android Enterprise Environment")
+        // 2. Active Protection & Policy State
+        sb.appendLine("## ⚙️ 1. Active Protection & Policy State (حالة السياسة والحظر)")
+        if (currentPolicy != null) {
+            sb.appendLine("| Protection Property | Current Value |")
+            sb.appendLine("| :--- | :--- |")
+            sb.appendLine("| **Current Policy Version** | `v${currentPolicy.version}` |")
+            sb.appendLine("| **Effective Block Active Now** | `${if (isEffectiveBlock) "🔴 LOCKED / ACTIVE" else "🟢 NORMAL / DAYTIME"}` |")
+            sb.appendLine("| **Curfew Feature Master Switch** | `${if (currentPolicy.isCurfewEnabled) "✅ ENABLED" else "❌ DISABLED"}` |")
+            sb.appendLine("| **Curfew Schedule (Weekday)** | `${String.format(Locale.US, "%02d:%02d", currentPolicy.curfewStartHour, currentPolicy.curfewStartMinute)} ➔ ${String.format(Locale.US, "%02d:%02d", currentPolicy.curfewEndHour, currentPolicy.curfewEndMinute)}` |")
+            sb.appendLine("| **Curfew Schedule (Weekend)** | `${if (currentPolicy.isWeekendCurfewEnabled) "✅ ACTIVE" else "❌ OFF"} (${String.format(Locale.US, "%02d:%02d", currentPolicy.weekendCurfewStartHour, currentPolicy.weekendCurfewStartMinute)} ➔ ${String.format(Locale.US, "%02d:%02d", currentPolicy.weekendCurfewEndHour, currentPolicy.weekendCurfewEndMinute)})` |")
+            sb.appendLine("| **Policy Timezone** | `${currentPolicy.timeZoneId}` |")
+            sb.appendLine("| **Supervised by Guardian** | `${if (currentPolicy.isSupervised) "✅ YES" else "❌ NO (Standalone)"}` |")
+            sb.appendLine("| **Guardian Identity** | `${currentPolicy.guardianName ?: "None"} (${currentPolicy.guardianUid ?: "None"})` |")
+            sb.appendLine("| **Self-Control Allowed** | `${if (currentPolicy.isSelfControlAllowed) "✅ YES" else "❌ LOCKED BY GUARDIAN"}` |")
+            sb.appendLine("| **VPN Blackhole Internet Kill** | `${if (currentPolicy.isVpnBlackholeEnabled) "✅ ACTIVE" else "❌ DISABLED"}` |")
+            sb.appendLine("| **Instant Internet Kill** | `${if (currentPolicy.isInstantInternetKillEnabled) "🔴 ACTIVE" else "⚪ OFF"}` |")
+            sb.appendLine("| **Active DNS Host** | `${currentPolicy.dnsHost}` |")
+            sb.appendLine("| **Local Device UID** | `$cachedUid` |")
+        } else {
+            sb.appendLine("⚠️ *Unable to load current device policy from SQLite.*")
+        }
+        sb.appendLine()
+
+        // 3. Environment Summary
+        sb.appendLine("## 📱 2. Device & Android Enterprise Environment")
         sb.appendLine("| Property | Value |")
         sb.appendLine("| :--- | :--- |")
         sb.appendLine("| **Device Model** | `${env.manufacturer} ${env.model} (${env.device})` |")
@@ -78,11 +132,11 @@ object AiTelemetryReporter {
         sb.appendLine("| **RAM (Available / Total)** | `${env.availableMemoryMb} MB / ${env.totalMemoryMb} MB` |")
         sb.appendLine("| **Device Owner (DO) Active** | `${if (env.isDeviceOwner) "✅ YES" else "❌ NO"}` |")
         sb.appendLine("| **Device Admin (DA) Active** | `${if (env.isAdminActive) "✅ YES" else "❌ NO"}` |")
-        sb.appendLine("| **Total Logged Events** | `${if (totalEventsCount >= 0) totalEventsCount else "Unknown"}` |")
+        sb.appendLine("| **Total Logged Events in Black Box** | `${if (totalEventsCount >= 0) totalEventsCount else "Unknown"}` |")
         sb.appendLine()
 
-        // 3. Crash Status
-        sb.appendLine("## 💥 2. Latest Crash Incident")
+        // 4. Crash Status
+        sb.appendLine("## 💥 3. Latest Crash Incident")
         if (!latestCrash.isNullOrBlank()) {
             sb.appendLine("```text")
             sb.appendLine(latestCrash.trim())
@@ -92,28 +146,60 @@ object AiTelemetryReporter {
         }
         sb.appendLine()
 
-        // 4. Recent Operations Table
-        sb.appendLine("## ⏱️ 3. Recent 50 Operations & DPM Execution Latencies")
-        if (recentEvents.isNotEmpty()) {
-            sb.appendLine("| Timestamp | Tag | Action | Latency | Status | Error Details | Context Metadata |")
-            sb.appendLine("| :--- | :--- | :--- | :---: | :---: | :--- | :--- |")
-            for (event in recentEvents) {
-                sb.appendLine(event.toMarkdownTableRow())
+        // 5. Cloud Sync & Identity Timeline
+        sb.appendLine("## 🔄 4. Cloud Sync & Identity Timeline (آخر عمليات المزامنة والهويات)")
+        if (cloudEvents.isNotEmpty()) {
+            sb.appendLine("| Timestamp | Action | Status | Metadata / Error |")
+            sb.appendLine("| :--- | :--- | :---: | :--- |")
+            for (event in cloudEvents.take(25)) {
+                val statusEmoji = if (event.isSuccess) "✅ OK" else "❌ FAIL"
+                val errOrMeta = event.errorDetails?.takeIf { it.isNotBlank() } ?: (event.contextMetadata ?: "-")
+                sb.appendLine("| `${event.formattedTime()}` | `${event.actionName}` | $statusEmoji | ${errOrMeta.replace("|", "/")} |")
             }
         } else {
-            sb.appendLine("ℹ️ *No diagnostic events recorded yet.*")
+            sb.appendLine("ℹ️ *No cloud synchronization events recorded yet.*")
         }
         sb.appendLine()
 
-        // 5. AI Prompt & Diagnosis Guidance
+        // 6. Curfew, Nap & Alarm Lifecycle Events
+        sb.appendLine("## 🌙 5. Curfew & Alarm Lifecycle Events (أحداث الحظر الليلي والمنبهات)")
+        if (curfewEvents.isNotEmpty()) {
+            sb.appendLine("| Timestamp | Action | Status | Details / Error |")
+            sb.appendLine("| :--- | :--- | :---: | :--- |")
+            for (event in curfewEvents.take(25)) {
+                val statusEmoji = if (event.isSuccess) "✅ OK" else "❌ FAIL"
+                val errOrMeta = event.errorDetails?.takeIf { it.isNotBlank() } ?: (event.contextMetadata ?: "-")
+                sb.appendLine("| `${event.formattedTime()}` | `${event.actionName}` | $statusEmoji | ${errOrMeta.replace("|", "/")} |")
+            }
+        } else {
+            sb.appendLine("ℹ️ *No curfew lifecycle events recorded yet.*")
+        }
+        sb.appendLine()
+
+        // 7. System DPM Operations
+        sb.appendLine("## ⚙️ 6. System & DPM Operations (أوامر حماية النظام)")
+        if (dpmEvents.isNotEmpty()) {
+            sb.appendLine("| Timestamp | Action | Latency | Status | Error Details |")
+            sb.appendLine("| :--- | :--- | :---: | :---: | :--- |")
+            for (event in dpmEvents.take(25)) {
+                val statusEmoji = if (event.isSuccess) "✅ OK" else "❌ FAIL"
+                val err = event.errorDetails?.replace("|", "/") ?: "-"
+                sb.appendLine("| `${event.formattedTime()}` | `${event.actionName}` | `${event.executionTimeMs}ms` | $statusEmoji | $err |")
+            }
+        } else {
+            sb.appendLine("ℹ️ *No DPM operations recorded yet.*")
+        }
+        sb.appendLine()
+
+        // 8. AI Prompt & Diagnosis Guidance
         sb.appendLine("---")
-        sb.appendLine("## 🤖 4. AI Diagnosis Instructions (تعليمات التحليل للذكاء الاصطناعي)")
+        sb.appendLine("## 🤖 7. AI Diagnosis Instructions (تعليمات التحليل للذكاء الاصطناعي)")
         sb.appendLine("""
-Please analyze the telemetry log above and provide an actionable diagnosis:
-1. **Button Responsiveness & Latency:** Identify any operations with latencies exceeding 100ms or binder deadlocks.
-2. **DPM Security & Permissions:** Check for any `SecurityException`, `NOT_DEVICE_OWNER`, or permission denials.
-3. **Crash Root Cause:** If a crash stacktrace is present, diagnose the exact failure line and suggest a surgical fix.
-4. **Actionable Recommendations:** Recommend concise architectural or code adjustments.
+Please analyze the telemetry and black-box log above and provide an actionable diagnosis:
+1. **Curfew & Alarm Timing:** Verify if the scheduled curfew start/end matches the observed behavior and identify any alarm skips or drift.
+2. **Cloud Sync & Monotonic Guards:** Check for rejected stale policies, UID mismatches, or missing acknowledgments.
+3. **Permissions & Security:** Identify any DPM failures, SecurityExceptions, or unexpected state transitions.
+4. **Actionable Recommendations:** Provide a surgical diagnosis and concrete code/configuration recommendations.
 """.trimIndent())
 
         return sb.toString()

@@ -156,6 +156,7 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_pending_approvals_status ON $TABLE_PENDING_APPROVALS ($COL_APPROVAL_STATUS)")
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_timestamp ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TIMESTAMP)")
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_tag ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TAG)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_tag_timestamp ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TAG, $COL_DIAG_TIMESTAMP DESC)")
 
             // Seed default policy if empty
             val defaultBundle = DevicePolicyBundle.defaultPolicy()
@@ -193,6 +194,7 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
             }
         }
         if (oldVersion < 3) {
+            db.beginTransaction()
             try {
                 db.execSQL(
                     """
@@ -210,9 +212,14 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_timestamp ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TIMESTAMP)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_tag ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TAG)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_tag_timestamp ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TAG, $COL_DIAG_TIMESTAMP DESC)")
+                db.setTransactionSuccessful()
                 Log.i(TAG, "Successfully upgraded AntiPornDatabase to version 3 (added $TABLE_DIAGNOSTIC_EVENTS)")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed creating diagnostic_events table during upgrade to version 3", e)
+                throw SQLException("Failed to upgrade database to version 3", e)
+            } finally {
+                db.endTransaction()
             }
         }
     }
@@ -624,7 +631,6 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
         }
     }
 
-    @Synchronized
     fun getRecentDiagnosticEvents(limit: Int = 50): List<DiagnosticEventDto> {
         val db = readableDatabase
         val events = mutableListOf<DiagnosticEventDto>()
@@ -674,7 +680,7 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
     }
 
     @Synchronized
-    fun pruneDiagnosticEventsOlderThan(days: Int = 7): Int {
+    fun pruneDiagnosticEventsOlderThan(days: Int = 30): Int {
         if (days <= 0) return 0
         val cutoffTimestamp = TrustedTimeProvider.currentTimeMillis() - (days.toLong() * 24 * 60 * 60 * 1000L)
         val db = writableDatabase
@@ -694,7 +700,99 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
         }
     }
 
+    /**
+     * Enforces a hard cap on the total number of diagnostic events in SQLite (Ring Buffer).
+     * Deletes the oldest events exceeding [maxEvents].
+     */
     @Synchronized
+    fun enforceMaxEventsCap(maxEvents: Int = 5000): Int {
+        if (maxEvents <= 0) return 0
+        val currentCount = getDiagnosticEventsCount()
+        if (currentCount <= maxEvents) return 0
+        val excess = (currentCount - maxEvents).toInt()
+        val db = writableDatabase
+        return try {
+            // Delete oldest excess rows based on ascending timestamp / id
+            val sql = "DELETE FROM $TABLE_DIAGNOSTIC_EVENTS WHERE $COL_DIAG_ID IN (" +
+                    "SELECT $COL_DIAG_ID FROM $TABLE_DIAGNOSTIC_EVENTS ORDER BY $COL_DIAG_TIMESTAMP ASC, $COL_DIAG_ID ASC LIMIT ?)"
+            db.execSQL(sql, arrayOf(excess))
+            Log.i(TAG, "Enforced ring buffer cap: deleted $excess excess diagnostic events (was $currentCount, cap $maxEvents)")
+            excess
+        } catch (e: Exception) {
+            Log.e(TAG, "Error enforcing diagnostic events cap", e)
+            0
+        }
+    }
+
+    /**
+     * Clears all diagnostic events from the database.
+     */
+    @Synchronized
+    fun clearAllDiagnosticEvents(): Boolean {
+        val db = writableDatabase
+        return try {
+            db.delete(TABLE_DIAGNOSTIC_EVENTS, null, null)
+            Log.i(TAG, "Cleared all diagnostic events from database")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error clearing all diagnostic events", e)
+            false
+        }
+    }
+
+    /**
+     * Fetches diagnostic events with optional category filtering and custom limit.
+     */
+    fun getDiagnosticEvents(limit: Int = 200, category: String? = null): List<DiagnosticEventDto> {
+        val db = readableDatabase
+        val events = mutableListOf<DiagnosticEventDto>()
+        var cursor: Cursor? = null
+        try {
+            val selection = if (category.isNullOrBlank() || category == "ALL") null else "$COL_DIAG_TAG = ?"
+            val selectionArgs = if (category.isNullOrBlank() || category == "ALL") null else arrayOf(category)
+            cursor = db.query(
+                TABLE_DIAGNOSTIC_EVENTS,
+                null,
+                selection,
+                selectionArgs,
+                null,
+                null,
+                "$COL_DIAG_TIMESTAMP DESC",
+                limit.toString()
+            )
+            if (cursor.moveToFirst()) {
+                val idIdx = cursor.getColumnIndexOrThrow(COL_DIAG_ID)
+                val timeIdx = cursor.getColumnIndexOrThrow(COL_DIAG_TIMESTAMP)
+                val tagIdx = cursor.getColumnIndexOrThrow(COL_DIAG_TAG)
+                val actionIdx = cursor.getColumnIndexOrThrow(COL_DIAG_ACTION_NAME)
+                val execIdx = cursor.getColumnIndexOrThrow(COL_DIAG_EXECUTION_TIME_MS)
+                val successIdx = cursor.getColumnIndexOrThrow(COL_DIAG_IS_SUCCESS)
+                val errIdx = cursor.getColumnIndexOrThrow(COL_DIAG_ERROR_DETAILS)
+                val metaIdx = cursor.getColumnIndexOrThrow(COL_DIAG_CONTEXT_METADATA)
+
+                do {
+                    events.add(
+                        DiagnosticEventDto(
+                            id = cursor.getLong(idIdx),
+                            timestamp = cursor.getLong(timeIdx),
+                            tag = cursor.getString(tagIdx),
+                            actionName = cursor.getString(actionIdx),
+                            executionTimeMs = cursor.getLong(execIdx),
+                            isSuccess = cursor.getInt(successIdx) == 1,
+                            errorDetails = cursor.getString(errIdx),
+                            contextMetadata = cursor.getString(metaIdx)
+                        )
+                    )
+                } while (cursor.moveToNext())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying diagnostic events (category=$category, limit=$limit)", e)
+        } finally {
+            cursor?.close()
+        }
+        return events
+    }
+
     fun getDiagnosticEventsCount(): Long {
         val db = readableDatabase
         var cursor: Cursor? = null

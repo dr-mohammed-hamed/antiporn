@@ -30,3 +30,9 @@ app/src/main/assets_backup/
 
 # Cloudflare Wrangler Cache
 .wrangler/
+
+# Firebase Admin SDK & Secrets
+*firebase-adminsdk*.json
+*serviceAccountKey*.json
+.secrets/
+credentials/

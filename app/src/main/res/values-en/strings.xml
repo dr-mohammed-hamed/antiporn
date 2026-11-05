@@ -641,4 +641,24 @@
     <string name="self_control_locked_title">Self-Control Locked</string>
     <string name="self_control_locked_desc">Your accountability partner or supervisor has locked self-control settings to protect and support you.</string>
     <string name="btn_go_to_accountability">Go to Accountability Partner</string>
+    <!-- Black Box Diagnostic Log Viewer -->
+    <string name="title_log_viewer">Black Box Flight Log</string>
+    <string name="btn_view_logs">View Logs</string>
+    <string name="filter_chip_all">All</string>
+    <string name="filter_chip_curfew">Curfew</string>
+    <string name="filter_chip_cloud">Cloud Sync</string>
+    <string name="filter_chip_time">Time</string>
+    <string name="filter_chip_dpm">System DPM</string>
+    <string name="menu_clear_logs">Clear Logs</string>
+    <string name="dialog_clear_logs_title">Confirm Clear Logs</string>
+    <string name="dialog_clear_logs_msg">Are you sure you want to clear all black-box diagnostic events from this device? This action cannot be undone.</string>
+    <string name="toast_logs_cleared">All diagnostic logs cleared successfully</string>
+    <string name="empty_logs_text">No diagnostic events recorded yet.</string>
+    <string name="total_events_count_format">Showing %1$d of %2$d events</string>
+    <string name="btn_delete">Clear</string>
+    <string name="status_curfew_active">Curfew Active</string>
+    <string name="status_curfew_normal">Normal</string>
+    <string name="policy_summary_format">v%1$d | %2$s (%3$02d:%4$02d)</string>
+    <string name="log_latency_format">%1$d ms</string>
+    <string name="telemetry_share_subject">AntiPorn Diagnostic Report</string>
 </resources>

@@ -155,4 +155,16 @@ class TelemetryAndGatewayTest {
         assertTrue(jsonStr.contains("\"isDeviceOwner\": true"))
         assertTrue(jsonStr.contains("\"manufacturer\": \"Google\""))
     }
+
+    @Test
+    fun testBlackBoxRecorderTags() {
+        assertEquals("CURFEW", BlackBoxRecorder.TAG_CURFEW)
+        assertEquals("CLOUD_SYNC", BlackBoxRecorder.TAG_CLOUD_SYNC)
+        assertEquals("IDENTITY", BlackBoxRecorder.TAG_IDENTITY)
+        assertEquals("TIME", BlackBoxRecorder.TAG_TIME)
+        assertEquals("DPM", BlackBoxRecorder.TAG_DPM)
+        assertEquals("GATE", BlackBoxRecorder.TAG_GATE)
+        assertEquals("CRASH", BlackBoxRecorder.TAG_CRASH)
+        assertEquals("ALL", BlackBoxRecorder.CATEGORY_ALL)
+    }
 }

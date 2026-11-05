@@ -239,6 +239,12 @@ object TrustedTimeProvider {
 
             driftToNotify?.let { drift ->
                 Log.i(TAG, "TrustedTime detected significant time drift ($drift ms). Triggering onTimeDriftCorrected listener.")
+                com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordTime(
+                    context,
+                    "TIME_DRIFT_DETECTED",
+                    isSuccess = true,
+                    details = "drift=${drift}ms"
+                )
                 try {
                     onTimeDriftCorrected?.invoke(drift)
                 } catch (e: Exception) {
@@ -247,9 +253,21 @@ object TrustedTimeProvider {
             }
 
             Log.i(TAG, "TrustedTime synchronized via ${result.source}: trueTime=${result.timeMs}, latency=${result.roundTripLatencyMs}ms")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordTime(
+                context,
+                "SNTP_SYNC_SUCCESS",
+                isSuccess = true,
+                details = "source=${result.source}, latency=${result.roundTripLatencyMs}ms"
+            )
             true
         } else {
             Log.w(TAG, "TrustedTime network synchronization failed across all sources")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordTime(
+                context,
+                "SNTP_SYNC_FAILED",
+                isSuccess = false,
+                error = "Network synchronization failed across all sources"
+            )
             false
         }
     }
