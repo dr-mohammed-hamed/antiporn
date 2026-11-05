@@ -68,7 +68,9 @@ object AiTelemetryReporter {
         // Read Categorized Diagnostic Events from SQLite
         val db = AntiPornDatabase.getInstance(appContext)
         val cloudEvents = try {
-            db.getDiagnosticEvents(30, BlackBoxRecorder.TAG_CLOUD_SYNC) + db.getDiagnosticEvents(15, BlackBoxRecorder.TAG_IDENTITY)
+            db.getDiagnosticEvents(30, BlackBoxRecorder.TAG_CLOUD_SYNC) +
+                db.getDiagnosticEvents(15, BlackBoxRecorder.TAG_IDENTITY) +
+                db.getDiagnosticEvents(20, BlackBoxRecorder.TAG_PAIRING)
         } catch (e: Exception) {
             emptyList()
         }.sortedByDescending { it.timestamp }
@@ -146,8 +148,8 @@ object AiTelemetryReporter {
         }
         sb.appendLine()
 
-        // 5. Cloud Sync & Identity Timeline
-        sb.appendLine("## 🔄 4. Cloud Sync & Identity Timeline (آخر عمليات المزامنة والهويات)")
+        // 5. Cloud Sync, Pairing & Identity Timeline
+        sb.appendLine("## 🔄 4. Cloud Sync, Pairing & Identity Timeline (آخر عمليات المزامنة والاقتران والهويات)")
         if (cloudEvents.isNotEmpty()) {
             sb.appendLine("| Timestamp | Action | Status | Metadata / Error |")
             sb.appendLine("| :--- | :--- | :---: | :--- |")

@@ -156,21 +156,28 @@ class AccountabilityRepository private constructor(context: Context) {
                     }
                 }
 
+                val currentLocalPolicy = database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
                 val pairingDoc = mapOf(
                     "pairingCode" to code,
                     "ownerUid" to uid,
                     "ownerName" to deviceName,
                     "status" to "ACTIVE",
-                    "createdAt" to (existingDoc.getLong("createdAt") ?: System.currentTimeMillis())
+                    "policyVersion" to currentLocalPolicy.version,
+                    "createdAt" to (existingDoc.getLong("createdAt") ?: TrustedTimeProvider.currentTimeMillis(appContext))
                 )
                 firestore.collection("pairings").document(code).set(pairingDoc).await()
                 prefs.edit().putString(KEY_MY_PAIRING_CODE, code).apply()
                 registered = true
-                Log.i(TAG, "Successfully registered pairing code $code for UID $uid (name: $deviceName)")
+                Log.i(TAG, "Successfully registered pairing code $code for UID $uid (name: $deviceName, policyVersion: ${currentLocalPolicy.version})")
+                com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordPairing(
+                    appContext,
+                    "CODE_REGISTERED",
+                    isSuccess = true,
+                    details = "code=$code, uid=$uid, version=${currentLocalPolicy.version}"
+                )
 
                 // Proactively ensure base policy exists in Firestore under /policies/$uid
                 try {
-                    val currentLocalPolicy = database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
                     firestore.collection("policies").document(uid).set(currentLocalPolicy.toMap(), com.google.firebase.firestore.SetOptions.merge()).await()
                     Log.d(TAG, "Ensured base policy document in Firestore for UID $uid")
                 } catch (policyEx: Exception) {
@@ -236,6 +243,8 @@ class AccountabilityRepository private constructor(context: Context) {
                 }
 
                 val currentVersion = policyDoc?.getLong("version") ?: 1L
+                val pairingPolicyVersion = snapshot.getLong("policyVersion") ?: 1L
+                val baseVersion = maxOf(currentVersion, pairingPolicyVersion)
                 val basePolicy = policyDoc?.data?.let { DevicePolicyBundle.fromMap(it) }
                     ?: DevicePolicyBundle.defaultPolicy()
 
@@ -243,8 +252,8 @@ class AccountabilityRepository private constructor(context: Context) {
                     guardianUid = myUid,
                     guardianName = myDeviceName,
                     isSupervised = true,
-                    version = currentVersion + 1,
-                    updatedAt = System.currentTimeMillis()
+                    version = baseVersion + 1,
+                    updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
                 )
                 try {
                     firestore.collection("pairings").document(cleanCode).update(
@@ -283,7 +292,7 @@ class AccountabilityRepository private constructor(context: Context) {
                     guardianName = targetName,
                     isSupervised = true,
                     version = currentVersion + 1,
-                    updatedAt = System.currentTimeMillis()
+                    updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
                 )
                 firestore.collection("policies").document(myUid).set(updatedMyPolicy.toMap()).await()
                 database.saveDevicePolicy(DevicePolicyEntity.fromBundle(updatedMyPolicy))
@@ -296,8 +305,8 @@ class AccountabilityRepository private constructor(context: Context) {
                 displayName = targetName,
                 role = role,
                 status = PartnerEntity.STATUS_ACTIVE,
-                createdAt = System.currentTimeMillis(),
-                lastSyncAt = System.currentTimeMillis()
+                createdAt = TrustedTimeProvider.currentTimeMillis(appContext),
+                lastSyncAt = TrustedTimeProvider.currentTimeMillis(appContext)
             )
 
             // Save relation in Firestore
@@ -306,7 +315,7 @@ class AccountabilityRepository private constructor(context: Context) {
                 "partnerName" to targetName,
                 "role" to role,
                 "pairingCode" to cleanCode,
-                "pairedAt" to System.currentTimeMillis()
+                "pairedAt" to TrustedTimeProvider.currentTimeMillis(appContext)
             )
             firestore.collection("users").document(myUid)
                 .collection("partners").document(targetUid)
@@ -317,9 +326,22 @@ class AccountabilityRepository private constructor(context: Context) {
             database.savePartner(partner)
 
             Log.i(TAG, "Successfully paired with $targetName ($targetUid) as $role under strict single guardian lock")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordPairing(
+                appContext,
+                "PAIR_SUCCESS",
+                isSuccess = true,
+                details = "targetUid=$targetUid, targetName=$targetName, role=$role, code=$cleanCode"
+            )
             Result.success(partner)
         } catch (e: Exception) {
             Log.e(TAG, "Error during pairing with code $code", e)
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordPairing(
+                appContext,
+                "PAIR_FAILED",
+                isSuccess = false,
+                details = "code=$code, role=$role",
+                error = e.message
+            )
             Result.failure(e)
         }
     }
@@ -379,9 +401,22 @@ class AccountabilityRepository private constructor(context: Context) {
             }
 
             Log.i(TAG, "Successfully revoked supervision for ward targets: $targetUids")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordPairing(
+                appContext,
+                "SUPERVISION_REVOKED_BY_GUARDIAN",
+                isSuccess = true,
+                details = "targets=$targetUids"
+            )
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Error revoking supervision for ward $wardUid", e)
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordPairing(
+                appContext,
+                "SUPERVISION_REVOKE_FAILED",
+                isSuccess = false,
+                details = "wardUid=$wardUid",
+                error = e.message
+            )
             Result.failure(e)
         }
     }
@@ -402,8 +437,22 @@ class AccountabilityRepository private constructor(context: Context) {
                 return@withContext
             }
 
+            val uid = getOrCreateCurrentUid()
             for (guardian in guardians) {
                 database.deletePartner(guardian.id)
+                // Delete from cloud Firestore /users/{uid}/partners/{guardian.id} to eliminate ghost guardians
+                if (!uid.startsWith("dev_") || auth.currentUser != null) {
+                    repositoryScope.launch(Dispatchers.IO) {
+                        try {
+                            firestore.collection("users").document(uid)
+                                .collection("partners").document(guardian.id)
+                                .delete().await()
+                            Log.d(TAG, "Pruned revoked guardian ${guardian.id} from cloud /users/$uid/partners")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed pruning revoked guardian from cloud: ${e.message}")
+                        }
+                    }
+                }
             }
 
             val oldCode = prefs.getString(KEY_MY_PAIRING_CODE, null)
@@ -426,19 +475,33 @@ class AccountabilityRepository private constructor(context: Context) {
             }
 
             // 4. Publish new code to Firestore
-            val uid = getOrCreateCurrentUid()
             val deviceName = getMyDisplayName()
+            val currentLocalPolicy = database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
             val pairingDoc = mapOf(
                 "pairingCode" to newCode,
                 "ownerUid" to uid,
                 "ownerName" to deviceName,
                 "status" to "ACTIVE",
+                "policyVersion" to currentLocalPolicy.version,
                 "createdAt" to TrustedTimeProvider.currentTimeMillis(appContext)
             )
             firestore.collection("pairings").document(newCode).set(pairingDoc).await()
-            Log.i(TAG, "Successfully processed local revocation: generated and registered new pairing code $newCode")
+            Log.i(TAG, "Successfully processed local revocation: generated and registered new pairing code $newCode (v${currentLocalPolicy.version})")
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordPairing(
+                appContext,
+                "CODE_REGENERATED_REVOCATION",
+                isSuccess = true,
+                details = "code=$newCode, uid=$uid, version=${currentLocalPolicy.version}"
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Error executing local supervision revocation cleanup", e)
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordPairing(
+                appContext,
+                "CODE_REGENERATION_FAILED",
+                isSuccess = false,
+                details = "uid=${getCachedUid()}",
+                error = e.message
+            )
         }
     }
 
@@ -471,6 +534,12 @@ class AccountabilityRepository private constructor(context: Context) {
 
                 if (!isCloudSupervised) {
                     Log.i(TAG, "[SelfHealing] Desync detected! Device locally marked supervised, but cloud policy is unsupervised. Self-healing now...")
+                    com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordPairing(
+                        appContext,
+                        "SUPERVISION_HEALED",
+                        isSuccess = true,
+                        details = "Desync resolved: local was marked supervised, cloud policy is unsupervised"
+                    )
                     PolicyRepository.getInstance(appContext).updateLocalPolicyAndEnforce(cloudPolicy)
                     onSupervisionRevokedLocally()
                     return@withContext true
@@ -506,7 +575,17 @@ class AccountabilityRepository private constructor(context: Context) {
 
                 Log.i(TAG, "Initiating cloud partners restore for UID: $myUid...")
 
-                // 1. Fetch all partners registered under /users/{myUid}/partners
+                // 1. Fetch cloud policy first to verify if device is truly supervised in cloud
+                val myPolicyDoc = try {
+                    firestore.collection("policies").document(myUid).get().await()
+                } catch (e: Exception) {
+                    null
+                }
+                val isActuallyCloudSupervised = myPolicyDoc != null && myPolicyDoc.exists() &&
+                    myPolicyDoc.getBoolean("isSupervised") == true &&
+                    !myPolicyDoc.getString("guardianUid").isNullOrBlank()
+
+                // 2. Fetch all partners registered under /users/{myUid}/partners
                 val cloudPartnersSnapshot = firestore.collection("users").document(myUid)
                     .collection("partners").get().await()
 
@@ -516,6 +595,19 @@ class AccountabilityRepository private constructor(context: Context) {
                     val role = doc.getString("role") ?: PartnerEntity.ROLE_WARD
                     val pairingCode = doc.getString("pairingCode") ?: CODE_LOCKED
                     val pairedAt = doc.getLong("pairedAt") ?: TrustedTimeProvider.currentTimeMillis(appContext)
+
+                    // GHOST GUARDIAN GUARD: If a partner doc has role == GUARDIAN, but cloud policy is NOT supervised:
+                    if (role == PartnerEntity.ROLE_GUARDIAN && !isActuallyCloudSupervised) {
+                        Log.w(TAG, "[GhostGuardian] Detected orphaned guardian $rawPartnerUid in cloud while policy is unsupervised. Pruning from cloud...")
+                        try {
+                            firestore.collection("users").document(myUid)
+                                .collection("partners").document(doc.id)
+                                .delete().await()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed pruning orphaned cloud guardian ${doc.id}: ${e.message}")
+                        }
+                        continue // NEVER save an orphaned guardian to SQLite!
+                    }
 
                     val partnerUid = resolveActivePartnerUid(rawPartnerUid, pairingCode)
                     if (partnerUid != rawPartnerUid) {
@@ -542,14 +634,12 @@ class AccountabilityRepository private constructor(context: Context) {
                     Log.d(TAG, "Restored cloud partner to SQLite: $partnerName ($partnerUid, role=$role)")
                 }
 
-                // 2. Self-heal Guardian from /policies/{myUid} if supervised
+                // 3. Self-heal Guardian from /policies/{myUid} if supervised
                 try {
-                    val myPolicyDoc = firestore.collection("policies").document(myUid).get().await()
-                    if (myPolicyDoc.exists()) {
-                        val isSupervised = myPolicyDoc.getBoolean("isSupervised") ?: false
-                        val guardianUid = myPolicyDoc.getString("guardianUid")
+                    if (isActuallyCloudSupervised) {
+                        val guardianUid = myPolicyDoc?.getString("guardianUid")
                         val guardianName = myPolicyDoc.getString("guardianName")
-                        if (isSupervised && !guardianUid.isNullOrBlank()) {
+                        if (!guardianUid.isNullOrBlank()) {
                             val activeGuardianUid = resolveActivePartnerUid(guardianUid, CODE_LOCKED)
                             val guardian = PartnerEntity(
                                 id = activeGuardianUid,
@@ -619,7 +709,7 @@ class AccountabilityRepository private constructor(context: Context) {
                 role = PartnerEntity.ROLE_GUARDIAN,
                 status = PartnerEntity.STATUS_ACTIVE,
                 createdAt = policy.updatedAt,
-                lastSyncAt = System.currentTimeMillis()
+                lastSyncAt = TrustedTimeProvider.currentTimeMillis(appContext)
             )
             try {
                 database.savePartner(synthesizedGuardian)
@@ -685,7 +775,7 @@ class AccountabilityRepository private constructor(context: Context) {
                 "uid" to myUid,
                 "displayName" to effectiveName,
                 "deviceModel" to "${Build.MANUFACTURER} ${Build.MODEL}",
-                "updatedAt" to System.currentTimeMillis()
+                "updatedAt" to TrustedTimeProvider.currentTimeMillis(appContext)
             )
             try {
                 firestore.collection("users").document(myUid)
@@ -748,7 +838,7 @@ class AccountabilityRepository private constructor(context: Context) {
                     .set(
                         mapOf(
                             "partnerName" to cleanName,
-                            "updatedAt" to System.currentTimeMillis()
+                            "updatedAt" to TrustedTimeProvider.currentTimeMillis(appContext)
                         ),
                         com.google.firebase.firestore.SetOptions.merge()
                     )
@@ -772,7 +862,7 @@ class AccountabilityRepository private constructor(context: Context) {
     suspend fun updateHeartbeat(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val myUid = getOrCreateCurrentUid()
-            val now = System.currentTimeMillis()
+            val now = TrustedTimeProvider.currentTimeMillis(appContext)
             firestore.collection("policies").document(myUid)
                 .set(mapOf("lastHeartbeat" to now), com.google.firebase.firestore.SetOptions.merge())
                 .await()

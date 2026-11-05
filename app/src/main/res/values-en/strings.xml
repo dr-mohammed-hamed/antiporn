@@ -649,6 +649,7 @@
     <string name="filter_chip_cloud">Cloud Sync</string>
     <string name="filter_chip_time">Time</string>
     <string name="filter_chip_dpm">System DPM</string>
+    <string name="filter_chip_pairing">Pairing &amp; Sync</string>
     <string name="menu_clear_logs">Clear Logs</string>
     <string name="dialog_clear_logs_title">Confirm Clear Logs</string>
     <string name="dialog_clear_logs_msg">Are you sure you want to clear all black-box diagnostic events from this device? This action cannot be undone.</string>

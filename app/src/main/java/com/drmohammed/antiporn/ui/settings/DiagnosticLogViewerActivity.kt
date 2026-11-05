@@ -124,6 +124,7 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
                 R.id.chipFilterCloud -> BlackBoxRecorder.TAG_CLOUD_SYNC
                 R.id.chipFilterTime -> BlackBoxRecorder.TAG_TIME
                 R.id.chipFilterDpm -> BlackBoxRecorder.TAG_DPM
+                R.id.chipFilterPairing -> BlackBoxRecorder.TAG_PAIRING
                 else -> null
             }
             loadLogs()

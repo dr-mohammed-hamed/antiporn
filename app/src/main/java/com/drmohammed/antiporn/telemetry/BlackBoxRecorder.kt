@@ -34,6 +34,7 @@ object BlackBoxRecorder {
     const val TAG_TIME = "TIME"
     const val TAG_DPM = "DPM"
     const val TAG_GATE = "GATE"
+    const val TAG_PAIRING = "PAIRING"
     const val TAG_CRASH = "CRASH"
 
     /**
@@ -138,5 +139,16 @@ object BlackBoxRecorder {
         error: String? = null
     ) {
         record(context, TAG_GATE, action, isSuccess, 0L, error, details)
+    }
+
+    fun recordPairing(
+        context: Context,
+        action: String,
+        isSuccess: Boolean = true,
+        details: String? = null,
+        error: String? = null,
+        executionTimeMs: Long = 0L
+    ) {
+        record(context, TAG_PAIRING, action, isSuccess, executionTimeMs, error, details)
     }
 }

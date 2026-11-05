@@ -929,6 +929,7 @@
     <string name="filter_chip_cloud">المزامنة والسحابة</string>
     <string name="filter_chip_time">التوقيت</string>
     <string name="filter_chip_dpm">أوامر النظام</string>
+    <string name="filter_chip_pairing">الاقتران والربط</string>
     <string name="menu_clear_logs">مسح السجلات</string>
     <string name="dialog_clear_logs_title">تأكيد مسح السجلات</string>
     <string name="dialog_clear_logs_msg">هل أنت متأكد من رغبتك في مسح كافة سجلات الصندوق الأسود من الهاتف؟ لا يمكن التراجع عن هذا الإجراء.</string>
