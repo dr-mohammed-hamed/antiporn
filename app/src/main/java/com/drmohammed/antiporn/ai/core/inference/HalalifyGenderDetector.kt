@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.Log
+import timber.log.Timber
 import com.drmohammed.antiporn.ai.core.model.HalalifyDetection
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
@@ -97,25 +98,25 @@ class HalalifyGenderDetector(
 
         private fun safeLogI(msg: String) {
             try {
-                Log.i(TAG, msg)
-            } catch (t: Throwable) {
-                println("[$TAG] $msg")
+                Timber.tag(TAG).i(msg)
+            } catch (_: Throwable) {
+                // Ignore fallback in unmocked environments
             }
         }
 
         private fun safeLogW(msg: String) {
             try {
-                Log.w(TAG, msg)
-            } catch (t: Throwable) {
-                println("[$TAG] WARN: $msg")
+                Timber.tag(TAG).w(msg)
+            } catch (_: Throwable) {
+                // Ignore fallback in unmocked environments
             }
         }
 
         private fun safeLogE(msg: String, tr: Throwable? = null) {
             try {
-                if (tr != null) Log.e(TAG, msg, tr) else Log.e(TAG, msg)
-            } catch (t: Throwable) {
-                System.err.println("[$TAG] ERROR: $msg ${tr?.message ?: ""}")
+                if (tr != null) Timber.tag(TAG).e(tr, msg) else Timber.tag(TAG).e(msg)
+            } catch (_: Throwable) {
+                // Ignore fallback in unmocked environments
             }
         }
     }

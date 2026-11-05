@@ -19,10 +19,18 @@ zxing = "3.5.3"
 camerax = "1.4.1"
 mlkitBarcode = "17.3.0"
 koin = "3.5.6"
+timber = "5.0.1"
+onnxruntime = "1.20.0"
+print = "1.0.0"
+jsonTest = "20240303"
 
 [libraries]
 koin-android = { group = "io.insert-koin", name = "koin-android", version.ref = "koin" }
 koin-test = { group = "io.insert-koin", name = "koin-test", version.ref = "koin" }
+timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntime" }
+androidx-print = { group = "androidx.print", name = "print", version.ref = "print" }
+json-test = { group = "org.json", name = "json", version.ref = "jsonTest" }
 adb-kt = { group = "com.github.rhythmcache", name = "adb-kt", version.ref = "adbKt" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }

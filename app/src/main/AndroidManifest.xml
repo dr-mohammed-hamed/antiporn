@@ -111,12 +111,18 @@
 
         <receiver
             android:name=".curfew.CurfewAlarmReceiver"
-            android:exported="true"
-            tools:ignore="ExportedReceiver">
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.drmohammed.antiporn.ACTION_CURFEW_START" />
                 <action android:name="com.drmohammed.antiporn.ACTION_CURFEW_END" />
                 <action android:name="com.drmohammed.antiporn.ACTION_NAP_END" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".curfew.CurfewBootReceiver"
+            android:exported="true">
+            <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.TIME_SET" />

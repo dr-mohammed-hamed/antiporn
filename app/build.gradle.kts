@@ -76,7 +76,7 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
-        // CRITICAL(C2): production key comes exclusively from CI secrets (never committed).
+        // Production key comes exclusively from CI secrets (never committed).
         // Set KEYSTORE_PATH/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD to sign releases.
         val prodKeystorePath = System.getenv("KEYSTORE_PATH")
         if (!prodKeystorePath.isNullOrBlank()) {
@@ -121,15 +121,12 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 
     androidResources {
         noCompress += "tflite"
         noCompress += "onnx"
-    }
-
-    buildFeatures {
-        buildConfig = true
     }
 
     packaging {
@@ -152,7 +149,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.tensorflow.lite)
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+    implementation(libs.onnxruntime.android)
 
     // Firebase BoM & Cloud Infrastructure
     implementation(platform(libs.firebase.bom))
@@ -176,16 +173,16 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode.scanning)
-    implementation("androidx.print:print:1.0.0")
+    implementation(libs.androidx.print)
 
     // Dependency Injection (Koin)
     implementation(libs.koin.android)
     testImplementation(libs.koin.test)
 
-    implementation("com.jakewharton.timber:timber:5.0.1")
+    implementation(libs.timber)
 
     testImplementation(libs.junit)
-    testImplementation("org.json:json:20240303")
+    testImplementation(libs.json.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

@@ -16,6 +16,7 @@ import android.view.View
 import android.view.WindowManager
 import androidx.annotation.MainThread
 import androidx.annotation.VisibleForTesting
+import timber.log.Timber
 
 /**
  * مدير التعتيم والتظليل الموضعي اللحظي لشاشة الهاتف (ScreenBlurOverlayManager).
@@ -215,25 +216,25 @@ class ScreenBlurOverlayManager(
 
         private fun logI(tag: String, msg: String) {
             try {
-                Log.i(tag, msg)
-            } catch (t: Throwable) {
-                println("[$tag] $msg")
+                Timber.tag(tag).i(msg)
+            } catch (_: Throwable) {
+                // Ignore fallback in unmocked environments
             }
         }
 
         private fun logW(tag: String, msg: String, tr: Throwable? = null) {
             try {
-                if (tr != null) Log.w(tag, msg, tr) else Log.w(tag, msg)
-            } catch (t: Throwable) {
-                println("[$tag] WARN: $msg ${tr?.message ?: ""}")
+                if (tr != null) Timber.tag(tag).w(tr, msg) else Timber.tag(tag).w(msg)
+            } catch (_: Throwable) {
+                // Ignore fallback in unmocked environments
             }
         }
 
         private fun logE(tag: String, msg: String, tr: Throwable? = null) {
             try {
-                if (tr != null) Log.e(tag, msg, tr) else Log.e(tag, msg)
-            } catch (t: Throwable) {
-                System.err.println("[$tag] ERROR: $msg ${tr?.message ?: ""}")
+                if (tr != null) Timber.tag(tag).e(tr, msg) else Timber.tag(tag).e(msg)
+            } catch (_: Throwable) {
+                // Ignore fallback in unmocked environments
             }
         }
     }

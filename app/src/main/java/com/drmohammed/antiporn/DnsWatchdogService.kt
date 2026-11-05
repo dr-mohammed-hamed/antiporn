@@ -357,7 +357,7 @@ class DnsWatchdogService : Service() {
                 addAction(Intent.ACTION_SCREEN_ON)
                 addAction(Intent.ACTION_USER_PRESENT)
             }
-            // CRITICAL(C1): explicit NOT_EXPORTED required for targetSdk=36 / API 33+.
+            // Explicit NOT_EXPORTED required for targetSdk=36 / API 33+.
             ContextCompat.registerReceiver(this, screenReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
             isScreenReceiverRegistered = true
             Log.i(TAG, "Layer 2 - Screen / User Present BroadcastReceiver registered successfully")

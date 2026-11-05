@@ -47,7 +47,7 @@ class MobileNetV4ModestyDetector(
 
     private var interpreter: Interpreter? = null
     private var output2d: Array<FloatArray>? = null
-    // MAJOR(M7): Interpreter.run is not thread-safe — serialize all detect() calls.
+    // Thread-safety guard: Interpreter.run is not thread-safe — serialize all detect() calls.
     private val inferenceLock = Any()
 
     companion object {
@@ -123,7 +123,7 @@ class MobileNetV4ModestyDetector(
                 this.interpreter = null
                 return false
             }
-            // MAJOR(M8): never trust model-reported dims verbatim (tampered model → 201MB alloc → OOM).
+            // Safety validation: never trust model-reported dims verbatim (tampered model → 201MB alloc → OOM).
             if (inputWidth <= 0 || inputHeight <= 0 || inputWidth > MAX_INPUT_DIM || inputHeight > MAX_INPUT_DIM) {
                 Log.e(TAG, "Rejecting absurd input dims: ${inputWidth}x${inputHeight}")
                 try { interp.close() } catch (e: Exception) { Log.d(TAG, "Interpreter close notice: ${e.message}") }

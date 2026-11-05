@@ -81,7 +81,7 @@ class ContextualGatingWatcher(
         val events = try {
             usm.queryEvents(now - (checkIntervalMs * 3), now)
         } catch (e: SecurityException) {
-            // CRITICAL(C5): permission revoked → fail CLOSED (keep scanning), never silent fail-open.
+            // Fail-closed security policy: permission revoked → keep scanning, never silent fail-open.
             failClosed("usage permission revoked: ${e.message}")
             return
         } catch (e: Exception) {
@@ -119,7 +119,7 @@ class ContextualGatingWatcher(
 
         if (latestEventPackage != currentForegroundPackage) {
             currentForegroundPackage = latestEventPackage
-            // MAJOR(M17): AppPolicyRegistry delegates run on main looper — never let one throw kill watcher.
+            // Defensive resilience: AppPolicyRegistry delegates run on main looper — never let one throw kill watcher.
             val isTarget = try {
                 isTargetPackage(latestEventPackage)
             } catch (e: Exception) {

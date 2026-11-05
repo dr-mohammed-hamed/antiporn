@@ -19,7 +19,7 @@ class RowStrideExtractor(
     private val dataType: DataType = DataType.FLOAT32
 ) {
     init {
-        // MAJOR(M8): cap construction dims — allocateDirect(201MB) on tampered 4K dims → OOM.
+        // Memory protection: cap construction dims to avoid OOM on unexpected 4K input.
         require(width in 1..MAX_DIM && height in 1..MAX_DIM) { "Absurd extractor dims ${width}x${height}" }
     }
     /** نمط تطبيع قيم البكسل قبل الاستدلال. */
@@ -95,7 +95,7 @@ class RowStrideExtractor(
         shortBuffer?.rewind()
 
         val planes = image.planes
-        // MAJOR(M4): never rely on AIOOBE — validate planes/dims/strides loudly (service catch drops frame).
+        // Defensive validation: validate planes/dims/strides explicitly before buffer operations.
         require(planes.isNotEmpty()) { "Image has no planes" }
         require(image.width > 0 && image.height > 0) {
             "Invalid image dimensions: ${image.width}x${image.height}"

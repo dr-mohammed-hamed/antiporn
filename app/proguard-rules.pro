@@ -2,6 +2,7 @@
 -keep class com.drmohammed.antiporn.AdminReceiver { *; }
 -keep class com.drmohammed.antiporn.PackageChangeReceiver { *; }
 -keep class com.drmohammed.antiporn.curfew.CurfewAlarmReceiver { *; }
+-keep class com.drmohammed.antiporn.curfew.CurfewBootReceiver { *; }
 -keep class com.drmohammed.antiporn.DnsWatchdogService { *; }
 
 # Keep AppPolicyRegistry and models

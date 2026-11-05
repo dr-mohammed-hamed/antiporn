@@ -23,7 +23,15 @@ google-services.json
 *.keystore
 key.properties
 app/keystore/*
-!app/keystore/testkey.p12
+
+# Antigravity & Agent tools
+.agents/
+.specify/
+
+# Temporary provisioning & audit artifacts
+provisioning_payload.json
+provisioning_qr.png
+audit_executive_report.md
 
 # Assets & Heavy Backups
 app/src/main/assets_backup/

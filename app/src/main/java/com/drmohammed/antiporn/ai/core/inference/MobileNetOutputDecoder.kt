@@ -92,7 +92,7 @@ class MobileNetOutputDecoder(
             out[i] = e.toFloat()
             sum += e
         }
-        // MAJOR(M10): corrupt/NNAPI-delegated logits (NaN/±Inf, all -Inf → sum=0) must never decode to silent-safe.
+        // Defensive guard: corrupt/NNAPI-delegated logits (NaN/±Inf, all -Inf → sum=0) must never decode to silent-safe.
         if (sum.isNaN() || sum <= 0.0 || sum.isInfinite()) {
             return FloatArray(logits.size) { 1f / logits.size }
         }

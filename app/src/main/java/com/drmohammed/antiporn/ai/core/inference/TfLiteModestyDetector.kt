@@ -32,7 +32,7 @@ class TfLiteModestyDetector(
         private set
 
     private var outputArray: Array<Array<FloatArray>>? = null
-    // MAJOR(M7): Interpreter.run is not thread-safe — serialize all detect() calls.
+    // Thread-safety guard: Interpreter.run is not thread-safe — serialize all detect() calls.
     private val inferenceLock = Any()
 
     companion object {
@@ -106,7 +106,7 @@ class TfLiteModestyDetector(
                 inputHeight = inputShape[2]
                 inputWidth = inputShape[3]
             }
-            // MAJOR(M8): cap model-reported dims (tampered model → OOM in extractor/differencer).
+            // Safety validation: cap model-reported dims (tampered model → OOM in extractor/differencer).
             if (inputWidth <= 0 || inputHeight <= 0 || inputWidth > 640 || inputHeight > 640) {
                 Log.e(TAG, "Rejecting absurd input dims: ${inputWidth}x${inputHeight}")
                 try { interp.close() } catch (e: Exception) { Log.d(TAG, "Interpreter close notice: ${e.message}") }

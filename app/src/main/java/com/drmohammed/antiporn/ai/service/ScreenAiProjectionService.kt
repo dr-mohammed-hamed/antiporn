@@ -99,7 +99,7 @@ class ScreenAiProjectionService : Service() {
             private set
 
         /**
-         * CRITICAL(C3): re-entrancy guard — ACTION_STOP sets this synchronously so a
+         * Re-entrancy guard: ACTION_STOP sets this synchronously so a
          * rapid STOP→START cannot overwrite live VirtualDisplay/ImageReader before
          * async onDestroy tears them down. Cleared at end of onDestroy.
          */
@@ -196,7 +196,7 @@ class ScreenAiProjectionService : Service() {
 
         if (action == ACTION_STOP) {
             isRunning = false
-            // CRITICAL(C3): stop frame flow synchronously — onDestroy is async and a rapid
+            // Stop frame flow synchronously — onDestroy is async and a rapid
             // STOP→START would otherwise overwrite live handles (leak + double VirtualDisplay).
             isStopping = true
             isProcessingFrame.set(false)
@@ -241,7 +241,7 @@ class ScreenAiProjectionService : Service() {
                 Log.w(TAG, "Duplicate/reentrant ACTION_START ignored; running=$isRunning stopping=$isStopping")
                 return START_NOT_STICKY
             }
-            // CRITICAL(C4): fail-closed — never hold MediaProjection while detectors are dead.
+            // Fail-closed protection: never hold MediaProjection while detectors are dead.
             if (initError.isNotEmpty() || !::halalifyDetector.isInitialized || !::nudeNetDetector.isInitialized) {
                 Log.e(TAG, "Refusing START: detectors not ready: $initError")
                 val msg = initError.ifEmpty { getString(R.string.ai_init_failed_desc, NudeNetDetector.MODEL_INPUT_SIZE) }
@@ -282,7 +282,7 @@ class ScreenAiProjectionService : Service() {
                 initMediaProjection(resultCode, resultData)
             } else {
                 Log.e(TAG, "Invalid projection token parameters")
-                // MAJOR: startForegroundService() requires startForeground before stopSelf
+                // Android requirement: startForegroundService() requires startForeground before stopSelf
                 // or the system throws ForegroundServiceDidNotStartInTimeException.
                 try {
                     startForegroundWithNotification()
@@ -300,7 +300,7 @@ class ScreenAiProjectionService : Service() {
     }
 
     private fun startForegroundWithNotification() {
-        // MAJOR(S3): clear stale cross-session state on every START (detections/FPS/error).
+        // Clear stale cross-session state on every START (detections/FPS/error).
         lastDetection = LastDetection()
         lastDetectedLabel = ""
         lastConfidence = 0f
@@ -378,7 +378,7 @@ class ScreenAiProjectionService : Service() {
         imageReader = reader
 
         reader.setOnImageAvailableListener({ imageReaderInstance ->
-            // CRITICAL(C3): drop frames synchronously after STOP — onDestroy is async.
+            // Drop frames synchronously after STOP — onDestroy is async.
             if (!isRunning || isStopping) {
                 try { imageReaderInstance.acquireLatestImage()?.close() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
                 return@setOnImageAvailableListener
