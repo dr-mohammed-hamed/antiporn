@@ -4,15 +4,15 @@ import android.app.admin.DeviceAdminReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class AdminReceiver : DeviceAdminReceiver() {
 
     companion object {
         private const val TAG = "AntiPorn_AdminReceiver"
         const val ACTION_ENFORCE_POLICIES = "com.drmohammed.antiporn.ENFORCE_POLICIES"
-
-        private val bgExecutor = Executors.newSingleThreadExecutor()
     }
 
     override fun onEnabled(context: Context, intent: Intent) {
@@ -73,19 +73,14 @@ class AdminReceiver : DeviceAdminReceiver() {
             Log.e(TAG, "Error initiating PolicyRepository sync in AdminReceiver", e)
         }
         val pendingResult = goAsync()
-        try {
-            bgExecutor.execute {
-                try {
-                    com.drmohammed.antiporn.core.engine.ProtectionEngine.applyAllSync(appContext)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error applying policies in AdminReceiver", e)
-                } finally {
-                    pendingResult.finish()
-                }
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                com.drmohammed.antiporn.core.engine.ProtectionEngine.applyAllSync(appContext)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error applying policies in AdminReceiver", e)
+            } finally {
+                pendingResult.finish()
             }
-        } catch (e: java.util.concurrent.RejectedExecutionException) {
-            Log.e(TAG, "Executor rejected task in AdminReceiver", e)
-            pendingResult.finish()
         }
     }
 

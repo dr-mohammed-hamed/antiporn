@@ -4,8 +4,11 @@ import android.content.Context
 import android.util.Log
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Enterprise In-App Black Box Flight Recorder.
@@ -16,12 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object BlackBoxRecorder {
 
     private const val TAG = "AntiPorn_BlackBox"
-    private val bgExecutor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "BlackBox-Recorder-Thread").apply {
-            priority = Thread.MIN_PRIORITY // Run at low priority to never contest UI or audio
-            isDaemon = true
-        }
-    }
+    private val recorderScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val eventCounter = AtomicInteger(0)
     private const val CAP_CHECK_INTERVAL = 100 // Enforce max row cap every 100 events
@@ -50,7 +48,7 @@ object BlackBoxRecorder {
         metadata: String? = null
     ) {
         val appContext = context.applicationContext
-        bgExecutor.execute {
+        recorderScope.launch {
             try {
                 val timestamp = TrustedTimeProvider.currentTimeMillis(appContext)
                 val db = AntiPornDatabase.getInstance(appContext)

@@ -7,8 +7,9 @@ import android.util.Log
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import com.drmohammed.antiporn.telemetry.BlackBoxRecorder
-import java.util.concurrent.Executors
-import java.util.concurrent.RejectedExecutionException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Internal non-exported BroadcastReceiver for scheduled exact alarms:
@@ -31,50 +32,44 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
         val appContext = context.applicationContext
         val pendingResult = goAsync()
 
-        try {
-            bgExecutor.execute {
-                try {
-                    // Reject unauthenticated external snooze broadcasts to maintain Zero-Bypass security
-                    if (action == CurfewConfig.ACTION_CURFEW_SNOOZE) {
-                        Log.w(TAG, "Rejected external ACTION_CURFEW_SNOOZE broadcast: unauthenticated bypass vector")
-                        return@execute
-                    }
-                    if (action == CurfewConfig.ACTION_CURFEW_SNOOZE_END) {
-                        CurfewEnforcer.clearSnooze(appContext)
-                        CurfewEnforcer.syncBlockState(appContext)
-                        CurfewScheduler.scheduleNextAlarms(appContext)
-                        return@execute
-                    }
-                    if (action == NapConfig.ACTION_NAP_END) {
-                        // Nap end: merge block state (curfew OR nap), keep night alarms scheduled,
-                        // then reschedule nap alarm if still active (extended), else cancel.
-                        CurfewEnforcer.syncBlockState(appContext)
-                        CurfewScheduler.scheduleNextAlarms(appContext)
-                        rescheduleNapIfNeeded(appContext)
-                        if (!NapController.isNapActive(appContext)) {
-                            ProtectionNotificationCoordinator.postNapEndedNotification(appContext)
-                        }
-                        return@execute
-                    }
-
-                    // Curfew Start / End actions:
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Reject unauthenticated external snooze broadcasts to maintain Zero-Bypass security
+                if (action == CurfewConfig.ACTION_CURFEW_SNOOZE) {
+                    Log.w(TAG, "Rejected external ACTION_CURFEW_SNOOZE broadcast: unauthenticated bypass vector")
+                    return@launch
+                }
+                if (action == CurfewConfig.ACTION_CURFEW_SNOOZE_END) {
+                    CurfewEnforcer.clearSnooze(appContext)
                     CurfewEnforcer.syncBlockState(appContext)
                     CurfewScheduler.scheduleNextAlarms(appContext)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error processing curfew alarm action: $action", e)
-                } finally {
-                    pendingResult.finish()
+                    return@launch
                 }
+                if (action == NapConfig.ACTION_NAP_END) {
+                    // Nap end: merge block state (curfew OR nap), keep night alarms scheduled,
+                    // then reschedule nap alarm if still active (extended), else cancel.
+                    CurfewEnforcer.syncBlockState(appContext)
+                    CurfewScheduler.scheduleNextAlarms(appContext)
+                    rescheduleNapIfNeeded(appContext)
+                    if (!NapController.isNapActive(appContext)) {
+                        ProtectionNotificationCoordinator.postNapEndedNotification(appContext)
+                    }
+                    return@launch
+                }
+
+                // Curfew Start / End actions:
+                CurfewEnforcer.syncBlockState(appContext)
+                CurfewScheduler.scheduleNextAlarms(appContext)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing curfew alarm action: $action", e)
+            } finally {
+                pendingResult.finish()
             }
-        } catch (e: RejectedExecutionException) {
-            Log.e(TAG, "Executor rejected curfew task for action: $action", e)
-            pendingResult.finish()
         }
     }
 
     companion object {
         private const val TAG = "AntiPorn_CurfewReceiver"
-        private val bgExecutor = Executors.newSingleThreadExecutor()
 
         const val ACTION_CURFEW_START = "com.drmohammed.antiporn.ACTION_CURFEW_START"
         const val ACTION_CURFEW_END = "com.drmohammed.antiporn.ACTION_CURFEW_END"

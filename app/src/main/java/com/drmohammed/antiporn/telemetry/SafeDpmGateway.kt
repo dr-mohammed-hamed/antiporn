@@ -3,6 +3,8 @@ package com.drmohammed.antiporn.telemetry
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
+import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
@@ -90,6 +92,378 @@ object SafeDpmGateway {
             Log.w(TAG, "[WARN] SafeDpmGateway.executeBlocking called on Main Thread for action [$actionName]. Consider migrating to suspend execute()!")
         }
         return executeInternal(context, tag, actionName, metadata, requireDeviceOwner, action)
+    }
+
+    // ==========================================
+    // High-Level Domain Execution Methods
+    // ==========================================
+
+    suspend fun setPackagesSuspended(
+        context: Context,
+        packages: Array<String>,
+        suspended: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Array<String>> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setPackagesSuspended",
+        metadata = "suspended=$suspended, count=${packages.size}"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            dpm.setPackagesSuspended(admin, packages, suspended) ?: emptyArray()
+        } else {
+            emptyArray()
+        }
+    }
+
+    fun setPackagesSuspendedBlocking(
+        context: Context,
+        packages: Array<String>,
+        suspended: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Array<String>> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setPackagesSuspendedBlocking",
+        metadata = "suspended=$suspended, count=${packages.size}"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            dpm.setPackagesSuspended(admin, packages, suspended) ?: emptyArray()
+        } else {
+            emptyArray()
+        }
+    }
+
+    suspend fun isPackageSuspended(
+        context: Context,
+        packageName: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = execute(
+        context = context,
+        tag = tag,
+        actionName = "isPackageSuspended",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            dpm.isPackageSuspended(admin, packageName)
+        } else {
+            false
+        }
+    }
+
+    fun isPackageSuspendedBlocking(
+        context: Context,
+        packageName: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "isPackageSuspendedBlocking",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            dpm.isPackageSuspended(admin, packageName)
+        } else {
+            false
+        }
+    }
+
+    suspend fun setApplicationHidden(
+        context: Context,
+        packageName: String,
+        hidden: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setApplicationHidden",
+        metadata = "pkg=$packageName, hidden=$hidden"
+    ) { dpm, admin ->
+        dpm.setApplicationHidden(admin, packageName, hidden)
+    }
+
+    fun setApplicationHiddenBlocking(
+        context: Context,
+        packageName: String,
+        hidden: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setApplicationHiddenBlocking",
+        metadata = "pkg=$packageName, hidden=$hidden"
+    ) { dpm, admin ->
+        dpm.setApplicationHidden(admin, packageName, hidden)
+    }
+
+    suspend fun isApplicationHidden(
+        context: Context,
+        packageName: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = execute(
+        context = context,
+        tag = tag,
+        actionName = "isApplicationHidden",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        dpm.isApplicationHidden(admin, packageName)
+    }
+
+    fun isApplicationHiddenBlocking(
+        context: Context,
+        packageName: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "isApplicationHiddenBlocking",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        dpm.isApplicationHidden(admin, packageName)
+    }
+
+    suspend fun addUserRestriction(
+        context: Context,
+        userRestriction: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = execute(
+        context = context,
+        tag = tag,
+        actionName = "addUserRestriction",
+        metadata = "restriction=$userRestriction"
+    ) { dpm, admin ->
+        dpm.addUserRestriction(admin, userRestriction)
+    }
+
+    fun addUserRestrictionBlocking(
+        context: Context,
+        userRestriction: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "addUserRestrictionBlocking",
+        metadata = "restriction=$userRestriction"
+    ) { dpm, admin ->
+        dpm.addUserRestriction(admin, userRestriction)
+    }
+
+    suspend fun clearUserRestriction(
+        context: Context,
+        userRestriction: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = execute(
+        context = context,
+        tag = tag,
+        actionName = "clearUserRestriction",
+        metadata = "restriction=$userRestriction"
+    ) { dpm, admin ->
+        dpm.clearUserRestriction(admin, userRestriction)
+    }
+
+    fun clearUserRestrictionBlocking(
+        context: Context,
+        userRestriction: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "clearUserRestrictionBlocking",
+        metadata = "restriction=$userRestriction"
+    ) { dpm, admin ->
+        dpm.clearUserRestriction(admin, userRestriction)
+    }
+
+    suspend fun setUninstallBlocked(
+        context: Context,
+        packageName: String,
+        blocked: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setUninstallBlocked",
+        metadata = "pkg=$packageName, blocked=$blocked"
+    ) { dpm, admin ->
+        dpm.setUninstallBlocked(admin, packageName, blocked)
+    }
+
+    fun setUninstallBlockedBlocking(
+        context: Context,
+        packageName: String,
+        blocked: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setUninstallBlockedBlocking",
+        metadata = "pkg=$packageName, blocked=$blocked"
+    ) { dpm, admin ->
+        dpm.setUninstallBlocked(admin, packageName, blocked)
+    }
+
+    suspend fun isUninstallBlocked(
+        context: Context,
+        packageName: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = execute(
+        context = context,
+        tag = tag,
+        actionName = "isUninstallBlocked",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        dpm.isUninstallBlocked(admin, packageName)
+    }
+
+    fun isUninstallBlockedBlocking(
+        context: Context,
+        packageName: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "isUninstallBlockedBlocking",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        dpm.isUninstallBlocked(admin, packageName)
+    }
+
+    suspend fun setApplicationRestrictions(
+        context: Context,
+        packageName: String,
+        restrictions: Bundle,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setApplicationRestrictions",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        dpm.setApplicationRestrictions(admin, packageName, restrictions)
+    }
+
+    fun setApplicationRestrictionsBlocking(
+        context: Context,
+        packageName: String,
+        restrictions: Bundle,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setApplicationRestrictionsBlocking",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        dpm.setApplicationRestrictions(admin, packageName, restrictions)
+    }
+
+    suspend fun setGlobalPrivateDns(
+        context: Context,
+        host: String?,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Int> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setGlobalPrivateDns",
+        metadata = "host=$host"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (host.isNullOrBlank()) {
+                dpm.setGlobalPrivateDnsModeOpportunistic(admin)
+            } else {
+                dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, host)
+            }
+        } else {
+            0
+        }
+    }
+
+    fun setGlobalPrivateDnsBlocking(
+        context: Context,
+        host: String?,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Int> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setGlobalPrivateDnsBlocking",
+        metadata = "host=$host"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (host.isNullOrBlank()) {
+                dpm.setGlobalPrivateDnsModeOpportunistic(admin)
+            } else {
+                dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, host)
+            }
+        } else {
+            0
+        }
+    }
+
+    suspend fun getGlobalPrivateDnsHost(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<String?> = execute(
+        context = context,
+        tag = tag,
+        actionName = "getGlobalPrivateDnsHost"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            dpm.getGlobalPrivateDnsHost(admin)
+        } else {
+            null
+        }
+    }
+
+    fun getGlobalPrivateDnsHostBlocking(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<String?> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "getGlobalPrivateDnsHostBlocking"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            dpm.getGlobalPrivateDnsHost(admin)
+        } else {
+            null
+        }
+    }
+
+    suspend fun setAlwaysOnVpnPackage(
+        context: Context,
+        vpnPackage: String?,
+        lockdown: Boolean,
+        bypassedPackages: Set<String>? = null,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setAlwaysOnVpnPackage",
+        metadata = "vpn=$vpnPackage, lockdown=$lockdown"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && bypassedPackages != null) {
+            dpm.setAlwaysOnVpnPackage(admin, vpnPackage, lockdown, bypassedPackages)
+        } else {
+            dpm.setAlwaysOnVpnPackage(admin, vpnPackage, lockdown)
+        }
+    }
+
+    fun setAlwaysOnVpnPackageBlocking(
+        context: Context,
+        vpnPackage: String?,
+        lockdown: Boolean,
+        bypassedPackages: Set<String>? = null,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setAlwaysOnVpnPackageBlocking",
+        metadata = "vpn=$vpnPackage, lockdown=$lockdown"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && bypassedPackages != null) {
+            dpm.setAlwaysOnVpnPackage(admin, vpnPackage, lockdown, bypassedPackages)
+        } else {
+            dpm.setAlwaysOnVpnPackage(admin, vpnPackage, lockdown)
+        }
     }
 
     private fun <T> executeInternal(

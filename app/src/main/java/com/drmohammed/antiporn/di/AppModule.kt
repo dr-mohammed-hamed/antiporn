@@ -25,9 +25,9 @@ import org.koin.dsl.module
 val appModule = module {
     // Core Singletons
     single { AntiPornDatabase.getInstance(androidContext()) }
-    single { PolicyRepository.getInstance(androidContext()) }
-    single { AccountabilityRepository.getInstance(androidContext()) }
-    single { ApprovalRepository.getInstance(androidContext()) }
+    single { PolicyRepository(androidContext(), get()) }
+    single { AccountabilityRepository(androidContext(), get()) }
+    single { ApprovalRepository(androidContext(), get()) }
     single { AppInventoryManager.getInstance(androidContext()) }
     single { GoogleAuthManager.getInstance(androidContext()) }
     single { OtaRepository.getInstance(androidContext()) }

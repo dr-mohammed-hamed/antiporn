@@ -18,7 +18,10 @@ import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Pluggable security shield targeting unauthorized and unrestricted applications:
@@ -147,7 +150,7 @@ object AppSuspensionShield : ProtectionShield {
      */
     val BLACKLISTED_PACKAGES: Set<String> get() = AppPolicyRegistry.getBlacklistedPackages()
 
-    private val fastExecutor = Executors.newSingleThreadExecutor()
+    private val shieldScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val processingPackages = ConcurrentHashMap.newKeySet<String>()
 
     fun isImmune(packageName: String): Boolean = AppPolicyRegistry.isImmune(packageName)
@@ -289,7 +292,7 @@ object AppSuspensionShield : ProtectionShield {
     }
 
     fun enforceBlacklistFastAsync(context: Context) {
-        fastExecutor.execute {
+        shieldScope.launch {
             try {
                 enforceBlacklistFast(context)
             } catch (e: Exception) {

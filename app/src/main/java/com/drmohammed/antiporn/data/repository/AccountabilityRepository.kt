@@ -29,10 +29,12 @@ import java.util.Locale
  * and managing Guardian / Ward relationships both locally in SQLite and in Cloud Firestore.
  * Implements strict single-guardian enforcement and automated revocation recovery.
  */
-class AccountabilityRepository private constructor(context: Context) {
+class AccountabilityRepository(
+    context: Context,
+    private val database: AntiPornDatabase = AntiPornDatabase.getInstance(context)
+) {
 
     private val appContext = context.applicationContext
-    private val database = AntiPornDatabase.getInstance(appContext)
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
@@ -1039,11 +1041,15 @@ class AccountabilityRepository private constructor(context: Context) {
         private var instance: AccountabilityRepository? = null
 
         fun getInstance(context: Context): AccountabilityRepository {
-            return instance ?: synchronized(this) {
+            return try {
+                org.koin.core.context.GlobalContext.getOrNull()?.get<AccountabilityRepository>()
+            } catch (e: Exception) {
+                null
+            } ?: (instance ?: synchronized(this) {
                 instance ?: AccountabilityRepository(context.applicationContext).also {
                     instance = it
                 }
-            }
+            })
         }
     }
 }

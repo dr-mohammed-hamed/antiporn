@@ -43,10 +43,12 @@ import kotlinx.coroutines.withContext
  * Unified Single Source of Truth (SSOT) repository for device protection policies.
  * Manages local persistence in SQLite and real-time bidirectional synchronization with Firestore.
  */
-class PolicyRepository private constructor(context: Context) {
+class PolicyRepository(
+    context: Context,
+    private val database: AntiPornDatabase = AntiPornDatabase.getInstance(context)
+) {
 
     private val appContext = context.applicationContext
-    private val database = AntiPornDatabase.getInstance(appContext)
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val _currentPolicyFlow = MutableStateFlow(loadInitialPolicy())
@@ -461,8 +463,8 @@ class PolicyRepository private constructor(context: Context) {
                     }.toTypedArray()
                     if (packagesToSuspend.isNotEmpty()) {
                         try {
-                            dpm.setPackagesSuspended(admin, packagesToSuspend, true)
-                            Log.i(TAG, "Enforced 24/7 custom blacklist suspension for ${packagesToSuspend.size} packages")
+                            com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspended(appContext, packagesToSuspend, true)
+                            Log.i(TAG, "Enforced 24/7 custom blacklist suspension via SafeDpmGateway for ${packagesToSuspend.size} packages")
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed suspending customBlacklistPackages", e)
                         }
@@ -485,8 +487,8 @@ class PolicyRepository private constructor(context: Context) {
                         }.toTypedArray()
                         if (packagesToUnsuspend.isNotEmpty()) {
                             try {
-                                dpm.setPackagesSuspended(admin, packagesToUnsuspend, false)
-                                Log.i(TAG, "Unsuspended ${packagesToUnsuspend.size} packages removed from custom blacklist")
+                                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspended(appContext, packagesToUnsuspend, false)
+                                Log.i(TAG, "Unsuspended ${packagesToUnsuspend.size} packages removed from custom blacklist via SafeDpmGateway")
                             } catch (e: Exception) {
                                 Log.e(TAG, "Failed unsuspending removed blacklist packages", e)
                             }
@@ -533,8 +535,8 @@ class PolicyRepository private constructor(context: Context) {
                         }.toTypedArray()
                         if (whitelistedToUnsuspend.isNotEmpty()) {
                             try {
-                                dpm.setPackagesSuspended(admin, whitelistedToUnsuspend, false)
-                                Log.i(TAG, "Unsuspended ${whitelistedToUnsuspend.size} newly whitelisted packages during daytime: ${whitelistedToUnsuspend.joinToString()}")
+                                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspended(appContext, whitelistedToUnsuspend, false)
+                                Log.i(TAG, "Unsuspended ${whitelistedToUnsuspend.size} newly whitelisted packages during daytime via SafeDpmGateway: ${whitelistedToUnsuspend.joinToString()}")
                                 AppInventoryManager.getInstance(appContext).syncInventoryToCloudAsync(force = true)
                             } catch (e: Exception) {
                                 Log.e(TAG, "Failed unsuspending newly whitelisted packages", e)
@@ -545,7 +547,7 @@ class PolicyRepository private constructor(context: Context) {
                     // App Protection (bundle.protectedAppPackages)
                     for (pkg in bundle.protectedAppPackages) {
                         try {
-                            dpm.setUninstallBlocked(admin, pkg, true)
+                            com.drmohammed.antiporn.telemetry.SafeDpmGateway.setUninstallBlocked(appContext, pkg, true)
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed setting uninstall blocked for protected package: $pkg", e)
                         }
@@ -555,7 +557,7 @@ class PolicyRepository private constructor(context: Context) {
                     val unprotectPackages = previousPolicy.protectedAppPackages - bundle.protectedAppPackages
                     for (pkg in unprotectPackages) {
                         try {
-                            dpm.setUninstallBlocked(admin, pkg, false)
+                            com.drmohammed.antiporn.telemetry.SafeDpmGateway.setUninstallBlocked(appContext, pkg, false)
                             Log.i(TAG, "Cleared uninstall blocked for unprotected package: $pkg")
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed clearing uninstall blocked for package: $pkg", e)
@@ -564,8 +566,8 @@ class PolicyRepository private constructor(context: Context) {
 
                     // Always enforce DISALLOW_APPS_CONTROL to protect Hisn itself (and any protected packages)
                     // from Force Stop, clearing data/cache, or disabling via system application settings.
-                    dpm.addUserRestriction(admin, UserManager.DISALLOW_APPS_CONTROL)
-                    Log.i(TAG, "Enforced DISALLOW_APPS_CONTROL restriction for self-protection and ${bundle.protectedAppPackages.size} protected packages")
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.addUserRestriction(appContext, UserManager.DISALLOW_APPS_CONTROL)
+                    Log.i(TAG, "Enforced DISALLOW_APPS_CONTROL restriction for self-protection via SafeDpmGateway and ${bundle.protectedAppPackages.size} protected packages")
                 }
 
                 // 4. Synchronize Zero-Trust active foreground watcher state
@@ -758,11 +760,15 @@ class PolicyRepository private constructor(context: Context) {
         private var instance: PolicyRepository? = null
 
         fun getInstance(context: Context): PolicyRepository {
-            return instance ?: synchronized(this) {
+            return try {
+                org.koin.core.context.GlobalContext.getOrNull()?.get<PolicyRepository>()
+            } catch (e: Exception) {
+                null
+            } ?: (instance ?: synchronized(this) {
                 instance ?: PolicyRepository(context.applicationContext).also {
                     instance = it
                 }
-            }
+            })
         }
     }
 }

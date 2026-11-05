@@ -80,11 +80,15 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
         private var instance: AntiPornDatabase? = null
 
         fun getInstance(context: Context): AntiPornDatabase {
-            return instance ?: synchronized(this) {
+            return try {
+                org.koin.core.context.GlobalContext.getOrNull()?.get<AntiPornDatabase>()
+            } catch (e: Exception) {
+                null
+            } ?: (instance ?: synchronized(this) {
                 instance ?: AntiPornDatabase(context.applicationContext).also {
                     instance = it
                 }
-            }
+            })
         }
     }
 

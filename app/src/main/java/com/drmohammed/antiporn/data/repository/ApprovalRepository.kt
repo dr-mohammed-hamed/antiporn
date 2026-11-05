@@ -33,10 +33,12 @@ import kotlinx.coroutines.withContext
  * Repository responsible for managing Zero-Trust app installation approvals.
  * Coordinates immediate local suspension, cloud queue logging, and remote unfreezing.
  */
-class ApprovalRepository private constructor(context: Context) {
+class ApprovalRepository(
+    context: Context,
+    private val database: AntiPornDatabase = AntiPornDatabase.getInstance(context)
+) {
 
     private val appContext = context.applicationContext
-    private val database = AntiPornDatabase.getInstance(appContext)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var approvalsListener: ListenerRegistration? = null
 
@@ -102,7 +104,7 @@ class ApprovalRepository private constructor(context: Context) {
         } else {
             Log.w(TAG, "⚠️ [FREEZE_REJECTED] Device suspension rejected for $packageName. Executing Fail-Secure fallback (setApplicationHidden)...")
             val hidden = try {
-                dpm.setApplicationHidden(admin, packageName, true)
+                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(appContext, packageName, true).getOrNull() ?: false
             } catch (e: Exception) {
                 Log.e(TAG, "❌ [FALLBACK_HIDE_EXCEPTION] Exception hiding package $packageName via DPM", e)
                 false
@@ -292,8 +294,8 @@ class ApprovalRepository private constructor(context: Context) {
         try {
             // Unhide application if it was hidden via Fail-Secure fallback
             try {
-                if (dpm.isApplicationHidden(admin, packageName)) {
-                    val unhidden = dpm.setApplicationHidden(admin, packageName, false)
+                if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(appContext, packageName).getOrNull() == true) {
+                    val unhidden = com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(appContext, packageName, false).getOrNull() ?: false
                     Log.i(TAG, "Unhid package $packageName on approval: $unhidden")
                 }
             } catch (e: Exception) {
@@ -301,7 +303,7 @@ class ApprovalRepository private constructor(context: Context) {
             }
 
             val failed: Array<String>? = try {
-                dpm.setPackagesSuspended(admin, arrayOf(packageName), false)
+                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(appContext, arrayOf(packageName), false).getOrNull()
             } catch (e: Exception) {
                 Log.w(TAG, "Exception calling setPackagesSuspended(false) for $packageName", e)
                 null
@@ -615,13 +617,13 @@ class ApprovalRepository private constructor(context: Context) {
         if (isDo && dpm != null && packagesToUnsuspend.isNotEmpty()) {
             Log.w(TAG, "🌱 [UNFREEZE_BASELINE] Unfreezing ${packagesToUnsuspend.size} pre-existing baseline packages...")
             try {
-                dpm.setPackagesSuspended(admin, packagesToUnsuspend.toTypedArray(), false)
+                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(appContext, packagesToUnsuspend.toTypedArray(), false)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to unsuspend baseline packages via DPM", e)
             }
             for (pkg in packagesToUnsuspend) {
                 try {
-                    dpm.setApplicationHidden(admin, pkg, false)
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(appContext, pkg, false)
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to unhide baseline package $pkg", e)
                 }
@@ -706,7 +708,7 @@ class ApprovalRepository private constructor(context: Context) {
                     )
                     if (!suspended) {
                         try {
-                            dpm.setApplicationHidden(admin, pkg, true)
+                            com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(appContext, pkg, true)
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed to hide rejected package $pkg", e)
                         }
@@ -828,11 +830,15 @@ class ApprovalRepository private constructor(context: Context) {
         private var instance: ApprovalRepository? = null
 
         fun getInstance(context: Context): ApprovalRepository {
-            return instance ?: synchronized(this) {
+            return try {
+                org.koin.core.context.GlobalContext.getOrNull()?.get<ApprovalRepository>()
+            } catch (e: Exception) {
+                null
+            } ?: (instance ?: synchronized(this) {
                 instance ?: ApprovalRepository(context.applicationContext).also {
                     instance = it
                 }
-            }
+            })
         }
     }
 }

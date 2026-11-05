@@ -21,7 +21,9 @@ import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.MainActivity
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
-import java.util.concurrent.Executors
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -36,7 +38,6 @@ class EnterpriseProvisioningActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "AntiPorn_Provisioning"
-        private val bgExecutor = Executors.newSingleThreadExecutor()
     }
 
     private val isProvisioningCompleted = AtomicBoolean(false)
@@ -106,7 +107,7 @@ class EnterpriseProvisioningActivity : AppCompatActivity() {
         Log.i(TAG, "Setup Wizard initiated ADMIN_POLICY_COMPLIANCE. Applying baseline shields in background...")
         val appContext = applicationContext
 
-        bgExecutor.execute {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
                 // 1. Enforce baseline security shields (DNS, Anti-tamper, VPN lock, Curfew)
                 try {

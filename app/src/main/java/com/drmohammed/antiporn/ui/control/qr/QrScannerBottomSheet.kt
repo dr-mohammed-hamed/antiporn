@@ -43,7 +43,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -67,7 +68,7 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var camera: Camera? = null
-    private var cameraExecutor: ExecutorService? = null
+    private var cameraExecutor: java.util.concurrent.Executor? = null
     private var barcodeScanner: BarcodeScanner? = null
 
     private val isCodeProcessing = AtomicBoolean(false)
@@ -114,7 +115,7 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
 
         defaultStatusColor = tvScanStatus.currentTextColor
 
-        cameraExecutor = Executors.newSingleThreadExecutor()
+        cameraExecutor = Dispatchers.Default.asExecutor()
 
         try {
             val options = BarcodeScannerOptions.Builder()
@@ -442,7 +443,6 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
             Log.w(TAG, "Barcode scanner close failed", e)
         }
 
-        cameraExecutor?.shutdown()
         cameraExecutor = null
     }
 

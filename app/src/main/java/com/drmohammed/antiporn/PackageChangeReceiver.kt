@@ -24,7 +24,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 
 /**
@@ -37,7 +36,6 @@ object PackageChangeHandler {
     private const val TAG = "AntiPorn_PkgReceiver"
     private const val DEBOUNCE_WINDOW_MS = 3000L
 
-    private val bgExecutor = Executors.newSingleThreadExecutor()
     private val handlerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val handledAddEvents = ConcurrentHashMap<String, Long>()
@@ -69,9 +67,8 @@ object PackageChangeHandler {
         Log.w(TAG, "📥📥📥 [PACKAGE_ADDED] New package detected: $packageName (source: $source, isReplacing: $isReplacing)")
 
         val appContext = context.applicationContext
-        try {
-            bgExecutor.execute {
-                try {
+        handlerScope.launch {
+            try {
                     val approvalRepo = ApprovalRepository.getInstance(appContext)
                     val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any { it.packageName == packageName && it.isApproved }
                     val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
@@ -124,9 +121,7 @@ object PackageChangeHandler {
                             ))
 
                             if (isEligible) {
-                                runBlocking {
-                                    PolicyRepository.getInstance(appContext).addAppToCurfewWhitelist(packageName)
-                                }
+                                PolicyRepository.getInstance(appContext).addAppToCurfewWhitelist(packageName)
                             }
                         } catch (e: Exception) {
                             Log.w(TAG, "Error checking auto-whitelist eligibility for $packageName", e)
@@ -135,14 +130,10 @@ object PackageChangeHandler {
 
                     if (AppPolicyRegistry.isRestrictedBrowser(packageName)) {
                         try {
-                            val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-                            if (dpm != null && com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) {
-                                val admin = ComponentName(appContext, AdminReceiver::class.java)
-                                val currentPolicy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
-                                val restrictionsBundle = BrowserShield.buildBrowserRestrictionsBundle(currentPolicy)
-                                dpm.setApplicationRestrictions(admin, packageName, restrictionsBundle)
-                                Log.i(TAG, "Applied browser restrictions to newly added/replaced restricted browser: $packageName")
-                            }
+                            val currentPolicy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
+                            val restrictionsBundle = BrowserShield.buildBrowserRestrictionsBundle(currentPolicy)
+                            com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationRestrictionsBlocking(appContext, packageName, restrictionsBundle)
+                            Log.i(TAG, "Applied browser restrictions to newly added/replaced restricted browser via SafeDpmGateway: $packageName")
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed applying browser restrictions to $packageName", e)
                         }
@@ -169,10 +160,6 @@ object PackageChangeHandler {
                 } finally {
                     onComplete?.invoke()
                 }
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "❌ [REJECTED] Executor rejected task for package $packageName", e)
-            onComplete?.invoke()
         }
     }
 
@@ -207,28 +194,21 @@ object PackageChangeHandler {
         Log.i(TAG, "📤 [PACKAGE_REMOVED] Package removed: $packageName (source: $source)")
 
         val appContext = context.applicationContext
-        try {
-            bgExecutor.execute {
-                try {
-                    ApprovalRepository.getInstance(appContext).removePendingApproval(packageName)
-                    ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+        handlerScope.launch {
+            try {
+                ApprovalRepository.getInstance(appContext).removePendingApproval(packageName)
+                ZeroTrustForegroundWatcher.syncWatcherState(appContext)
 
-                    handlerScope.launch {
-                        try {
-                            AppInventoryManager.getInstance(appContext).syncInventoryToCloud(force = true)
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Async inventory sync failed on package removed: $packageName: ${e.message}")
-                        }
-                    }
+                try {
+                    AppInventoryManager.getInstance(appContext).syncInventoryToCloud(force = true)
                 } catch (e: Exception) {
-                    Log.e(TAG, "❌ [ERROR] Error handling package removed: $packageName", e)
-                } finally {
-                    onComplete?.invoke()
+                    Log.w(TAG, "Async inventory sync failed on package removed: $packageName: ${e.message}")
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ [ERROR] Error handling package removed: $packageName", e)
+            } finally {
+                onComplete?.invoke()
             }
-        } catch (e: Throwable) {
-            Log.e(TAG, "❌ [REJECTED] Executor rejected task on package removed: $packageName", e)
-            onComplete?.invoke()
         }
     }
 }

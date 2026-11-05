@@ -17,7 +17,11 @@ import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import java.util.Calendar
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Enforces and releases app suspensions based on the night curfew schedule.
@@ -29,7 +33,7 @@ import java.util.concurrent.Executors
 object CurfewEnforcer {
 
     private const val TAG = "AntiPorn_CurfewEnforcer"
-    private val bgExecutor = Executors.newSingleThreadExecutor()
+    private val enforcerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private fun isMinuteInWindow(minuteOfDay: Int, startMinute: Int, endMinute: Int): Boolean {
         return if (startMinute <= endMinute) {
@@ -119,7 +123,7 @@ object CurfewEnforcer {
         val prefs = appContext.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(CurfewConfig.KEY_MANUAL_TEST_ACTIVE, active).apply()
 
-        bgExecutor.execute {
+        enforcerScope.launch {
             var success = false
             try {
                 val shouldBeActive = isEffectiveCurfewActive(appContext)
@@ -128,7 +132,7 @@ object CurfewEnforcer {
                 Log.e(TAG, "Error executing setManualTestActiveAsync", e)
             } finally {
                 if (onComplete != null) {
-                    Handler(Looper.getMainLooper()).post {
+                    withContext(Dispatchers.Main) {
                         onComplete.invoke(success)
                     }
                 }
@@ -496,8 +500,8 @@ object CurfewEnforcer {
 
             if (safeToUnsuspend.isNotEmpty()) {
                 try {
-                    val failed = dpm.setPackagesSuspended(admin, safeToUnsuspend.toTypedArray(), false)
-                    Log.i(TAG, "Curfew released: unsuspended ${safeToUnsuspend.size - (failed?.size ?: 0)} packages")
+                    val failed = com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, safeToUnsuspend.toTypedArray(), false).getOrNull()
+                    Log.i(TAG, "Curfew released: unsuspended ${safeToUnsuspend.size - (failed?.size ?: 0)} packages via SafeDpmGateway")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error unsuspending curfew packages", e)
                 }
@@ -523,11 +527,11 @@ object CurfewEnforcer {
     }
 
     /**
-     * Asynchronously synchronizes curfew state on background executor.
+     * Asynchronously synchronizes curfew state on background coroutine.
      */
     fun syncCurfewStateAsync(context: Context, onComplete: ((Boolean) -> Unit)? = null) {
         val appContext = context.applicationContext
-        bgExecutor.execute {
+        enforcerScope.launch {
             var success = false
             try {
                 val shouldBeActive = isEffectiveCurfewActive(appContext)
@@ -536,7 +540,7 @@ object CurfewEnforcer {
                 Log.e(TAG, "Error in syncCurfewStateAsync", e)
             } finally {
                 if (onComplete != null) {
-                    Handler(Looper.getMainLooper()).post {
+                    withContext(Dispatchers.Main) {
                         onComplete.invoke(success)
                     }
                 }
@@ -554,11 +558,11 @@ object CurfewEnforcer {
     }
 
     /**
-     * Asynchronously synchronizes merged block state on background executor.
+     * Asynchronously synchronizes merged block state on background coroutine.
      */
     fun syncBlockStateAsync(context: Context, onComplete: ((Boolean) -> Unit)? = null) {
         val appContext = context.applicationContext
-        bgExecutor.execute {
+        enforcerScope.launch {
             var success = false
             try {
                 val shouldBeActive = isEffectiveBlockActive(appContext)
@@ -567,7 +571,7 @@ object CurfewEnforcer {
                 Log.e(TAG, "Error in syncBlockStateAsync", e)
             } finally {
                 if (onComplete != null) {
-                    Handler(Looper.getMainLooper()).post {
+                    withContext(Dispatchers.Main) {
                         onComplete.invoke(success)
                     }
                 }
@@ -599,9 +603,9 @@ object CurfewEnforcer {
         if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) return
 
         try {
-            dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
+            com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(appContext, arrayOf(packageName), true)
             if (CurfewConfig.OEM_APP_STORES.contains(packageName) || CurfewConfig.CURFEW_SEARCH_APPS.contains(packageName)) {
-                dpm.setApplicationHidden(admin, packageName, true)
+                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(appContext, packageName, true)
             }
             // Add to recorded curfew packages
             val prefs = appContext.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
@@ -610,7 +614,7 @@ object CurfewEnforcer {
             savedSet.add(packageName)
             prefs.edit().putStringSet(CurfewConfig.KEY_CURFEW_SUSPENDED_PACKAGES, savedSet).apply()
 
-            Log.i(TAG, "Newly installed package $packageName immediately suspended and recorded under active curfew")
+            Log.i(TAG, "Newly installed package $packageName immediately suspended and recorded via SafeDpmGateway under active curfew")
         } catch (e: Exception) {
             Log.e(TAG, "Error suspending newly installed package $packageName", e)
         }
@@ -702,8 +706,8 @@ object CurfewEnforcer {
 
         if (stuckToUnsuspend.isNotEmpty()) {
             try {
-                dpm.setPackagesSuspended(admin, stuckToUnsuspend.toTypedArray(), false)
-                Log.i(TAG, "[REPAIR] [REPAIR_STUCK_APPS] Successfully unsuspended ${stuckToUnsuspend.size} stuck apps: $stuckToUnsuspend")
+                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(appContext, stuckToUnsuspend.toTypedArray(), false)
+                Log.i(TAG, "[REPAIR] [REPAIR_STUCK_APPS] Successfully unsuspended ${stuckToUnsuspend.size} stuck apps via SafeDpmGateway: $stuckToUnsuspend")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed repairing stuck apps via DPM", e)
             }

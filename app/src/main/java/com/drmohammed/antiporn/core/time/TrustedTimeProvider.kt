@@ -11,8 +11,10 @@ import androidx.annotation.VisibleForTesting
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import java.util.Calendar
 import java.util.TimeZone
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -111,12 +113,8 @@ object TrustedTimeProvider {
 
     private val stateLock = Any()
 
-    /** Background executor for asynchronous network syncs and debounced disk persistence. */
-    private val backgroundExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "AntiPorn-TrustedTimeWorker").apply {
-            isDaemon = true
-        }
-    }
+    /** Background CoroutineScope for asynchronous network syncs and debounced disk persistence. */
+    private val timeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** Handler targeting Android main thread for UI completion callbacks (lazily evaluated). */
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
@@ -286,7 +284,7 @@ object TrustedTimeProvider {
      */
     fun syncNowAsync(context: Context, force: Boolean = false, onComplete: ((Boolean) -> Unit)? = null) {
         val appContext = context.applicationContext
-        backgroundExecutor.execute {
+        timeScope.launch {
             val success = syncNow(appContext, force)
             if (onComplete != null) {
                 mainHandler.post {
@@ -509,7 +507,7 @@ object TrustedTimeProvider {
             lastPersistedElapsedMs = nowElapsed
             val nowWall = wallTimeProvider()
             val ctx = cachedAppContext ?: return
-            backgroundExecutor.execute {
+            timeScope.launch {
                 try {
                     ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                         .edit()

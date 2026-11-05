@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity(),
 
     private val uninstallStatusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            refreshUi(isEnforcing = false)
+            // Uninstallation status handled reactively by child fragments
         }
     }
 
@@ -239,18 +239,13 @@ class MainActivity : AppCompatActivity(),
         if (isDeviceOwner) {
             DnsWatchdogService.startService(this)
             CurfewScheduler.scheduleNextAlarms(this)
-            CurfewEnforcer.syncBlockStateAsync(this) {
-                if (!isFinishing && !isDestroyed) {
-                    refreshUi(isEnforcing = false)
-                }
-            }
+            CurfewEnforcer.syncBlockStateAsync(this)
             if (!ProtectionEngine.isSystemFullyProtected(this)) {
                 triggerEnforcement(showToast = false)
             }
             com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).ensureInitialBaselineSeededAsync()
             com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).reconcileUnapprovedInstalledAppsAsync()
         }
-        refreshUi(isEnforcing = false)
         AppInventoryManager.getInstance(this).syncInventoryToCloudAsync()
     }
 
@@ -286,16 +281,13 @@ class MainActivity : AppCompatActivity(),
 
         if (enable) {
             if (!Settings.canDrawOverlays(this)) {
-                tryAutoGrantOverlayPermission()
-                if (!Settings.canDrawOverlays(this)) {
-                    val intent = Intent(
-                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        "package:$packageName".toUri()
-                    )
-                    startActivity(intent)
-                    Toast.makeText(this, R.string.overlay_permission_prompt, Toast.LENGTH_LONG).show()
-                    return
-                }
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    "package:$packageName".toUri()
+                )
+                startActivity(intent)
+                Toast.makeText(this, R.string.overlay_permission_prompt, Toast.LENGTH_LONG).show()
+                return
             }
 
             val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
@@ -345,22 +337,7 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    private fun tryAutoGrantOverlayPermission() {
-        try {
-            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
-            val admin = ComponentName(this, AdminReceiver::class.java)
-            if (ProtectionEngine.isDeviceOwner(this)) {
-                dpm.setPermissionGrantState(
-                    admin,
-                    packageName,
-                    android.Manifest.permission.SYSTEM_ALERT_WINDOW,
-                    DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
-                )
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Device Owner overlay grant attempt: ${e.message}")
-        }
-    }
+
 
     private fun getCurrentAppVersion(): Pair<String, Long> {
         return try {
@@ -419,7 +396,6 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun triggerEnforcement(showToast: Boolean) {
-        refreshUi(isEnforcing = true)
         ProtectionEngine.applyAllAsync(this) { results ->
             if (!isFinishing && !isDestroyed) {
                 val allSuccess = results.all { it.success }
@@ -433,22 +409,8 @@ class MainActivity : AppCompatActivity(),
                 if (showToast) {
                     Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
                 }
-                refreshUi(isEnforcing = false)
             }
         }
-    }
-
-    private fun refreshUi(isEnforcing: Boolean) {
-        val isDo = ProtectionEngine.isDeviceOwner(this)
-        val shields = ProtectionEngine.evaluateSystemStatus(this)
-
-        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-        val admin = ProtectionEngine.getAdminComponent(this)
-        val currentDnsHost = if (dpm != null && isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            try { dpm.getGlobalPrivateDnsHost(admin) } catch (e: Exception) { null }
-        } else null
-
-        // Internal check: evaluates system status without mutating detached fragment state
     }
 
     companion object {

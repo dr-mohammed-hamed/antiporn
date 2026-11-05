@@ -8,8 +8,9 @@ import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import com.drmohammed.antiporn.telemetry.BlackBoxRecorder
-import java.util.concurrent.Executors
-import java.util.concurrent.RejectedExecutionException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Manifest-declared public BroadcastReceiver for OS system lifecycle events.
@@ -40,41 +41,35 @@ class CurfewBootReceiver : BroadcastReceiver() {
 
         val pendingResult = goAsync()
 
-        try {
-            bgExecutor.execute {
-                try {
-                    Log.i(TAG, "Processing system lifecycle broadcast: $action")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Log.i(TAG, "Processing system lifecycle broadcast: $action")
 
-                    CurfewEnforcer.syncBlockState(appContext)
-                    CurfewScheduler.scheduleNextAlarms(appContext)
+                CurfewEnforcer.syncBlockState(appContext)
+                CurfewScheduler.scheduleNextAlarms(appContext)
 
-                    if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-                        rescheduleNapIfNeeded(appContext)
-                        rescheduleSnoozeIfNeeded(appContext)
-                        CurfewEnforcer.repairStuckSuspendedApps(appContext)
-                    }
-
-                    if (action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_TIMEZONE_CHANGED) {
-                        Log.i(TAG, "Time/Timezone change detected; re-synchronizing trusted time and policies immediately")
-                        TrustedTimeProvider.syncNowAsync(appContext)
-                        ProtectionEngine.applyAllAsync(appContext)
-                        ProtectionNotificationCoordinator.syncProtectionNotification(appContext)
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error processing system lifecycle action: $action", e)
-                } finally {
-                    pendingResult.finish()
+                if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+                    rescheduleNapIfNeeded(appContext)
+                    rescheduleSnoozeIfNeeded(appContext)
+                    CurfewEnforcer.repairStuckSuspendedApps(appContext)
                 }
+
+                if (action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_TIMEZONE_CHANGED) {
+                    Log.i(TAG, "Time/Timezone change detected; re-synchronizing trusted time and policies immediately")
+                    TrustedTimeProvider.syncNowAsync(appContext)
+                    ProtectionEngine.applyAllAsync(appContext)
+                    ProtectionNotificationCoordinator.syncProtectionNotification(appContext)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing system lifecycle action: $action", e)
+            } finally {
+                pendingResult.finish()
             }
-        } catch (e: RejectedExecutionException) {
-            Log.e(TAG, "Executor rejected task in CurfewBootReceiver for action: $action", e)
-            pendingResult.finish()
         }
     }
 
     companion object {
         private const val TAG = "AntiPorn_BootReceiver"
-        private val bgExecutor = Executors.newSingleThreadExecutor()
 
         private fun rescheduleNapIfNeeded(appContext: Context) {
             try {

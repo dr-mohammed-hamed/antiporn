@@ -3,8 +3,6 @@ package com.drmohammed.antiporn.core.engine
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.DnsWatchdogService
@@ -19,8 +17,12 @@ import com.drmohammed.antiporn.shields.DnsShield
 import com.drmohammed.antiporn.shields.SystemTamperShield
 import com.drmohammed.antiporn.shields.VpnShield
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Central orchestrator engine coordinating all pluggable protection shields.
@@ -39,8 +41,7 @@ object ProtectionEngine {
         CurfewShield
     )
 
-    private val bgExecutor = Executors.newSingleThreadExecutor()
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val pendingCallbacks = CopyOnWriteArrayList<(List<ShieldResult>) -> Unit>()
     private val isEnforcing = AtomicBoolean(false)
 
@@ -49,7 +50,14 @@ object ProtectionEngine {
     }
 
     /**
-     * Applies all registered security shields asynchronously on a background thread.
+     * Suspending version: Applies all registered security shields asynchronously on [Dispatchers.IO].
+     */
+    suspend fun applyAll(context: Context): List<ShieldResult> = withContext(Dispatchers.IO) {
+        applyAllSync(context.applicationContext)
+    }
+
+    /**
+     * Applies all registered security shields asynchronously on a background coroutine.
      * Prevents UI freezing and drops no callbacks by safely queuing concurrent requests.
      */
     fun applyAllAsync(context: Context, onComplete: ((List<ShieldResult>) -> Unit)? = null) {
@@ -65,7 +73,7 @@ object ProtectionEngine {
         }
 
         val appContext = context.applicationContext
-        bgExecutor.execute {
+        engineScope.launch {
             val results = try {
                 applyAllSync(appContext)
             } catch (t: Throwable) {
@@ -79,7 +87,7 @@ object ProtectionEngine {
                 )
             }
 
-            mainHandler.post {
+            withContext(Dispatchers.Main) {
                 val callbacks = mutableListOf<(List<ShieldResult>) -> Unit>()
                 synchronized(pendingCallbacks) {
                     callbacks.addAll(pendingCallbacks)

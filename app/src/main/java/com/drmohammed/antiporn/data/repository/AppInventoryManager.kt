@@ -191,11 +191,15 @@ class AppInventoryManager private constructor(context: Context) {
         private var instance: AppInventoryManager? = null
 
         fun getInstance(context: Context): AppInventoryManager {
-            return instance ?: synchronized(this) {
+            return try {
+                org.koin.core.context.GlobalContext.getOrNull()?.get<AppInventoryManager>()
+            } catch (e: Exception) {
+                null
+            } ?: (instance ?: synchronized(this) {
                 instance ?: AppInventoryManager(context.applicationContext).also {
                     instance = it
                 }
-            }
+            })
         }
     }
 }
