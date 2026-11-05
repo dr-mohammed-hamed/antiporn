@@ -3,6 +3,7 @@ package com.drmohammed.antiporn.telemetry
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
@@ -48,12 +49,12 @@ object SafeDpmGateway {
     }
 
     /**
-     * Checks if the app is actively running as the device-wide Device Owner.
+     * Checks if the app is actively running as the device-wide Device Owner or Profile Owner.
      */
     fun isDeviceOwner(context: Context): Boolean {
         return try {
             val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return false
-            dpm.isDeviceOwnerApp(context.packageName)
+            dpm.isDeviceOwnerApp(context.packageName) || dpm.isProfileOwnerApp(context.packageName)
         } catch (e: Exception) {
             Log.w(TAG, "Error checking isDeviceOwnerApp", e)
             false
@@ -465,6 +466,425 @@ object SafeDpmGateway {
             dpm.setAlwaysOnVpnPackage(admin, vpnPackage, lockdown)
         }
     }
+
+    suspend fun getAlwaysOnVpnPackage(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<String?> = execute(
+        context = context,
+        tag = tag,
+        actionName = "getAlwaysOnVpnPackage"
+    ) { dpm, admin ->
+        dpm.getAlwaysOnVpnPackage(admin)
+    }
+
+    fun getAlwaysOnVpnPackageBlocking(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<String?> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "getAlwaysOnVpnPackageBlocking"
+    ) { dpm, admin ->
+        dpm.getAlwaysOnVpnPackage(admin)
+    }
+
+    suspend fun isAlwaysOnVpnLockdownEnabled(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = execute(
+        context = context,
+        tag = tag,
+        actionName = "isAlwaysOnVpnLockdownEnabled"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            dpm.isAlwaysOnVpnLockdownEnabled(admin)
+        } else {
+            false
+        }
+    }
+
+    fun isAlwaysOnVpnLockdownEnabledBlocking(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "isAlwaysOnVpnLockdownEnabledBlocking"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            dpm.isAlwaysOnVpnLockdownEnabled(admin)
+        } else {
+            false
+        }
+    }
+
+    suspend fun setPackageSuspendedWithMessage(
+        context: Context,
+        packageName: String,
+        message: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setPackageSuspendedWithMessage",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val builderClass = Class.forName("android.content.pm.SuspendDialogInfo\$Builder")
+                val builder = builderClass.getDeclaredConstructor().newInstance()
+                val setMessageMethod = builderClass.getMethod("setMessage", String::class.java)
+                setMessageMethod.invoke(builder, message)
+                val buildMethod = builderClass.getMethod("build")
+                val dialogInfo = buildMethod.invoke(builder)
+
+                val suspendMethod = DevicePolicyManager::class.java.getMethod(
+                    "setPackagesSuspended",
+                    ComponentName::class.java,
+                    Array<String>::class.java,
+                    Boolean::class.javaPrimitiveType,
+                    android.os.PersistableBundle::class.java,
+                    android.os.PersistableBundle::class.java,
+                    Class.forName("android.content.pm.SuspendDialogInfo")
+                )
+                val rawResult = suspendMethod.invoke(dpm, admin, arrayOf(packageName), true, null, null, dialogInfo)
+                val failedPkgs = (rawResult as? Array<*>)?.filterIsInstance<String>() ?: emptyList()
+                if (rawResult != null && !failedPkgs.contains(packageName)) {
+                    return@execute true
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Reflection for SuspendDialogInfo failed, falling back to standard suspension: ${e.message}")
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val failed = dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
+            failed.isEmpty() || !failed.contains(packageName)
+        } else {
+            false
+        }
+    }
+
+    fun setPackageSuspendedWithMessageBlocking(
+        context: Context,
+        packageName: String,
+        message: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setPackageSuspendedWithMessageBlocking",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val builderClass = Class.forName("android.content.pm.SuspendDialogInfo\$Builder")
+                val builder = builderClass.getDeclaredConstructor().newInstance()
+                val setMessageMethod = builderClass.getMethod("setMessage", String::class.java)
+                setMessageMethod.invoke(builder, message)
+                val buildMethod = builderClass.getMethod("build")
+                val dialogInfo = buildMethod.invoke(builder)
+
+                val suspendMethod = DevicePolicyManager::class.java.getMethod(
+                    "setPackagesSuspended",
+                    ComponentName::class.java,
+                    Array<String>::class.java,
+                    Boolean::class.javaPrimitiveType,
+                    android.os.PersistableBundle::class.java,
+                    android.os.PersistableBundle::class.java,
+                    Class.forName("android.content.pm.SuspendDialogInfo")
+                )
+                val rawResult = suspendMethod.invoke(dpm, admin, arrayOf(packageName), true, null, null, dialogInfo)
+                val failedPkgs = (rawResult as? Array<*>)?.filterIsInstance<String>() ?: emptyList()
+                if (rawResult != null && !failedPkgs.contains(packageName)) {
+                    return@executeBlocking true
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Reflection for SuspendDialogInfo failed, falling back to standard suspension: ${e.message}")
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val failed = dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
+            failed.isEmpty() || !failed.contains(packageName)
+        } else {
+            false
+        }
+    }
+
+    suspend fun setTimeZone(
+        context: Context,
+        timeZoneId: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setTimeZone",
+        metadata = "tz=$timeZoneId"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            dpm.setTimeZone(admin, timeZoneId)
+        }
+    }
+
+    fun setTimeZoneBlocking(
+        context: Context,
+        timeZoneId: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setTimeZoneBlocking",
+        metadata = "tz=$timeZoneId"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            dpm.setTimeZone(admin, timeZoneId)
+        }
+    }
+
+    suspend fun setAutoTimeRequired(
+        context: Context,
+        required: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setAutoTimeRequired",
+        metadata = "required=$required"
+    ) { dpm, admin ->
+        @Suppress("DEPRECATION")
+        dpm.setAutoTimeRequired(admin, required)
+    }
+
+    fun setAutoTimeRequiredBlocking(
+        context: Context,
+        required: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setAutoTimeRequiredBlocking",
+        metadata = "required=$required"
+    ) { dpm, admin ->
+        @Suppress("DEPRECATION")
+        dpm.setAutoTimeRequired(admin, required)
+    }
+
+    suspend fun setAutoTimeEnabled(
+        context: Context,
+        enabled: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setAutoTimeEnabled",
+        metadata = "enabled=$enabled"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            dpm.setAutoTimeEnabled(admin, enabled)
+        }
+    }
+
+    fun setAutoTimeEnabledBlocking(
+        context: Context,
+        enabled: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setAutoTimeEnabledBlocking",
+        metadata = "enabled=$enabled"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            dpm.setAutoTimeEnabled(admin, enabled)
+        }
+    }
+
+    suspend fun setAutoTimeZoneEnabled(
+        context: Context,
+        enabled: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setAutoTimeZoneEnabled",
+        metadata = "enabled=$enabled"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            dpm.setAutoTimeZoneEnabled(admin, enabled)
+        }
+    }
+
+    fun setAutoTimeZoneEnabledBlocking(
+        context: Context,
+        enabled: Boolean,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setAutoTimeZoneEnabledBlocking",
+        metadata = "enabled=$enabled"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            dpm.setAutoTimeZoneEnabled(admin, enabled)
+        }
+    }
+
+    suspend fun enableSystemApp(
+        context: Context,
+        intent: Intent,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Int> = execute(
+        context = context,
+        tag = tag,
+        actionName = "enableSystemAppByIntent",
+        metadata = "intent=$intent"
+    ) { dpm, admin ->
+        dpm.enableSystemApp(admin, intent)
+    }
+
+    fun enableSystemAppBlocking(
+        context: Context,
+        intent: Intent,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Int> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "enableSystemAppByIntentBlocking",
+        metadata = "intent=$intent"
+    ) { dpm, admin ->
+        dpm.enableSystemApp(admin, intent)
+    }
+
+    suspend fun enableSystemApp(
+        context: Context,
+        packageName: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = execute(
+        context = context,
+        tag = tag,
+        actionName = "enableSystemAppByPackage",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        dpm.enableSystemApp(admin, packageName)
+    }
+
+    fun enableSystemAppBlocking(
+        context: Context,
+        packageName: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Unit> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "enableSystemAppByPackageBlocking",
+        metadata = "pkg=$packageName"
+    ) { dpm, admin ->
+        dpm.enableSystemApp(admin, packageName)
+    }
+
+    suspend fun getUserRestrictions(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Bundle?> = execute(
+        context = context,
+        tag = tag,
+        actionName = "getUserRestrictions"
+    ) { dpm, admin ->
+        dpm.getUserRestrictions(admin)
+    }
+
+    fun getUserRestrictionsBlocking(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Bundle?> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "getUserRestrictionsBlocking"
+    ) { dpm, admin ->
+        dpm.getUserRestrictions(admin)
+    }
+
+    fun hasUserRestriction(
+        context: Context,
+        userRestriction: String,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): Boolean {
+        return try {
+            val bundle = getUserRestrictionsBlocking(context, tag).getOrNull()
+            bundle?.getBoolean(userRestriction, false) == true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun setPermissionGrantState(
+        context: Context,
+        packageName: String,
+        permission: String,
+        grantState: Int,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setPermissionGrantState",
+        metadata = "pkg=$packageName, perm=$permission, state=$grantState"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            dpm.setPermissionGrantState(admin, packageName, permission, grantState)
+        } else {
+            false
+        }
+    }
+
+    fun setPermissionGrantStateBlocking(
+        context: Context,
+        packageName: String,
+        permission: String,
+        grantState: Int,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Boolean> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setPermissionGrantStateBlocking",
+        metadata = "pkg=$packageName, perm=$permission, state=$grantState"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            dpm.setPermissionGrantState(admin, packageName, permission, grantState)
+        } else {
+            false
+        }
+    }
+
+    suspend fun <T> executeRaw(
+        context: Context,
+        tag: String,
+        actionName: String,
+        metadata: String? = null,
+        requireDeviceOwner: Boolean = true,
+        action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
+    ): DpmExecutionResult<T> = execute(
+        context = context,
+        tag = tag,
+        actionName = actionName,
+        metadata = metadata,
+        requireDeviceOwner = requireDeviceOwner,
+        action = action
+    )
+
+    fun <T> executeRawBlocking(
+        context: Context,
+        tag: String,
+        actionName: String,
+        metadata: String? = null,
+        requireDeviceOwner: Boolean = true,
+        action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
+    ): DpmExecutionResult<T> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = actionName,
+        metadata = metadata,
+        requireDeviceOwner = requireDeviceOwner,
+        action = action
+    )
 
     private fun <T> executeInternal(
         context: Context,

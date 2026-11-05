@@ -119,10 +119,8 @@ class EnterpriseProvisioningActivity : AppCompatActivity() {
 
                 // 2. Dual-layer resilience: ensure core system applications remain active across all OEMs
                 try {
-                    val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-                    if (dpm != null && dpm.isDeviceOwnerApp(appContext.packageName)) {
-                        val admin = ComponentName(appContext, AdminReceiver::class.java)
-                        enableCoreSystemApps(appContext, dpm, admin)
+                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(appContext)) {
+                        enableCoreSystemApps(appContext)
                     }
                 } catch (t: Throwable) {
                     Log.e(TAG, "Non-fatal error enabling core system apps in compliance", t)
@@ -167,7 +165,7 @@ class EnterpriseProvisioningActivity : AppCompatActivity() {
      * Realme/ColorOS, Pixel, Transsion). Every single resolution and enable call is isolated in its own
      * try-catch block to guarantee zero crashes on any device.
      */
-    private fun enableCoreSystemApps(context: Context, dpm: DevicePolicyManager, admin: ComponentName) {
+    private fun enableCoreSystemApps(context: Context) {
         try {
             val pm = context.packageManager ?: return
 
@@ -183,7 +181,7 @@ class EnterpriseProvisioningActivity : AppCompatActivity() {
             for (intent in coreIntents) {
                 // A) Direct intent enablement via DPM
                 try {
-                    dpm.enableSystemApp(admin, intent)
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.enableSystemAppBlocking(context, intent)
                 } catch (t: Throwable) {
                     Log.d(TAG, "enableSystemApp(intent) skipped for $intent: ${t.message}")
                 }
@@ -198,7 +196,7 @@ class EnterpriseProvisioningActivity : AppCompatActivity() {
                         val pkgName = resolveInfo.activityInfo?.packageName
                         if (!pkgName.isNullOrBlank() && pkgName != context.packageName) {
                             try {
-                                dpm.enableSystemApp(admin, pkgName)
+                                com.drmohammed.antiporn.telemetry.SafeDpmGateway.enableSystemAppBlocking(context, pkgName)
                                 Log.d(TAG, "Enabled resolved system app: $pkgName")
                             } catch (t: Throwable) {
                                 Log.d(TAG, "enableSystemApp(pkg) skipped for $pkgName: ${t.message}")
@@ -247,7 +245,7 @@ class EnterpriseProvisioningActivity : AppCompatActivity() {
 
             for (pkg in oemKnownPackages) {
                 try {
-                    dpm.enableSystemApp(admin, pkg)
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.enableSystemAppBlocking(context, pkg)
                 } catch (t: Throwable) {
                     // Normal on devices from other manufacturers; silently proceed
                     Log.v(TAG, "OEM app $pkg not present or already active")

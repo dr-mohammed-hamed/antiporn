@@ -31,6 +31,7 @@ object BlackBoxRecorder {
     const val TAG_IDENTITY = "IDENTITY"
     const val TAG_TIME = "TIME"
     const val TAG_DPM = "DPM"
+    const val TAG_SHIELD = "SHIELD"
     const val TAG_GATE = "GATE"
     const val TAG_PAIRING = "PAIRING"
     const val TAG_CRASH = "CRASH"

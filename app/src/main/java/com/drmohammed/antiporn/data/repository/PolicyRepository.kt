@@ -366,13 +366,10 @@ class PolicyRepository(
     fun applyPolicyToSystem(bundle: DevicePolicyBundle, previousPolicy: DevicePolicyBundle = _currentPolicyFlow.value) {
         repositoryScope.launch {
             try {
-                val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return@launch
-                val isDeviceOwner = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)
-                val isDo = dpm.isDeviceOwnerApp(appContext.packageName)
-                val admin = if (isDeviceOwner) ComponentName(appContext, AdminReceiver::class.java) else null
+                val isDeviceOwner = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(appContext)
 
                 // 1. Dynamic Date & Time Protection / Timezone Configuration (Requires DO)
-                if (isDo && admin != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                if (isDeviceOwner && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     // Always synchronize device timezone with policy timezone (e.g. Cairo or Makkah)
                     if (bundle.timeZoneId.isNotBlank()) {
                         val validTz = if (com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry.isValidIanaId(bundle.timeZoneId)) {
@@ -384,18 +381,18 @@ class PolicyRepository(
                             TimeZone.setDefault(null)
                             val currentTz = TimeZone.getDefault()
                             if (currentTz.id != validTz) {
-                                dpm.setTimeZone(admin, validTz)
+                                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setTimeZone(appContext, validTz)
                                 TimeZone.setDefault(null)
                                 Log.i(TAG, "Applied dynamic timezone update to: $validTz")
                             }
                         } catch (e: Exception) {
-                            Log.e(TAG, "Failed setting timezone ${bundle.timeZoneId} via DPM", e)
+                            Log.e(TAG, "Failed setting timezone ${bundle.timeZoneId} via SafeDpmGateway", e)
                         }
                     }
 
                     if (bundle.isDateTimeLocked) {
                         try {
-                            dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
+                            com.drmohammed.antiporn.telemetry.SafeDpmGateway.addUserRestriction(appContext, UserManager.DISALLOW_CONFIG_DATE_TIME)
                             Log.i(TAG, "Enforced DISALLOW_CONFIG_DATE_TIME restriction from policy bundle")
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed applying DISALLOW_CONFIG_DATE_TIME: ${e.message}")
@@ -403,15 +400,14 @@ class PolicyRepository(
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             try {
-                                dpm.setAutoTimeZoneEnabled(admin, false)
-                                dpm.setAutoTimeEnabled(admin, true)
+                                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAutoTimeZoneEnabled(appContext, false)
+                                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAutoTimeEnabled(appContext, true)
                             } catch (e: Exception) {
                                 Log.w(TAG, "Failed setting auto time/timezone on Android 11+: ${e.message}")
                             }
                         } else {
                             try {
-                                @Suppress("DEPRECATION")
-                                dpm.setAutoTimeRequired(admin, true)
+                                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAutoTimeRequired(appContext, true)
                             } catch (e: Exception) {
                                 Log.w(TAG, "Failed setting auto time required: ${e.message}")
                             }
@@ -419,7 +415,7 @@ class PolicyRepository(
                     } else {
                         // Time lock is not enabled: Clear restrictions and restore default auto-time state
                         try {
-                            dpm.clearUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
+                            com.drmohammed.antiporn.telemetry.SafeDpmGateway.clearUserRestriction(appContext, UserManager.DISALLOW_CONFIG_DATE_TIME)
                             Log.i(TAG, "Cleared DISALLOW_CONFIG_DATE_TIME restriction from policy bundle (phone settings open)")
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed clearing DISALLOW_CONFIG_DATE_TIME: ${e.message}")
@@ -427,14 +423,13 @@ class PolicyRepository(
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             try {
-                                dpm.setAutoTimeZoneEnabled(admin, true)
+                                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAutoTimeZoneEnabled(appContext, true)
                             } catch (e: Exception) {
                                 Log.w(TAG, "Failed restoring auto timezone on Android 11+: ${e.message}")
                             }
                         } else {
                             try {
-                                @Suppress("DEPRECATION")
-                                dpm.setAutoTimeRequired(admin, false)
+                                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAutoTimeRequired(appContext, false)
                             } catch (e: Exception) {
                                 Log.w(TAG, "Failed clearing auto time required: ${e.message}")
                             }
@@ -451,9 +446,15 @@ class PolicyRepository(
                 com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.syncPolicy(appContext)
 
                 // 4. Apply browser & DNS restrictions, custom blacklist suspension, and protected apps
-                if (isDeviceOwner && admin != null) {
-                    BrowserShield.applyBrowserRestrictions(dpm, admin, bundle)
-                    DnsShield.apply(appContext, dpm, admin)
+                if (isDeviceOwner) {
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.executeRaw(
+                        context = appContext,
+                        tag = com.drmohammed.antiporn.telemetry.BlackBoxRecorder.TAG_SHIELD,
+                        actionName = "applyBrowserAndDnsShields"
+                    ) { dpm, admin ->
+                        BrowserShield.applyBrowserRestrictions(dpm, admin, bundle)
+                        DnsShield.apply(appContext, dpm, admin)
+                    }
 
                     // 24/7 Custom App Freezing (bundle.customBlacklistPackages)
                     val currentBlacklist = bundle.customBlacklistPackages
@@ -531,7 +532,7 @@ class PolicyRepository(
                             !currentBlacklist.contains(pkg) &&
                             !AppSuspensionShield.isBlacklisted(pkg) &&
                             (!isZeroTrustActive || approvedPackages.contains(pkg) || immunePackages.contains(pkg) || isSystemOrUpdatedApp || pkg == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE || CurfewConfig.KNOWN_APP_STORES.contains(pkg)) &&
-                            try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+                            com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(appContext, pkg).getOrNull() == true
                         }.toTypedArray()
                         if (whitelistedToUnsuspend.isNotEmpty()) {
                             try {

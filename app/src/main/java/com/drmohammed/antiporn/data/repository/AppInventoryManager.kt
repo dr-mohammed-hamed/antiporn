@@ -1,6 +1,5 @@
 package com.drmohammed.antiporn.data.repository
 
-import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -37,9 +36,7 @@ class AppInventoryManager private constructor(context: Context) {
      */
     fun getInstalledApps(context: Context = appContext): List<InstalledAppDto> {
         val pm = context.packageManager
-        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-        val admin = ComponentName(context, AdminReceiver::class.java)
-        val isDeviceOwner = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(context)
+        val isDeviceOwner = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(context)
 
         val policy = try {
             PolicyRepository.getInstance(context).getCurrentPolicy()
@@ -107,12 +104,7 @@ class AppInventoryManager private constructor(context: Context) {
                 val isSystem = isSystemApp && !isUpdatedSystem
 
                 val isDpmSuspended = if (isDeviceOwner) {
-                    try {
-                        dpm?.isPackageSuspended(admin, pkg) == true
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed querying package suspension state for $pkg", e)
-                        false
-                    }
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() == true
                 } else {
                     false
                 }

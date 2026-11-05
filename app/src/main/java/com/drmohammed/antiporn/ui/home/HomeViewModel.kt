@@ -1,7 +1,6 @@
 package com.drmohammed.antiporn.ui.home
 
 import android.app.Application
-import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.os.Build
 import android.util.Log
@@ -110,15 +109,7 @@ class HomeViewModel(
             val isDo = ProtectionEngine.isDeviceOwner(app)
             val shields = ProtectionEngine.evaluateSystemStatus(app)
 
-            val dpm = app.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-            val admin = ProtectionEngine.getAdminComponent(app)
-            val currentDnsHost = if (dpm != null && isDo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                try {
-                    dpm.getGlobalPrivateDnsHost(admin)
-                } catch (e: Exception) {
-                    null
-                }
-            } else null
+            val currentDnsHost = com.drmohammed.antiporn.telemetry.SafeDpmGateway.getGlobalPrivateDnsHost(app).getOrNull()
 
             // Also check active shields evaluator for diagnostic completeness
             val activeShields = ActiveShieldsEvaluator.evaluateActiveShields(app)

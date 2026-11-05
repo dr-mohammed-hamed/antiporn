@@ -1,6 +1,5 @@
 package com.drmohammed.antiporn.data.repository
 
-import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -80,22 +79,17 @@ class ApprovalRepository(
             return false
         }
 
-        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-            ?: return false
-        val admin = ComponentName(appContext, AdminReceiver::class.java)
-
-        if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) {
+        if (!com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(appContext)) {
             Log.w(TAG, "Cannot freeze $packageName: Not Device/Profile Owner")
             return false
         }
 
         // 1. Instant 0ms suspension with Fail-Secure Fallback
-        val suspended = suspendWithGuardianMessage(
-            dpm = dpm,
-            admin = admin,
+        val suspended = com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackageSuspendedWithMessageBlocking(
+            context = appContext,
             packageName = packageName,
             message = appContext.getString(R.string.toast_app_suspended_by_guardian)
-        )
+        ).getOrNull() == true
 
         val finalStatus: String
         if (suspended) {
@@ -273,10 +267,7 @@ class ApprovalRepository(
             return
         }
 
-        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
-        val admin = ComponentName(appContext, AdminReceiver::class.java)
-
-        if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) return
+        if (!com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(appContext)) return
 
         val isBlockActive = CurfewEnforcer.isEffectiveBlockActive(appContext)
         val isWhitelisted = CurfewConfig.STATIC_WHITELIST.contains(packageName) ||
@@ -540,9 +531,7 @@ class ApprovalRepository(
 
         Log.i(TAG, "🌱 [SEED_BASELINE] Establishing Initial Zero-Trust Baseline for pre-existing apps...")
         val pm = appContext.packageManager
-        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-        val admin = ComponentName(appContext, AdminReceiver::class.java)
-        val isDo = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)
+        val isDo = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(appContext)
 
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             PackageManager.MATCH_UNINSTALLED_PACKAGES or PackageManager.MATCH_DISABLED_COMPONENTS
@@ -564,9 +553,9 @@ class ApprovalRepository(
 
         val packagesToUnsuspend = mutableListOf<String>()
 
-        val policy = if (isDo && dpm != null) PolicyRepository.getInstance(appContext).getCurrentPolicy() else null
-        val isBlockActive = if (isDo && dpm != null) CurfewEnforcer.isEffectiveBlockActive(appContext) else false
-        val immunePackages = if (isDo && dpm != null) CurfewAppResolver.resolveImmunePackages(appContext) else emptySet()
+        val policy = if (isDo) PolicyRepository.getInstance(appContext).getCurrentPolicy() else null
+        val isBlockActive = if (isDo) CurfewEnforcer.isEffectiveBlockActive(appContext) else false
+        val immunePackages = if (isDo) CurfewAppResolver.resolveImmunePackages(appContext) else emptySet()
 
         for (pkgInfo in installedPackages) {
             val pkg = pkgInfo.packageName ?: continue
@@ -595,7 +584,7 @@ class ApprovalRepository(
             database.savePendingApproval(baselineEntity)
 
             // If it was inadvertently suspended or hidden, queue it for unfreezing ONLY if not restricted by Curfew or Custom Blacklist
-            if (isDo && dpm != null && policy != null) {
+            if (isDo && policy != null) {
                 val isWhitelisted = CurfewConfig.STATIC_WHITELIST.contains(pkg) || immunePackages.contains(pkg)
 
                 if (policy.customBlacklistPackages.contains(pkg)) {
@@ -605,8 +594,8 @@ class ApprovalRepository(
                     continue
                 }
 
-                val isSuspended = try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
-                val isHidden = try { dpm.isApplicationHidden(admin, pkg) } catch (e: Exception) { false }
+                val isSuspended = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(appContext, pkg).getOrNull() == true
+                val isHidden = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(appContext, pkg).getOrNull() == true
                 if (isSuspended || isHidden) {
                     packagesToUnsuspend.add(pkg)
                 }
@@ -614,7 +603,7 @@ class ApprovalRepository(
         }
 
         // Unsuspend and unhide all pre-existing baseline packages
-        if (isDo && dpm != null && packagesToUnsuspend.isNotEmpty()) {
+        if (isDo && packagesToUnsuspend.isNotEmpty()) {
             Log.w(TAG, "🌱 [UNFREEZE_BASELINE] Unfreezing ${packagesToUnsuspend.size} pre-existing baseline packages...")
             try {
                 com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(appContext, packagesToUnsuspend.toTypedArray(), false)
@@ -659,8 +648,7 @@ class ApprovalRepository(
         // 1. Establish initial baseline on first run to protect pre-existing apps
         ensureInitialBaselineSeeded()
 
-        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
-        val admin = ComponentName(appContext, AdminReceiver::class.java)
+        if (!com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(appContext)) return
         val pm = appContext.packageManager
 
         val installedPackages = try {
@@ -696,16 +684,15 @@ class ApprovalRepository(
 
             // If it was already rejected by guardian, ensure it is suspended/hidden if active, but do NOT call freezeAndSubmitApprovalLocal or modify status to PENDING
             if (rejectedSet.contains(pkg)) {
-                val isSuspended = try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
-                val isHidden = try { dpm.isApplicationHidden(admin, pkg) } catch (e: Exception) { false }
+                val isSuspended = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(appContext, pkg).getOrNull() == true
+                val isHidden = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(appContext, pkg).getOrNull() == true
                 if (!isSuspended && !isHidden) {
                     Log.w(TAG, "🚨 [RECONCILE_REJECTED_APP] Rejected package '$pkg' was active. Enforcing suspension/hide!")
-                    val suspended = suspendWithGuardianMessage(
-                        dpm = dpm,
-                        admin = admin,
+                    val suspended = com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackageSuspendedWithMessageBlocking(
+                        context = appContext,
                         packageName = pkg,
                         message = appContext.getString(R.string.toast_app_suspended_by_guardian)
-                    )
+                    ).getOrNull() == true
                     if (!suspended) {
                         try {
                             com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(appContext, pkg, true)
@@ -719,8 +706,8 @@ class ApprovalRepository(
 
             // If it's already recorded as pending and verified suspended/hidden, skip
             if (pendingSet.contains(pkg)) {
-                val isSuspended = try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
-                val isHidden = try { dpm.isApplicationHidden(admin, pkg) } catch (e: Exception) { false }
+                val isSuspended = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(appContext, pkg).getOrNull() == true
+                val isHidden = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(appContext, pkg).getOrNull() == true
                 if (isSuspended || isHidden) continue
             }
 
@@ -752,74 +739,7 @@ class ApprovalRepository(
         }
     }
 
-    private fun suspendWithGuardianMessage(
-        dpm: DevicePolicyManager,
-        admin: ComponentName,
-        packageName: String,
-        message: String
-    ): Boolean {
-        if (com.drmohammed.antiporn.curfew.CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)) {
-            Log.w(TAG, "IRON GUARD: Strictly refusing to suspend critical system package: $packageName")
-            return false
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                val builderClass = Class.forName("android.content.pm.SuspendDialogInfo\$Builder")
-                val builder = builderClass.getDeclaredConstructor().newInstance()
-                val setMessageMethod = builderClass.getMethod("setMessage", String::class.java)
-                setMessageMethod.invoke(builder, message)
-                val buildMethod = builderClass.getMethod("build")
-                val dialogInfo = buildMethod.invoke(builder)
 
-                val suspendMethod = DevicePolicyManager::class.java.getMethod(
-                    "setPackagesSuspended",
-                    ComponentName::class.java,
-                    Array<String>::class.java,
-                    Boolean::class.javaPrimitiveType,
-                    android.os.PersistableBundle::class.java,
-                    android.os.PersistableBundle::class.java,
-                    Class.forName("android.content.pm.SuspendDialogInfo")
-                )
-                val rawResult = suspendMethod.invoke(dpm, admin, arrayOf(packageName), true, null, null, dialogInfo)
-                val failedPkgs = (rawResult as? Array<*>)?.filterIsInstance<String>() ?: emptyList()
-                val isSuccess = rawResult != null && !failedPkgs.contains(packageName)
-                if (isSuccess) {
-                    Log.i(TAG, "Applied Zero-Trust suspension with custom SuspendDialogInfo for $packageName")
-                    return true
-                } else {
-                    Log.w(TAG, "Reflection setPackagesSuspended returned failed package for $packageName: $failedPkgs. Attempting standard fallback.")
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Reflection for SuspendDialogInfo failed (${e.javaClass.simpleName}: ${e.message}), falling back to standard suspension")
-            }
-        }
-
-        return try {
-            val failedPkgs: Array<String>? = try {
-                dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
-            } catch (e: Exception) {
-                Log.w(TAG, "Exception invoking standard setPackagesSuspended for $packageName", e)
-                null
-            }
-            val isSuccess = failedPkgs != null && !failedPkgs.contains(packageName)
-            if (isSuccess) {
-                Log.i(TAG, "Applied Zero-Trust standard suspension for $packageName")
-                true
-            } else {
-                val isSuspended = try { dpm.isPackageSuspended(admin, packageName) } catch (e: Exception) { false }
-                if (isSuspended) {
-                    Log.i(TAG, "Zero-Trust suspension confirmed via isPackageSuspended for $packageName")
-                    true
-                } else {
-                    Log.e(TAG, "Standard setPackagesSuspended failed for $packageName (failed packages: ${failedPkgs?.joinToString()})")
-                    false
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Exception during standard setPackagesSuspended for $packageName", e)
-            false
-        }
-    }
 
     companion object {
         private const val TAG = "AntiPorn_ApprovalRepo"

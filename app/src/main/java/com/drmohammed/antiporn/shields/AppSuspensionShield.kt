@@ -256,18 +256,19 @@ object AppSuspensionShield : ProtectionShield {
     fun handlePackageAdded(context: Context, packageName: String) {
         if (isImmune(packageName) || !isBlacklisted(packageName)) return
         val appContext = context.applicationContext
-        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-        if (dpm == null) {
-            Log.e(TAG, "DevicePolicyManager unavailable in handlePackageAdded")
-            return
-        }
-        val admin = ComponentName(appContext, AdminReceiver::class.java)
-        if (!ProtectionEngine.isDeviceOwner(appContext)) {
+        if (!com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(appContext)) {
             Log.w(TAG, "Cannot freeze $packageName: App is not Device/Profile Owner")
             return
         }
         Log.i(TAG, "Freezing and uninstalling blacklisted app on install: $packageName")
-        freezeAndUninstall(appContext, dpm, admin, packageName)
+        com.drmohammed.antiporn.telemetry.SafeDpmGateway.executeRawBlocking(
+            context = appContext,
+            tag = com.drmohammed.antiporn.telemetry.BlackBoxRecorder.TAG_SHIELD,
+            actionName = "handleBlacklistedPackageAdded",
+            metadata = "pkg=$packageName"
+        ) { dpm, admin ->
+            freezeAndUninstall(appContext, dpm, admin, packageName)
+        }
     }
 
     /**
@@ -276,17 +277,21 @@ object AppSuspensionShield : ProtectionShield {
      */
     fun enforceBlacklistFast(context: Context) {
         val appContext = context.applicationContext
-        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
-        val admin = ComponentName(appContext, AdminReceiver::class.java)
-        if (!ProtectionEngine.isDeviceOwner(appContext)) {
+        if (!com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(appContext)) {
             Log.w(TAG, "enforceBlacklistFast skipped: not Device/Profile Owner")
             return
         }
 
         val pm = appContext.packageManager
-        for (pkg in BLACKLISTED_PACKAGES) {
-            if (!isImmune(pkg) && isPackageInstalled(pm, pkg)) {
-                freezeAndUninstall(appContext, dpm, admin, pkg)
+        com.drmohammed.antiporn.telemetry.SafeDpmGateway.executeRawBlocking(
+            context = appContext,
+            tag = com.drmohammed.antiporn.telemetry.BlackBoxRecorder.TAG_SHIELD,
+            actionName = "enforceBlacklistFast"
+        ) { dpm, admin ->
+            for (pkg in BLACKLISTED_PACKAGES) {
+                if (!isImmune(pkg) && isPackageInstalled(pm, pkg)) {
+                    freezeAndUninstall(appContext, dpm, admin, pkg)
+                }
             }
         }
     }

@@ -111,51 +111,55 @@ object ProtectionEngine {
      * MUST be called from a background thread.
      */
     fun applyAllSync(context: Context): List<ShieldResult> {
-        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-            ?: return listOf(
-                ShieldResult(
-                    shieldId = "engine",
-                    success = false,
-                    message = context.getString(R.string.toast_dpm_missing)
-                )
-            )
-
-        val admin = getAdminComponent(context)
-        val isDeviceOwner = isDeviceOwner(context)
-
-        if (!isDeviceOwner) {
+        val appContext = context.applicationContext
+        if (!isDeviceOwner(appContext)) {
             Log.w(TAG, "App is not Device/Profile Owner. Cannot apply shields.")
             return listOf(
                 ShieldResult(
                     shieldId = "engine",
                     success = false,
-                    message = context.getString(R.string.toast_not_device_owner)
+                    message = appContext.getString(R.string.toast_not_device_owner)
                 )
             )
         }
 
-        val results = mutableListOf<ShieldResult>()
-
-        for (shield in shields) {
-            try {
-                val res = shield.apply(context, dpm, admin)
-                results.add(res)
-                Log.d(TAG, "Applied shield [${shield.id}]: success=${res.success}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception applying shield [${shield.id}]", e)
-                results.add(
-                    ShieldResult(
-                        shieldId = shield.id,
-                        success = false,
-                        message = context.getString(R.string.toast_error_applying, e.localizedMessage ?: "Unknown")
+        val dpmResult = com.drmohammed.antiporn.telemetry.SafeDpmGateway.executeRawBlocking(
+            context = appContext,
+            tag = com.drmohammed.antiporn.telemetry.BlackBoxRecorder.TAG_SHIELD,
+            actionName = "applyAllShieldsSync",
+            requireDeviceOwner = true
+        ) { dpm, admin ->
+            val results = mutableListOf<ShieldResult>()
+            for (shield in shields) {
+                try {
+                    val res = shield.apply(appContext, dpm, admin)
+                    results.add(res)
+                    Log.d(TAG, "Applied shield [${shield.id}]: success=${res.success}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Exception applying shield [${shield.id}]", e)
+                    results.add(
+                        ShieldResult(
+                            shieldId = shield.id,
+                            success = false,
+                            message = appContext.getString(R.string.toast_error_applying, e.localizedMessage ?: "Unknown")
+                        )
                     )
-                )
+                }
             }
+            results
         }
+
+        val results = dpmResult.getOrNull() ?: listOf(
+            ShieldResult(
+                shieldId = "engine",
+                success = false,
+                message = appContext.getString(R.string.toast_dpm_missing)
+            )
+        )
 
         if (!DnsWatchdogService.isRunning) {
             try {
-                DnsWatchdogService.startService(context)
+                DnsWatchdogService.startService(appContext)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start watchdog service", e)
             }
@@ -168,36 +172,38 @@ object ProtectionEngine {
      * Evaluates the active status of every registered shield.
      */
     fun evaluateSystemStatus(context: Context): Map<String, ShieldStatus> {
-        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-            ?: return shields.associate { it.id to ShieldStatus.Disabled(context.getString(R.string.toast_dpm_missing)) }
-
-        val admin = getAdminComponent(context)
-        val isDeviceOwner = isDeviceOwner(context)
-
-        if (!isDeviceOwner) {
-            return shields.associate { it.id to ShieldStatus.Disabled(context.getString(R.string.card_device_owner_inactive)) }
+        val appContext = context.applicationContext
+        if (!isDeviceOwner(appContext)) {
+            return shields.associate { it.id to ShieldStatus.Disabled(appContext.getString(R.string.card_device_owner_inactive)) }
         }
 
-        val statusMap = mutableMapOf<String, ShieldStatus>()
-        for (shield in shields) {
-            val status = try {
-                shield.checkStatus(context, dpm, admin)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error checking status for shield [${shield.id}]", e)
-                ShieldStatus.NeedsEnforcement(context.getString(R.string.card_device_owner_inactive))
+        val dpmResult = com.drmohammed.antiporn.telemetry.SafeDpmGateway.executeRawBlocking(
+            context = appContext,
+            tag = com.drmohammed.antiporn.telemetry.BlackBoxRecorder.TAG_SHIELD,
+            actionName = "evaluateSystemStatus",
+            requireDeviceOwner = true
+        ) { dpm, admin ->
+            val statusMap = mutableMapOf<String, ShieldStatus>()
+            for (shield in shields) {
+                val status = try {
+                    shield.checkStatus(appContext, dpm, admin)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error checking status for shield [${shield.id}]", e)
+                    ShieldStatus.NeedsEnforcement(appContext.getString(R.string.card_device_owner_inactive))
+                }
+                statusMap[shield.id] = status
             }
-            statusMap[shield.id] = status
+            statusMap
         }
-        return statusMap
+
+        return dpmResult.getOrNull() ?: shields.associate { it.id to ShieldStatus.Disabled(appContext.getString(R.string.toast_dpm_missing)) }
     }
 
     /**
      * Checks if the app is currently the active Device Owner or Profile Owner.
      */
     fun isDeviceOwner(context: Context): Boolean {
-        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return false
-        val pkg = context.packageName
-        return dpm.isDeviceOwnerApp(pkg) || dpm.isProfileOwnerApp(pkg)
+        return com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(context)
     }
 
     /**

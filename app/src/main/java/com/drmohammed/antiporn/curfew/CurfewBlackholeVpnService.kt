@@ -155,10 +155,13 @@ class CurfewBlackholeVpnService : VpnService() {
             val bypassedPackages = CurfewConfig.getVpnBypassedPackages(this)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 try {
-                    val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? android.app.admin.DevicePolicyManager
-                    val admin = android.content.ComponentName(this, com.drmohammed.antiporn.AdminReceiver::class.java)
-                    if (dpm != null && dpm.isDeviceOwnerApp(packageName)) {
-                        dpm.setAlwaysOnVpnPackage(admin, packageName, true, bypassedPackages)
+                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(this)) {
+                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAlwaysOnVpnPackageBlocking(
+                            context = this,
+                            vpnPackage = packageName,
+                            lockdown = true,
+                            bypassedPackages = bypassedPackages
+                        )
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Could not update Always-On VPN lockdown bypassed packages", e)

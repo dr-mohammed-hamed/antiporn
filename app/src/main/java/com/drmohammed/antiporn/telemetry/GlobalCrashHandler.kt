@@ -2,7 +2,6 @@ package com.drmohammed.antiporn.telemetry
 
 import android.app.ActivityManager
 import android.app.Application
-import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
@@ -96,18 +95,8 @@ class GlobalCrashHandler private constructor(
         }
 
         // Query Device Owner & Admin Status
-        var isDeviceOwner = false
-        var isAdminActive = false
-        try {
-            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-            if (dpm != null) {
-                isDeviceOwner = dpm.isDeviceOwnerApp(context.packageName)
-                val adminComponent = ComponentName(context, AdminReceiver::class.java)
-                isAdminActive = dpm.isAdminActive(adminComponent)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Error querying DPM status in crash handler", e)
-        }
+        val isDeviceOwner = SafeDpmGateway.isDeviceOwner(context)
+        val isAdminActive = SafeDpmGateway.isAdminActive(context)
 
         return CrashReport(
             timestampMs = now,

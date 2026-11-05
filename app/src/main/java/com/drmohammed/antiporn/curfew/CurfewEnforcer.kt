@@ -1,7 +1,5 @@
 package com.drmohammed.antiporn.curfew
 
-import android.app.admin.DevicePolicyManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -10,7 +8,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.UserManager
 import android.util.Log
-import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.shields.AppSuspensionShield
@@ -187,10 +184,7 @@ object CurfewEnforcer {
      */
     @Synchronized
     fun enforce(context: Context, activate: Boolean, calendar: Calendar = CurfewConfig.getCurfewCalendar(context)): Boolean {
-        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return false
-        val admin = ComponentName(context, AdminReceiver::class.java)
-
-        if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(context)) {
+        if (!com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(context)) {
             Log.w(TAG, "Cannot enforce curfew: Not Device/Profile Owner")
             return false
         }
@@ -217,24 +211,17 @@ object CurfewEnforcer {
 
         if (vpnEnabled) {
             try {
-                val currentVpn = dpm.getAlwaysOnVpnPackage(admin)
+                val currentVpn = com.drmohammed.antiporn.telemetry.SafeDpmGateway.getAlwaysOnVpnPackageBlocking(context).getOrNull()
                 val bypassedPackages = CurfewConfig.getVpnBypassedPackages(context)
-                val isLockdownActive = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                    try {
-                        dpm.isAlwaysOnVpnLockdownEnabled(admin)
-                    } catch (e: Exception) {
-                        false
-                    }
-                } else {
-                    false
-                }
+                val isLockdownActive = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isAlwaysOnVpnLockdownEnabledBlocking(context).getOrNull() == true
                 if (currentVpn != context.packageName || !isLockdownActive) {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                        dpm.setAlwaysOnVpnPackage(admin, context.packageName, true, bypassedPackages)
-                    } else {
-                        dpm.setAlwaysOnVpnPackage(admin, context.packageName, true)
-                    }
-                    Log.i(TAG, "Always-on Blackhole VPN configured to ${context.packageName} with lockdown=true")
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAlwaysOnVpnPackageBlocking(
+                        context = context,
+                        vpnPackage = context.packageName,
+                        lockdown = true,
+                        bypassedPackages = bypassedPackages
+                    )
+                    Log.i(TAG, "Always-on Blackhole VPN configured to ${context.packageName} with lockdown=true via SafeDpmGateway")
                 }
                 CurfewBlackholeVpnService.start(context)
             } catch (e: Exception) {
@@ -245,15 +232,15 @@ object CurfewEnforcer {
                 val requiredMode = CurfewBlackholeVpnService.evaluateRequiredMode(context)
                 if (requiredMode == CurfewBlackholeVpnService.VpnMode.DNS_FILTERING_ONLY) {
                     CurfewBlackholeVpnService.syncPolicy(context)
-                    if (dpm.getAlwaysOnVpnPackage(admin) == context.packageName) {
-                        dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
-                        Log.i(TAG, "Always-on VPN transitioned to DNS-only filtering mode (lockdown=false)")
+                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.getAlwaysOnVpnPackageBlocking(context).getOrNull() == context.packageName) {
+                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAlwaysOnVpnPackageBlocking(context, context.packageName, false)
+                        Log.i(TAG, "Always-on VPN transitioned to DNS-only filtering mode (lockdown=false) via SafeDpmGateway")
                     }
                 } else {
                     CurfewBlackholeVpnService.forceReleaseVpn(context)
-                    if (dpm.getAlwaysOnVpnPackage(admin) == context.packageName) {
-                        dpm.setAlwaysOnVpnPackage(admin, null, false)
-                        Log.i(TAG, "Always-on Blackhole VPN released")
+                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.getAlwaysOnVpnPackageBlocking(context).getOrNull() == context.packageName) {
+                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAlwaysOnVpnPackageBlocking(context, null, false)
+                        Log.i(TAG, "Always-on Blackhole VPN released via SafeDpmGateway")
                     }
                 }
                 Log.i(TAG, "VPN Blackhole is disabled and network is released.")
@@ -283,8 +270,8 @@ object CurfewEnforcer {
             val packagesToHide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
             for (pkg in packagesToHide) {
                 try {
-                    if (!dpm.isApplicationHidden(admin, pkg)) {
-                        dpm.setApplicationHidden(admin, pkg, true)
+                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(context, pkg).getOrNull() != true) {
+                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(context, pkg, true)
                         Log.i(TAG, "Hidden store/search package: $pkg")
                     }
                 } catch (e: Exception) {
@@ -294,17 +281,17 @@ object CurfewEnforcer {
 
             // Ensure Google Play Store and Google Search are NOT hidden and NOT suspended so games can use background IPC
             try {
-                if (dpm.isApplicationHidden(admin, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE)) {
-                    dpm.setApplicationHidden(admin, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, false)
+                if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(context, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE).getOrNull() == true) {
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(context, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, false)
                 }
-                if (dpm.isPackageSuspended(admin, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE)) {
-                    dpm.setPackagesSuspended(admin, arrayOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE), false)
+                if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE).getOrNull() == true) {
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, arrayOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE), false)
                 }
-                if (dpm.isApplicationHidden(admin, CurfewConfig.GOOGLE_SEARCH_PACKAGE)) {
-                    dpm.setApplicationHidden(admin, CurfewConfig.GOOGLE_SEARCH_PACKAGE, false)
+                if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(context, CurfewConfig.GOOGLE_SEARCH_PACKAGE).getOrNull() == true) {
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(context, CurfewConfig.GOOGLE_SEARCH_PACKAGE, false)
                 }
-                if (dpm.isPackageSuspended(admin, CurfewConfig.GOOGLE_SEARCH_PACKAGE)) {
-                    dpm.setPackagesSuspended(admin, arrayOf(CurfewConfig.GOOGLE_SEARCH_PACKAGE), false)
+                if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, CurfewConfig.GOOGLE_SEARCH_PACKAGE).getOrNull() == true) {
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, arrayOf(CurfewConfig.GOOGLE_SEARCH_PACKAGE), false)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Could not ensure Play Store / Google Search unhidden/unsuspended", e)
@@ -312,16 +299,12 @@ object CurfewEnforcer {
 
             // 2. Suspend target applications (excluding already suspended)
             val toSuspend = targets.filter { pkg ->
-                try {
-                    !dpm.isPackageSuspended(admin, pkg)
-                } catch (e: Exception) {
-                    true
-                }
+                com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() != true
             }
 
             if (toSuspend.isNotEmpty()) {
                 try {
-                    val failed = dpm.setPackagesSuspended(admin, toSuspend.toTypedArray(), true)
+                    val failed = com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, toSuspend.toTypedArray(), true).getOrNull()
                     Log.i(TAG, "Curfew activated: suspended ${toSuspend.size - (failed?.size ?: 0)} packages")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error suspending curfew packages", e)
@@ -355,19 +338,19 @@ object CurfewEnforcer {
                 val coreCritical = CurfewAppResolver.resolveCoreSystemCriticalPackages(context)
                 coreCritical.filter { pkg ->
                     !AppSuspensionShield.isBlacklisted(pkg) &&
-                    try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() == true
                 }
             } else {
                 immunePackages.filter { pkg ->
                     !AppSuspensionShield.isBlacklisted(pkg) &&
                     !customBlacklist.contains(pkg) &&
                     !unapprovedPackages.contains(pkg) &&
-                    try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() == true
                 }
             }
             if (immuneToUnsuspend.isNotEmpty()) {
                 try {
-                    dpm.setPackagesSuspended(admin, immuneToUnsuspend.toTypedArray(), false)
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, immuneToUnsuspend.toTypedArray(), false)
                     Log.i(TAG, "Unsuspended whitelisted/immune packages during curfew: $immuneToUnsuspend")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error unsuspending immune packages during curfew", e)
@@ -376,7 +359,7 @@ object CurfewEnforcer {
 
             // Ensure DISALLOW_INSTALL_APPS is NOT active, preserving ADB developer workflow.
             try {
-                dpm.clearUserRestriction(admin, UserManager.DISALLOW_INSTALL_APPS)
+                com.drmohammed.antiporn.telemetry.SafeDpmGateway.clearUserRestrictionBlocking(context, UserManager.DISALLOW_INSTALL_APPS)
             } catch (e: Exception) {
                 Log.w(TAG, "Could not clear DISALLOW_INSTALL_APPS restriction", e)
             }
@@ -404,8 +387,8 @@ object CurfewEnforcer {
             val packagesToUnhide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
             for (pkg in packagesToUnhide) {
                 try {
-                    if (dpm.isApplicationHidden(admin, pkg)) {
-                        dpm.setApplicationHidden(admin, pkg, false)
+                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(context, pkg).getOrNull() == true) {
+                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(context, pkg, false)
                         Log.i(TAG, "Unhid store/search package: $pkg")
                     }
                 } catch (e: Exception) {
@@ -415,7 +398,7 @@ object CurfewEnforcer {
 
             // 2. Clear app installation restriction
             try {
-                dpm.clearUserRestriction(admin, UserManager.DISALLOW_INSTALL_APPS)
+                com.drmohammed.antiporn.telemetry.SafeDpmGateway.clearUserRestrictionBlocking(context, UserManager.DISALLOW_INSTALL_APPS)
                 Log.i(TAG, "Curfew restriction cleared: DISALLOW_INSTALL_APPS")
             } catch (e: Exception) {
                 Log.w(TAG, "Could not clear DISALLOW_INSTALL_APPS restriction", e)
@@ -491,11 +474,7 @@ object CurfewEnforcer {
                 }
                 true
             }.filter { pkg ->
-                try {
-                    dpm.isPackageSuspended(admin, pkg)
-                } catch (e: Exception) {
-                    false
-                }
+                com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() == true
             }
 
             if (safeToUnsuspend.isNotEmpty()) {
@@ -598,9 +577,7 @@ object CurfewEnforcer {
             return
         }
 
-        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
-        val admin = ComponentName(appContext, AdminReceiver::class.java)
-        if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) return
+        if (!com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(appContext)) return
 
         try {
             com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(appContext, arrayOf(packageName), true)
@@ -627,9 +604,7 @@ object CurfewEnforcer {
     @Synchronized
     fun repairStuckSuspendedApps(context: Context): Int {
         val appContext = context.applicationContext
-        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return 0
-        val admin = ComponentName(appContext, AdminReceiver::class.java)
-        if (!dpm.isDeviceOwnerApp(appContext.packageName)) return 0
+        if (!com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(appContext)) return 0
 
         val pm = appContext.packageManager ?: return 0
         val isCurfewRunning = isEffectiveBlockActive(appContext)
@@ -698,7 +673,7 @@ object CurfewEnforcer {
                 }
             }
 
-            val isSuspended = try { dpm.isPackageSuspended(admin, pkg) } catch (e: Exception) { false }
+            val isSuspended = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(appContext, pkg).getOrNull() == true
             if (isSuspended) {
                 stuckToUnsuspend.add(pkg)
             }

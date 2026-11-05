@@ -1,7 +1,6 @@
 package com.drmohammed.antiporn.telemetry
 
 import android.app.ActivityManager
-import android.app.admin.DevicePolicyManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
@@ -294,18 +293,8 @@ Please analyze the telemetry and black-box log above and provide an actionable d
         }
 
         // Query Device Owner & Admin Status
-        var isDeviceOwner = false
-        var isAdminActive = false
-        try {
-            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-            if (dpm != null) {
-                isDeviceOwner = dpm.isDeviceOwnerApp(context.packageName)
-                val adminComponent = ComponentName(context, AdminReceiver::class.java)
-                isAdminActive = dpm.isAdminActive(adminComponent)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Error querying DPM status", e)
-        }
+        val isDeviceOwner = SafeDpmGateway.isDeviceOwner(context)
+        val isAdminActive = SafeDpmGateway.isAdminActive(context)
 
         return EnvironmentInfo(
             batteryPercent = batteryLevel,

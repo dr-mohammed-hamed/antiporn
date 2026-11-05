@@ -483,20 +483,23 @@ class RemoteAppManagerActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             if (isLocalMode) {
-                val dpm = getSystemService(DEVICE_POLICY_SERVICE) as? android.app.admin.DevicePolicyManager
-                val admin = ComponentName(applicationContext, AdminReceiver::class.java)
-                val isDo = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(applicationContext)
-
                 var success = false
                 var errorMsg: String? = null
 
-                if (isDo && dpm != null) {
-                    try {
-                        val failed = dpm.setPackagesSuspended(admin, arrayOf(pkg), false)
-                        success = failed.isEmpty()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error unsuspending package locally: $pkg", e)
-                        errorMsg = e.message
+                if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(applicationContext)) {
+                    val result = com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspended(
+                        context = applicationContext,
+                        packages = arrayOf(pkg),
+                        suspended = false
+                    )
+                    when (result) {
+                        is com.drmohammed.antiporn.telemetry.DpmExecutionResult.Success -> {
+                            success = result.data.isEmpty()
+                            if (!success) errorMsg = "Failed to unsuspend $pkg"
+                        }
+                        is com.drmohammed.antiporn.telemetry.DpmExecutionResult.Failure -> {
+                            errorMsg = result.message
+                        }
                     }
                 } else {
                     errorMsg = "Device Owner not active"

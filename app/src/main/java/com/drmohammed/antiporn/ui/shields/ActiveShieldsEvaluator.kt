@@ -1,6 +1,5 @@
 package com.drmohammed.antiporn.ui.shields
 
-import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.os.Build
 import android.os.UserManager
@@ -41,9 +40,6 @@ object ActiveShieldsEvaluator {
         } catch (_: Exception) {
             null
         }
-
-        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-        val admin = ProtectionEngine.getAdminComponent(context)
 
         // 1. Full Privilege Shield (Device Owner)
         activeList.add(
@@ -104,9 +100,8 @@ object ActiveShieldsEvaluator {
 
         // 5. Prevent Time Tampering Shield (منع تغيير الوقت)
         val isDateTimeLockedPolicy = policy?.isDateTimeLocked ?: false
-        if (isDateTimeLockedPolicy && dpm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val restrictions = try { dpm.getUserRestrictions(admin) } catch (_: Exception) { null }
-            val isDateTimeRestricted = restrictions?.getBoolean(UserManager.DISALLOW_CONFIG_DATE_TIME, false) ?: false
+        if (isDateTimeLockedPolicy && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val isDateTimeRestricted = com.drmohammed.antiporn.telemetry.SafeDpmGateway.hasUserRestriction(context, UserManager.DISALLOW_CONFIG_DATE_TIME)
 
             val targetTzId = CurfewConfig.getTargetTimeZoneId(context)
             val targetTz = TimeZone.getTimeZone(targetTzId)
