@@ -42,6 +42,6 @@ val appModule = module {
     viewModel { HomeViewModel(androidApplication(), get()) }
     viewModel { SelfControlViewModel(androidApplication(), get(), get()) }
     viewModel { AccountabilityViewModel(androidApplication(), get(), get(), get(), get()) }
-    viewModel { SettingsViewModel(androidApplication(), get(), get()) }
+    viewModel { SettingsViewModel(androidApplication(), get(), get(), get()) }
     viewModel { NotificationCenterViewModel(get()) }
 }

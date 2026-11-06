@@ -8,6 +8,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -19,6 +20,7 @@ import com.drmohammed.antiporn.databinding.FragmentSettingsBinding
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
 import com.drmohammed.antiporn.telemetry.AiTelemetryReporter
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,6 +52,7 @@ class SettingsFragment : Fragment() {
     private val viewModel get() = settingsViewModel
 
     private var lastViewLogsClickTime = 0L
+    private var lastEditNameClickTime = 0L
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -96,6 +99,9 @@ class SettingsFragment : Fragment() {
     private fun render(state: SettingsUiState) {
         if (_binding == null) return
         val ctx = context ?: return
+
+        // 0. Device Display Name
+        binding.tvDeviceDisplayName.text = state.myDisplayName.ifBlank { getString(R.string.device_name_not_set) }
 
         // 1. Screen AI Inspection
         renderAiSection(state, ctx)
@@ -247,6 +253,13 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupListeners() {
+        binding.layoutDeviceNamePreference.setOnClickListener {
+            val currentTime = SystemClock.elapsedRealtime()
+            if (currentTime - lastEditNameClickTime < 800L) return@setOnClickListener
+            lastEditNameClickTime = currentTime
+            showEditDeviceNameDialog()
+        }
+
         binding.switchAiShield.setOnCheckedChangeListener { _, isChecked ->
             if (binding.switchAiShield.isPressed) {
                 actionListener?.onToggleAiRequested(isChecked)
@@ -301,6 +314,45 @@ class SettingsFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private fun showEditDeviceNameDialog() {
+        val ctx = context ?: return
+        val currentName = viewModel.uiState.value.myDisplayName
+        val input = EditText(ctx).apply {
+            setText(currentName)
+            setSelection(text?.length ?: 0)
+            hint = getString(R.string.dialog_edit_device_name_hint)
+            setSingleLine(true)
+            filters = arrayOf(android.text.InputFilter.LengthFilter(28))
+        }
+        val frame = android.widget.FrameLayout(ctx).apply {
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, (8 * resources.displayMetrics.density).toInt(), pad, 0)
+            addView(input)
+        }
+
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.dialog_edit_device_name_title)
+            .setView(frame)
+            .setPositiveButton(R.string.btn_save) { dialog, _ ->
+                val newName = input.text?.toString()?.trim() ?: ""
+                if (newName.isNotBlank() && newName != currentName) {
+                    viewModel.setMyDisplayName(newName) { result ->
+                        if (!isAdded || _binding == null) return@setMyDisplayName
+                        result.onSuccess {
+                            Toast.makeText(context, R.string.toast_name_saved, Toast.LENGTH_SHORT).show()
+                        }.onFailure { e ->
+                            Timber.e(e, "Failed to update display name")
+                            val errMsg = e.localizedMessage ?: getString(R.string.error_unknown)
+                            Toast.makeText(context, getString(R.string.toast_partner_failed, errMsg), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.dialog_btn_cancel, null)
+            .show()
     }
 
     // Public legacy update hooks for backward compatibility

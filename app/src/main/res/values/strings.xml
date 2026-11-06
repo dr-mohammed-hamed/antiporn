@@ -696,6 +696,15 @@
     <string name="status_offline_hours">آخر ظهور: منذ %d ساعة</string>
     <string name="status_offline_days">آخر ظهور: منذ %d يوم</string>
 
+    <!-- Settings Device Display Name -->
+    <string name="settings_device_name_title">اسم الجهاز للشركاء</string>
+    <string name="settings_device_name_desc">الاسم الذي يظهر لمشرفك عند ربط الجهاز ومتابعته</string>
+    <string name="dialog_edit_device_name_title">تعديل اسم الجهاز للشركاء</string>
+    <string name="dialog_edit_device_name_hint">أدخل اسماً يميز هذا الجهاز للمشرف (مثال: هاتف أحمد)</string>
+    <string name="device_name_not_set">لم يُحدد بعد</string>
+    <string name="btn_request_unlink">طلب فك الارتباط</string>
+    <string name="guardian_status_active_verified">مشرف نشط ومعتمد</string>
+
     <!-- 24h Emergency Breakout -->
     <string name="btn_request_emergency_breakout">طلب فك ارتباط اضطراري (مهلة 24 ساعة)</string>
     <string name="dialog_breakout_title">طلب فك الارتباط الاضطراري</string>

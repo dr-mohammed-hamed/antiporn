@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.drmohammed.antiporn.ai.service.ScreenAiProjectionService
 import com.drmohammed.antiporn.cloud.auth.GoogleAuthManager
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
+import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
 import com.drmohammed.antiporn.ota.model.OtaVersionInfo
 import com.drmohammed.antiporn.ota.repository.OtaRepository
@@ -28,7 +29,8 @@ import kotlinx.coroutines.withContext
 class SettingsViewModel(
     application: Application,
     private val otaRepository: OtaRepository = OtaRepository.getInstance(application),
-    private val googleAuthManager: GoogleAuthManager = GoogleAuthManager.getInstance(application)
+    private val googleAuthManager: GoogleAuthManager = GoogleAuthManager.getInstance(application),
+    private val accountabilityRepo: AccountabilityRepository = AccountabilityRepository.getInstance(application)
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -66,12 +68,30 @@ class SettingsViewModel(
     }
 
     /**
-     * Refreshes AI, Google Auth, and Device Owner statuses in batch.
+     * Refreshes AI, Google Auth, Device Owner statuses, and Device Display Name in batch.
      */
     fun refreshAll() {
+        refreshDisplayName()
         refreshAiState()
         refreshGoogleState()
         refreshDeviceOwnerState()
+    }
+
+    fun refreshDisplayName() {
+        val name = accountabilityRepo.getMyDisplayName()
+        _uiState.update { it.copy(myDisplayName = name) }
+    }
+
+    fun setMyDisplayName(name: String, onResult: ((Result<Unit>) -> Unit)? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = accountabilityRepo.setMyDisplayName(name)
+            withContext(Dispatchers.Main) {
+                if (result.isSuccess) {
+                    _uiState.update { it.copy(myDisplayName = name) }
+                }
+                onResult?.invoke(result)
+            }
+        }
     }
 
     fun refreshAiState() {
