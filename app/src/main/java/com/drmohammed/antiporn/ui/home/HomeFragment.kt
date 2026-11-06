@@ -15,11 +15,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewForegroundWatcher
 import com.drmohammed.antiporn.curfew.NapController
 import com.drmohammed.antiporn.databinding.FragmentHomeBinding
+import com.drmohammed.antiporn.provisioning.ui.ProvisioningWizardActivity
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.BrowserShield
 import com.drmohammed.antiporn.shields.CurfewShield
@@ -58,6 +60,7 @@ class HomeFragment : Fragment() {
     private var lastNapTapTime = 0L
     private var lastEnforceClickTime = 0L
     private var lastBellClickTime = 0L
+    private var lastProvisioningClickTime = 0L
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -192,16 +195,29 @@ class HomeFragment : Fragment() {
             }
         }
 
+        binding.btnOpenProvisioningWizard.setOnClickListener {
+            launchProvisioningWizard()
+        }
+
+        binding.cardAdbHelp.setOnClickListener {
+            launchProvisioningWizard()
+        }
+
         binding.btnEnforceNow.setOnClickListener {
             val now = SystemClock.elapsedRealtime()
             if (now - lastEnforceClickTime < 1000L) return@setOnClickListener
             lastEnforceClickTime = now
 
+            val ctx = context ?: return@setOnClickListener
+            if (!ProtectionEngine.isDeviceOwner(ctx)) {
+                launchProvisioningWizard()
+                return@setOnClickListener
+            }
+
             binding.btnEnforceNow.isEnabled = false
             homeViewModel.toggleProtection { success, errorMsg ->
                 if (isAdded && _binding != null) {
                     binding.btnEnforceNow.isEnabled = true
-                    val ctx = context ?: return@toggleProtection
                     val message = if (success) {
                         getString(R.string.toast_enforce_success, DnsShield.getEffectiveDnsHost(ctx))
                     } else {
@@ -266,6 +282,8 @@ class HomeFragment : Fragment() {
                     binding.cardHomeNotice.visibility = View.VISIBLE
                     binding.tvHomeNoticeTitle.text = getString(R.string.status_no_device_owner_title)
                     binding.tvHomeNoticeDesc.text = getString(R.string.status_no_device_owner_desc)
+                    binding.btnEnforceNow.isEnabled = true
+                    binding.btnEnforceNow.setText(R.string.btn_activate_device_owner_now)
 
                     binding.tvHeroShieldStatus.text = getString(R.string.home_shield_inactive)
                     binding.tvHeroShieldStatus.setTextColor(ContextCompat.getColor(ctx, R.color.shield_amber_calm))
@@ -274,6 +292,17 @@ class HomeFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private fun launchProvisioningWizard() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastProvisioningClickTime < 800L) return
+        lastProvisioningClickTime = now
+        val ctx = context ?: return
+        val intent = Intent(ctx, ProvisioningWizardActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        startActivity(intent)
     }
 
     /**

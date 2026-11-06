@@ -201,6 +201,7 @@
         <activity
             android:name=".provisioning.ui.ProvisioningWizardActivity"
             android:exported="false"
+            android:launchMode="singleTop"
             android:label="@string/provisioning_wizard_title" />
 
         <!-- In-App Notification Center -->

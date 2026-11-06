@@ -29,7 +29,8 @@
 
     <string name="card_device_owner_active">مفعلة وتتحكم بالنظام بالكامل</string>
 
-    <string name="card_device_owner_inactive">غير مفعلة (مطلوب أمر ADB)</string>
+    <string name="card_device_owner_inactive">غير مفعلة (اضغط للتفعيل الذاتي)</string>
+    <string name="toast_device_owner_already_active">صلاحية المالك نشطة ودرع حِصْن يعمل بأقصى كفاءة 🛡️</string>
 
     <string name="card_nextdns_title">درع فلترة الـ DNS وحظر الإباحية والإعلانات</string>
 
@@ -67,11 +68,14 @@
 
     <string name="card_developer_desc">مفتوح ومتاح دائماً لأعمال تطوير وبرمجة التطبيقات</string>
 
-    <string name="card_adb_help_title">التفعيل عبر ADB مطلوب:</string>
-
+    <string name="card_adb_help_title">تفعيل الصلاحية العالية بدون كمبيوتر:</string>
+    <string name="card_adb_help_desc">يدعم التطبيق التفعيل الذاتي عبر التصحيح اللاسلكي المحلي دون الحاجة لكمبيوتر ودون حذف حساباتك.</string>
+    <string name="btn_open_provisioning_wizard">فتح معالج التفعيل الذاتي</string>
+    <string name="card_adb_pc_toggle_hint">أو للتفعيل عبر كابل USB وأمر الكمبيوتر:</string>
     <string name="card_adb_help_cmd">adb shell dpm set-device-owner com.drmohammed.antiporn/.AdminReceiver</string>
 
     <string name="btn_enforce_now">تطبيق وتأكيد القفل الآن</string>
+    <string name="btn_activate_device_owner_now">بدء التفعيل الذاتي الفوري 🛡️</string>
 
     <string name="btn_enforcing">جاري تطبيق الإعدادات&#8230;</string>
 
@@ -947,6 +951,18 @@
     <!-- Black Box Diagnostic Log Viewer -->
     <string name="title_log_viewer">سجل الصندوق الأسود</string>
     <string name="btn_view_logs">عرض السجلات</string>
+    <string name="bottom_sheet_logs_title">سجلات النظام والتشخيص</string>
+    <string name="bottom_sheet_logs_subtitle">أدوات متقدمة لتشخيص النظام وتصدير السجلات الفنية</string>
+    <string name="btn_check_update_short">تحقق الآن</string>
+    <string name="card_ota_status_compact">الإصدار %1$s • %2$s</string>
+    <string name="ota_status_up_to_date_short">أحدث إصدار</string>
+    <string name="ota_status_checking_short">جارٍ الفحص&#8230;</string>
+    <string name="ota_status_available_short">يتوفر %1$s</string>
+    <string name="ota_status_downloading_short">جارٍ التنزيل %1$d%%</string>
+    <string name="ota_status_installing_short">جارٍ التثبيت&#8230;</string>
+    <string name="ota_status_error_short">خطأ بالتحديث</string>
+    <string name="ai_shield_status_stopped_short">متوقف حالياً</string>
+    <string name="ai_shield_status_running_short">يعمل بنشاط</string>
     <string name="filter_chip_all">الكل</string>
     <string name="filter_chip_curfew">الحظر والليلي</string>
     <string name="filter_chip_cloud">المزامنة والسحابة</string>

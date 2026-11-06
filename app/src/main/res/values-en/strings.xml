@@ -436,7 +436,8 @@
     <string name="section_details_title">Active Shields Status</string>
     <string name="card_device_owner_title">Device Owner Authority</string>
     <string name="card_device_owner_active">Device Owner mode is active.</string>
-    <string name="card_device_owner_inactive">Not activated. Setup required via computer.</string>
+    <string name="card_device_owner_inactive">Not activated. (Tap to activate)</string>
+    <string name="toast_device_owner_already_active">Device Owner is active and your shield is fully operational 🛡️</string>
     <string name="card_nextdns_active">%1$s (Enforced &amp; Locked)</string>
     <string name="card_nextdns_pending">Current host: %1$s (Updating to %2$s)</string>
     <string name="card_nextdns_inactive">DNS server is not set.</string>
@@ -452,9 +453,13 @@
     <string name="card_browser_unblocked">Incognito mode is not restricted.</string>
     <string name="card_developer_title">Developer Options Shield</string>
     <string name="card_developer_desc">Developer options and USB debugging are preserved.</string>
-    <string name="card_adb_help_title">Activation Command via Computer</string>
+    <string name="card_adb_help_title">High Permission Setup (No PC Required):</string>
+    <string name="card_adb_help_desc">AntiPorn supports zero-PC on-device wireless activation without deleting any accounts.</string>
+    <string name="btn_open_provisioning_wizard">Open Activation Wizard</string>
+    <string name="card_adb_pc_toggle_hint">Or via legacy USB cable ADB command on PC:</string>
     <string name="card_adb_help_cmd">adb shell dpm set-device-owner com.drmohammed.antiporn/.AdminReceiver</string>
     <string name="btn_enforce_now">Enforce Protection Now</string>
+    <string name="btn_activate_device_owner_now">Start Self-Activation Now 🛡️</string>
     <string name="btn_enforcing">Enforcing Shields...</string>
     <string name="toast_enforce_success">Enforced AntiPorn DNS (%1$s), blocked VPN &amp; private browsing successfully!</string>
     <string name="toast_enforce_status_code">DNS shield applied successfully</string>
@@ -657,6 +662,18 @@
     <!-- Black Box Diagnostic Log Viewer -->
     <string name="title_log_viewer">Black Box Flight Log</string>
     <string name="btn_view_logs">View Logs</string>
+    <string name="bottom_sheet_logs_title">System &amp; Diagnostic Logs</string>
+    <string name="bottom_sheet_logs_subtitle">Advanced diagnostic tools and technical event logs</string>
+    <string name="btn_check_update_short">Check Now</string>
+    <string name="card_ota_status_compact">Version %1$s • %2$s</string>
+    <string name="ota_status_up_to_date_short">Up to date</string>
+    <string name="ota_status_checking_short">Checking&#8230;</string>
+    <string name="ota_status_available_short">New %1$s</string>
+    <string name="ota_status_downloading_short">Downloading %1$d%%</string>
+    <string name="ota_status_installing_short">Installing&#8230;</string>
+    <string name="ota_status_error_short">Update error</string>
+    <string name="ai_shield_status_stopped_short">Currently inactive</string>
+    <string name="ai_shield_status_running_short">Active</string>
     <string name="filter_chip_all">All</string>
     <string name="filter_chip_curfew">Curfew</string>
     <string name="filter_chip_cloud">Cloud Sync</string>
