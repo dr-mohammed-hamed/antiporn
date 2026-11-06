@@ -55,8 +55,12 @@ object SystemTamperShield : ProtectionShield {
                 try { dpm.addUserRestriction(admin, UserManager.DISALLOW_FACTORY_RESET) } catch (e: Exception) { Log.w(TAG, "Factory reset block: ${e.message}") }
             }
 
-            // 3. Block Multi-User & Guest creation (Works for DO and PO)
+            // 3. Block Multi-User, Guest & Managed Work Profile creation (Works for DO and PO)
             try { dpm.addUserRestriction(admin, UserManager.DISALLOW_ADD_USER) } catch (e: Exception) { Log.w(TAG, "Add user block: ${e.message}") }
+            try {
+                @Suppress("DEPRECATION")
+                dpm.addUserRestriction(admin, UserManager.DISALLOW_ADD_MANAGED_PROFILE)
+            } catch (e: Exception) { Log.w(TAG, "Add managed profile block: ${e.message}") }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 try { dpm.addUserRestriction(admin, UserManager.DISALLOW_USER_SWITCH) } catch (e: Exception) { Log.w(TAG, "User switch block: ${e.message}") }
             }
@@ -232,6 +236,8 @@ object SystemTamperShield : ProtectionShield {
             val isSafeBootBlocked = restrictions?.getBoolean(UserManager.DISALLOW_SAFE_BOOT, false) ?: false
             val isFactoryResetBlocked = restrictions?.getBoolean(UserManager.DISALLOW_FACTORY_RESET, false) ?: false
             val isAddUserBlocked = restrictions?.getBoolean(UserManager.DISALLOW_ADD_USER, false) ?: false
+            @Suppress("DEPRECATION")
+            val isAddManagedProfileBlocked = restrictions?.getBoolean(UserManager.DISALLOW_ADD_MANAGED_PROFILE, false) ?: false
             val isDateTimeBlocked = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 restrictions?.getBoolean(UserManager.DISALLOW_CONFIG_DATE_TIME, false) ?: false
             } else {
@@ -281,7 +287,7 @@ object SystemTamperShield : ProtectionShield {
             }
 
             val isFullyProtected = if (isDo) {
-                val baseProtected = isSafeBootBlocked && isFactoryResetBlocked && isAddUserBlocked && isUninstallBlocked && isClearDataBlocked
+                val baseProtected = isSafeBootBlocked && isFactoryResetBlocked && isAddUserBlocked && isAddManagedProfileBlocked && isUninstallBlocked && isClearDataBlocked
                 if (isDateTimeLocked) {
                     baseProtected && isDateTimeBlocked && isTargetTz
                 } else {

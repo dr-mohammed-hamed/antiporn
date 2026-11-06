@@ -64,7 +64,7 @@ object PackageChangeHandler {
         }
         handledAddEvents[packageName] = now
 
-        Log.w(TAG, "📥📥📥 [PACKAGE_ADDED] New package detected: $packageName (source: $source, isReplacing: $isReplacing)")
+        Log.w(TAG, "[PACKAGE_ADDED] New package detected: $packageName (source: $source, isReplacing: $isReplacing)")
 
         val appContext = context.applicationContext
         handlerScope.launch {
@@ -73,19 +73,19 @@ object PackageChangeHandler {
                     val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any { it.packageName == packageName && it.isApproved }
                     val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
 
-                    Log.w(TAG, "🔍 [ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved")
+                    Log.w(TAG, "[ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved")
 
                     if (policy.lockNewInstallsUntilApproved && !isAlreadyApproved) {
                         val isImmune = CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)
                         if (isImmune) {
-                            Log.w(TAG, "🛡️ [IMMUNE_SKIP] Package $packageName is critical system component, launcher, dialer, or keyboard. Skipping freeze.")
+                            Log.w(TAG, "[IMMUNE_SKIP] Package $packageName is critical system component, launcher, dialer, or keyboard. Skipping freeze.")
                         } else {
-                            Log.w(TAG, "❄️❄️❄️ [ZERO_TRUST_FREEZE] Strict Zero-Trust active: Freezing unapproved package $packageName (isReplacing=$isReplacing) in 0ms and submitting approval ticket")
+                            Log.w(TAG, "[ZERO_TRUST_FREEZE] Strict Zero-Trust active: Freezing unapproved package $packageName (isReplacing=$isReplacing) in 0ms and submitting approval ticket")
                             val frozen = approvalRepo.freezeAndSubmitApprovalLocal(packageName)
-                            Log.w(TAG, "❄️❄️❄️ [FREEZE_STATUS] Result of local freeze for $packageName: $frozen")
+                            Log.w(TAG, "[FREEZE_STATUS] Result of local freeze for $packageName: $frozen")
                         }
                     } else {
-                        Log.w(TAG, "⚖️ [CURFEW_EVAL] Package $packageName approved or not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")
+                        Log.w(TAG, "[CURFEW_EVAL] Package $packageName approved or not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")
                         CurfewEnforcer.handlePackageAdded(appContext, packageName)
                     }
 
@@ -156,7 +156,7 @@ object PackageChangeHandler {
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "❌ [ERROR] Error handling added package $packageName in $source", e)
+                    Log.e(TAG, "[ERROR] Error handling added package $packageName in $source", e)
                 } finally {
                     onComplete?.invoke()
                 }
@@ -174,7 +174,7 @@ object PackageChangeHandler {
         onComplete: (() -> Unit)? = null
     ) {
         if (isReplacing) {
-            Log.i(TAG, "⏩ [PACKAGE_UPDATING] Package $packageName is being replaced/updated. Preserving approval records & watcher state.")
+            Log.i(TAG, "[PACKAGE_UPDATING] Package $packageName is being replaced/updated. Preserving approval records & watcher state.")
             onComplete?.invoke()
             return
         }
@@ -185,13 +185,13 @@ object PackageChangeHandler {
         }
         val lastHandled = handledRemoveEvents[packageName] ?: 0L
         if (now - lastHandled < DEBOUNCE_WINDOW_MS) {
-            Log.d(TAG, "⏩ [DEBOUNCE] Skipping duplicate package removed event for $packageName from $source")
+            Log.d(TAG, "[DEBOUNCE] Skipping duplicate package removed event for $packageName from $source")
             onComplete?.invoke()
             return
         }
         handledRemoveEvents[packageName] = now
 
-        Log.i(TAG, "📤 [PACKAGE_REMOVED] Package removed: $packageName (source: $source)")
+        Log.i(TAG, "[PACKAGE_REMOVED] Package removed: $packageName (source: $source)")
 
         val appContext = context.applicationContext
         handlerScope.launch {
@@ -205,7 +205,7 @@ object PackageChangeHandler {
                     Log.w(TAG, "Async inventory sync failed on package removed: $packageName: ${e.message}")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ [ERROR] Error handling package removed: $packageName", e)
+                Log.e(TAG, "[ERROR] Error handling package removed: $packageName", e)
             } finally {
                 onComplete?.invoke()
             }
@@ -230,7 +230,7 @@ class PackageChangeReceiver : BroadcastReceiver() {
         val packageName = data?.schemeSpecificPart
 
         val isDeviceOwner = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(context)
-        Log.w(TAG, "⚡⚡⚡ [STATIC_RECEIVER] onReceive: action=$action | package=$packageName | isDeviceOwner=$isDeviceOwner")
+        Log.w(TAG, "[STATIC_RECEIVER] onReceive: action=$action | package=$packageName | isDeviceOwner=$isDeviceOwner")
 
         when (action) {
             Intent.ACTION_PACKAGE_ADDED -> {
@@ -250,7 +250,7 @@ class PackageChangeReceiver : BroadcastReceiver() {
                 if (packageName.isNullOrBlank()) return
                 val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
                 if (isReplacing) {
-                    Log.i(TAG, "⏩ [STATIC_RECEIVER] Package $packageName is being replaced/updated (EXTRA_REPLACING=true). Ignoring temporary removal.")
+                    Log.i(TAG, "[STATIC_RECEIVER] Package $packageName is being replaced/updated (EXTRA_REPLACING=true). Ignoring temporary removal.")
                     return
                 }
                 val pendingResult = goAsync()
@@ -269,13 +269,13 @@ class PackageChangeReceiver : BroadcastReceiver() {
                 val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: ""
                 when (status) {
                     PackageInstaller.STATUS_SUCCESS -> {
-                        Log.i(TAG, "✅ [UNINSTALL_SUCCESS] Silent uninstall succeeded for $pkgName")
+                        Log.i(TAG, "[UNINSTALL_SUCCESS] Silent uninstall succeeded for $pkgName")
                     }
                     PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                        Log.w(TAG, "⚠️ [UNINSTALL_PENDING] Silent uninstall requires user action for $pkgName")
+                        Log.w(TAG, "[UNINSTALL_PENDING] Silent uninstall requires user action for $pkgName")
                     }
                     else -> {
-                        Log.w(TAG, "❌ [UNINSTALL_FAILED] Silent uninstall failed for $pkgName (status: $status, msg: $message)")
+                        Log.w(TAG, "[UNINSTALL_FAILED] Silent uninstall failed for $pkgName (status: $status, msg: $message)")
                     }
                 }
             }

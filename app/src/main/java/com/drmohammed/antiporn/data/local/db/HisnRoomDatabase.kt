@@ -185,7 +185,7 @@ abstract class HisnRoomDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
             .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_3_5)
-            .fallbackToDestructiveMigrationFrom(1, 2)
+            .fallbackToDestructiveMigrationFrom(true, 1, 2)
             .addCallback(object : Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)

@@ -137,7 +137,7 @@ class DnsWatchdogService : Service() {
             if (intent == null) return
             val action = intent.action ?: return
             val packageName = intent.data?.schemeSpecificPart?.takeIf { it.isNotBlank() } ?: return
-            Log.w(TAG, "⚡⚡⚡ [DYNAMIC_WATCHDOG_RECEIVER] onReceive: action=$action | package=$packageName")
+            Log.w(TAG, "[EVENT] [DYNAMIC_WATCHDOG_RECEIVER] onReceive: action=$action | package=$packageName")
             when (action) {
                 Intent.ACTION_PACKAGE_ADDED -> {
                     val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)

@@ -98,21 +98,21 @@ class ApprovalRepository(
         val finalStatus: String
         if (suspended) {
             finalStatus = PendingApprovalEntity.STATUS_PENDING
-            Log.w(TAG, "❄️ [FREEZE_SUCCESS] Instant 0ms freeze applied to package: $packageName (showToast=$showToast)")
+            Log.w(TAG, "[FREEZE_SUCCESS] Instant 0ms freeze applied to package: $packageName (showToast=$showToast)")
         } else {
-            Log.w(TAG, "⚠️ [FREEZE_REJECTED] Device suspension rejected for $packageName. Executing Fail-Secure fallback (setApplicationHidden)...")
+            Log.w(TAG, "[FREEZE_REJECTED] Device suspension rejected for $packageName. Executing Fail-Secure fallback (setApplicationHidden)...")
             val hidden = try {
                 com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(appContext, packageName, true).getOrNull() ?: false
             } catch (e: Exception) {
-                Log.e(TAG, "❌ [FALLBACK_HIDE_EXCEPTION] Exception hiding package $packageName via DPM", e)
+                Log.e(TAG, "[FALLBACK_HIDE_EXCEPTION] Exception hiding package $packageName via DPM", e)
                 false
             }
 
             if (hidden) {
                 finalStatus = PendingApprovalEntity.STATUS_FALLBACK_HIDDEN
-                Log.i(TAG, "🛡️ [FAIL_SECURE_HIDDEN] Package $packageName hidden successfully via Device Owner fallback")
+                Log.i(TAG, "[FAIL_SECURE_HIDDEN] Package $packageName hidden successfully via Device Owner fallback")
             } else {
-                Log.e(TAG, "❌ [TOTAL_ENFORCEMENT_FAILURE] Both setPackagesSuspended and setApplicationHidden failed for package $packageName")
+                Log.e(TAG, "[TOTAL_ENFORCEMENT_FAILURE] Both setPackagesSuspended and setApplicationHidden failed for package $packageName")
                 return false
             }
         }
