@@ -37,8 +37,22 @@ class OtaUpdateWorker(
 
         try {
             if (isStopped) return@withContext Result.retry()
-            otaRepository.checkForUpdatesAndAutoInstall(applicationContext)
+            val otaResult = otaRepository.checkForUpdatesAndAutoInstall(applicationContext)
             val duration = TrustedTimeProvider.currentTimeMillis(applicationContext) - startTime
+            if (otaResult.isFailure) {
+                val error = otaResult.exceptionOrNull()
+                Timber.w(error, "OTA auto-install failed after ${duration}ms (attempt $runAttemptCount)")
+                BlackBoxRecorder.record(
+                    context = applicationContext,
+                    tag = "OTA_WORKER",
+                    actionName = "PERIODIC_CHECK_FAILURE",
+                    isSuccess = false,
+                    executionTimeMs = duration,
+                    errorDetails = error?.message,
+                    metadata = "runAttempt=$runAttemptCount"
+                )
+                return@withContext if (runAttemptCount < 3) Result.retry() else Result.failure()
+            }
             BlackBoxRecorder.record(
                 context = applicationContext,
                 tag = "OTA_WORKER",

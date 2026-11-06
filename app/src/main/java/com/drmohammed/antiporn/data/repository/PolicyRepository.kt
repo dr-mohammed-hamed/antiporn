@@ -54,7 +54,7 @@ class PolicyRepository(
     private val appContext = context.applicationContext
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private val _currentPolicyFlow = MutableStateFlow(loadInitialPolicy())
+    private val _currentPolicyFlow = MutableStateFlow(DevicePolicyBundle.defaultPolicy())
     val currentPolicyFlow: StateFlow<DevicePolicyBundle> = _currentPolicyFlow.asStateFlow()
 
     private var firestoreListener: ListenerRegistration? = null
@@ -63,7 +63,11 @@ class PolicyRepository(
     private var lastSyncedCloudVersion: Long = 0L
 
     init {
-        com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = _currentPolicyFlow.value.isSelfControlAllowed
+        repositoryScope.launch {
+            val initial = loadInitialPolicy()
+            _currentPolicyFlow.value = initial
+            com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = initial.isSelfControlAllowed
+        }
         // Observe local policy changes and trigger background sync
         startFirestoreSync()
     }

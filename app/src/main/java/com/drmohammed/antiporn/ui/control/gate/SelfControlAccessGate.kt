@@ -88,38 +88,11 @@ object SelfControlAccessGateRegistry {
             null
         }
 
-        val hasGuardianPartner = try {
-            com.drmohammed.antiporn.data.local.db.HisnRoomDatabase.getInstance(context.applicationContext)
-                .partnerDao()
-                .getPartnersByRoleBlocking(com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN)
-                .any { it.status == com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.STATUS_ACTIVE }
-        } catch (e: Exception) {
-            false
-        }
-
-        val hasGuardianUid = !policy?.guardianUid.isNullOrBlank()
-
-        val isSupervised = (policy?.isSupervised == true) || hasGuardianUid || hasGuardianPartner || try {
-            com.drmohammed.antiporn.data.repository.AccountabilityRepository.getInstance(context.applicationContext).isSupervised()
-        } catch (e: Exception) {
-            Log.w(TAG, "[SelfControlDiag] Failed to check accountability supervision in isSelfControlPermitted", e)
-            true
-        }
-
+        val isSupervised = policy?.isSupervised == true || !policy?.guardianUid.isNullOrBlank()
         val isAllowed = policy?.isSelfControlAllowed ?: true
+        val permitted = if (isSupervised) isAllowed else true
 
-        val permitted = if (isSupervised) {
-            if (policy == null) {
-                Log.w(TAG, "[SelfControlDiag] Precautionary lockout: policy cannot be retrieved on supervised device")
-                false
-            } else {
-                isAllowed
-            }
-        } else {
-            true
-        }
-
-        Log.i(TAG, "[SelfControlDiag] isSelfControlPermitted evaluated: isSupervised=$isSupervised (policySupervised=${policy?.isSupervised}, hasGuardianUid=$hasGuardianUid, hasGuardianPartner=$hasGuardianPartner), isSelfControlAllowed=$isAllowed => PERMITTED=$permitted")
+        Log.i(TAG, "[SelfControlDiag] isSelfControlPermitted evaluated: isSupervised=$isSupervised (policySupervised=${policy?.isSupervised}, hasGuardianUid=${!policy?.guardianUid.isNullOrBlank()}), isSelfControlAllowed=$isAllowed => PERMITTED=$permitted")
         return permitted
     }
 

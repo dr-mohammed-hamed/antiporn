@@ -223,15 +223,20 @@ class OtaRepository(private val appContext: Context) {
      * Autonomous update workflow designed for scheduled or background triggers (Watchdog and FCM).
      * Automatically queries latest version metadata and executes silent download & install if newer.
      */
-    suspend fun checkForUpdatesAndAutoInstall(context: Context) {
+    suspend fun checkForUpdatesAndAutoInstall(context: Context): Result<Unit> {
         Log.i(TAG, "Autonomous background OTA check initiated")
         val checkResult = checkForUpdates(context)
+        if (checkResult.isFailure) {
+            val ex = checkResult.exceptionOrNull() ?: Exception("Failed to check for updates")
+            return Result.failure(ex)
+        }
         val info = checkResult.getOrNull()
-        if (info != null) {
+        return if (info != null) {
             Log.i(TAG, "New OTA version ${info.versionName} detected in background. Executing auto-install...")
             downloadAndInstall(context, info, showNotification = true)
         } else {
             Log.d(TAG, "Autonomous OTA check finished: no newer updates available")
+            Result.success(Unit)
         }
     }
 

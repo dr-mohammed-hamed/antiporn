@@ -110,7 +110,7 @@ object SafeDpmGateway {
         metadata = "suspended=$suspended, count=${packages.size}"
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            dpm.setPackagesSuspended(admin, packages, suspended) ?: emptyArray()
+            dpm.setPackagesSuspended(admin, packages, suspended) ?: packages
         } else {
             emptyArray()
         }
@@ -128,7 +128,7 @@ object SafeDpmGateway {
         metadata = "suspended=$suspended, count=${packages.size}"
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            dpm.setPackagesSuspended(admin, packages, suspended) ?: emptyArray()
+            dpm.setPackagesSuspended(admin, packages, suspended) ?: packages
         } else {
             emptyArray()
         }
@@ -558,7 +558,7 @@ object SafeDpmGateway {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val failed = dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
-            failed.isEmpty() || !failed.contains(packageName)
+            failed != null && !failed.contains(packageName)
         } else {
             false
         }
@@ -604,7 +604,7 @@ object SafeDpmGateway {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val failed = dpm.setPackagesSuspended(admin, arrayOf(packageName), true)
-            failed.isEmpty() || !failed.contains(packageName)
+            failed != null && !failed.contains(packageName)
         } else {
             false
         }
@@ -940,7 +940,7 @@ object SafeDpmGateway {
         // 3. Pre-Flight: Check Device Owner status if required
         if (requireDeviceOwner) {
             val isDeviceOwner = try {
-                dpm.isDeviceOwnerApp(appContext.packageName)
+                dpm.isDeviceOwnerApp(appContext.packageName) || dpm.isProfileOwnerApp(appContext.packageName)
             } catch (e: Exception) {
                 val msg = "Exception checking isDeviceOwnerApp: ${e.message}"
                 Log.e(TAG, "Pre-flight exception for [$actionName]: $msg", e)

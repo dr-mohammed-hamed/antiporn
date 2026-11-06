@@ -29,6 +29,20 @@ class RoomMigrationTest {
     }
 
     @Test
+    fun testMigration4To5VersionInvariants() {
+        val migration = HisnRoomDatabase.MIGRATION_4_5
+        assertEquals("Migration start version must be 4", 4, migration.startVersion)
+        assertEquals("Migration end version must be 5", 5, migration.endVersion)
+    }
+
+    @Test
+    fun testMigration3To5VersionInvariants() {
+        val migration = HisnRoomDatabase.MIGRATION_3_5
+        assertEquals("Migration start version must be 3", 3, migration.startVersion)
+        assertEquals("Migration end version must be 5", 5, migration.endVersion)
+    }
+
+    @Test
     fun testMigrationExecutionOnSupportDatabase() {
         val executedSqlList = mutableListOf<String>()
         val dummyDb = Proxy.newProxyInstance(
@@ -57,6 +71,52 @@ class RoomMigrationTest {
         assertTrue("Must create idx_diag_timestamp", allSql.contains("idx_diag_timestamp"))
         assertTrue("Must create idx_diag_tag", allSql.contains("idx_diag_tag"))
         assertTrue("Must create idx_diag_tag_timestamp", allSql.contains("idx_diag_tag_timestamp"))
+    }
+
+    @Test
+    fun testMigration4To5ExecutionDropsLegacyTableAndRecreatesSchemas() {
+        val executedSqlList = mutableListOf<String>()
+        val dummyDb = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java)
+        ) { _, method, args ->
+            if (method.name == "execSQL" && args != null && args.isNotEmpty()) {
+                executedSqlList.add(args[0] as String)
+            }
+            null
+        } as SupportSQLiteDatabase
+
+        HisnRoomDatabase.MIGRATION_4_5.migrate(dummyDb)
+
+        assertTrue("Migration 4->5 must execute DDL statements", executedSqlList.isNotEmpty())
+
+        val allSql = executedSqlList.joinToString(separator = "\n")
+        assertTrue("Must drop legacy in_app_notifications table", allSql.contains("DROP TABLE IF EXISTS `in_app_notifications`"))
+        assertTrue("Must create device_policies_new", allSql.contains("device_policies_new"))
+        assertTrue("Must create partners_new", allSql.contains("partners_new"))
+        assertTrue("Must create pending_approvals_new", allSql.contains("pending_approvals_new"))
+        assertTrue("Must create diagnostic_events_new", allSql.contains("diagnostic_events_new"))
+    }
+
+    @Test
+    fun testMigration3To5ExecutionChainsCorrectly() {
+        val executedSqlList = mutableListOf<String>()
+        val dummyDb = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java)
+        ) { _, method, args ->
+            if (method.name == "execSQL" && args != null && args.isNotEmpty()) {
+                executedSqlList.add(args[0] as String)
+            }
+            null
+        } as SupportSQLiteDatabase
+
+        HisnRoomDatabase.MIGRATION_3_5.migrate(dummyDb)
+
+        assertTrue("Migration 3->5 must execute DDL statements", executedSqlList.isNotEmpty())
+        val allSql = executedSqlList.joinToString(separator = "\n")
+        assertTrue("Must drop legacy in_app_notifications table", allSql.contains("DROP TABLE IF EXISTS `in_app_notifications`"))
+        assertTrue("Must create device_policies_new", allSql.contains("device_policies_new"))
     }
 
     @Test

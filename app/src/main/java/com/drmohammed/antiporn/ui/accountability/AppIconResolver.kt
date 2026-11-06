@@ -33,6 +33,7 @@ import java.net.URL
 import java.util.Collections
 import java.util.WeakHashMap
 import java.util.regex.Pattern
+import timber.log.Timber
 
 /**
  * High-performance, memory-safe Smart Hybrid App Icon Resolver.
@@ -193,6 +194,7 @@ object AppIconResolver {
                         diskFile.delete()
                     }
                 } catch (e: Exception) {
+                    Timber.w(e, "Corrupted disk icon cache for $packageName")
                     diskFile.delete()
                 }
             } else {
@@ -248,7 +250,9 @@ object AppIconResolver {
             val completionHandler = currentJob?.invokeOnCompletion {
                 try {
                     connection?.disconnect()
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    Timber.w(e, "Error disconnecting HTTP connection")
+                }
             }
 
             val iconUrl = if (connection.responseCode == HttpURLConnection.HTTP_OK) {
@@ -276,12 +280,14 @@ object AppIconResolver {
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            Log.d(TAG, "Could not resolve Play Store icon for $packageName: ${e.message}")
+            Timber.d("Could not resolve Play Store icon for $packageName: ${e.message}")
             null
         } finally {
             try {
                 connection?.disconnect()
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Timber.w(e, "Error disconnecting HTTP connection")
+            }
         }
     }
 
@@ -298,7 +304,9 @@ object AppIconResolver {
             val completionHandler = parentJob?.invokeOnCompletion {
                 try {
                     conn?.disconnect()
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    Timber.w(e, "Error disconnecting download connection")
+                }
             }
 
             val bitmap = if (conn.responseCode == HttpURLConnection.HTTP_OK) {
@@ -314,11 +322,14 @@ object AppIconResolver {
             bitmap
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
+            Timber.w(e, "Failed downloading bitmap from $urlStr")
             null
         } finally {
             try {
                 conn?.disconnect()
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Timber.w(e, "Error disconnecting download connection")
+            }
         }
     }
 

@@ -409,7 +409,8 @@ class DnsWatchdogService : Service() {
         val isTimeLocked = try {
             com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(this)
                 .getCurrentPolicy().isDateTimeLocked
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed reading dateTimeLocked policy", e)
             false
         }
 
@@ -419,8 +420,9 @@ class DnsWatchdogService : Service() {
                 val targetTz = TimeZone.getTimeZone(targetTzId)
                 TimeZone.setDefault(null)
                 val currentTz = TimeZone.getDefault()
+                val trustedTime = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(this)
                 val isTargetTz = currentTz.id == targetTzId || currentTz.hasSameRules(targetTz) ||
-                    currentTz.getOffset(System.currentTimeMillis()) == targetTz.getOffset(System.currentTimeMillis())
+                    currentTz.getOffset(trustedTime) == targetTz.getOffset(trustedTime)
                 if (!isTargetTz) {
                     Log.w(TAG, "Timezone mismatch detected in watchdog: current=${currentTz.id}, expected=$targetTzId")
                     needsEnforce = true

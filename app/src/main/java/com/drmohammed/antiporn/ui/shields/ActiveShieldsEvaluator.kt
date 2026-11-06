@@ -106,8 +106,9 @@ object ActiveShieldsEvaluator {
             val targetTzId = CurfewConfig.getTargetTimeZoneId(context)
             val targetTz = TimeZone.getTimeZone(targetTzId)
             val currentTz = TimeZone.getDefault()
+            val trustedTime = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(context)
             val isTargetTz = currentTz.id == targetTzId || currentTz.hasSameRules(targetTz) ||
-                currentTz.getOffset(System.currentTimeMillis()) == targetTz.getOffset(System.currentTimeMillis())
+                currentTz.getOffset(trustedTime) == targetTz.getOffset(trustedTime)
 
             if (isDateTimeRestricted && isTargetTz) {
                 activeList.add(

@@ -341,14 +341,14 @@ class RemoteAppManagerViewModel(
                     when (result) {
                         is DpmExecutionResult.Success -> {
                             success = result.data.isEmpty()
-                            if (!success) errorMsg = "Failed to unsuspend $pkg"
+                            if (!success) errorMsg = context.getString(R.string.error_unknown)
                         }
                         is DpmExecutionResult.Failure -> {
                             errorMsg = result.message
                         }
                     }
                 } else {
-                    errorMsg = "Device Owner not active"
+                    errorMsg = context.getString(R.string.toast_not_device_owner)
                 }
 
                 _uiState.update { current ->
@@ -368,7 +368,7 @@ class RemoteAppManagerViewModel(
                 } else {
                     _events.emit(
                         RemoteAppManagerEvent.ShowToastString(
-                            context.getString(R.string.toast_quick_unsuspend_failed, errorMsg ?: ""),
+                            context.getString(R.string.toast_quick_unsuspend_failed, errorMsg ?: context.getString(R.string.error_unknown)),
                             isLong = true
                         )
                     )
@@ -386,7 +386,7 @@ class RemoteAppManagerViewModel(
                     isSupervised = true,
                     customBlacklistPackages = updatedBlacklist,
                     customCurfewWhitelistPackages = updatedCurfewWhitelist,
-                    updatedAt = System.currentTimeMillis()
+                    updatedAt = TrustedTimeProvider.currentTimeMillis(context)
                 )
 
                 val success = policyRepository.pushPolicyToWard(state.wardId, updatedPolicy)
@@ -414,7 +414,7 @@ class RemoteAppManagerViewModel(
                 } else {
                     _events.emit(
                         RemoteAppManagerEvent.ShowToastString(
-                            context.getString(R.string.toast_quick_unsuspend_failed, "Network error"),
+                            context.getString(R.string.toast_quick_unsuspend_failed, context.getString(R.string.error_unknown)),
                             isLong = true
                         )
                     )
