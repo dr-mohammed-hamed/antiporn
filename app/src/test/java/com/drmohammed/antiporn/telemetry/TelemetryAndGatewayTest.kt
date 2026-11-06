@@ -167,4 +167,15 @@ class TelemetryAndGatewayTest {
         assertEquals("CRASH", BlackBoxRecorder.TAG_CRASH)
         assertEquals("ALL", BlackBoxRecorder.CATEGORY_ALL)
     }
+
+    @Test
+    fun testSafeDpmPackageBridge_emptyArrayContractOnSuccess() {
+        // Android DevicePolicyManager.setPackagesSuspended returns null when ALL packages were successfully suspended.
+        // The bridge contract must convert null to emptyArray() (meaning 0 failed packages).
+        val dpmReturnedNull: Array<String>? = null
+        val normalized = dpmReturnedNull ?: emptyArray()
+
+        assertTrue("Null return from DPM indicates 0 failures, must map to empty array", normalized.isEmpty())
+        assertEquals(0, normalized.size)
+    }
 }

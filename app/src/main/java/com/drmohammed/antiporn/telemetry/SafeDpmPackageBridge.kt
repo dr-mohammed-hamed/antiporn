@@ -25,7 +25,7 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
         metadata = "suspended=$suspended, count=${packages.size}"
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            dpm.setPackagesSuspended(admin, packages, suspended) ?: packages
+            dpm.setPackagesSuspended(admin, packages, suspended) ?: emptyArray()
         } else {
             emptyArray()
         }
@@ -43,7 +43,7 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
         metadata = "suspended=$suspended, count=${packages.size}"
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            dpm.setPackagesSuspended(admin, packages, suspended) ?: packages
+            dpm.setPackagesSuspended(admin, packages, suspended) ?: emptyArray()
         } else {
             emptyArray()
         }

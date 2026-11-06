@@ -339,4 +339,25 @@ class DevicePolicyBundleTest {
         assertEquals("guardian_uid_123", serializedMap["guardianUid"])
         assertEquals("Guardian Device", serializedMap["guardianName"])
     }
+
+    @Test
+    fun testFastSynchronousPolicySerializationRoundTrip() {
+        val original = DevicePolicyBundle(
+            curfewStartHour = 21,
+            curfewStartMinute = 30,
+            curfewEndHour = 8,
+            curfewEndMinute = 0,
+            isCurfewEnabled = true,
+            version = 15L,
+            updatedAt = 1750000000000L
+        )
+        val json = original.toJson()
+        val deserialized = DevicePolicyBundle.fromJson(json)
+        assertEquals(original.curfewStartHour, deserialized.curfewStartHour)
+        assertEquals(original.curfewStartMinute, deserialized.curfewStartMinute)
+        assertEquals(original.curfewEndHour, deserialized.curfewEndHour)
+        assertEquals(original.curfewEndMinute, deserialized.curfewEndMinute)
+        assertEquals(original.version, deserialized.version)
+        assertEquals(original.isCurfewEnabled, deserialized.isCurfewEnabled)
+    }
 }

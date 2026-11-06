@@ -54,8 +54,8 @@ class PolicyRepository(
     private val appContext = context.applicationContext
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private val _currentPolicyFlow = MutableStateFlow(DevicePolicyBundle.defaultPolicy())
-    val currentPolicyFlow: StateFlow<DevicePolicyBundle> = _currentPolicyFlow.asStateFlow()
+    private val _currentPolicyFlow: MutableStateFlow<DevicePolicyBundle>
+    val currentPolicyFlow: StateFlow<DevicePolicyBundle>
 
     private var firestoreListener: ListenerRegistration? = null
     private val firestoreSyncMutex = Mutex()
@@ -63,74 +63,113 @@ class PolicyRepository(
     private var lastSyncedCloudVersion: Long = 0L
 
     init {
+        // Fast synchronous load to eliminate cold-boot curfew bypass (0ms delay)
+        val initialPolicy = loadFastSynchronousPolicy()
+        _currentPolicyFlow = MutableStateFlow(initialPolicy)
+        currentPolicyFlow = _currentPolicyFlow.asStateFlow()
+        com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = initialPolicy.isSelfControlAllowed
+
         repositoryScope.launch {
-            val initial = loadInitialPolicy()
-            _currentPolicyFlow.value = initial
-            com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = initial.isSelfControlAllowed
+            val reconciled = loadAndReconcilePolicy(initialPolicy)
+            if (reconciled != initialPolicy) {
+                _currentPolicyFlow.value = reconciled
+                saveFastPolicyCache(reconciled)
+                com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = reconciled.isSelfControlAllowed
+            }
         }
         // Observe local policy changes and trigger background sync
         startFirestoreSync()
     }
 
-    private fun loadInitialPolicy(): DevicePolicyBundle {
-        return try {
-            val loaded = policyDao.getDevicePolicyBlocking()?.toBundle()
-            if (loaded != null) {
-                // Reconcile standalone devices (no guardians attached) on initial policy v1
-                val hasGuardians = try {
-                    partnerDao.getPartnersByRoleBlocking(com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN).isNotEmpty()
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed checking guardians in SQLite during cold boot reconcile", e)
-                    false
-                }
-                if (loaded.isSupervised && !loaded.guardianUid.isNullOrBlank() && !hasGuardians) {
-                    try {
-                        val guardian = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity(
-                            id = loaded.guardianUid,
-                            pairingCode = AccountabilityRepository.CODE_LOCKED,
-                            displayName = loaded.guardianName ?: appContext.getString(R.string.guardian_default_name),
-                            role = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN,
-                            status = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.STATUS_ACTIVE,
-                            createdAt = loaded.updatedAt,
-                            lastSyncAt = loaded.updatedAt
-                        )
-                        partnerDao.savePartnerBlocking(guardian)
-                        Log.i(TAG, "Reconciled missing guardian in SQLite on cold boot: ${loaded.guardianName}")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed reconciling missing guardian in SQLite", e)
-                    }
-                }
-
-                var workingPolicy = loaded
-                var needsSave = false
-
-                if (!hasGuardians && workingPolicy.version == 1L && workingPolicy.isVpnBlackholeEnabled != com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED) {
-                    workingPolicy = workingPolicy.copy(isVpnBlackholeEnabled = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED)
-                    needsSave = true
-                }
-
-                if (needsSave) {
-                    val reconciled = workingPolicy.copy(updatedAt = TrustedTimeProvider.currentTimeMillis(appContext))
-                    repositoryScope.launch {
-                        try {
-                            policyDao.saveDevicePolicy(com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity.fromBundle(reconciled))
-                            Log.i(TAG, "Reconciled standalone device policy on cold boot (version=${reconciled.version})")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed saving reconciled policy", e)
-                        }
-                    }
-                    reconciled
-                } else {
-                    loaded
-                }
-            } else {
-                val defaultBundle = DevicePolicyBundle.defaultPolicy()
-                policyDao.saveDevicePolicyBlocking(com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity.fromBundle(defaultBundle))
-                defaultBundle
+    private fun loadFastSynchronousPolicy(): DevicePolicyBundle {
+        // 1. SharedPreferences cache (sub-millisecond in-memory read on cold boot)
+        try {
+            val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val cachedJson = prefs.getString(KEY_CACHED_POLICY_JSON, null)
+            if (!cachedJson.isNullOrBlank()) {
+                val parsed = DevicePolicyBundle.fromJson(cachedJson)
+                Log.d(TAG, "Fast synchronous policy loaded from SharedPreferences cache (version=${parsed.version})")
+                return parsed
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading initial policy from SQLite", e)
-            DevicePolicyBundle.defaultPolicy()
+            Log.w(TAG, "Failed reading fast policy cache from SharedPreferences", e)
+        }
+
+        // 2. Direct synchronous SQLite read from Room
+        try {
+            val loaded = policyDao.getDevicePolicyBlocking()?.toBundle()
+            if (loaded != null) {
+                Log.i(TAG, "Fast synchronous policy loaded directly from SQLite Room (version=${loaded.version})")
+                saveFastPolicyCache(loaded)
+                return loaded
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed reading policy synchronously from SQLite on cold boot", e)
+        }
+
+        // 3. First install fallback
+        val defaultBundle = DevicePolicyBundle.defaultPolicy()
+        saveFastPolicyCache(defaultBundle)
+        return defaultBundle
+    }
+
+    private fun saveFastPolicyCache(bundle: DevicePolicyBundle) {
+        try {
+            val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString(KEY_CACHED_POLICY_JSON, bundle.toJson()).apply()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed saving policy to fast SharedPreferences cache", e)
+        }
+    }
+
+    private fun loadAndReconcilePolicy(initialPolicy: DevicePolicyBundle): DevicePolicyBundle {
+        return try {
+            val loaded = policyDao.getDevicePolicyBlocking()?.toBundle() ?: initialPolicy
+            // Reconcile standalone devices (no guardians attached) on initial policy v1
+            val hasGuardians = try {
+                partnerDao.getPartnersByRoleBlocking(com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN).isNotEmpty()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed checking guardians in SQLite during cold boot reconcile", e)
+                false
+            }
+            if (loaded.isSupervised && !loaded.guardianUid.isNullOrBlank() && !hasGuardians) {
+                try {
+                    val guardian = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity(
+                        id = loaded.guardianUid,
+                        pairingCode = AccountabilityRepository.CODE_LOCKED,
+                        displayName = loaded.guardianName ?: appContext.getString(R.string.guardian_default_name),
+                        role = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN,
+                        status = com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.STATUS_ACTIVE,
+                        createdAt = loaded.updatedAt,
+                        lastSyncAt = loaded.updatedAt
+                    )
+                    partnerDao.savePartnerBlocking(guardian)
+                    Log.i(TAG, "Reconciled missing guardian in SQLite on cold boot: ${loaded.guardianName}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed reconciling missing guardian in SQLite", e)
+                }
+            }
+
+            var workingPolicy = loaded
+            var needsSave = false
+
+            if (!hasGuardians && workingPolicy.version == 1L && workingPolicy.isVpnBlackholeEnabled != com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED) {
+                workingPolicy = workingPolicy.copy(isVpnBlackholeEnabled = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED)
+                needsSave = true
+            }
+
+            if (needsSave) {
+                val reconciled = workingPolicy.copy(updatedAt = TrustedTimeProvider.currentTimeMillis(appContext))
+                policyDao.saveDevicePolicyBlocking(com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity.fromBundle(reconciled))
+                saveFastPolicyCache(reconciled)
+                Log.i(TAG, "Reconciled standalone device policy on cold boot (version=${reconciled.version})")
+                reconciled
+            } else {
+                loaded
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in loadAndReconcilePolicy", e)
+            initialPolicy
         }
     }
 
@@ -328,6 +367,7 @@ class PolicyRepository(
 
         policyDao.saveDevicePolicyBlocking(DevicePolicyEntity.fromBundle(bundle))
         _currentPolicyFlow.value = bundle
+        saveFastPolicyCache(bundle)
         com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = bundle.isSelfControlAllowed
 
         com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
@@ -765,6 +805,8 @@ class PolicyRepository(
 
     companion object {
         private const val TAG = "AntiPorn_PolicyRepo"
+        const val PREFS_NAME = "hisn_policy_fast_cache"
+        const val KEY_CACHED_POLICY_JSON = "cached_policy_json"
 
         @Volatile
         private var instance: PolicyRepository? = null

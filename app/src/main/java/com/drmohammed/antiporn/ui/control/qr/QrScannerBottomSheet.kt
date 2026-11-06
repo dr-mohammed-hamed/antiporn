@@ -56,15 +56,32 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
     var onVerified: (() -> Unit)? = null
     var onEmergencyBypassTriggered: (() -> Unit)? = null
 
-    private lateinit var previewViewQrScanner: PreviewView
-    private lateinit var btnToggleTorch: MaterialButton
-    private lateinit var tvScanStatus: TextView
-    private lateinit var btnCloseScanner: MaterialButton
-    private lateinit var layoutEmergencyBypass: MaterialCardView
-    private lateinit var tvEmergencyBypassInfo: TextView
-    private lateinit var btnEmergencyBypass: MaterialButton
-    private lateinit var layoutPermissionFallback: View
-    private lateinit var btnGrantPermission: Button
+    private var _previewViewQrScanner: PreviewView? = null
+    private val previewViewQrScanner get() = _previewViewQrScanner!!
+
+    private var _btnToggleTorch: MaterialButton? = null
+    private val btnToggleTorch get() = _btnToggleTorch!!
+
+    private var _tvScanStatus: TextView? = null
+    private val tvScanStatus get() = _tvScanStatus!!
+
+    private var _btnCloseScanner: MaterialButton? = null
+    private val btnCloseScanner get() = _btnCloseScanner!!
+
+    private var _layoutEmergencyBypass: MaterialCardView? = null
+    private val layoutEmergencyBypass get() = _layoutEmergencyBypass!!
+
+    private var _tvEmergencyBypassInfo: TextView? = null
+    private val tvEmergencyBypassInfo get() = _tvEmergencyBypassInfo!!
+
+    private var _btnEmergencyBypass: MaterialButton? = null
+    private val btnEmergencyBypass get() = _btnEmergencyBypass!!
+
+    private var _layoutPermissionFallback: View? = null
+    private val layoutPermissionFallback get() = _layoutPermissionFallback!!
+
+    private var _btnGrantPermission: Button? = null
+    private val btnGrantPermission get() = _btnGrantPermission!!
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var camera: Camera? = null
@@ -103,15 +120,15 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        previewViewQrScanner = view.findViewById(R.id.previewViewQrScanner)
-        btnToggleTorch = view.findViewById(R.id.btnToggleTorch)
-        tvScanStatus = view.findViewById(R.id.tvScanStatus)
-        btnCloseScanner = view.findViewById(R.id.btnCloseScanner)
-        layoutEmergencyBypass = view.findViewById(R.id.layoutEmergencyBypass)
-        tvEmergencyBypassInfo = view.findViewById(R.id.tvEmergencyBypassInfo)
-        btnEmergencyBypass = view.findViewById(R.id.btnEmergencyBypass)
-        layoutPermissionFallback = view.findViewById(R.id.layoutPermissionFallback)
-        btnGrantPermission = view.findViewById(R.id.btnGrantPermission)
+        _previewViewQrScanner = view.findViewById(R.id.previewViewQrScanner)
+        _btnToggleTorch = view.findViewById(R.id.btnToggleTorch)
+        _tvScanStatus = view.findViewById(R.id.tvScanStatus)
+        _btnCloseScanner = view.findViewById(R.id.btnCloseScanner)
+        _layoutEmergencyBypass = view.findViewById(R.id.layoutEmergencyBypass)
+        _tvEmergencyBypassInfo = view.findViewById(R.id.tvEmergencyBypassInfo)
+        _btnEmergencyBypass = view.findViewById(R.id.btnEmergencyBypass)
+        _layoutPermissionFallback = view.findViewById(R.id.layoutPermissionFallback)
+        _btnGrantPermission = view.findViewById(R.id.btnGrantPermission)
 
         defaultStatusColor = tvScanStatus.currentTextColor
 
@@ -444,6 +461,16 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
         }
 
         cameraExecutor = null
+
+        _previewViewQrScanner = null
+        _btnToggleTorch = null
+        _tvScanStatus = null
+        _btnCloseScanner = null
+        _layoutEmergencyBypass = null
+        _tvEmergencyBypassInfo = null
+        _btnEmergencyBypass = null
+        _layoutPermissionFallback = null
+        _btnGrantPermission = null
     }
 
     companion object {

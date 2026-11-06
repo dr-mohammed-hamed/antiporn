@@ -141,12 +141,16 @@ class SelfControlApprovalsViewBinder(
         if (isApproved) {
             val qrManager = SelfControlQrManager.getInstance(activity.applicationContext)
             if (qrManager.isQrLockEnabled()) {
-                val tag = "qr_scanner_approve_app"
-                if (activity.supportFragmentManager.isStateSaved || activity.supportFragmentManager.findFragmentByTag(tag) != null) return
-                QrScannerBottomSheet.newInstance().apply {
-                    onVerified = { executeAction() }
-                    onEmergencyBypassTriggered = { executeAction() }
-                }.show(activity.supportFragmentManager, tag)
+                val requestKey = "qr_scanner_approve_app"
+                if (activity.supportFragmentManager.isStateSaved || activity.supportFragmentManager.findFragmentByTag(requestKey) != null) return
+                activity.supportFragmentManager.setFragmentResultListener(requestKey, activity) { _, bundle ->
+                    val verified = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_VERIFIED, false)
+                    val bypass = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_EMERGENCY_BYPASS, false)
+                    if (verified || bypass) {
+                        executeAction()
+                    }
+                }
+                QrScannerBottomSheet.newInstance(requestKey).show(activity.supportFragmentManager, requestKey)
             } else {
                 executeAction()
             }
