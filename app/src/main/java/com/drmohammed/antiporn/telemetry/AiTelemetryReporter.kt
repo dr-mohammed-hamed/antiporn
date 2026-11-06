@@ -12,7 +12,7 @@ import android.util.Log
 import androidx.core.content.pm.PackageInfoCompat
 import com.drmohammed.antiporn.AdminReceiver
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -64,30 +64,30 @@ object AiTelemetryReporter {
         // Read Latest Crash Dump if present
         val latestCrash = getLatestCrashDump(appContext)
 
-        // Read Categorized Diagnostic Events from SQLite
-        val db = AntiPornDatabase.getInstance(appContext)
+        // Read Categorized Diagnostic Events from Room Database
+        val diagDao = HisnRoomDatabase.getInstance(appContext).diagnosticEventDao()
         val cloudEvents = try {
-            db.getDiagnosticEvents(30, BlackBoxRecorder.TAG_CLOUD_SYNC) +
-                db.getDiagnosticEvents(15, BlackBoxRecorder.TAG_IDENTITY) +
-                db.getDiagnosticEvents(20, BlackBoxRecorder.TAG_PAIRING)
+            (diagDao.getDiagnosticEventsBlocking(30, BlackBoxRecorder.TAG_CLOUD_SYNC) +
+                diagDao.getDiagnosticEventsBlocking(15, BlackBoxRecorder.TAG_IDENTITY) +
+                diagDao.getDiagnosticEventsBlocking(20, BlackBoxRecorder.TAG_PAIRING)).map { it.toDto() }
         } catch (e: Exception) {
             emptyList()
         }.sortedByDescending { it.timestamp }
 
         val curfewEvents = try {
-            db.getDiagnosticEvents(40, BlackBoxRecorder.TAG_CURFEW)
+            diagDao.getDiagnosticEventsBlocking(40, BlackBoxRecorder.TAG_CURFEW).map { it.toDto() }
         } catch (e: Exception) {
             emptyList()
         }
 
         val dpmEvents = try {
-            db.getDiagnosticEvents(30, BlackBoxRecorder.TAG_DPM)
+            diagDao.getDiagnosticEventsBlocking(30, BlackBoxRecorder.TAG_DPM).map { it.toDto() }
         } catch (e: Exception) {
             emptyList()
         }
 
         val totalEventsCount = try {
-            db.getDiagnosticEventsCount()
+            diagDao.getEventsCountBlocking()
         } catch (e: Exception) {
             Log.w(TAG, "Error querying diagnostic events count", e)
             -1L

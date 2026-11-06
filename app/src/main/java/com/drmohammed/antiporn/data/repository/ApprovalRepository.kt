@@ -13,7 +13,8 @@ import com.drmohammed.antiporn.curfew.CurfewAppResolver
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
+import com.drmohammed.antiporn.data.local.db.dao.PendingApprovalDao
 import com.drmohammed.antiporn.data.local.db.entity.PendingApprovalEntity
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.google.firebase.auth.FirebaseAuth
@@ -24,6 +25,7 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -34,12 +36,14 @@ import kotlinx.coroutines.withContext
  */
 class ApprovalRepository(
     context: Context,
-    private val database: AntiPornDatabase = AntiPornDatabase.getInstance(context)
+    private val approvalDao: PendingApprovalDao = HisnRoomDatabase.getInstance(context).pendingApprovalDao()
 ) {
 
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var approvalsListener: ListenerRegistration? = null
+
+    val pendingApprovalsFlow: Flow<List<PendingApprovalEntity>> = approvalDao.getPendingApprovalsFlow()
 
     /**
      * Intercepts a newly installed package:
@@ -147,7 +151,7 @@ class ApprovalRepository(
         )
 
         // 3. Save locally in SQLite
-        database.savePendingApproval(approvalEntity)
+        approvalDao.savePendingApprovalBlocking(approvalEntity)
 
         // 4. Update Zero-Trust active foreground watcher immediately and trigger in-memory anti-race evaluation
         ZeroTrustForegroundWatcher.syncWatcherState(appContext)
@@ -160,7 +164,7 @@ class ApprovalRepository(
         val localSuccess = freezeAndSubmitApprovalLocal(packageName)
         if (!localSuccess) return@withContext false
 
-        val entity = database.getPendingApprovals().find { it.packageName == packageName }
+        val entity = approvalDao.getPendingApprovalsBlocking().find { it.packageName == packageName }
             ?: return@withContext false
 
         // ANR-protected cloud upload with 3500ms timeout
@@ -173,31 +177,11 @@ class ApprovalRepository(
     }
 
     /**
-     * Blocking wrapper for [freezeAndSubmitApprovalSync] with strict 3500ms ANR timeout.
-     */
-    fun freezeAndSubmitApprovalBlocking(packageName: String): Boolean {
-        val localSuccess = freezeAndSubmitApprovalLocal(packageName)
-        if (!localSuccess) return false
-
-        return kotlinx.coroutines.runBlocking {
-            kotlinx.coroutines.withTimeoutOrNull(3500L) {
-                try {
-                    syncPendingApprovalsToCloud()
-                    true
-                } catch (e: Exception) {
-                    Log.w(TAG, "Cloud sync in freezeAndSubmitApprovalBlocking timed out or failed: ${e.message}")
-                    false
-                }
-            } ?: false
-        }
-    }
-
-    /**
      * Uploads all locally stored pending approvals that have not yet reached Firestore (e.g. created while offline).
      */
     suspend fun syncPendingApprovalsToCloud() = withContext(Dispatchers.IO) {
         try {
-            val unsynced = database.getUnsyncedApprovals()
+            val unsynced = approvalDao.getUnsyncedApprovalsBlocking()
             if (unsynced.isEmpty()) return@withContext
             Log.i(TAG, "Syncing ${unsynced.size} unsynced pending approvals to cloud")
             for (approval in unsynced) {
@@ -236,7 +220,7 @@ class ApprovalRepository(
                 .set(data)
                 .await()
 
-            database.markApprovalCloudSynced(approval.packageName, true)
+            approvalDao.markApprovalCloudSyncedBlocking(approval.packageName, 1)
             Log.i(TAG, "Uploaded approval ticket to cloud for ${approval.packageName} under /policies/$uid/approvals")
             true
         } catch (e: Exception) {
@@ -262,7 +246,13 @@ class ApprovalRepository(
         val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
         if (policy.customBlacklistPackages.contains(packageName)) {
             Log.w(TAG, "Security Alert: Cannot unsuspend $packageName - in custom blacklist!")
-            database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_REJECTED, "CUSTOM_BLACKLIST")
+            approvalDao.upsertApprovalStatusBlocking(
+                packageName = packageName,
+                status = PendingApprovalEntity.STATUS_REJECTED,
+                decidedBy = "CUSTOM_BLACKLIST",
+                decidedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext),
+                isSynced = 1
+            )
             ZeroTrustForegroundWatcher.syncWatcherState(appContext)
             return
         }
@@ -276,7 +266,13 @@ class ApprovalRepository(
 
         if (isBlockActive && !isWhitelisted) {
             Log.i(TAG, "Package $packageName approved by $decidedBy, but kept suspended until curfew wakeup")
-            database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
+            approvalDao.upsertApprovalStatusBlocking(
+                packageName = packageName,
+                status = PendingApprovalEntity.STATUS_APPROVED,
+                decidedBy = decidedBy,
+                decidedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext),
+                isSynced = 1
+            )
             ZeroTrustForegroundWatcher.syncWatcherState(appContext)
             syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
             return
@@ -313,14 +309,26 @@ class ApprovalRepository(
 
                 if (!isInstalled) {
                     Log.i(TAG, "Package $packageName is uninstalled; marking pending approval as approved/resolved")
-                    database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
+                    approvalDao.upsertApprovalStatusBlocking(
+                        packageName = packageName,
+                        status = PendingApprovalEntity.STATUS_APPROVED,
+                        decidedBy = decidedBy,
+                        decidedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext),
+                        isSynced = 1
+                    )
                     ZeroTrustForegroundWatcher.syncWatcherState(appContext)
                     syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
                 } else {
                     Log.e(TAG, "Failed unfreezing package $packageName: DPM returned failure for package")
                 }
             } else {
-                database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
+                approvalDao.upsertApprovalStatusBlocking(
+                    packageName = packageName,
+                    status = PendingApprovalEntity.STATUS_APPROVED,
+                    decidedBy = decidedBy,
+                    decidedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext),
+                    isSynced = 1
+                )
                 Log.i(TAG, "Unfrozen and approved package: $packageName")
                 ZeroTrustForegroundWatcher.syncWatcherState(appContext)
                 syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
@@ -336,7 +344,7 @@ class ApprovalRepository(
      */
     fun removePendingApproval(packageName: String) {
         try {
-            database.deletePendingApproval(packageName)
+            approvalDao.deletePendingApprovalBlocking(packageName)
             ZeroTrustForegroundWatcher.syncWatcherState(appContext)
             deleteApprovalFromCloud(packageName)
             Log.i(TAG, "Removed pending approval for package: $packageName")
@@ -350,7 +358,13 @@ class ApprovalRepository(
      */
     fun recordRejection(packageName: String, decidedBy: String? = null) {
         try {
-            database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_REJECTED, decidedBy)
+            approvalDao.upsertApprovalStatusBlocking(
+                packageName = packageName,
+                status = PendingApprovalEntity.STATUS_REJECTED,
+                decidedBy = decidedBy,
+                decidedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext),
+                isSynced = 1
+            )
             Log.i(TAG, "Recorded rejection for package: $packageName by $decidedBy")
             ZeroTrustForegroundWatcher.syncWatcherState(appContext)
             syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_REJECTED, decidedBy)
@@ -514,7 +528,7 @@ class ApprovalRepository(
         }
     }
 
-    fun getLocalPendingApprovals(): List<PendingApprovalEntity> = database.getPendingApprovals()
+    fun getLocalPendingApprovals(): List<PendingApprovalEntity> = approvalDao.getPendingApprovalsBlocking()
 
     /**
      * Seeds all pre-existing installed applications as the Initial Approved Baseline.
@@ -552,6 +566,7 @@ class ApprovalRepository(
         }
 
         val packagesToUnsuspend = mutableListOf<String>()
+        val baselineEntities = mutableListOf<PendingApprovalEntity>()
 
         val policy = if (isDo) PolicyRepository.getInstance(appContext).getCurrentPolicy() else null
         val isBlockActive = if (isDo) CurfewEnforcer.isEffectiveBlockActive(appContext) else false
@@ -581,7 +596,7 @@ class ApprovalRepository(
                 decidedAt = nowMs,
                 isCloudSynced = true // Do not flood Firestore
             )
-            database.savePendingApproval(baselineEntity)
+            baselineEntities.add(baselineEntity)
 
             // If it was inadvertently suspended or hidden, queue it for unfreezing ONLY if not restricted by Curfew or Custom Blacklist
             if (isDo && policy != null) {
@@ -600,6 +615,11 @@ class ApprovalRepository(
                     packagesToUnsuspend.add(pkg)
                 }
             }
+        }
+
+        // Batch insert pre-existing baseline approvals in a single database transaction
+        if (baselineEntities.isNotEmpty()) {
+            approvalDao.savePendingApprovalsBlocking(baselineEntities)
         }
 
         // Unsuspend and unhide all pre-existing baseline packages

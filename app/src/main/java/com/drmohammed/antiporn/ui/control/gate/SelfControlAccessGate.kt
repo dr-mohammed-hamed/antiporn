@@ -89,8 +89,9 @@ object SelfControlAccessGateRegistry {
         }
 
         val hasGuardianPartner = try {
-            com.drmohammed.antiporn.data.local.db.AntiPornDatabase.getInstance(context.applicationContext)
-                .getPartnersByRole(com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN)
+            com.drmohammed.antiporn.data.local.db.HisnRoomDatabase.getInstance(context.applicationContext)
+                .partnerDao()
+                .getPartnersByRoleBlocking(com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN)
                 .any { it.status == com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.STATUS_ACTIVE }
         } catch (e: Exception) {
             false

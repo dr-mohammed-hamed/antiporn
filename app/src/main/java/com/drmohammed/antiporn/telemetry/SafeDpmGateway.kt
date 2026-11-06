@@ -10,7 +10,6 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import com.drmohammed.antiporn.AdminReceiver
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -22,7 +21,7 @@ import kotlinx.coroutines.withContext
  * 2. Mandatory background execution off the Main Thread (`Dispatchers.IO`).
  * 3. Accurate execution latency tracking in milliseconds.
  * 4. Surgical exception catching (SecurityException, IllegalArgumentException) preventing swallowed failures.
- * 5. Automatic atomic recording in SQLite WAL [AntiPornDatabase] diagnostic table.
+ * 5. Automatic atomic recording in SQLite Room [HisnRoomDatabase] diagnostic table.
  */
 object SafeDpmGateway {
 

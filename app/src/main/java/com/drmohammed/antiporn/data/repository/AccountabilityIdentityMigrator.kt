@@ -2,8 +2,11 @@ package com.drmohammed.antiporn.data.repository
 
 import android.content.Context
 import android.util.Log
+import androidx.room.withTransaction
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
+import com.drmohammed.antiporn.data.local.db.dao.DevicePolicyDao
+import com.drmohammed.antiporn.data.local.db.dao.PartnerDao
 import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.google.firebase.firestore.FirebaseFirestore
@@ -19,16 +22,14 @@ import kotlinx.coroutines.withContext
 class AccountabilityIdentityMigrator(
     private val appContext: Context,
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val database: AntiPornDatabase = AntiPornDatabase.getInstance(appContext)
+    private val partnerDao: PartnerDao = HisnRoomDatabase.getInstance(appContext).partnerDao(),
+    private val policyDao: DevicePolicyDao = HisnRoomDatabase.getInstance(appContext).devicePolicyDao(),
+    private val database: HisnRoomDatabase = HisnRoomDatabase.getInstance(appContext)
 ) {
 
     /**
      * Migrates user identity in Firestore from [oldUid] (e.g. anonymous or device fallback)
      * to [newUid] (e.g. authenticated Google account).
-     *
-     * 1. Writes an active forwarding alias at /uid_mappings/{oldUid}
-     * 2. Copies existing /policies/{oldUid} to /policies/{newUid} if missing or lower version
-     * 3. Copies /users/{oldUid}/partners collection to /users/{newUid}/partners
      */
     suspend fun migrateUserIdentity(oldUid: String, newUid: String) = withContext(Dispatchers.IO) {
         if (oldUid.isBlank() || newUid.isBlank() || oldUid == newUid) return@withContext
@@ -48,75 +49,86 @@ class AccountabilityIdentityMigrator(
             )
             try {
                 firestore.collection("uid_mappings").document(oldUid)
-                    .set(forwardingRecord, SetOptions.merge())
-                    .await()
-                Log.d(TAG, "[UidMigration] Forwarding alias recorded: $oldUid -> $newUid")
+                    .set(forwardingRecord, SetOptions.merge()).await()
+                Log.i(TAG, "[UidMigration] Forwarding mapping created: $oldUid -> $newUid")
             } catch (e: Exception) {
                 Log.w(TAG, "[UidMigration] Failed writing /uid_mappings/$oldUid: ${e.message}")
             }
 
-            // 2. Policy Migration: check /policies/$oldUid and copy to /policies/$newUid
+            // 2. Migrate sovereign policy document
             try {
                 val oldPolicyDoc = firestore.collection("policies").document(oldUid).get().await()
-                val oldPolicyData = oldPolicyDoc.data
-                if (oldPolicyDoc.exists() && oldPolicyData != null) {
-                    val oldVersion = oldPolicyDoc.getLong("version") ?: 1L
+                if (oldPolicyDoc.exists()) {
+                    val oldPolicyData = oldPolicyDoc.data
+                    if (oldPolicyData != null) {
+                        val newPolicyDoc = firestore.collection("policies").document(newUid).get().await()
+                        val shouldCopy = !newPolicyDoc.exists() ||
+                                ((newPolicyDoc.getLong("version") ?: 0L) < (oldPolicyDoc.getLong("version") ?: 0L))
 
-                    val newPolicyDoc = try {
-                        firestore.collection("policies").document(newUid).get().await()
-                    } catch (e: Exception) {
-                        null
-                    }
-
-                    val shouldCopy = if (newPolicyDoc == null || !newPolicyDoc.exists()) {
-                        true
-                    } else {
-                        val newVersion = newPolicyDoc.getLong("version") ?: 0L
-                        oldVersion > newVersion
-                    }
-
-                    if (shouldCopy) {
-                        firestore.collection("policies").document(newUid)
-                            .set(oldPolicyData, SetOptions.merge())
-                            .await()
-                        Log.i(TAG, "[UidMigration] Policy map copied from $oldUid to $newUid (v$oldVersion)")
+                        if (shouldCopy) {
+                            firestore.collection("policies").document(newUid)
+                                .set(oldPolicyData, SetOptions.merge()).await()
+                            Log.i(TAG, "[UidMigration] Policy migrated successfully from $oldUid to $newUid")
+                        }
                     }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "[UidMigration] Failed copying policy from $oldUid to $newUid: ${e.message}")
+                Log.w(TAG, "[UidMigration] Policy copy error: ${e.message}")
             }
 
-            // 3. Partners Migration: fetch /users/$oldUid/partners and copy to /users/$newUid/partners
+            // 3. Migrate partners subcollection
             try {
-                val oldPartnersSnapshot = firestore.collection("users").document(oldUid)
+                val partnersSnapshot = firestore.collection("users").document(oldUid)
                     .collection("partners").get().await()
-                for (doc in oldPartnersSnapshot.documents) {
-                    val partnerData = doc.data
-                    if (partnerData != null) {
-                        firestore.collection("users").document(newUid)
-                            .collection("partners").document(doc.id)
-                            .set(partnerData, SetOptions.merge())
-                            .await()
-                    }
+
+                for (doc in partnersSnapshot.documents) {
+                    val data = doc.data ?: continue
+                    firestore.collection("users").document(newUid)
+                        .collection("partners").document(doc.id)
+                        .set(data, SetOptions.merge()).await()
                 }
-                Log.d(TAG, "[UidMigration] Copied ${oldPartnersSnapshot.size()} partner documents from $oldUid to $newUid")
+                Log.i(TAG, "[UidMigration] Migrated ${partnersSnapshot.size()} partner documents to $newUid")
             } catch (e: Exception) {
-                Log.w(TAG, "[UidMigration] Failed copying partners from $oldUid to $newUid: ${e.message}")
+                Log.w(TAG, "[UidMigration] Partners copy error: ${e.message}")
             }
 
-            Log.i(TAG, "[UidMigration] Migrated identity from $oldUid to $newUid")
+            // 4. Update foreign partner references where oldUid was a guardian or ward
+            try {
+                // If oldUid was protecting someone, update the ward's /policies doc
+                val wardsSnapshot = firestore.collection("policies")
+                    .whereEqualTo("guardianUid", oldUid).get().await()
+                for (doc in wardsSnapshot.documents) {
+                    doc.reference.update(
+                        mapOf(
+                            "guardianUid" to newUid,
+                            "updatedAt" to TrustedTimeProvider.currentTimeMillis(appContext)
+                        )
+                    ).await()
+                    Log.i(TAG, "[UidMigration] Updated ward ${doc.id} guardianUid from $oldUid to $newUid")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "[UidMigration] Foreign reference update error: ${e.message}")
+            }
+
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordIdentity(
+                appContext,
+                "IDENTITY_MIGRATION_COMPLETED",
+                isSuccess = true,
+                details = "successfully migrated $oldUid to $newUid"
+            )
         } catch (e: Exception) {
-            Log.e(TAG, "[UidMigration] Error migrating user identity from $oldUid to $newUid", e)
+            Log.e(TAG, "[UidMigration] Error executing user identity migration", e)
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordIdentity(
+                appContext,
+                "IDENTITY_MIGRATION_FAILED",
+                isSuccess = false,
+                error = e.message
+            )
         }
     }
 
     /**
-     * Resolves the active UID for a partner, healing any stale references caused by
-     * account upgrades or identity migrations.
-     *
-     * 1. Checks /uid_mappings/{partnerUid} for an activeUid alias.
-     * 2. If not found and pairingCode is valid, checks /pairings/{pairingCode} for ownerUid.
-     * 3. If resolved to a new UID, updates SQLite partners table and returns the resolved UID.
+     * Resolves the current canonical UID for a partner by checking Firestore alias mappings.
      */
     suspend fun resolveActivePartnerUid(partnerUid: String, pairingCode: String? = null): String = withContext(Dispatchers.IO) {
         if (partnerUid.isBlank()) return@withContext partnerUid
@@ -136,7 +148,7 @@ class AccountabilityIdentityMigrator(
                 Log.w(TAG, "[UidMigration] Failed checking /uid_mappings/$partnerUid: ${e.message}")
             }
 
-            // 2. If not found and pairingCode != null && pairingCode.isNotBlank() && pairingCode != AccountabilityRepository.CODE_LOCKED
+            // 2. Check pairings if available
             if (resolvedUid.isNullOrBlank() && !pairingCode.isNullOrBlank() && pairingCode != AccountabilityRepository.CODE_LOCKED) {
                 try {
                     val pairingDoc = firestore.collection("pairings").document(pairingCode).get().await()
@@ -153,7 +165,6 @@ class AccountabilityIdentityMigrator(
 
             // 3. If resolvedUid != null && resolvedUid != partnerUid
             if (!resolvedUid.isNullOrBlank() && resolvedUid != partnerUid) {
-                // Safeguard: Never downgrade a real authenticated UID to a temporary dev_ UUID
                 if (resolvedUid.startsWith("dev_") && !partnerUid.startsWith("dev_")) {
                     Log.w(TAG, "[UidMigration] Refusing to downgrade authenticated UID $partnerUid to legacy $resolvedUid")
                     return@withContext partnerUid
@@ -165,18 +176,20 @@ class AccountabilityIdentityMigrator(
                     isSuccess = true,
                     details = "partnerUid switched from $partnerUid to $resolvedUid"
                 )
-                val localPartner = database.getPartnerById(partnerUid)
-                if (localPartner != null) {
-                    val updatedPartner = localPartner.copy(id = resolvedUid)
-                    database.savePartner(updatedPartner)
-                    database.deletePartner(partnerUid)
+                database.withTransaction {
+                    val localPartner = partnerDao.getPartnerById(partnerUid)
+                    if (localPartner != null) {
+                        val updatedPartner = localPartner.copy(id = resolvedUid)
+                        partnerDao.savePartner(updatedPartner)
+                        partnerDao.deletePartner(partnerUid)
 
-                    // If this partner is the active guardian, keep local device policy in sync
-                    if (localPartner.role == PartnerEntity.ROLE_GUARDIAN) {
-                        val policy = database.getDevicePolicy()?.toBundle()
-                        if (policy != null && policy.guardianUid == partnerUid) {
-                            val updatedPolicy = policy.copy(guardianUid = resolvedUid)
-                            database.saveDevicePolicy(DevicePolicyEntity.fromBundle(updatedPolicy))
+                        // If this partner is the active guardian, keep local device policy in sync
+                        if (localPartner.role == PartnerEntity.ROLE_GUARDIAN) {
+                            val policy = policyDao.getDevicePolicy()?.toBundle()
+                            if (policy != null && policy.guardianUid == partnerUid) {
+                                val updatedPolicy = policy.copy(guardianUid = resolvedUid)
+                                policyDao.saveDevicePolicy(DevicePolicyEntity.fromBundle(updatedPolicy))
+                            }
                         }
                     }
                 }

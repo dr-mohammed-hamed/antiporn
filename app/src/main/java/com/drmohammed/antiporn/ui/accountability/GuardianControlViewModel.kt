@@ -9,13 +9,15 @@ import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.core.network.DnsFilteringValidator
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.CurfewConfig
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
+import com.drmohammed.antiporn.data.local.db.dao.PartnerDao
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -36,11 +38,12 @@ class GuardianControlViewModel(
     application: Application,
     private val policyRepository: PolicyRepository = PolicyRepository.getInstance(application),
     private val accountabilityRepository: AccountabilityRepository = AccountabilityRepository.getInstance(application),
-    private val database: AntiPornDatabase = AntiPornDatabase.getInstance(application)
+    private val partnerDao: PartnerDao = HisnRoomDatabase.getInstance(application).partnerDao()
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(GuardianControlUiState())
     val uiState: StateFlow<GuardianControlUiState> = _uiState.asStateFlow()
+    private var loadWardJob: Job? = null
 
     private val _events = MutableSharedFlow<GuardianControlEvent>()
     val events: SharedFlow<GuardianControlEvent> = _events.asSharedFlow()
@@ -65,8 +68,9 @@ class GuardianControlViewModel(
 
         _uiState.update { it.copy(isLoading = true) }
 
-        viewModelScope.launch(Dispatchers.IO) {
-            val partner = database.getPartnerById(state.wardId)
+        loadWardJob?.cancel()
+        loadWardJob = viewModelScope.launch(Dispatchers.IO) {
+            val partner = partnerDao.getPartnerById(state.wardId)
             val resolvedWardId = accountabilityRepository.resolveActivePartnerUid(state.wardId, partner?.pairingCode)
             val activeWardId = if (resolvedWardId.isNotBlank()) resolvedWardId else state.wardId
 
@@ -418,7 +422,12 @@ class GuardianControlViewModel(
                 _events.emit(GuardianControlEvent.ShowToastRes(R.string.toast_name_saved))
             }.onFailure { e ->
                 Log.e(TAG, "Failed to rename ward", e)
-                _events.emit(GuardianControlEvent.ShowToastString(e.localizedMessage ?: "Rename failed", isLong = true))
+                val msg = e.localizedMessage
+                if (!msg.isNullOrBlank()) {
+                    _events.emit(GuardianControlEvent.ShowToastString(msg, isLong = true))
+                } else {
+                    _events.emit(GuardianControlEvent.ShowToastRes(R.string.toast_rename_failed, isLong = true))
+                }
             }
         }
     }

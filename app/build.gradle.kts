@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.ksp)
 }
 import java.util.Properties
 import java.io.FileInputStream
@@ -117,6 +118,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
 
     buildFeatures {
@@ -140,6 +142,10 @@ android {
             excludes += "/META-INF/INDEX.LIST"
         }
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -177,9 +183,21 @@ dependencies {
 
     // Dependency Injection (Koin)
     implementation(libs.koin.android)
+    implementation(libs.koin.androidx.workmanager)
     testImplementation(libs.koin.test)
 
+    // AndroidX WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
+    testImplementation(libs.androidx.work.testing)
+
     implementation(libs.timber)
+
+    // Jetpack Room Persistence & Desugaring
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+    testImplementation(libs.room.testing)
 
     testImplementation(libs.junit)
     testImplementation(libs.json.test)

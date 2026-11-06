@@ -10,7 +10,8 @@ import android.os.Build
 import android.util.Log
 import androidx.core.content.pm.PackageInfoCompat
 import com.drmohammed.antiporn.AdminReceiver
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
+import com.drmohammed.antiporn.data.local.db.entity.DiagnosticEventEntity
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -152,7 +153,7 @@ class GlobalCrashHandler private constructor(
      */
     private fun writeCrashToDatabase(thread: Thread, throwable: Throwable, report: CrashReport) {
         try {
-            val db = AntiPornDatabase.getInstance(context)
+            val eventDao = HisnRoomDatabase.getInstance(context).diagnosticEventDao()
             val metadata = JSONObject().apply {
                 put("thread", thread.name)
                 put("battery", report.batteryPercent)
@@ -165,16 +166,17 @@ class GlobalCrashHandler private constructor(
             val errorDetails = "${report.exceptionClass}: ${report.exceptionMessage}\n" +
                     report.stackTrace.take(1500)
 
-            db.insertDiagnosticEvent(
+            val event = DiagnosticEventEntity(
+                timestamp = report.timestampMs,
                 tag = "CRASH",
                 actionName = "UNCAUGHT_EXCEPTION",
                 executionTimeMs = 0L,
                 isSuccess = false,
                 errorDetails = errorDetails,
-                contextMetadata = metadata,
-                timestamp = report.timestampMs
+                contextMetadata = metadata
             )
-            Log.i(TAG, "Recorded fatal crash event in AntiPornDatabase diagnostic_events table")
+            eventDao.insertDiagnosticEventBlocking(event)
+            Log.i(TAG, "Recorded fatal crash event in Room diagnostic_events table")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to record fatal crash event in database", e)
         }

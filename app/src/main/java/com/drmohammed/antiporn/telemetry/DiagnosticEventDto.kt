@@ -1,5 +1,6 @@
 package com.drmohammed.antiporn.telemetry
 
+import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -26,7 +27,7 @@ data class DiagnosticEventDto(
             val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
             sdf.format(Date(timestamp))
         } catch (e: Exception) {
-            android.util.Log.w("DiagnosticEventDto", "Failed to format timestamp", e)
+            Timber.w(e, "Failed to format timestamp")
             timestamp.toString()
         }
     }

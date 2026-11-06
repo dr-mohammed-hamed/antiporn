@@ -132,6 +132,7 @@
     <string name="dialog_edit_ward_name_title">Edit Ward Device Name</string>
     <string name="dialog_edit_ward_name_hint">Enter a custom alias (e.g. Omar phone)</string>
     <string name="toast_name_saved">Name updated successfully</string>
+    <string name="toast_rename_failed">Failed to update name</string>
     <string name="btn_save">Save</string>
     <string name="btn_edit">Edit</string>
     <string name="btn_back">Back</string>

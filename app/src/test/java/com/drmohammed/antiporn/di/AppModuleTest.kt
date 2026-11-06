@@ -1,7 +1,12 @@
 package com.drmohammed.antiporn.di
 
+import androidx.work.WorkerParameters
 import com.drmohammed.antiporn.cloud.auth.GoogleAuthManager
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
+import com.drmohammed.antiporn.data.local.db.dao.DevicePolicyDao
+import com.drmohammed.antiporn.data.local.db.dao.DiagnosticEventDao
+import com.drmohammed.antiporn.data.local.db.dao.PartnerDao
+import com.drmohammed.antiporn.data.local.db.dao.PendingApprovalDao
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.drmohammed.antiporn.data.repository.AppInventoryManager
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
@@ -14,6 +19,8 @@ import com.drmohammed.antiporn.ui.control.SelfControlViewModel
 import com.drmohammed.antiporn.ui.home.HomeViewModel
 import com.drmohammed.antiporn.ui.main.MainViewModel
 import com.drmohammed.antiporn.ui.settings.SettingsViewModel
+import com.drmohammed.antiporn.work.CloudSyncWorker
+import com.drmohammed.antiporn.work.OtaUpdateWorker
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -41,7 +48,8 @@ class AppModuleTest : KoinTest {
         appModule.verify(
             extraTypes = listOf(
                 android.content.Context::class,
-                android.app.Application::class
+                android.app.Application::class,
+                WorkerParameters::class
             )
         )
     }
@@ -52,7 +60,11 @@ class AppModuleTest : KoinTest {
         val registeredTypes = appModule.mappings.values.map { it.beanDefinition.primaryType }.toSet()
 
         val expectedTypes = listOf(
-            AntiPornDatabase::class,
+            HisnRoomDatabase::class,
+            DevicePolicyDao::class,
+            PartnerDao::class,
+            PendingApprovalDao::class,
+            DiagnosticEventDao::class,
             PolicyRepository::class,
             AccountabilityRepository::class,
             ApprovalRepository::class,
@@ -65,7 +77,9 @@ class AppModuleTest : KoinTest {
             AccountabilityViewModel::class,
             RemoteAppManagerViewModel::class,
             GuardianControlViewModel::class,
-            SettingsViewModel::class
+            SettingsViewModel::class,
+            OtaUpdateWorker::class,
+            CloudSyncWorker::class
         )
 
         for (expected in expectedTypes) {
@@ -74,7 +88,7 @@ class AppModuleTest : KoinTest {
                 registeredTypes.contains(expected)
             )
         }
-        assertEquals(14, registeredTypes.size)
+        assertEquals(20, registeredTypes.size)
     }
 
     @Test

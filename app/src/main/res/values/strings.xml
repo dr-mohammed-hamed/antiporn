@@ -654,6 +654,7 @@
     <string name="dialog_edit_ward_name_title">تعديل اسم المكفول</string>
     <string name="dialog_edit_ward_name_hint">أدخل اسماً مخصصاً لهذا الجهاز (مثال: هاتف عمر)</string>
     <string name="toast_name_saved">تم تحديث الاسم بنجاح</string>
+    <string name="toast_rename_failed">فشل تحديث الاسم</string>
     <string name="btn_save">حفظ</string>
     <string name="btn_edit">تعديل</string>
 

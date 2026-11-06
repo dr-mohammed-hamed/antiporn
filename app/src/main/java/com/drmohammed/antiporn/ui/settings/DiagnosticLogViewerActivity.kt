@@ -19,13 +19,14 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.telemetry.AiTelemetryReporter
 import com.drmohammed.antiporn.telemetry.BlackBoxRecorder
 import com.drmohammed.antiporn.telemetry.DiagnosticEventDto
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.chip.ChipGroup
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import timber.log.Timber
 import kotlinx.coroutines.Dispatchers
@@ -135,9 +136,12 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
         // Red-Teaming Scenario 1: Cancel any in-flight query to prevent race conditions on rapid taps
         loadJob?.cancel()
         loadJob = lifecycleScope.launch(Dispatchers.IO) {
-            val db = AntiPornDatabase.getInstance(applicationContext)
-            val events = db.getDiagnosticEvents(limit = 300, category = currentFilter)
-            val totalCount = db.getDiagnosticEventsCount()
+            val eventDao = HisnRoomDatabase.getInstance(applicationContext).diagnosticEventDao()
+            val filter = currentFilter
+            val tag = if (filter.isNullOrBlank() || filter == BlackBoxRecorder.CATEGORY_ALL) null else filter
+            val entities = eventDao.getDiagnosticEvents(limit = 300, tag = tag)
+            val events = entities.map { it.toDto() }
+            val totalCount = eventDao.getEventsCount()
 
             withContext(Dispatchers.Main) {
                 if (isFinishing || isDestroyed) return@withContext
@@ -224,8 +228,8 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
                 isClearing = true
                 lifecycleScope.launch(Dispatchers.IO) {
                     try {
-                        val db = AntiPornDatabase.getInstance(applicationContext)
-                        db.clearAllDiagnosticEvents()
+                        val eventDao = HisnRoomDatabase.getInstance(applicationContext).diagnosticEventDao()
+                        eventDao.clearAllEvents()
                         withContext(Dispatchers.Main) {
                             if (isFinishing || isDestroyed) return@withContext
                             Toast.makeText(applicationContext, R.string.toast_logs_cleared, Toast.LENGTH_SHORT).show()
@@ -276,7 +280,12 @@ class DiagnosticLogAdapter : ListAdapter<DiagnosticEventDto, DiagnosticLogAdapte
 
             val context = itemView.context
             val successColor = ContextCompat.getColor(context, R.color.status_green)
-            val failureColor = ContextCompat.getColor(context, R.color.status_red)
+            val fallbackErrorColor = ContextCompat.getColor(context, R.color.status_red)
+            val failureColor = MaterialColors.getColor(
+                context,
+                androidx.appcompat.R.attr.colorError,
+                fallbackErrorColor
+            )
 
             if (event.isSuccess) {
                 viewStatusDot.backgroundTintList = ColorStateList.valueOf(successColor)

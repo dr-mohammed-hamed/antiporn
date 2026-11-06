@@ -3,7 +3,8 @@ package com.drmohammed.antiporn.telemetry
 import android.content.Context
 import android.util.Log
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
+import com.drmohammed.antiporn.data.local.db.entity.DiagnosticEventEntity
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,20 +53,24 @@ object BlackBoxRecorder {
         recorderScope.launch {
             try {
                 val timestamp = TrustedTimeProvider.currentTimeMillis(appContext)
-                val db = AntiPornDatabase.getInstance(appContext)
-                db.insertDiagnosticEvent(
+                val dao = HisnRoomDatabase.getInstance(appContext).diagnosticEventDao()
+                val event = DiagnosticEventEntity(
+                    timestamp = timestamp,
                     tag = tag,
                     actionName = actionName,
                     executionTimeMs = executionTimeMs,
                     isSuccess = isSuccess,
                     errorDetails = errorDetails,
-                    contextMetadata = metadata,
-                    timestamp = timestamp
+                    contextMetadata = metadata
                 )
+                dao.insertDiagnosticEvent(event)
 
                 // Periodically enforce the 5,000 max row cap
                 if (eventCounter.incrementAndGet() % CAP_CHECK_INTERVAL == 0) {
-                    db.enforceMaxEventsCap(5000)
+                    val count = dao.getEventsCount()
+                    if (count > 5000) {
+                        dao.deleteOldestExcess((count - 5000).toInt())
+                    }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed writing diagnostic event [$tag / $actionName]: ${e.message}")

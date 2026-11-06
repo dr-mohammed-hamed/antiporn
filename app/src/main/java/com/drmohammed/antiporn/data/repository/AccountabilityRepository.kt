@@ -6,7 +6,9 @@ import android.util.Log
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
+import com.drmohammed.antiporn.data.local.db.dao.DevicePolicyDao
+import com.drmohammed.antiporn.data.local.db.dao.PartnerDao
 import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.google.firebase.auth.FirebaseAuth
@@ -16,6 +18,7 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -31,17 +34,22 @@ import java.util.Locale
  */
 class AccountabilityRepository(
     context: Context,
-    private val database: AntiPornDatabase = AntiPornDatabase.getInstance(context)
+    private val partnerDao: PartnerDao = HisnRoomDatabase.getInstance(context).partnerDao(),
+    private val policyDao: DevicePolicyDao = HisnRoomDatabase.getInstance(context).devicePolicyDao()
 ) {
 
     private val appContext = context.applicationContext
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
+    val partnersFlow: Flow<List<PartnerEntity>> = partnerDao.getAllPartnersFlow()
+    val guardiansFlow: Flow<List<PartnerEntity>> = partnerDao.getPartnersByRoleFlow(PartnerEntity.ROLE_GUARDIAN)
+    val wardsFlow: Flow<List<PartnerEntity>> = partnerDao.getPartnersByRoleFlow(PartnerEntity.ROLE_WARD)
+
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val syncPartnersMutex = Mutex()
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val identityMigrator by lazy { AccountabilityIdentityMigrator(appContext, firestore, database) }
+    private val identityMigrator by lazy { AccountabilityIdentityMigrator(appContext, firestore, partnerDao, policyDao) }
 
     suspend fun getOrCreateCurrentUid(): String = withContext(Dispatchers.IO) {
         val user = auth.currentUser
@@ -109,7 +117,7 @@ class AccountabilityRepository(
      * Synchronously checks whether this device is currently under active guardian supervision.
      */
     fun isSupervised(): Boolean {
-        val policy = database.getDevicePolicy()?.toBundle()
+        val policy = policyDao.getDevicePolicyBlocking()?.toBundle()
         return policy?.isSupervised == true
     }
 
@@ -119,7 +127,7 @@ class AccountabilityRepository(
      * Automatically resolves collisions and self-heals permissions if the code belongs to another UID.
      */
     suspend fun getOrCreateMyPairingCode(): String = withContext(Dispatchers.IO) {
-        val currentPolicy = database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
+        val currentPolicy = policyDao.getDevicePolicyBlocking()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
         if (currentPolicy.isSupervised) {
             return@withContext CODE_LOCKED
         }
@@ -158,7 +166,7 @@ class AccountabilityRepository(
                     }
                 }
 
-                val currentLocalPolicy = database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
+                val currentLocalPolicy = policyDao.getDevicePolicyBlocking()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
                 val pairingDoc = mapOf(
                     "pairingCode" to code,
                     "ownerUid" to uid,
@@ -286,7 +294,7 @@ class AccountabilityRepository(
 
                 val currentVersion = myPolicyDoc?.getLong("version") ?: 1L
                 val basePolicy = myPolicyDoc?.data?.let { DevicePolicyBundle.fromMap(it) }
-                    ?: database.getDevicePolicy()?.toBundle()
+                    ?: policyDao.getDevicePolicyBlocking()?.toBundle()
                     ?: DevicePolicyBundle.defaultPolicy()
 
                 val updatedMyPolicy = basePolicy.copy(
@@ -297,7 +305,7 @@ class AccountabilityRepository(
                     updatedAt = TrustedTimeProvider.currentTimeMillis(appContext)
                 )
                 firestore.collection("policies").document(myUid).set(updatedMyPolicy.toMap()).await()
-                database.saveDevicePolicy(DevicePolicyEntity.fromBundle(updatedMyPolicy))
+                policyDao.saveDevicePolicyBlocking(DevicePolicyEntity.fromBundle(updatedMyPolicy))
                 PolicyRepository.getInstance(appContext).updateLocalPolicyAndEnforce(updatedMyPolicy)
             }
 
@@ -325,7 +333,7 @@ class AccountabilityRepository(
                 .await()
 
             // Save locally in SQLite
-            database.savePartner(partner)
+            partnerDao.savePartnerBlocking(partner)
 
             Log.i(TAG, "Successfully paired with $targetName ($targetUid) as $role under strict single guardian lock")
             com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordPairing(
@@ -362,7 +370,7 @@ class AccountabilityRepository(
             val myUid = getOrCreateCurrentUid()
 
             // Resolve active UID in case ward migrated (e.g. from initial anonymous setup to Google)
-            val partner = database.getPartnerById(wardUid)
+            val partner = partnerDao.getPartnerByIdBlocking(wardUid)
             val resolvedActiveUid = resolveActivePartnerUid(wardUid, partner?.pairingCode)
             val targetUids = mutableSetOf(wardUid)
             if (resolvedActiveUid.isNotBlank()) {
@@ -399,7 +407,7 @@ class AccountabilityRepository(
                 }
 
                 // Delete locally from SQLite
-                database.deletePartner(targetUid)
+                partnerDao.deletePartnerBlocking(targetUid)
             }
 
             Log.i(TAG, "Successfully revoked supervision for ward targets: $targetUids")
@@ -432,7 +440,7 @@ class AccountabilityRepository(
     suspend fun onSupervisionRevokedLocally() = withContext(Dispatchers.IO) {
         try {
             // 1. Delete all guardian records locally
-            val guardians = database.getPartnersByRole(PartnerEntity.ROLE_GUARDIAN)
+            val guardians = partnerDao.getPartnersByRoleBlocking(PartnerEntity.ROLE_GUARDIAN)
             val currentCode = prefs.getString(KEY_MY_PAIRING_CODE, null)
             if (guardians.isEmpty() && !currentCode.isNullOrBlank() && currentCode != CODE_LOCKED) {
                 Log.d(TAG, "Local supervision already revoked and fresh pairing code exists, skipping redundant cycle")
@@ -441,7 +449,7 @@ class AccountabilityRepository(
 
             val uid = getOrCreateCurrentUid()
             for (guardian in guardians) {
-                database.deletePartner(guardian.id)
+                partnerDao.deletePartnerBlocking(guardian.id)
                 // Delete from cloud Firestore /users/{uid}/partners/{guardian.id} to eliminate ghost guardians
                 if (!uid.startsWith("dev_") || auth.currentUser != null) {
                     repositoryScope.launch(Dispatchers.IO) {
@@ -478,7 +486,7 @@ class AccountabilityRepository(
 
             // 4. Publish new code to Firestore
             val deviceName = getMyDisplayName()
-            val currentLocalPolicy = database.getDevicePolicy()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
+            val currentLocalPolicy = policyDao.getDevicePolicyBlocking()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
             val pairingDoc = mapOf(
                 "pairingCode" to newCode,
                 "ownerUid" to uid,
@@ -515,9 +523,9 @@ class AccountabilityRepository(
      */
     suspend fun checkAndSelfHealSupervisionStatus(): Boolean = withContext(Dispatchers.IO) {
         try {
-            val localPolicy = database.getDevicePolicy()?.toBundle()
+            val localPolicy = policyDao.getDevicePolicyBlocking()?.toBundle()
             val isLocallySupervised = localPolicy?.isSupervised == true ||
-                database.getPartnersByRole(PartnerEntity.ROLE_GUARDIAN).isNotEmpty()
+                partnerDao.getPartnersByRoleBlocking(PartnerEntity.ROLE_GUARDIAN).isNotEmpty()
 
             if (!isLocallySupervised) {
                 return@withContext false
@@ -557,7 +565,7 @@ class AccountabilityRepository(
      * Retrieves all saved partners from local SQLite database.
      */
     suspend fun getAllPartners(): List<PartnerEntity> = withContext(Dispatchers.IO) {
-        database.getAllPartners()
+        partnerDao.getAllPartnersBlocking()
     }
 
     /**
@@ -572,7 +580,7 @@ class AccountabilityRepository(
                 val myUid = getOrCreateCurrentUid()
                 if (myUid.startsWith("dev_") && auth.currentUser == null) {
                     Log.d(TAG, "Unauthenticated device UID ($myUid), skipping cloud partner restore")
-                    return@withLock Result.success(database.getAllPartners())
+                    return@withLock Result.success(partnerDao.getAllPartnersBlocking())
                 }
 
                 Log.i(TAG, "Initiating cloud partners restore for UID: $myUid...")
@@ -632,7 +640,7 @@ class AccountabilityRepository(
                         createdAt = pairedAt,
                         lastSyncAt = TrustedTimeProvider.currentTimeMillis(appContext)
                     )
-                    database.savePartner(partnerEntity)
+                    partnerDao.savePartnerBlocking(partnerEntity)
                     Log.d(TAG, "Restored cloud partner to SQLite: $partnerName ($partnerUid, role=$role)")
                 }
 
@@ -652,7 +660,7 @@ class AccountabilityRepository(
                                 createdAt = myPolicyDoc.getLong("updatedAt") ?: TrustedTimeProvider.currentTimeMillis(appContext),
                                 lastSyncAt = TrustedTimeProvider.currentTimeMillis(appContext)
                             )
-                            database.savePartner(guardian)
+                            partnerDao.savePartnerBlocking(guardian)
                             Log.i(TAG, "Restored Guardian from cloud policy: ${guardian.displayName} ($activeGuardianUid)")
                         }
                     }
@@ -661,7 +669,7 @@ class AccountabilityRepository(
                 }
 
                 // 3. Migrate any local ward partners to cloud /users/{myUid}/partners if missing from cloud
-                val localPartners = database.getAllPartners().filter { it.role != PartnerEntity.ROLE_GUARDIAN }
+                val localPartners = partnerDao.getAllPartnersBlocking().filter { it.role != PartnerEntity.ROLE_GUARDIAN }
                 for (local in localPartners) {
                     if (cloudPartnersSnapshot.documents.none { it.id == local.id }) {
                         try {
@@ -686,7 +694,7 @@ class AccountabilityRepository(
                 // 4. Perform self-healing check on supervision desync
                 checkAndSelfHealSupervisionStatus()
 
-                val finalPartners = database.getAllPartners()
+                val finalPartners = partnerDao.getAllPartnersBlocking()
                 Log.i(TAG, "Cloud partners sync completed successfully: ${finalPartners.size} total partners in SQLite")
                 Result.success(finalPartners)
             } catch (e: Exception) {
@@ -697,11 +705,11 @@ class AccountabilityRepository(
     }
 
     suspend fun getGuardians(): List<PartnerEntity> = withContext(Dispatchers.IO) {
-        val list = database.getPartnersByRole(PartnerEntity.ROLE_GUARDIAN)
+        val list = partnerDao.getPartnersByRoleBlocking(PartnerEntity.ROLE_GUARDIAN)
         if (list.isNotEmpty()) return@withContext list
 
         // Self-Healing Fallback: Check if device policy is supervised and has guardianUid
-        val policy = database.getDevicePolicy()?.toBundle()
+        val policy = policyDao.getDevicePolicyBlocking()?.toBundle()
         if (policy != null && policy.isSupervised && !policy.guardianUid.isNullOrBlank()) {
             val activeGuardianUid = resolveActivePartnerUid(policy.guardianUid, CODE_LOCKED)
             val synthesizedGuardian = PartnerEntity(
@@ -714,7 +722,7 @@ class AccountabilityRepository(
                 lastSyncAt = TrustedTimeProvider.currentTimeMillis(appContext)
             )
             try {
-                database.savePartner(synthesizedGuardian)
+                partnerDao.savePartnerBlocking(synthesizedGuardian)
                 Log.i(TAG, "Self-healed guardian record in SQLite: ${synthesizedGuardian.displayName}")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to self-heal guardian in SQLite", e)
@@ -725,7 +733,7 @@ class AccountabilityRepository(
     }
 
     suspend fun getWards(): List<PartnerEntity> = withContext(Dispatchers.IO) {
-        database.getPartnersByRole(PartnerEntity.ROLE_WARD)
+        partnerDao.getPartnersByRoleBlocking(PartnerEntity.ROLE_WARD)
     }
 
     suspend fun deletePartner(partnerId: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -735,7 +743,7 @@ class AccountabilityRepository(
                 .collection("partners").document(partnerId)
                 .delete()
                 .await()
-            database.deletePartner(partnerId)
+            partnerDao.deletePartnerBlocking(partnerId)
             Log.i(TAG, "Successfully deleted partner $partnerId from cloud and local database")
             Result.success(Unit)
         } catch (e: Exception) {
@@ -800,7 +808,7 @@ class AccountabilityRepository(
             }
 
             // 3. Update guardianName in policies of all my wards
-            val wards = database.getPartnersByRole(PartnerEntity.ROLE_WARD)
+            val wards = partnerDao.getPartnersByRoleBlocking(PartnerEntity.ROLE_WARD)
             for (ward in wards) {
                 try {
                     firestore.collection("policies").document(ward.id)
@@ -830,7 +838,7 @@ class AccountabilityRepository(
             }
 
             // 1. Update SQLite locally (immediate)
-            database.updatePartnerDisplayName(partnerId, cleanName)
+            partnerDao.updatePartnerDisplayNameBlocking(partnerId, cleanName, TrustedTimeProvider.currentTimeMillis(appContext))
 
             // 2. Sync to Firestore in background
             val myUid = getOrCreateCurrentUid()

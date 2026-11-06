@@ -18,7 +18,9 @@ import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
 import com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher
-import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
+import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
+import com.drmohammed.antiporn.data.local.db.dao.DevicePolicyDao
+import com.drmohammed.antiporn.data.local.db.dao.PartnerDao
 import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.BrowserShield
@@ -45,7 +47,8 @@ import kotlinx.coroutines.withContext
  */
 class PolicyRepository(
     context: Context,
-    private val database: AntiPornDatabase = AntiPornDatabase.getInstance(context)
+    private val policyDao: DevicePolicyDao = HisnRoomDatabase.getInstance(context).devicePolicyDao(),
+    private val partnerDao: PartnerDao = HisnRoomDatabase.getInstance(context).partnerDao()
 ) {
 
     private val appContext = context.applicationContext
@@ -67,11 +70,11 @@ class PolicyRepository(
 
     private fun loadInitialPolicy(): DevicePolicyBundle {
         return try {
-            val loaded = database.getDevicePolicy()?.toBundle()
+            val loaded = policyDao.getDevicePolicyBlocking()?.toBundle()
             if (loaded != null) {
                 // Reconcile standalone devices (no guardians attached) on initial policy v1
                 val hasGuardians = try {
-                    database.getPartnersByRole(com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN).isNotEmpty()
+                    partnerDao.getPartnersByRoleBlocking(com.drmohammed.antiporn.data.local.db.entity.PartnerEntity.ROLE_GUARDIAN).isNotEmpty()
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed checking guardians in SQLite during cold boot reconcile", e)
                     false
@@ -87,7 +90,7 @@ class PolicyRepository(
                             createdAt = loaded.updatedAt,
                             lastSyncAt = loaded.updatedAt
                         )
-                        database.savePartner(guardian)
+                        partnerDao.savePartnerBlocking(guardian)
                         Log.i(TAG, "Reconciled missing guardian in SQLite on cold boot: ${loaded.guardianName}")
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed reconciling missing guardian in SQLite", e)
@@ -106,7 +109,7 @@ class PolicyRepository(
                     val reconciled = workingPolicy.copy(updatedAt = TrustedTimeProvider.currentTimeMillis(appContext))
                     repositoryScope.launch {
                         try {
-                            database.saveDevicePolicy(com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity.fromBundle(reconciled))
+                            policyDao.saveDevicePolicy(com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity.fromBundle(reconciled))
                             Log.i(TAG, "Reconciled standalone device policy on cold boot (version=${reconciled.version})")
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed saving reconciled policy", e)
@@ -117,7 +120,9 @@ class PolicyRepository(
                     loaded
                 }
             } else {
-                DevicePolicyBundle.defaultPolicy()
+                val defaultBundle = DevicePolicyBundle.defaultPolicy()
+                policyDao.saveDevicePolicyBlocking(com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity.fromBundle(defaultBundle))
+                defaultBundle
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error loading initial policy from SQLite", e)
@@ -256,7 +261,7 @@ class PolicyRepository(
                                                 createdAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext),
                                                 lastSyncAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)
                                             )
-                                            database.savePartner(partner)
+                                            partnerDao.savePartnerBlocking(partner)
                                         }
 
                                         val enforcedPolicy = cloudPolicy
@@ -317,7 +322,7 @@ class PolicyRepository(
             return
         }
 
-        database.saveDevicePolicy(DevicePolicyEntity.fromBundle(bundle))
+        policyDao.saveDevicePolicyBlocking(DevicePolicyEntity.fromBundle(bundle))
         _currentPolicyFlow.value = bundle
         com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = bundle.isSelfControlAllowed
 
