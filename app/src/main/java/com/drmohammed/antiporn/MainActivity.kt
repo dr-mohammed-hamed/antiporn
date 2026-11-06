@@ -261,8 +261,7 @@ class MainActivity : AppCompatActivity(),
             if (!ProtectionEngine.isSystemFullyProtected(this)) {
                 triggerEnforcement(showToast = false)
             }
-            com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).ensureInitialBaselineSeededAsync()
-            com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).reconcileUnapprovedInstalledAppsAsync()
+            com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).syncZeroTrustBaselineAndReconcileAsync()
         }
         AppInventoryManager.getInstance(this).syncInventoryToCloudAsync()
     }

@@ -765,6 +765,8 @@ class ApprovalRepository(
         val rejectedSet = localApprovals.filter { it.isRejected }.map { it.packageName }.toSet()
 
         var strayAppFrozen = false
+        val doEnabledAt = getDeviceOwnerEnabledTimestamp()
+
         for (pkgInfo in installedPackages) {
             val pkg = pkgInfo.packageName ?: continue
             if (pkg == appContext.packageName) continue
@@ -782,6 +784,31 @@ class ApprovalRepository(
             if (approvedSet.contains(pkg)) continue
             if (AppSuspensionShield.isBlacklisted(pkg)) continue
             if (com.drmohammed.antiporn.curfew.CurfewAppResolver.isSystemCriticalOrImmune(appContext, pkg)) continue
+
+            // Auto-Adopt Pre-existing Apps: If the app was installed prior to or during Device Owner activation,
+            // it is part of the user's pre-existing baseline. Auto-adopt it into approved baseline without freezing.
+            val firstInstallTime = pkgInfo.firstInstallTime
+            val isPreExisting = doEnabledAt > 0L && firstInstallTime > 0L && firstInstallTime <= (doEnabledAt + DO_ACTIVATION_GRACE_PERIOD_MS)
+            if (isPreExisting) {
+                Log.i(TAG, "🌱 [AUTO_ADOPT_PRE_EXISTING] Package '$pkg' was installed prior to Device Owner activation ($firstInstallTime <= $doEnabledAt). Auto-adopting into approved baseline.")
+                val appName = try {
+                    if (appInfo != null) pm.getApplicationLabel(appInfo).toString() else pkg
+                } catch (e: Exception) {
+                    pkg
+                }
+                val nowMs = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)
+                val baselineEntity = PendingApprovalEntity(
+                    packageName = pkg,
+                    appName = appName,
+                    requestedAt = firstInstallTime,
+                    status = PendingApprovalEntity.STATUS_APPROVED,
+                    decidedBy = "INITIAL_DEVICE_BASELINE",
+                    decidedAt = nowMs,
+                    isCloudSynced = true
+                )
+                approvalDao.savePendingApprovalBlocking(baselineEntity)
+                continue
+            }
 
             // If it was already rejected by guardian, ensure it is suspended/hidden if active, but do NOT call freezeAndSubmitApprovalLocal or modify status to PENDING
             if (rejectedSet.contains(pkg)) {
@@ -840,12 +867,66 @@ class ApprovalRepository(
         }
     }
 
+    /**
+     * Retrieves the timestamp when Device Owner was enabled, or initializes it if DO is currently active.
+     */
+    fun getDeviceOwnerEnabledTimestamp(): Long {
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        var ts = prefs.getLong(KEY_DEVICE_OWNER_ENABLED_AT, 0L)
+        if (ts == 0L && com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) {
+            ts = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)
+            prefs.edit().putLong(KEY_DEVICE_OWNER_ENABLED_AT, ts).apply()
+            Log.i(TAG, "Recorded initial Device Owner enabled timestamp: $ts")
+        }
+        return ts
+    }
+
+    /**
+     * Explicitly records or updates the timestamp when Device Owner was granted to this app.
+     */
+    fun recordDeviceOwnerEnabledTimestamp(timestamp: Long = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)) {
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val existing = prefs.getLong(KEY_DEVICE_OWNER_ENABLED_AT, 0L)
+        if (existing == 0L || timestamp > 0L) {
+            prefs.edit().putLong(KEY_DEVICE_OWNER_ENABLED_AT, timestamp).apply()
+            Log.i(TAG, "Device Owner enabled timestamp recorded: $timestamp")
+        }
+    }
+
+    /**
+     * Sequentially establishes or updates the Zero-Trust baseline and reconciles stray applications.
+     * Eliminates race conditions by ensuring baseline is fully established before any unapproved app checks run.
+     */
+    @Synchronized
+    fun syncZeroTrustBaselineAndReconcile() {
+        if (!com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(appContext)) return
+        getDeviceOwnerEnabledTimestamp()
+        ensureInitialBaselineSeeded()
+        reconcileUnapprovedInstalledApps()
+    }
+
+    /**
+     * Asynchronously executes [syncZeroTrustBaselineAndReconcile] in a single background coroutine.
+     */
+    fun syncZeroTrustBaselineAndReconcileAsync(onComplete: (() -> Unit)? = null) {
+        scope.launch {
+            try {
+                syncZeroTrustBaselineAndReconcile()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in syncZeroTrustBaselineAndReconcileAsync", e)
+            } finally {
+                onComplete?.invoke()
+            }
+        }
+    }
 
 
     companion object {
         private const val TAG = "AntiPorn_ApprovalRepo"
         private const val PREFS_NAME = "zero_trust_approval_prefs"
         private const val KEY_BASELINE_SEEDED = "is_zero_trust_baseline_seeded"
+        const val KEY_DEVICE_OWNER_ENABLED_AT = "device_owner_enabled_at_timestamp"
+        private const val DO_ACTIVATION_GRACE_PERIOD_MS = 15_000L
 
         @Volatile
         private var instance: ApprovalRepository? = null
