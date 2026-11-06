@@ -21,6 +21,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -268,6 +269,20 @@ class OtaRepository(private val appContext: Context) {
             downloadAndInstall(context, info, showNotification = true)
         } else {
             Log.d(TAG, "Autonomous OTA check finished: no newer updates available")
+        }
+    }
+
+    /**
+     * Non-blocking trigger executing autonomous OTA check & download on the repository singleton scope.
+     * Prevents short-lived service termination from killing background downloads.
+     */
+    fun checkForUpdatesAndAutoInstallAsync(context: Context) {
+        repositoryScope.launch {
+            try {
+                checkForUpdatesAndAutoInstall(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in checkForUpdatesAndAutoInstallAsync", e)
+            }
         }
     }
 

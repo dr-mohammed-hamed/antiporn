@@ -93,11 +93,7 @@ class PairingCodeReceiver : BroadcastReceiver() {
                     is PromotionResult.Failure -> {
                         Log.e(TAG, "Device Owner provisioning failed: ${result.message}")
 
-                        val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                        } else {
-                            PendingIntent.FLAG_UPDATE_CURRENT
-                        }
+                        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
                         val wizardIntent = Intent(appContext, ProvisioningWizardActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
