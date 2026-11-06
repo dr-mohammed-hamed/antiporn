@@ -35,6 +35,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.drmohammed.antiporn.ai.service.ScreenAiProjectionService
+import com.drmohammed.antiporn.notification.router.NotificationActionRouter
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
@@ -144,6 +145,7 @@ class MainActivity : AppCompatActivity(),
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
         setupNavigation(savedInstanceState)
+        handleIntentNavigation(intent)
         setupOtaTracking()
 
         splashController = SplashAnimationController(this).apply {
@@ -209,6 +211,22 @@ class MainActivity : AppCompatActivity(),
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntentNavigation(intent)
+    }
+
+    private fun handleIntentNavigation(intent: Intent?) {
+        if (intent == null) return
+        if (intent.hasExtra(NotificationActionRouter.EXTRA_NAVIGATE_TAB)) {
+            val tabPos = intent.getIntExtra(NotificationActionRouter.EXTRA_NAVIGATE_TAB, 0)
+            intent.removeExtra(NotificationActionRouter.EXTRA_NAVIGATE_TAB)
+            val menuId = positionToMenuId(tabPos)
+            navigateToTab(menuId)
         }
     }
 

@@ -26,6 +26,8 @@
     <string name="protection_vpn_channel_desc">Notifications for night curfew, nap mode, and guardian internet block</string>
     <string name="protection_events_channel_name">Protection &amp; Approval Alerts</string>
     <string name="protection_events_channel_desc">Alerts for guardian responses and timer completions</string>
+    <string name="critical_alerts_channel_name">Critical Security Alerts</string>
+    <string name="critical_alerts_channel_desc">Urgent alerts for security tampering and protection bypass attempts</string>
 
     <string name="notif_guardian_lockdown_title">Full Internet Blocked by Guardian</string>
     <string name="notif_guardian_lockdown_desc">The guardian has completely isolated device internet data. Calls and SMS work normally.</string>
@@ -487,6 +489,7 @@
     <string name="btn_grant_usage_access">Grant Usage Access</string>
     <string name="card_curfew_usage_missing_subtext">Usage access permission required for foreground app detection.</string>
     <string name="toast_open_settings_failed">Failed opening system settings.</string>
+    <string name="toast_open_app_failed">Unable to open the requested app</string>
     <string name="curfew_google_search_blocked">Google Search app is restricted during curfew.</string>
     <string name="btn_nap_start">Start Nap Mode (1 Hour)</string>
     <string name="btn_nap_active">Nap Mode Active</string>
@@ -662,4 +665,48 @@
     <string name="policy_summary_format">v%1$d | %2$s (%3$02d:%4$02d)</string>
     <string name="log_latency_format">%1$d ms</string>
     <string name="telemetry_share_subject">AntiPorn Diagnostic Report</string>
+
+    <!-- Notification Center & History -->
+    <string name="title_notification_center">Notification Center</string>
+    <string name="action_mark_all_read">Mark all as read</string>
+    <string name="action_clear_notifications">Clear history</string>
+    <string name="filter_all">All</string>
+    <string name="filter_approvals">Approvals</string>
+    <string name="filter_guardian">Guardian</string>
+    <string name="filter_curfew">Curfew</string>
+    <string name="filter_shields">Shields</string>
+    <string name="filter_ai">AI &amp; Vision</string>
+    <string name="filter_ota">Updates</string>
+    <string name="filter_system">System</string>
+    <string name="empty_notifications_title">No notifications yet</string>
+    <string name="empty_notifications_desc">Notification history is empty. Events and alerts will appear here as they occur.</string>
+    <string name="confirm_clear_notifications_title">Clear notification history</string>
+    <string name="confirm_clear_notifications_msg">Are you sure you want to delete all recorded notifications?</string>
+    <string name="btn_confirm_clear">Clear</string>
+
+    <!-- Event Notification Strings -->
+    <string name="notif_curfew_pre_warn_title">Curfew starting soon</string>
+    <string name="notif_curfew_pre_warn_msg">Night curfew will begin in 15 minutes (at %1$s). Please wrap up your tasks and save your work.</string>
+    <string name="notif_curfew_start_title">Night curfew is now active</string>
+    <string name="notif_curfew_start_msg">Night curfew has been activated. Distraction apps and internet access are paused until morning.</string>
+    <string name="notif_curfew_end_title">Good morning! Night curfew ended</string>
+    <string name="notif_curfew_end_msg">Night curfew has concluded. Apps and internet connection are now restored.</string>
+    <string name="notif_tamper_alert_title">Protection shield modification detected</string>
+    <string name="notif_tamper_alert_msg">An attempt to disable or modify protection settings (DNS or time) was detected, and shield enforcement was automatically restored.</string>
+    <string name="notif_policy_update_title">Protection policy updated</string>
+    <string name="notif_policy_update_msg">Your guardian has updated device protection policies and configurations.</string>
+    <string name="notif_ota_success_title">Update completed successfully</string>
+    <string name="notif_ota_success_msg">Hisn has been successfully updated to version %1$s with all protection measures intact.</string>
+    <string name="notif_ota_fail_title">Automatic update failed</string>
+    <string name="notif_ota_fail_msg">Failed to install the update package (error code: %1$d).</string>
+    <string name="notif_ota_repo_fail_title">Unable to complete automatic update</string>
+    <string name="notif_ota_repo_fail_msg">Failed to install update (%1$s): %2$s</string>
+    <string name="notif_ota_repo_download_fail_title">Unable to download automatic update</string>
+    <string name="notif_ota_repo_download_fail_msg">An error occurred while downloading or verifying update package (%1$s).</string>
+    <string name="notif_approval_deferred_curfew_desc">%1$s was approved by %2$s, and will be unlocked as soon as morning curfew ends.</string>
+    <string name="notif_breakout_alert_title">Pending emergency breakout request</string>
+    <string name="notif_breakout_alert_desc">%1$s requested an emergency unlock (%2$s remaining). You can reject to protect your ward.</string>
+    <string name="notif_ward_approval_req_title">New application review request</string>
+    <string name="notif_ward_approval_req_desc">Ward is requesting permission to install and use (%1$s).</string>
+    <string name="default_web_client_id" translatable="false"></string>
 </resources>

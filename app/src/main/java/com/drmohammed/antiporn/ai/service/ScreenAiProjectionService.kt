@@ -2,6 +2,10 @@ package com.drmohammed.antiporn.ai.service
 
 import android.app.Notification
 import android.app.NotificationChannel
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.model.NotificationActionType
+import com.drmohammed.antiporn.notification.model.NotificationCategory
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -84,8 +88,8 @@ class ScreenAiProjectionService : Service() {
 
     companion object {
         private const val TAG = "ScreenAiProjectionSvc"
-        private const val CHANNEL_ID = "antiporn_ai_channel"
-        private const val NOTIFICATION_ID = 2001
+        private const val CHANNEL_ID = NotificationRegistry.CHANNEL_ID_AI
+        private const val NOTIFICATION_ID = NotificationRegistry.FGS_AI_PROJECTION_ID
         private const val ALERT_DEBOUNCE_MS = 5000L // خافق التكرار لمنع الإغراق
         const val ANCHOR_INTERVAL_MS = 200L
 
@@ -686,6 +690,21 @@ class ScreenAiProjectionService : Service() {
         // 2. إظهار رسالة Toast على الخيط الرئيسي
         mainHandler.post {
             Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+        }
+
+        // 3. تسجيل الحدث في مركز الإشعارات الداخلي مع نافذة تهدئة 15 دقيقة
+        try {
+            AppNotificationManager.getInstance(applicationContext).postEventNotification(
+                category = NotificationCategory.AI,
+                title = getString(R.string.ai_service_channel_name),
+                message = message,
+                dedupKey = "ai_porn_alert_hard",
+                cooldownMs = 15 * 60 * 1000L,
+                actionType = NotificationActionType.NONE,
+                postSystemNotification = false
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Error recording hard porn alert in in-app notification center", e)
         }
 
         Log.w(TAG, "[ALERT] HARD PORN ALERT TRIGGERED: $message")

@@ -111,12 +111,12 @@
 
         <receiver
             android:name=".curfew.CurfewAlarmReceiver"
-            android:exported="true"
-            tools:ignore="ExportedReceiver">
+            android:exported="false" />
+
+        <receiver
+            android:name=".curfew.CurfewBootReceiver"
+            android:exported="true">
             <intent-filter>
-                <action android:name="com.drmohammed.antiporn.ACTION_CURFEW_START" />
-                <action android:name="com.drmohammed.antiporn.ACTION_CURFEW_END" />
-                <action android:name="com.drmohammed.antiporn.ACTION_NAP_END" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.TIME_SET" />
@@ -196,6 +196,13 @@
             android:name=".provisioning.ui.ProvisioningWizardActivity"
             android:exported="false"
             android:label="@string/provisioning_wizard_title" />
+
+        <!-- In-App Notification Center -->
+        <activity
+            android:name=".ui.notification.NotificationCenterActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:label="@string/title_notification_center" />
 
         <service
             android:name=".provisioning.service.AdbPairingNotificationService"

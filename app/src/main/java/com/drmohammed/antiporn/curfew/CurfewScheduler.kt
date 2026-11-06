@@ -17,6 +17,7 @@ import java.util.Calendar
 object CurfewScheduler {
 
     private const val TAG = "AntiPorn_CurfewScheduler"
+    private const val REQUEST_CODE_PRE_WARNING = 3000
     private const val REQUEST_CODE_START = 3001
     private const val REQUEST_CODE_END = 3002
 
@@ -140,6 +141,22 @@ object CurfewScheduler {
             val endElapsed = TrustedTimeProvider.computeElapsedTrigger(nextEnd.timeInMillis)
             setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, startElapsed, startPendingIntent)
             setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, endElapsed, endPendingIntent)
+
+            // Pre-Curfew 15-Minute Warning Alarm (Strictly guarded against retroactive triggers)
+            val nowMs = TrustedTimeProvider.currentTimeMillis(context)
+            val preWarningMs = nextStart.timeInMillis - 15 * 60 * 1000L
+            if (preWarningMs > nowMs) {
+                val preWarningIntent = Intent(context, CurfewAlarmReceiver::class.java).apply {
+                    action = CurfewAlarmReceiver.ACTION_CURFEW_PRE_WARNING
+                }
+                val preWarningPendingIntent = PendingIntent.getBroadcast(context, REQUEST_CODE_PRE_WARNING, preWarningIntent, flags)
+                val preElapsed = TrustedTimeProvider.computeElapsedTrigger(preWarningMs)
+                setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, preElapsed, preWarningPendingIntent)
+                Log.i(TAG, "Scheduled pre-curfew 15-minute warning alarm at $preWarningMs (elapsed=$preElapsed)")
+            } else {
+                Log.d(TAG, "Skipping pre-curfew warning for today because remaining time is less than 15 minutes")
+            }
+
             Log.i(TAG, "Scheduled exact curfew alarms via ELAPSED_REALTIME: Start at ${nextStart.time} (elapsed=$startElapsed), End at ${nextEnd.time} (elapsed=$endElapsed)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact alarms via AlarmManager", e)

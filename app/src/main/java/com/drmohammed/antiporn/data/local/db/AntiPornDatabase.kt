@@ -12,6 +12,9 @@ import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.drmohammed.antiporn.data.local.db.entity.PendingApprovalEntity
+import com.drmohammed.antiporn.notification.model.InAppNotification
+import com.drmohammed.antiporn.notification.model.NotificationActionType
+import com.drmohammed.antiporn.notification.model.NotificationCategory
 import com.drmohammed.antiporn.telemetry.DiagnosticEventDto
 
 /**
@@ -36,7 +39,7 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
     companion object {
         private const val TAG = "AntiPorn_Database"
         const val DATABASE_NAME = "antiporn_guard.db"
-        const val DATABASE_VERSION = 3
+        const val DATABASE_VERSION = 4
 
         // Table Device Policies
         const val TABLE_DEVICE_POLICIES = "device_policies"
@@ -75,6 +78,19 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
         const val COL_DIAG_IS_SUCCESS = "is_success"
         const val COL_DIAG_ERROR_DETAILS = "error_details"
         const val COL_DIAG_CONTEXT_METADATA = "context_metadata"
+
+        // Table In-App Notifications
+        const val TABLE_IN_APP_NOTIFICATIONS = "in_app_notifications"
+        const val COL_NOTIF_ID = "id"
+        const val COL_NOTIF_DEDUP_KEY = "dedup_key"
+        const val COL_NOTIF_CATEGORY = "category"
+        const val COL_NOTIF_TITLE = "title"
+        const val COL_NOTIF_MESSAGE = "message"
+        const val COL_NOTIF_TIMESTAMP = "timestamp"
+        const val COL_NOTIF_IS_READ = "is_read"
+        const val COL_NOTIF_ACTION_TYPE = "action_type"
+        const val COL_NOTIF_ACTION_PAYLOAD = "action_payload"
+        const val COL_NOTIF_IMPORTANCE = "importance"
 
         @Volatile
         private var instance: AntiPornDatabase? = null
@@ -158,6 +174,28 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_tag ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TAG)")
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_diag_tag_timestamp ON $TABLE_DIAGNOSTIC_EVENTS ($COL_DIAG_TAG, $COL_DIAG_TIMESTAMP DESC)")
 
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS $TABLE_IN_APP_NOTIFICATIONS (
+                    $COL_NOTIF_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    $COL_NOTIF_DEDUP_KEY TEXT UNIQUE,
+                    $COL_NOTIF_CATEGORY TEXT NOT NULL,
+                    $COL_NOTIF_TITLE TEXT NOT NULL,
+                    $COL_NOTIF_MESSAGE TEXT NOT NULL,
+                    $COL_NOTIF_TIMESTAMP INTEGER NOT NULL,
+                    $COL_NOTIF_IS_READ INTEGER NOT NULL DEFAULT 0,
+                    $COL_NOTIF_ACTION_TYPE TEXT,
+                    $COL_NOTIF_ACTION_PAYLOAD TEXT,
+                    $COL_NOTIF_IMPORTANCE INTEGER NOT NULL DEFAULT 1
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_notif_timestamp ON $TABLE_IN_APP_NOTIFICATIONS ($COL_NOTIF_TIMESTAMP DESC)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_notif_is_read ON $TABLE_IN_APP_NOTIFICATIONS ($COL_NOTIF_IS_READ)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_notif_category ON $TABLE_IN_APP_NOTIFICATIONS ($COL_NOTIF_CATEGORY)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_notif_dedup ON $TABLE_IN_APP_NOTIFICATIONS ($COL_NOTIF_DEDUP_KEY)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_notif_category_timestamp ON $TABLE_IN_APP_NOTIFICATIONS ($COL_NOTIF_CATEGORY, $COL_NOTIF_TIMESTAMP DESC)")
+
             // Seed default policy if empty
             val defaultBundle = DevicePolicyBundle.defaultPolicy()
             val initialValues = ContentValues().apply {
@@ -218,6 +256,39 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
             } catch (e: Exception) {
                 Log.e(TAG, "Failed creating diagnostic_events table during upgrade to version 3", e)
                 throw SQLException("Failed to upgrade database to version 3", e)
+            } finally {
+                db.endTransaction()
+            }
+        }
+        if (oldVersion < 4) {
+            db.beginTransaction()
+            try {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS $TABLE_IN_APP_NOTIFICATIONS (
+                        $COL_NOTIF_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                        $COL_NOTIF_DEDUP_KEY TEXT UNIQUE,
+                        $COL_NOTIF_CATEGORY TEXT NOT NULL,
+                        $COL_NOTIF_TITLE TEXT NOT NULL,
+                        $COL_NOTIF_MESSAGE TEXT NOT NULL,
+                        $COL_NOTIF_TIMESTAMP INTEGER NOT NULL,
+                        $COL_NOTIF_IS_READ INTEGER NOT NULL DEFAULT 0,
+                        $COL_NOTIF_ACTION_TYPE TEXT,
+                        $COL_NOTIF_ACTION_PAYLOAD TEXT,
+                        $COL_NOTIF_IMPORTANCE INTEGER NOT NULL DEFAULT 1
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_notif_timestamp ON $TABLE_IN_APP_NOTIFICATIONS ($COL_NOTIF_TIMESTAMP DESC)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_notif_is_read ON $TABLE_IN_APP_NOTIFICATIONS ($COL_NOTIF_IS_READ)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_notif_category ON $TABLE_IN_APP_NOTIFICATIONS ($COL_NOTIF_CATEGORY)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_notif_dedup ON $TABLE_IN_APP_NOTIFICATIONS ($COL_NOTIF_DEDUP_KEY)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_notif_category_timestamp ON $TABLE_IN_APP_NOTIFICATIONS ($COL_NOTIF_CATEGORY, $COL_NOTIF_TIMESTAMP DESC)")
+                db.setTransactionSuccessful()
+                Log.i(TAG, "Successfully upgraded AntiPornDatabase to version 4 (added $TABLE_IN_APP_NOTIFICATIONS)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed creating in_app_notifications table during upgrade to version 4", e)
+                throw SQLException("Failed to upgrade database to version 4", e)
             } finally {
                 db.endTransaction()
             }
@@ -807,5 +878,253 @@ class AntiPornDatabase private constructor(context: Context) : SQLiteOpenHelper(
         } finally {
             cursor?.close()
         }
+    }
+
+    // ==========================================
+    // In-App Notification Operations
+    // ==========================================
+
+    @Synchronized
+    fun insertOrUpdateNotification(notification: InAppNotification, cooldownMs: Long = 0L): Long {
+        val db = writableDatabase
+        val sanitizedDedupKey = notification.dedupKey?.trim()?.ifEmpty { null }
+
+        if (sanitizedDedupKey != null) {
+            val existing = getNotificationByDedupKey(sanitizedDedupKey)
+            if (existing != null) {
+                val elapsedSinceLast = notification.timestamp - existing.timestamp
+                if (cooldownMs > 0 && (elapsedSinceLast in 0 until cooldownMs || elapsedSinceLast < 0)) {
+                    Log.d(TAG, "Notification for $sanitizedDedupKey ignored due to active cooldown (${elapsedSinceLast}ms < ${cooldownMs}ms)")
+                    return -1L
+                }
+
+                // Cooldown passed: Update existing notification to make it prominent and unread again
+                val values = ContentValues().apply {
+                    put(COL_NOTIF_CATEGORY, notification.category.key)
+                    put(COL_NOTIF_TITLE, notification.title)
+                    put(COL_NOTIF_MESSAGE, notification.message)
+                    put(COL_NOTIF_TIMESTAMP, notification.timestamp)
+                    put(COL_NOTIF_IS_READ, 0)
+                    put(COL_NOTIF_ACTION_TYPE, notification.actionType.key)
+                    put(COL_NOTIF_ACTION_PAYLOAD, notification.actionPayload)
+                    put(COL_NOTIF_IMPORTANCE, notification.importance)
+                }
+                return try {
+                    val rows = db.update(TABLE_IN_APP_NOTIFICATIONS, values, "$COL_NOTIF_ID = ?", arrayOf(existing.id.toString()))
+                    if (rows > 0) existing.id else -1L
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error updating existing notification for dedupKey $sanitizedDedupKey", e)
+                    -1L
+                }
+            }
+        }
+
+        // Insert fresh notification
+        val values = ContentValues().apply {
+            put(COL_NOTIF_DEDUP_KEY, sanitizedDedupKey)
+            put(COL_NOTIF_CATEGORY, notification.category.key)
+            put(COL_NOTIF_TITLE, notification.title)
+            put(COL_NOTIF_MESSAGE, notification.message)
+            put(COL_NOTIF_TIMESTAMP, notification.timestamp)
+            put(COL_NOTIF_IS_READ, if (notification.isRead) 1 else 0)
+            put(COL_NOTIF_ACTION_TYPE, notification.actionType.key)
+            put(COL_NOTIF_ACTION_PAYLOAD, notification.actionPayload)
+            put(COL_NOTIF_IMPORTANCE, notification.importance)
+        }
+
+        return try {
+            val rowId = db.insertWithOnConflict(
+                TABLE_IN_APP_NOTIFICATIONS,
+                null,
+                values,
+                SQLiteDatabase.CONFLICT_REPLACE
+            )
+            rowId
+        } catch (e: Exception) {
+            Log.e(TAG, "Error inserting in-app notification [${notification.title}]", e)
+            -1L
+        }
+    }
+
+    fun getNotificationByDedupKey(dedupKey: String): InAppNotification? {
+        val db = readableDatabase
+        var cursor: Cursor? = null
+        return try {
+            cursor = db.query(
+                TABLE_IN_APP_NOTIFICATIONS,
+                null,
+                "$COL_NOTIF_DEDUP_KEY = ?",
+                arrayOf(dedupKey),
+                null,
+                null,
+                null
+            )
+            if (cursor.moveToFirst()) {
+                parseNotificationCursor(cursor)
+            } else null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching notification by dedupKey $dedupKey", e)
+            null
+        } finally {
+            cursor?.close()
+        }
+    }
+
+    fun getAllNotifications(limit: Int = 100, category: String? = null): List<InAppNotification> {
+        val db = readableDatabase
+        val list = mutableListOf<InAppNotification>()
+        var cursor: Cursor? = null
+        try {
+            val selection = if (category.isNullOrBlank() || category == "ALL") null else "$COL_NOTIF_CATEGORY = ?"
+            val selectionArgs = if (category.isNullOrBlank() || category == "ALL") null else arrayOf(category)
+            cursor = db.query(
+                TABLE_IN_APP_NOTIFICATIONS,
+                null,
+                selection,
+                selectionArgs,
+                null,
+                null,
+                "$COL_NOTIF_TIMESTAMP DESC",
+                limit.toString()
+            )
+            while (cursor.moveToNext()) {
+                list.add(parseNotificationCursor(cursor))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error reading all notifications", e)
+        } finally {
+            cursor?.close()
+        }
+        return list
+    }
+
+    fun getUnreadNotificationsCount(): Int {
+        val db = readableDatabase
+        var cursor: Cursor? = null
+        return try {
+            cursor = db.rawQuery(
+                "SELECT COUNT(*) FROM $TABLE_IN_APP_NOTIFICATIONS WHERE $COL_NOTIF_IS_READ = 0",
+                null
+            )
+            if (cursor.moveToFirst()) cursor.getInt(0) else 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting unread notifications count", e)
+            0
+        } finally {
+            cursor?.close()
+        }
+    }
+
+    @Synchronized
+    fun markNotificationAsRead(id: Long): Boolean {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(COL_NOTIF_IS_READ, 1)
+        }
+        return try {
+            val rows = db.update(TABLE_IN_APP_NOTIFICATIONS, values, "$COL_NOTIF_ID = ?", arrayOf(id.toString()))
+            rows > 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Error marking notification $id as read", e)
+            false
+        }
+    }
+
+    @Synchronized
+    fun markAllNotificationsAsRead(): Int {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(COL_NOTIF_IS_READ, 1)
+        }
+        return try {
+            db.update(TABLE_IN_APP_NOTIFICATIONS, values, "$COL_NOTIF_IS_READ = 0", null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error marking all notifications as read", e)
+            0
+        }
+    }
+
+    @Synchronized
+    fun deleteNotification(id: Long): Boolean {
+        val db = writableDatabase
+        return try {
+            val rows = db.delete(TABLE_IN_APP_NOTIFICATIONS, "$COL_NOTIF_ID = ?", arrayOf(id.toString()))
+            rows > 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting notification $id", e)
+            false
+        }
+    }
+
+    @Synchronized
+    fun clearAllNotifications(): Int {
+        val db = writableDatabase
+        return try {
+            db.delete(TABLE_IN_APP_NOTIFICATIONS, null, null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error clearing all notifications", e)
+            0
+        }
+    }
+
+    @Synchronized
+    fun pruneOldNotifications(maxKeep: Int = 200, olderThanDays: Int = 30): Int {
+        val db = writableDatabase
+        var pruned = 0
+        db.beginTransaction()
+        try {
+            if (olderThanDays > 0) {
+                val cutoff = TrustedTimeProvider.currentTimeMillis() - (olderThanDays.toLong() * 24 * 60 * 60 * 1000L)
+                pruned += db.delete(TABLE_IN_APP_NOTIFICATIONS, "$COL_NOTIF_TIMESTAMP < ?", arrayOf(cutoff.toString()))
+            }
+            if (maxKeep > 0) {
+                val total = db.rawQuery("SELECT COUNT(*) FROM $TABLE_IN_APP_NOTIFICATIONS", null).use { countCursor ->
+                    if (countCursor.moveToFirst()) countCursor.getInt(0) else 0
+                }
+
+                if (total > maxKeep) {
+                    val excess = total - maxKeep
+                    val sql = "DELETE FROM $TABLE_IN_APP_NOTIFICATIONS WHERE $COL_NOTIF_ID IN (" +
+                            "SELECT $COL_NOTIF_ID FROM $TABLE_IN_APP_NOTIFICATIONS ORDER BY $COL_NOTIF_TIMESTAMP ASC, $COL_NOTIF_ID ASC LIMIT ?)"
+                    db.execSQL(sql, arrayOf<Any>(excess))
+                    pruned += excess
+                }
+            }
+            db.setTransactionSuccessful()
+            if (pruned > 0) {
+                Log.i(TAG, "Pruned $pruned excess/stale in-app notifications (kept last $maxKeep)")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error pruning old in-app notifications", e)
+        } finally {
+            db.endTransaction()
+        }
+        return pruned
+    }
+
+    private fun parseNotificationCursor(cursor: Cursor): InAppNotification {
+        val idIdx = cursor.getColumnIndexOrThrow(COL_NOTIF_ID)
+        val dedupIdx = cursor.getColumnIndexOrThrow(COL_NOTIF_DEDUP_KEY)
+        val categoryIdx = cursor.getColumnIndexOrThrow(COL_NOTIF_CATEGORY)
+        val titleIdx = cursor.getColumnIndexOrThrow(COL_NOTIF_TITLE)
+        val msgIdx = cursor.getColumnIndexOrThrow(COL_NOTIF_MESSAGE)
+        val timeIdx = cursor.getColumnIndexOrThrow(COL_NOTIF_TIMESTAMP)
+        val readIdx = cursor.getColumnIndexOrThrow(COL_NOTIF_IS_READ)
+        val actionIdx = cursor.getColumnIndexOrThrow(COL_NOTIF_ACTION_TYPE)
+        val payloadIdx = cursor.getColumnIndexOrThrow(COL_NOTIF_ACTION_PAYLOAD)
+        val impIdx = cursor.getColumnIndexOrThrow(COL_NOTIF_IMPORTANCE)
+
+        return InAppNotification(
+            id = cursor.getLong(idIdx),
+            dedupKey = if (cursor.isNull(dedupIdx)) null else cursor.getString(dedupIdx),
+            category = NotificationCategory.fromKey(cursor.getString(categoryIdx)),
+            title = if (cursor.isNull(titleIdx)) "" else (cursor.getString(titleIdx) ?: ""),
+            message = if (cursor.isNull(msgIdx)) "" else (cursor.getString(msgIdx) ?: ""),
+            timestamp = cursor.getLong(timeIdx),
+            isRead = cursor.getInt(readIdx) == 1,
+            actionType = NotificationActionType.fromKey(if (cursor.isNull(actionIdx)) null else cursor.getString(actionIdx)),
+            actionPayload = if (cursor.isNull(payloadIdx)) null else cursor.getString(payloadIdx),
+            importance = cursor.getInt(impIdx)
+        )
     }
 }

@@ -61,20 +61,24 @@ class AntiPornApplication : Application() {
         // Initialize PolicyRepository on cold boot so policy and approval sync listeners start reliably
         PolicyRepository.getInstance(this)
 
+        // Initialize central Notification Channels
+        com.drmohammed.antiporn.notification.manager.AppNotificationManager.getInstance(this).createNotificationChannels()
+
         // Synchronize Zero-Trust active foreground watcher state on startup
         ZeroTrustForegroundWatcher.syncWatcherState(this)
 
-        // Prune diagnostic events older than 30 days and enforce 5000 event cap in background (non-blocking)
+        // Prune diagnostic events and in-app notifications in background (non-blocking)
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             try {
                 val db = AntiPornDatabase.getInstance(this@AntiPornApplication)
                 val pruned = db.pruneDiagnosticEventsOlderThan(30)
                 val capped = db.enforceMaxEventsCap(5000)
-                if (pruned > 0 || capped > 0) {
-                    Timber.i("Cleaned up diagnostic events: pruned=$pruned (>30 days), capped=$capped (>5000 events)")
+                val prunedNotifs = db.pruneOldNotifications(maxKeep = 200, olderThanDays = 30)
+                if (pruned > 0 || capped > 0 || prunedNotifs > 0) {
+                    Timber.i("Cleaned up database: diagPruned=$pruned, diagCapped=$capped, notifsPruned=$prunedNotifs")
                 }
             } catch (e: Exception) {
-                Timber.w(e, "Failed to prune diagnostic events")
+                Timber.w(e, "Failed to prune diagnostic events / notifications")
             }
         }
     }

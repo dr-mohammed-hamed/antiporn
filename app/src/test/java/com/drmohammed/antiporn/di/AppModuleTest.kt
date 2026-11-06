@@ -12,6 +12,9 @@ import com.drmohammed.antiporn.ui.control.SelfControlViewModel
 import com.drmohammed.antiporn.ui.home.HomeViewModel
 import com.drmohammed.antiporn.ui.main.MainViewModel
 import com.drmohammed.antiporn.ui.settings.SettingsViewModel
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.repository.NotificationRepository
+import com.drmohammed.antiporn.ui.notification.NotificationCenterViewModel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -39,7 +42,8 @@ class AppModuleTest : KoinTest {
         appModule.verify(
             extraTypes = listOf(
                 android.content.Context::class,
-                android.app.Application::class
+                android.app.Application::class,
+                kotlinx.coroutines.CoroutineScope::class
             )
         )
     }
@@ -61,7 +65,10 @@ class AppModuleTest : KoinTest {
             HomeViewModel::class,
             SelfControlViewModel::class,
             AccountabilityViewModel::class,
-            SettingsViewModel::class
+            SettingsViewModel::class,
+            NotificationRepository::class,
+            AppNotificationManager::class,
+            NotificationCenterViewModel::class
         )
 
         for (expected in expectedTypes) {
@@ -70,7 +77,7 @@ class AppModuleTest : KoinTest {
                 registeredTypes.contains(expected)
             )
         }
-        assertEquals(12, registeredTypes.size)
+        assertEquals(15, registeredTypes.size)
     }
 
     @Test

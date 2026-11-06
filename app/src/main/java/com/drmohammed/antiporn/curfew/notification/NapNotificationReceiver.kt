@@ -41,11 +41,21 @@ class NapNotificationReceiver : BroadcastReceiver() {
 
             Log.i(TAG, "Received ACTION_EXTEND_NAP from notification action button")
 
-            NapController.extendNap(appContext)
-            CurfewScheduler.scheduleNapEndAlarm(appContext, NapController.getEndWall(appContext))
-            CurfewEnforcer.syncBlockStateAsync(appContext) {
-                ProtectionNotificationCoordinator.syncProtectionNotification(appContext)
-                Toast.makeText(appContext, R.string.toast_nap_extended, Toast.LENGTH_SHORT).show()
+            val pendingResult = goAsync()
+            try {
+                NapController.extendNap(appContext)
+                CurfewScheduler.scheduleNapEndAlarm(appContext, NapController.getEndWall(appContext))
+                CurfewEnforcer.syncBlockStateAsync(appContext) {
+                    try {
+                        ProtectionNotificationCoordinator.syncProtectionNotification(appContext)
+                        Toast.makeText(appContext, R.string.toast_nap_extended, Toast.LENGTH_SHORT).show()
+                    } finally {
+                        pendingResult.finish()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error extending nap in receiver", e)
+                pendingResult.finish()
             }
         }
     }

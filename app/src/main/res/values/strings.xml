@@ -167,6 +167,7 @@
     <string name="card_curfew_usage_missing_subtext">إذن الوصول لبيانات الاستخدام مطلوب لتأمين إغلاق متجر Google Play أثناء الحظر.</string>
 
     <string name="toast_open_settings_failed">تعذر فتح شاشة الإعدادات</string>
+    <string name="toast_open_app_failed">تعذر فتح التطبيق المطلوب</string>
 
     <string name="curfew_google_search_blocked">بحث Google وتطبيق Gemini مغلقان أثناء حظر التجول الليلي!</string>
 
@@ -206,6 +207,8 @@
     <string name="protection_vpn_channel_desc">إشعارات أوضاع الحظر الليلي، وضع القيلولة، وعزل الإنترنت</string>
     <string name="protection_events_channel_name">تنبيهات وأحداث الحماية</string>
     <string name="protection_events_channel_desc">تنبيهات استجابات المشرف وانتهاء فترات الحظر</string>
+    <string name="critical_alerts_channel_name">تنبيهات الأمان الحرجة</string>
+    <string name="critical_alerts_channel_desc">إشعارات عاجلة لمحاولات التلاعب الأمني وتجاوز الحماية</string>
 
     <string name="notif_guardian_lockdown_title">تم حظر الإنترنت بالكامل من المشرف</string>
     <string name="notif_guardian_lockdown_desc">قام المشرف بعزل بيانات الإنترنت عن الجهاز. المكالمات وSMS تعمل بشكل طبيعي.</string>
@@ -942,4 +945,47 @@
     <string name="policy_summary_format">v%1$d | %2$s (%3$02d:%4$02d)</string>
     <string name="log_latency_format">%1$d ms</string>
     <string name="telemetry_share_subject">تقرير تشخيص حِصْن</string>
+
+    <!-- Notification Center & History -->
+    <string name="title_notification_center">مركز الإشعارات</string>
+    <string name="action_mark_all_read">تحديد الكل كمقروء</string>
+    <string name="action_clear_notifications">مسح السجل</string>
+    <string name="filter_all">الكل</string>
+    <string name="filter_approvals">الموافقات</string>
+    <string name="filter_guardian">المشرف</string>
+    <string name="filter_curfew">الحظر الليلي</string>
+    <string name="filter_shields">الدروع</string>
+    <string name="filter_ai">الرؤية والذكاء</string>
+    <string name="filter_ota">التحديثات</string>
+    <string name="filter_system">النظام</string>
+    <string name="empty_notifications_title">لا توجد إشعارات حالياً</string>
+    <string name="empty_notifications_desc">سجل الإشعارات فارغ. ستظهر هنا كافة الأحداث والتنبيهات فور ورودها.</string>
+    <string name="confirm_clear_notifications_title">مسح سجل الإشعارات</string>
+    <string name="confirm_clear_notifications_msg">هل أنت متأكد من رغبتك في حذف كافة الإشعارات المسجلة؟</string>
+    <string name="btn_confirm_clear">مسح</string>
+
+    <!-- Event Notification Strings -->
+    <string name="notif_curfew_pre_warn_title">اقتراب موعد حظر التجوال</string>
+    <string name="notif_curfew_pre_warn_msg">سيبدأ حظر التجوال الليلي خلال 15 دقيقة (الساعة %1$s). يُرجى إنهاء مهامك وحفظ عملك.</string>
+    <string name="notif_curfew_start_title">بدء سريان حظر التجوال الليلي</string>
+    <string name="notif_curfew_start_msg">تم تفعيل حظر التجوال الليلي. التطبيقات والإنترنت محظورة الآن حتى الصباح.</string>
+    <string name="notif_curfew_end_title">صباح الخير! انتهى موعد حظر التجوال</string>
+    <string name="notif_curfew_end_msg">انتهت فترة حظر التجوال الليلي، وفُتحت التطبيقات والإنترنت بنجاح.</string>
+    <string name="notif_tamper_alert_title">رصد محاولة تعديل دروع الحماية</string>
+    <string name="notif_tamper_alert_msg">تم رصد محاولة تعطيل أو تغيير إعدادات الحماية (مثل DNS أو الوقت) وتمت إعادة فرض الحصانة تلقائياً.</string>
+    <string name="notif_policy_update_title">تحديث إعدادات الحماية</string>
+    <string name="notif_policy_update_msg">قام المشرف بتحديث إعدادات الحماية والسياسات الخاصة بجهازك.</string>
+    <string name="notif_ota_success_title">اكتمل تحديث التطبيق بنجاح</string>
+    <string name="notif_ota_success_msg">تم تحديث تطبيق «حِصْن» إلى الإصدار %1$s بنجاح وتطبيق كافة تدابير الحماية.</string>
+    <string name="notif_ota_fail_title">تعذر تثبيت التحديث التلقائي</string>
+    <string name="notif_ota_fail_msg">فشل تثبيت حزمة التحديث (رمز الخطأ: %1$d).</string>
+    <string name="notif_ota_repo_fail_title">تعذر إكمال التحديث التلقائي</string>
+    <string name="notif_ota_repo_fail_msg">فشل تثبيت التحديث (%1$s): %2$s</string>
+    <string name="notif_ota_repo_download_fail_title">تعذر تنزيل التحديث التلقائي</string>
+    <string name="notif_ota_repo_download_fail_msg">حدث خطأ أثناء تنزيل أو معالجة التحديث (%1$s).</string>
+    <string name="notif_approval_deferred_curfew_desc">تمت الموافقة على %1$s من قِبل %2$s، وسيُتاح للاستخدام فور انتهاء موعد الحظر الصباحي.</string>
+    <string name="notif_breakout_alert_title">طلب كسر طوارئ معلّق</string>
+    <string name="notif_breakout_alert_desc">طلب %1$s فك حظر الطوارئ (متبقي %2$s). يمكنك الرفض لحماية المكفول.</string>
+    <string name="notif_ward_approval_req_title">طلب تطبيق جديد للمراجعة</string>
+    <string name="notif_ward_approval_req_desc">يطلب المكفول تثبيت واستخدام تطبيق (%1$s).</string>
 </resources>

@@ -14,36 +14,80 @@
         android:background="?attr/colorSurface"
         app:elevation="0dp">
 
-        <LinearLayout
-            android:id="@+id/layoutBrandHeader"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingHorizontal="24dp"
-            android:paddingTop="12dp"
-            android:paddingBottom="10dp">
+            android:layout_height="wrap_content">
 
-            <TextView
-                android:id="@+id/tvHeaderTitle"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:id="@+id/layoutBrandHeader"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/tajawal"
-                android:text="@string/header_title_unified"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingHorizontal="48dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="10dp">
 
-            <TextView
-                android:id="@+id/tvHeaderAyah"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="@font/tajawal"
-                android:text="@string/header_subtitle_slogan"
-                android:textColor="?attr/colorOutline"
-                android:textSize="13sp" />
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/tvHeaderTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/tajawal"
+                    android:text="@string/header_title_unified"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvHeaderAyah"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="@font/tajawal"
+                    android:text="@string/header_subtitle_slogan"
+                    android:textColor="?attr/colorOutline"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- Notification Bell with Unread Badge -->
+            <FrameLayout
+                android:id="@+id/btnNotificationBell"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="16dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="@string/title_notification_center">
+
+                <ImageView
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_notification_bell"
+                    app:tint="?attr/colorOnSurface" />
+
+                <TextView
+                    android:id="@+id/tvNotificationBadge"
+                    android:layout_width="wrap_content"
+                    android:minWidth="18dp"
+                    android:layout_height="18dp"
+                    android:paddingHorizontal="4dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_notification_badge"
+                    android:gravity="center"
+                    android:textColor="?attr/colorOnError"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="3"
+                    tools:visibility="visible" />
+            </FrameLayout>
+
+        </FrameLayout>
 
         <View
             android:layout_width="match_parent"

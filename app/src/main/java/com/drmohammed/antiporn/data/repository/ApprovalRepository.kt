@@ -16,6 +16,10 @@ import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher
 import com.drmohammed.antiporn.data.local.db.AntiPornDatabase
 import com.drmohammed.antiporn.data.local.db.entity.PendingApprovalEntity
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.model.NotificationActionType
+import com.drmohammed.antiporn.notification.model.NotificationCategory
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -153,6 +157,23 @@ class ApprovalRepository private constructor(context: Context) {
         // 3. Save locally in SQLite
         database.savePendingApproval(approvalEntity)
 
+        // 3.1 Post in-app and system notification regarding the frozen package
+        try {
+            AppNotificationManager.getInstance(appContext).postEventNotification(
+                category = NotificationCategory.APPROVALS,
+                title = appContext.getString(R.string.toast_app_suspended_by_guardian),
+                message = appContext.getString(R.string.toast_app_suspended_by_guardian) + " ($appName)",
+                dedupKey = "zero_trust_freeze_$packageName",
+                cooldownMs = 10 * 60 * 1000L,
+                actionType = NotificationActionType.OPEN_SELF_APPROVALS,
+                actionPayload = packageName,
+                postSystemNotification = true,
+                importance = 2
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Error posting freeze notification for $packageName", e)
+        }
+
         // 4. Update Zero-Trust active foreground watcher immediately and trigger in-memory anti-race evaluation
         ZeroTrustForegroundWatcher.syncWatcherState(appContext)
         ZeroTrustForegroundWatcher.evaluateCurrentForegroundApp(appContext, immediateTargetPackage = packageName)
@@ -286,6 +307,7 @@ class ApprovalRepository private constructor(context: Context) {
             database.updateApprovalStatus(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
             ZeroTrustForegroundWatcher.syncWatcherState(appContext)
             syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
+            postApprovalNotification(packageName, approved = true, isCurfewDeferred = true, decidedBy = decidedBy)
             return
         }
 
@@ -332,6 +354,7 @@ class ApprovalRepository private constructor(context: Context) {
                 ZeroTrustForegroundWatcher.syncWatcherState(appContext)
                 syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_APPROVED, decidedBy)
                 AppInventoryManager.getInstance(appContext).syncInventoryToCloudAsync(force = true)
+                postApprovalNotification(packageName, approved = true, isCurfewDeferred = false, decidedBy = decidedBy)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed unfreezing package $packageName", e)
@@ -361,8 +384,66 @@ class ApprovalRepository private constructor(context: Context) {
             Log.i(TAG, "Recorded rejection for package: $packageName by $decidedBy")
             ZeroTrustForegroundWatcher.syncWatcherState(appContext)
             syncApprovalDecisionToCloud(packageName, PendingApprovalEntity.STATUS_REJECTED, decidedBy)
+            postApprovalNotification(packageName, approved = false, isCurfewDeferred = false, decidedBy = decidedBy)
         } catch (e: Exception) {
             Log.e(TAG, "Failed recording rejection for package $packageName", e)
+        }
+    }
+
+    private fun postApprovalNotification(
+        packageName: String,
+        approved: Boolean,
+        isCurfewDeferred: Boolean,
+        decidedBy: String?
+    ) {
+        try {
+            val pm = appContext.packageManager
+            val appLabel = try {
+                val appInfo = pm.getApplicationInfo(packageName, 0)
+                pm.getApplicationLabel(appInfo).toString()
+            } catch (e: Exception) {
+                packageName
+            }
+
+            val guardianName = decidedBy?.takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+                ?: appContext.getString(R.string.guardian_default_name)
+
+            val title: String
+            val desc: String
+            val actionType: NotificationActionType
+
+            if (approved) {
+                title = appContext.getString(R.string.notif_approval_granted_title)
+                if (isCurfewDeferred) {
+                    desc = appContext.getString(R.string.notif_approval_deferred_curfew_desc, appLabel, guardianName)
+                    actionType = NotificationActionType.OPEN_CURFEW
+                } else {
+                    desc = appContext.getString(R.string.notif_approval_granted_desc, guardianName, appLabel)
+                    actionType = NotificationActionType.LAUNCH_APP
+                }
+            } else {
+                title = appContext.getString(R.string.notif_approval_rejected_title)
+                desc = appContext.getString(R.string.notif_approval_rejected_desc, guardianName, appLabel)
+                actionType = NotificationActionType.NONE
+            }
+
+            val dedupKey = if (approved) "approval_${packageName}_APPROVED" else "approval_${packageName}_REJECTED"
+
+            AppNotificationManager.getInstance(appContext).postEventNotification(
+                category = NotificationCategory.APPROVALS,
+                title = title,
+                message = desc,
+                dedupKey = dedupKey,
+                cooldownMs = 10 * 60 * 1000L,
+                actionType = actionType,
+                actionPayload = packageName,
+                systemNotificationId = packageName.hashCode(),
+                channelId = NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
+                postSystemNotification = true,
+                importance = 2
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error posting approval notification for $packageName", e)
         }
     }
 
