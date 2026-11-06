@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -16,9 +17,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.databinding.BottomSheetDiagnosticLogsBinding
 import com.drmohammed.antiporn.databinding.FragmentSettingsBinding
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
 import com.drmohammed.antiporn.telemetry.AiTelemetryReporter
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
@@ -124,7 +127,7 @@ class SettingsFragment : Fragment() {
                 binding.tvAiStatusSubtext.text = state.aiInitError
                 binding.tvAiStatusSubtext.setTextColor(ContextCompat.getColor(ctx, R.color.status_orange))
             } else {
-                binding.tvAiStatusSubtext.setText(R.string.card_ai_shield_active_desc)
+                binding.tvAiStatusSubtext.setText(R.string.ai_shield_status_running_short)
                 binding.tvAiStatusSubtext.setTextColor(ContextCompat.getColor(ctx, R.color.status_green))
             }
 
@@ -144,7 +147,7 @@ class SettingsFragment : Fragment() {
             }
             binding.tvAiMetrics.visibility = View.VISIBLE
         } else {
-            binding.tvAiStatusSubtext.setText(R.string.card_ai_shield_idle_desc)
+            binding.tvAiStatusSubtext.setText(R.string.ai_shield_status_stopped_short)
             val onSurfaceVariant = MaterialColors.getColor(binding.root, com.google.android.material.R.attr.colorOnSurfaceVariant)
             binding.tvAiStatusSubtext.setTextColor(onSurfaceVariant)
             binding.tvAiMetrics.visibility = View.GONE
@@ -152,40 +155,56 @@ class SettingsFragment : Fragment() {
     }
 
     private fun renderOtaSection(state: SettingsUiState, ctx: Context) {
-        binding.tvOtaVersion.text = getString(R.string.card_ota_current_version, state.appVersionName, state.appVersionCode)
+        binding.tvOtaStatus.visibility = View.GONE
 
         when (val ota = state.otaState) {
             is OtaUpdateState.Idle -> {
-                binding.tvOtaStatus.visibility = View.GONE
+                binding.tvOtaVersion.text = getString(
+                    R.string.card_ota_status_compact,
+                    state.appVersionName,
+                    getString(R.string.ota_status_up_to_date_short)
+                )
                 binding.pbOtaProgress.visibility = View.GONE
                 binding.btnCheckUpdate.isEnabled = true
-                binding.btnCheckUpdate.setText(R.string.btn_check_update)
+                binding.btnCheckUpdate.setText(R.string.btn_check_update_short)
             }
             is OtaUpdateState.Checking -> {
-                binding.tvOtaStatus.setText(R.string.btn_checking_update)
-                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.tvOtaVersion.text = getString(
+                    R.string.card_ota_status_compact,
+                    state.appVersionName,
+                    getString(R.string.ota_status_checking_short)
+                )
                 binding.pbOtaProgress.visibility = View.VISIBLE
                 binding.pbOtaProgress.isIndeterminate = true
                 binding.btnCheckUpdate.isEnabled = false
                 binding.btnCheckUpdate.setText(R.string.btn_checking_update)
             }
             is OtaUpdateState.NoUpdateAvailable -> {
-                binding.tvOtaStatus.setText(R.string.ota_up_to_date)
-                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.tvOtaVersion.text = getString(
+                    R.string.card_ota_status_compact,
+                    state.appVersionName,
+                    getString(R.string.ota_status_up_to_date_short)
+                )
                 binding.pbOtaProgress.visibility = View.GONE
                 binding.btnCheckUpdate.isEnabled = true
-                binding.btnCheckUpdate.setText(R.string.btn_check_update)
+                binding.btnCheckUpdate.setText(R.string.btn_check_update_short)
             }
             is OtaUpdateState.UpdateAvailable -> {
-                binding.tvOtaStatus.text = getString(R.string.ota_update_available, ota.info.versionName)
-                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.tvOtaVersion.text = getString(
+                    R.string.card_ota_status_compact,
+                    state.appVersionName,
+                    getString(R.string.ota_status_available_short, ota.info.versionName)
+                )
                 binding.pbOtaProgress.visibility = View.GONE
                 binding.btnCheckUpdate.isEnabled = true
                 binding.btnCheckUpdate.setText(R.string.btn_download_update)
             }
             is OtaUpdateState.Downloading -> {
-                binding.tvOtaStatus.text = getString(R.string.ota_downloading, ota.progressPercent)
-                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.tvOtaVersion.text = getString(
+                    R.string.card_ota_status_compact,
+                    state.appVersionName,
+                    getString(R.string.ota_status_downloading_short, ota.progressPercent)
+                )
                 binding.pbOtaProgress.visibility = View.VISIBLE
                 binding.pbOtaProgress.isIndeterminate = ota.progressPercent < 0
                 if (ota.progressPercent >= 0) {
@@ -195,34 +214,46 @@ class SettingsFragment : Fragment() {
                 binding.btnCheckUpdate.setText(R.string.btn_download_update)
             }
             is OtaUpdateState.Verifying -> {
-                binding.tvOtaStatus.setText(R.string.ota_verifying)
-                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.tvOtaVersion.text = getString(
+                    R.string.card_ota_status_compact,
+                    state.appVersionName,
+                    getString(R.string.btn_verifying_update)
+                )
                 binding.pbOtaProgress.visibility = View.VISIBLE
                 binding.pbOtaProgress.isIndeterminate = true
                 binding.btnCheckUpdate.isEnabled = false
                 binding.btnCheckUpdate.setText(R.string.btn_verifying_update)
             }
             is OtaUpdateState.ReadyToInstall -> {
-                binding.tvOtaStatus.setText(R.string.ota_installing)
-                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.tvOtaVersion.text = getString(
+                    R.string.card_ota_status_compact,
+                    state.appVersionName,
+                    getString(R.string.ota_status_installing_short)
+                )
                 binding.pbOtaProgress.visibility = View.GONE
                 binding.btnCheckUpdate.isEnabled = true
                 binding.btnCheckUpdate.setText(R.string.btn_download_update)
             }
             is OtaUpdateState.Installing -> {
-                binding.tvOtaStatus.setText(R.string.ota_installing)
-                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.tvOtaVersion.text = getString(
+                    R.string.card_ota_status_compact,
+                    state.appVersionName,
+                    getString(R.string.ota_status_installing_short)
+                )
                 binding.pbOtaProgress.visibility = View.VISIBLE
                 binding.pbOtaProgress.isIndeterminate = true
                 binding.btnCheckUpdate.isEnabled = false
                 binding.btnCheckUpdate.setText(R.string.ota_installing)
             }
             is OtaUpdateState.Error -> {
-                binding.tvOtaStatus.text = ota.message
-                binding.tvOtaStatus.visibility = View.VISIBLE
+                binding.tvOtaVersion.text = getString(
+                    R.string.card_ota_status_compact,
+                    state.appVersionName,
+                    getString(R.string.ota_status_error_short)
+                )
                 binding.pbOtaProgress.visibility = View.GONE
                 binding.btnCheckUpdate.isEnabled = true
-                binding.btnCheckUpdate.setText(R.string.btn_check_update)
+                binding.btnCheckUpdate.setText(R.string.btn_check_update_short)
             }
         }
     }
@@ -274,19 +305,33 @@ class SettingsFragment : Fragment() {
             actionListener?.onLinkGoogleRequested()
         }
 
-        binding.btnViewLogs.setOnClickListener {
+        binding.layoutDeviceOwnerPreference.setOnLongClickListener { view ->
+            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            showDiagnosticLogsBottomSheet()
+            true
+        }
+    }
+
+    private fun showDiagnosticLogsBottomSheet() {
+        val ctx = context ?: return
+        val bottomSheetDialog = BottomSheetDialog(ctx)
+        val sheetBinding = BottomSheetDiagnosticLogsBinding.inflate(layoutInflater)
+        bottomSheetDialog.setContentView(sheetBinding.root)
+
+        sheetBinding.cardViewLogs.setOnClickListener {
+            bottomSheetDialog.dismiss()
             val currentTime = SystemClock.elapsedRealtime()
             if (currentTime - lastViewLogsClickTime < 1000L) return@setOnClickListener
             lastViewLogsClickTime = currentTime
-            val ctx = context ?: return@setOnClickListener
-            val intent = Intent(ctx, DiagnosticLogViewerActivity::class.java)
+            val currentCtx = context ?: return@setOnClickListener
+            val intent = Intent(currentCtx, DiagnosticLogViewerActivity::class.java)
             startActivity(intent)
         }
 
-        binding.btnShareTelemetry.setOnClickListener {
-            val ctx = context ?: return@setOnClickListener
-            val appContext = ctx.applicationContext
-            binding.btnShareTelemetry.isEnabled = false
+        sheetBinding.cardShareTelemetry.setOnClickListener {
+            bottomSheetDialog.dismiss()
+            val currentCtx = context ?: return@setOnClickListener
+            val appContext = currentCtx.applicationContext
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
                     val report = withContext(Dispatchers.IO) {
@@ -309,11 +354,13 @@ class SettingsFragment : Fragment() {
                     } catch (e: Exception) {
                         Log.e(TAG, "Error launching share chooser", e)
                     }
-                } finally {
-                    _binding?.btnShareTelemetry?.isEnabled = true
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error generating telemetry report", e)
                 }
             }
         }
+
+        bottomSheetDialog.show()
     }
 
     private fun showEditDeviceNameDialog() {

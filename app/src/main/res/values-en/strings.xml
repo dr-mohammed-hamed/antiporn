@@ -657,6 +657,18 @@
     <!-- Black Box Diagnostic Log Viewer -->
     <string name="title_log_viewer">Black Box Flight Log</string>
     <string name="btn_view_logs">View Logs</string>
+    <string name="bottom_sheet_logs_title">System &amp; Diagnostic Logs</string>
+    <string name="bottom_sheet_logs_subtitle">Advanced diagnostic tools and technical event logs</string>
+    <string name="btn_check_update_short">Check Now</string>
+    <string name="card_ota_status_compact">Version %1$s • %2$s</string>
+    <string name="ota_status_up_to_date_short">Up to date</string>
+    <string name="ota_status_checking_short">Checking&#8230;</string>
+    <string name="ota_status_available_short">New %1$s</string>
+    <string name="ota_status_downloading_short">Downloading %1$d%%</string>
+    <string name="ota_status_installing_short">Installing&#8230;</string>
+    <string name="ota_status_error_short">Update error</string>
+    <string name="ai_shield_status_stopped_short">Currently inactive</string>
+    <string name="ai_shield_status_running_short">Active</string>
     <string name="filter_chip_all">All</string>
     <string name="filter_chip_curfew">Curfew</string>
     <string name="filter_chip_cloud">Cloud Sync</string>

@@ -262,7 +262,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
-                            android:text="@string/btn_check_update"
+                            android:text="@string/btn_check_update_short"
                             android:textSize="12sp"
                             app:cornerRadius="10dp" />
                     </LinearLayout>
@@ -341,85 +341,14 @@
                         app:cornerRadius="10dp" />
                 </LinearLayout>
 
-                <!-- 5. Diagnostic & Telemetry Log Preference Item -->
-                <LinearLayout
-                    android:id="@+id/layoutTelemetryPreference"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="14dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_shield_icon_circle">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_share" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="@font/tajawal"
-                            android:text="@string/settings_telemetry_title"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvTelemetryStatus"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/settings_telemetry_desc"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <!-- View Logs Button -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnViewLogs"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:text="@string/btn_view_logs"
-                        android:textSize="12sp"
-                        app:cornerRadius="10dp" />
-
-                    <!-- Share Log Button -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnShareTelemetry"
-                        style="@style/Widget.Material3.Button.TonalButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:text="@string/btn_share_telemetry"
-                        android:textSize="12sp"
-                        app:cornerRadius="10dp"
-                        app:icon="@drawable/ic_share"
-                        app:iconSize="16dp" />
-                </LinearLayout>
-
-                <!-- 4. Device Owner System Status Item -->
+                <!-- 4. Device Owner System Status Item (Long press opens diagnostic logs) -->
                 <LinearLayout
                     android:id="@+id/layoutDeviceOwnerPreference"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:baselineAligned="false"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
