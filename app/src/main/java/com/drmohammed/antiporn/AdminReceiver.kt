@@ -18,12 +18,24 @@ class AdminReceiver : DeviceAdminReceiver() {
     override fun onEnabled(context: Context, intent: Intent) {
         super.onEnabled(context, intent)
         Log.i(TAG, "Device Admin / Owner enabled. Enforcing NextDNS and security policies...")
+        val appContext = context.applicationContext
+        try {
+            com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(appContext).recordDeviceOwnerEnabledTimestamp()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error recording DO enabled timestamp in onEnabled", e)
+        }
         enforcePoliciesAsync(context)
     }
 
     override fun onProfileProvisioningComplete(context: Context, intent: Intent) {
         super.onProfileProvisioningComplete(context, intent)
         Log.i(TAG, "Profile provisioning complete. Enforcing NextDNS and security policies...")
+        val appContext = context.applicationContext
+        try {
+            com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(appContext).recordDeviceOwnerEnabledTimestamp()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error recording DO enabled timestamp in onProfileProvisioningComplete", e)
+        }
         enforcePoliciesAsync(context)
 
         // Bootstrap MainActivity as a fallback strictly for legacy Android versions (Android 11 and below)
@@ -71,6 +83,11 @@ class AdminReceiver : DeviceAdminReceiver() {
             com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(appContext).startFirestoreSync()
         } catch (e: Exception) {
             Log.e(TAG, "Error initiating PolicyRepository sync in AdminReceiver", e)
+        }
+        try {
+            com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(appContext).syncZeroTrustBaselineAndReconcileAsync()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initiating syncZeroTrustBaselineAndReconcileAsync in AdminReceiver", e)
         }
         val pendingResult = goAsync()
         try {

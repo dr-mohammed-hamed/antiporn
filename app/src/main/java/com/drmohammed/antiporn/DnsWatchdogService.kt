@@ -89,7 +89,7 @@ class DnsWatchdogService : Service() {
     private val screenDebounceRunnable = Runnable {
         Log.i(TAG, "Layer 2 - Screen event debounced check: enforcing blacklist and verifying shields")
         AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
-        com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).reconcileUnapprovedInstalledAppsAsync()
+        com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncZeroTrustBaselineAndReconcileAsync()
         checkAndEnforceProtection()
     }
 
@@ -195,7 +195,7 @@ class DnsWatchdogService : Service() {
         startHeartbeat()
         checkAndEnforceProtection()
         AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
-        com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).ensureInitialBaselineSeededAsync()
+        com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncZeroTrustBaselineAndReconcileAsync()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -475,6 +475,6 @@ class DnsWatchdogService : Service() {
                 Log.e(TAG, "Error posting tamper alert notification", e)
             }
         }
-        com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).reconcileUnapprovedInstalledAppsAsync()
+        com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncZeroTrustBaselineAndReconcileAsync()
     }
 }

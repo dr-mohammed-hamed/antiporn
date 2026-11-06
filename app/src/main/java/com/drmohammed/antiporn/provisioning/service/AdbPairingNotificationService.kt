@@ -30,24 +30,36 @@ class AdbPairingNotificationService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        try {
+            val initialNotification = buildInitialNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    initialNotification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, initialNotification)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to promote service to foreground in onCreate", e)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP_SERVICE) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error stopping foreground on ACTION_STOP_SERVICE", e)
+            }
             stopSelf()
             return START_NOT_STICKY
-        }
-
-        // Start foreground immediately
-        val initialNotification = buildInitialNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(
-                NOTIFICATION_ID,
-                initialNotification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, initialNotification)
         }
 
         startMdnsRadar()
