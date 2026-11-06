@@ -26,7 +26,6 @@ import androidx.lifecycle.lifecycleScope
 import com.drmohammed.antiporn.MainActivity
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
-import com.drmohammed.antiporn.provisioning.engine.AccountAuditor
 import com.drmohammed.antiporn.provisioning.engine.DeviceOwnerPromoter
 import com.drmohammed.antiporn.provisioning.engine.PromotionResult
 import com.drmohammed.antiporn.provisioning.receiver.PairingCodeReceiver
@@ -63,14 +62,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
     private lateinit var step3Number: TextView
     private lateinit var step3Check: ImageView
     private lateinit var step3Label: TextView
-
-    // Step 1 Views
-    private lateinit var cardStep1: MaterialCardView
-    private lateinit var layoutStep1Success: View
-    private lateinit var layoutStep1Action: View
-    private lateinit var tvStep1Status: TextView
-    private lateinit var tvAccountsList: TextView
-    private lateinit var btnOpenAccounts: MaterialButton
 
     // Step 2 Views
     private lateinit var cardStep2: MaterialCardView
@@ -118,24 +109,7 @@ class ProvisioningWizardActivity : AppCompatActivity() {
                         onProvisioningSuccessful()
                     } else {
                         val error = intent.getStringExtra(PairingCodeReceiver.EXTRA_ERROR_MESSAGE)
-                        val accounts = AccountAuditor.getActiveAccounts(this@ProvisioningWizardActivity)
-                        val isAccountsIssue = accounts.isNotEmpty() && (
-                            error?.contains("accounts", ignoreCase = true) == true ||
-                            error?.contains("users", ignoreCase = true) == true ||
-                            !AccountAuditor.isReadyForProvisioning(this@ProvisioningWizardActivity)
-                        )
-
-                        if (isAccountsIssue) {
-                            Toast.makeText(
-                                this@ProvisioningWizardActivity,
-                                getString(R.string.provisioning_failed_accounts_desc, accounts.size),
-                                Toast.LENGTH_LONG
-                            ).show()
-                            checkAccountsStatus()
-                            this@ProvisioningWizardActivity.focusOnAccountsCard()
-                        } else {
-                            Toast.makeText(this@ProvisioningWizardActivity, getString(R.string.toast_provisioning_failed, error ?: ""), Toast.LENGTH_LONG).show()
-                        }
+                        Toast.makeText(this@ProvisioningWizardActivity, getString(R.string.toast_provisioning_failed, error ?: ""), Toast.LENGTH_LONG).show()
                         isPromoting = false
                         btnPairAndActivate.setText(R.string.provisioning_btn_pair_and_activate)
                         validateInputs()
@@ -163,26 +137,27 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         bindViews()
         setupListeners()
 
-        if (intent?.getBooleanExtra(EXTRA_FOCUS_ACCOUNTS, false) == true) {
-            focusOnAccountsCard()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            findViewById<View>(R.id.layoutStepper)?.visibility = View.GONE
+            cardStep2.visibility = View.GONE
+            cardStep3.visibility = View.GONE
+            findViewById<View>(R.id.cardLegacyPureSite)?.visibility = View.VISIBLE
+            findViewById<View>(R.id.btnOpenPureSite)?.setOnClickListener {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://puresite.app/install")).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    })
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to open PureSite URL in browser", e)
+                    Toast.makeText(this, R.string.provisioning_btn_open_puresite, Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.getBooleanExtra(EXTRA_FOCUS_ACCOUNTS, false)) {
-            focusOnAccountsCard()
-        }
-    }
-
-    private fun focusOnAccountsCard() {
-        layoutStep1Success.visibility = View.GONE
-        layoutStep1Action.visibility = View.VISIBLE
-        cardStep1.post {
-            val scrollView = findViewById<android.widget.ScrollView>(R.id.scrollWizard)
-            scrollView?.smoothScrollTo(0, cardStep1.top)
-        }
     }
 
     private fun bindViews() {
@@ -203,14 +178,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         step3Number = findViewById(R.id.step3Number)
         step3Check = findViewById(R.id.step3Check)
         step3Label = findViewById(R.id.step3Label)
-
-        // Step 1
-        cardStep1 = findViewById(R.id.cardStep1)
-        layoutStep1Success = findViewById(R.id.layoutStep1Success)
-        layoutStep1Action = findViewById(R.id.layoutStep1Action)
-        tvStep1Status = findViewById(R.id.tvStep1Status)
-        tvAccountsList = findViewById(R.id.tvAccountsList)
-        btnOpenAccounts = findViewById(R.id.btnOpenAccounts)
 
         // Step 2
         cardStep2 = findViewById(R.id.cardStep2)
@@ -235,10 +202,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
-        btnOpenAccounts.setOnClickListener {
-            AccountAuditor.openAccountSettings(this)
-        }
-
         btnOpenDevOptions.setOnClickListener {
             if (!isDevOptionsEnabled()) {
                 showEnableDevOptionsDialog()
@@ -283,14 +246,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         btnPairAndActivate.setOnClickListener {
             if (isPromoting) return@setOnClickListener
 
-            if (!AccountAuditor.isReadyForProvisioning(this)) {
-                val count = AccountAuditor.getAccountCount(this)
-                Toast.makeText(this, getString(R.string.provisioning_failed_accounts_desc, count), Toast.LENGTH_LONG).show()
-                focusOnAccountsCard()
-                AccountAuditor.openAccountSettings(this)
-                return@setOnClickListener
-            }
-
             val code = etPairingCode.text?.toString()?.trim() ?: ""
             if (code.length != 6) {
                 Toast.makeText(this, R.string.provisioning_input_label, Toast.LENGTH_SHORT).show()
@@ -318,23 +273,7 @@ class ProvisioningWizardActivity : AppCompatActivity() {
                         if (result is PromotionResult.Success) {
                             onProvisioningSuccessful()
                         } else if (result is PromotionResult.Failure) {
-                            val accounts = AccountAuditor.getActiveAccounts(this@ProvisioningWizardActivity)
-                            val isAccountsIssue = accounts.isNotEmpty() && (
-                                result.message.contains("accounts", ignoreCase = true) ||
-                                result.message.contains("users", ignoreCase = true) ||
-                                !AccountAuditor.isReadyForProvisioning(this@ProvisioningWizardActivity)
-                            )
-                            if (isAccountsIssue) {
-                                Toast.makeText(
-                                    this@ProvisioningWizardActivity,
-                                    getString(R.string.provisioning_failed_accounts_desc, accounts.size),
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                checkAccountsStatus()
-                                focusOnAccountsCard()
-                            } else {
-                                Toast.makeText(this@ProvisioningWizardActivity, getString(R.string.toast_provisioning_failed, result.message), Toast.LENGTH_LONG).show()
-                            }
+                            Toast.makeText(this@ProvisioningWizardActivity, getString(R.string.toast_provisioning_failed, result.message), Toast.LENGTH_LONG).show()
                             btnPairAndActivate.setText(R.string.provisioning_btn_pair_and_activate)
                         }
                     }
@@ -362,8 +301,10 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         }
         ContextCompat.registerReceiver(this, provisioningReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
-        checkNotificationPermission()
-        AdbPairingNotificationService.start(this)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            checkNotificationPermission()
+            AdbPairingNotificationService.start(this)
+        }
     }
 
     override fun onResume() {
@@ -379,13 +320,9 @@ class ProvisioningWizardActivity : AppCompatActivity() {
             updateRadarUi()
         }
 
-        checkAccountsStatus()
         checkDevOptionsStatus()
         checkShizukuStatus()
-
-        if (intent?.getBooleanExtra(EXTRA_FOCUS_ACCOUNTS, false) == true) {
-            focusOnAccountsCard()
-        }
+        validateInputs()
     }
 
     override fun onStop() {
@@ -398,7 +335,7 @@ class ProvisioningWizardActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        if (!ProtectionEngine.isDeviceOwner(this)) {
+        if (!isChangingConfigurations && !ProtectionEngine.isDeviceOwner(this)) {
             AdbPairingNotificationService.stop(this)
         }
         super.onDestroy()
@@ -410,25 +347,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
                 notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
             }
         }
-    }
-
-    private fun checkAccountsStatus() {
-        val accounts = AccountAuditor.getActiveAccounts(this)
-        val accountsReady = accounts.isEmpty()
-        if (accountsReady) {
-            tvStep1Status.setText(R.string.provisioning_step1_ready)
-            tvStep1Status.setTextColor(ContextCompat.getColor(this, R.color.status_green))
-            tvAccountsList.visibility = View.GONE
-        } else {
-            tvStep1Status.text = getString(R.string.provisioning_step1_accounts_found, accounts.size)
-            tvStep1Status.setTextColor(ContextCompat.getColor(this, R.color.status_orange))
-            tvAccountsList.text = AccountAuditor.getAccountSummaryList(this).joinToString("\n• ", prefix = "• ")
-            tvAccountsList.visibility = View.VISIBLE
-        }
-        val devOptionsEnabled = isDevOptionsEnabled()
-        val portsDiscovered = discoveredPairingPort > 0
-        updateStepperUi(accountsReady, devOptionsEnabled, portsDiscovered)
-        validateInputs()
     }
 
     private fun isDevOptionsEnabled(): Boolean {
@@ -448,9 +366,8 @@ class ProvisioningWizardActivity : AppCompatActivity() {
             btnOpenDevOptions.setText(R.string.provisioning_btn_enable_dev_options)
             tvStep2Desc.setText(R.string.provisioning_step2_desc_disabled)
         }
-        val accountsReady = AccountAuditor.isReadyForProvisioning(this)
         val portsDiscovered = discoveredPairingPort > 0
-        updateStepperUi(accountsReady, devEnabled, portsDiscovered)
+        updateStepperUi(devEnabled, portsDiscovered)
     }
 
     private fun showEnableDevOptionsDialog() {
@@ -493,7 +410,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
     }
 
     private fun updateStepperUi(
-        accountsReady: Boolean,
         devOptionsEnabled: Boolean,
         portsDiscovered: Boolean
     ) {
@@ -502,77 +418,39 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         val colorOutlineVariant = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutlineVariant, ContextCompat.getColor(this, R.color.md_theme_light_outlineVariant))
         val colorPrimary = MaterialColors.getColor(this, androidx.appcompat.R.attr.colorPrimary, ContextCompat.getColor(this, R.color.md_theme_light_primary))
 
-        // Step 1 (Accounts)
-        if (accountsReady) {
-            layoutStep1Success.visibility = View.VISIBLE
-            layoutStep1Action.visibility = View.GONE
-            cardStep1.strokeColor = ContextCompat.getColor(this, R.color.status_green)
-
+        // Step 1: Wireless Debugging & Radar
+        if (portsDiscovered) {
             step1Circle.setBackgroundResource(R.drawable.bg_stepper_circle_done)
             step1Number.visibility = View.GONE
             step1Check.visibility = View.VISIBLE
             step1Label.setTextColor(ContextCompat.getColor(this, R.color.status_green))
 
             stepperLine1.setBackgroundColor(ContextCompat.getColor(this, R.color.status_green))
-        } else {
-            layoutStep1Success.visibility = View.GONE
-            layoutStep1Action.visibility = View.VISIBLE
-            cardStep1.strokeColor = ContextCompat.getColor(this, R.color.status_orange)
-
-            step1Circle.setBackgroundResource(R.drawable.bg_stepper_circle_active)
-            step1Number.visibility = View.VISIBLE
-            step1Number.setTextColor(ContextCompat.getColor(this, R.color.white))
-            step1Check.visibility = View.GONE
-            step1Label.setTextColor(colorOnSurface)
-
-            stepperLine1.setBackgroundColor(colorOutlineVariant)
-        }
-
-        // Step 2 (Wireless)
-        if (portsDiscovered) {
-            step2Circle.setBackgroundResource(R.drawable.bg_stepper_circle_done)
-            step2Number.visibility = View.GONE
-            step2Check.visibility = View.VISIBLE
-            step2Label.setTextColor(ContextCompat.getColor(this, R.color.status_green))
-
-            stepperLine2.setBackgroundColor(ContextCompat.getColor(this, R.color.status_green))
             cardStep2.strokeColor = ContextCompat.getColor(this, R.color.status_green)
-        } else if (accountsReady) {
+
+            // Step 2: Pairing & Activate (Active)
             step2Circle.setBackgroundResource(R.drawable.bg_stepper_circle_active)
             step2Number.visibility = View.VISIBLE
             step2Number.setTextColor(ContextCompat.getColor(this, R.color.white))
             step2Check.visibility = View.GONE
             step2Label.setTextColor(colorPrimary)
-
-            stepperLine2.setBackgroundColor(colorOutlineVariant)
-            cardStep2.strokeColor = colorPrimary
+            cardStep3.strokeColor = colorPrimary
         } else {
+            step1Circle.setBackgroundResource(R.drawable.bg_stepper_circle_active)
+            step1Number.visibility = View.VISIBLE
+            step1Number.setTextColor(ContextCompat.getColor(this, R.color.white))
+            step1Check.visibility = View.GONE
+            step1Label.setTextColor(colorPrimary)
+
+            stepperLine1.setBackgroundColor(colorOutlineVariant)
+            cardStep2.strokeColor = colorPrimary
+
+            // Step 2: Pairing & Activate (Inactive)
             step2Circle.setBackgroundResource(R.drawable.bg_stepper_circle_inactive)
             step2Number.visibility = View.VISIBLE
             step2Number.setTextColor(colorOnSurfaceVariant)
             step2Check.visibility = View.GONE
             step2Label.setTextColor(colorOnSurfaceVariant)
-
-            stepperLine2.setBackgroundColor(colorOutlineVariant)
-            cardStep2.strokeColor = colorOutlineVariant
-        }
-
-        // Step 3 (Pairing)
-        if (portsDiscovered) {
-            step3Circle.setBackgroundResource(R.drawable.bg_stepper_circle_active)
-            step3Number.visibility = View.VISIBLE
-            step3Number.setTextColor(ContextCompat.getColor(this, R.color.white))
-            step3Check.visibility = View.GONE
-            step3Label.setTextColor(ContextCompat.getColor(this, R.color.status_green))
-
-            cardStep3.strokeColor = ContextCompat.getColor(this, R.color.status_green)
-        } else {
-            step3Circle.setBackgroundResource(R.drawable.bg_stepper_circle_inactive)
-            step3Number.visibility = View.VISIBLE
-            step3Number.setTextColor(colorOnSurfaceVariant)
-            step3Check.visibility = View.GONE
-            step3Label.setTextColor(colorOnSurfaceVariant)
-
             cardStep3.strokeColor = colorOutlineVariant
         }
     }
@@ -587,10 +465,9 @@ class ProvisioningWizardActivity : AppCompatActivity() {
             tvRadarStatus.setTextColor(ContextCompat.getColor(this, R.color.status_orange))
             ivRadarIcon.setColorFilter(ContextCompat.getColor(this, R.color.status_orange))
         }
-        val accountsReady = AccountAuditor.isReadyForProvisioning(this)
         val devOptionsEnabled = isDevOptionsEnabled()
         val portsDiscovered = discoveredPairingPort > 0
-        updateStepperUi(accountsReady, devOptionsEnabled, portsDiscovered)
+        updateStepperUi(devOptionsEnabled, portsDiscovered)
         validateInputs()
     }
 
@@ -599,11 +476,10 @@ class ProvisioningWizardActivity : AppCompatActivity() {
             btnPairAndActivate.isEnabled = false
             return
         }
-        val accountsReady = AccountAuditor.isReadyForProvisioning(this)
         val codeLength = etPairingCode.text?.toString()?.trim()?.length ?: 0
         val portsDiscovered = discoveredPairingPort > 0 && discoveredConnectPort > 0
 
-        btnPairAndActivate.isEnabled = accountsReady && (codeLength == 6) && portsDiscovered
+        btnPairAndActivate.isEnabled = (codeLength == 6) && portsDiscovered
     }
 
     private fun attemptShizukuPromotion() {

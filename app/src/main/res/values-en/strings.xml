@@ -145,10 +145,15 @@
     <!-- Stepper Navigation -->
     <string name="stepper_number_1">1</string>
     <string name="stepper_number_2">2</string>
-    <string name="stepper_number_3">3</string>
-    <string name="stepper_step_1">1. Accounts</string>
-    <string name="stepper_step_2">2. Wireless</string>
-    <string name="stepper_step_3">3. Pairing</string>
+    <string name="stepper_step_1">1. Wireless</string>
+    <string name="stepper_step_2">2. Pairing &amp; Activate</string>
+
+    <string name="provisioning_zero_account_banner_title">Zero-Account Instant Activation</string>
+    <string name="provisioning_zero_account_banner_desc">AntiPorn automatically bypasses account restrictions; your Google, WhatsApp, and Telegram accounts remain 100%% safe and intact.</string>
+
+    <string name="provisioning_legacy_title">Android 7 to 10 Devices</string>
+    <string name="provisioning_legacy_desc">Because Android 10 and below do not support on-device Wireless Debugging pairing, please connect your phone via USB cable to PureSite to activate in 1 click without removing accounts.</string>
+    <string name="provisioning_btn_open_puresite">Open PureSite Installer</string>
     <string name="provisioning_step1_title">Step 1: Account Audit (Android Requirement)</string>
     <string name="provisioning_step1_ready">Device is ready for pairing (No active accounts)</string>
     <string name="provisioning_step1_success_title">Accounts verified and ready</string>
@@ -156,7 +161,7 @@
     <string name="provisioning_step1_warning_reassurance">Security note: Your cloud data is safe and you can re-add accounts immediately after setup.</string>
     <string name="provisioning_step1_accounts_found">Found %1$d active accounts that must be temporarily removed to set Device Owner.</string>
     <string name="provisioning_btn_open_accounts">Open Accounts Settings for Temporary Removal</string>
-    <string name="provisioning_step2_title">Step 2: Enable Wireless Debugging</string>
+    <string name="provisioning_step2_title">Step 1: Enable Wireless Debugging</string>
     <string name="provisioning_step2_desc">1. Tap button below to jump directly to Wireless Debugging.\n2. Enable "Wireless Debugging".\n3. Tap "Pair device with pairing code".</string>
     <string name="provisioning_step2_desc_disabled">Developer Options are not enabled yet. Tap below to open "About Phone" and tap "Build Number" 7 times.</string>
     <string name="provisioning_btn_open_dev_options">Open Wireless Debugging</string>
@@ -164,7 +169,7 @@
     <string name="dialog_enable_dev_title">How to Enable Developer Options (5 Seconds)</string>
     <string name="dialog_enable_dev_desc">1. We will open the "About Phone" screen.\n2. Tap rapidly 7 times on "Build Number".\n3. Enter your screen lock PIN if prompted.\n4. Once "You are now a developer!" appears, tap back to return here.</string>
     <string name="dialog_enable_dev_btn_open">Open "About Phone" Now</string>
-    <string name="provisioning_step3_title">Step 3: Enter 6-digit Pairing Code</string>
+    <string name="provisioning_step3_title">Step 2: Enter Pairing Code &amp; Activate</string>
     <string name="provisioning_radar_waiting">Radar searching for wireless pairing signal...</string>
     <string name="provisioning_radar_port_found">Captured port automatically (%1$d)</string>
     <string name="provisioning_input_hint">Enter 6-digit code here</string>
@@ -191,6 +196,11 @@
     <string name="provisioning_success_title">Maximum Protection Activated!</string>
     <string name="provisioning_success_desc">AntiPorn is now Device Owner. You can safely re-add your accounts.</string>
     <string name="provisioning_failed_title">Failed to activate Device Owner</string>
+    <string name="provisioning_tap_to_retry">Tap here to retry in the wizard</string>
+    <string name="provisioning_error_xiaomi_security_settings">Notice for Xiaomi/Redmi devices:\nPlease go to Developer Options and enable \'USB debugging (Security settings)\', then retry.</string>
+    <string name="provisioning_error_samsung_secure_folder">Please disable Samsung \'Secure Folder\' or \'Dual Messenger\' temporarily during activation.</string>
+    <string name="provisioning_error_realme_precondition">For Realme and Oppo devices: Please sign out of HeyTap/Realme account in Settings and enable \'Disable permission monitoring\' in Developer options.</string>
+    <string name="provisioning_error_already_device_owner">A Device Owner is already registered on this device, or protection was previously activated.</string>
     <string name="provisioning_failed_accounts_title">Activation Failed: Accounts Must Be Removed</string>
     <string name="provisioning_failed_accounts_desc">Found %1$d active accounts on device preventing Device Owner.</string>
     <string name="provisioning_failed_accounts_action">Tap here to open Settings and remove them temporarily.</string>

@@ -67,6 +67,22 @@ class AntiPornApplication : Application() {
         // Synchronize Zero-Trust active foreground watcher state on startup
         ZeroTrustForegroundWatcher.syncWatcherState(this)
 
+        // Self-healing watchdog: check for stuck user_setup_complete state on cold boot
+        try {
+            val setupComplete = android.provider.Settings.Secure.getInt(contentResolver, "user_setup_complete", 1)
+            val provisioned = android.provider.Settings.Global.getInt(contentResolver, android.provider.Settings.Global.DEVICE_PROVISIONED, 1)
+            if (setupComplete == 0 && provisioned == 1) {
+                Timber.w("AntiPorn Boot Watchdog: Detected stuck user_setup_complete=0 on provisioned device.")
+                try {
+                    android.provider.Settings.Secure.putInt(contentResolver, "user_setup_complete", 1)
+                } catch (t: Throwable) {
+                    Timber.w(t, "Setup state watchdog: Failed to restore user_setup_complete")
+                }
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Setup state watchdog check failed")
+        }
+
         // Prune diagnostic events and in-app notifications in background (non-blocking)
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             try {

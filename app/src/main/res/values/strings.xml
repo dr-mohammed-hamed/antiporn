@@ -558,13 +558,18 @@
 
     <string name="provisioning_wizard_subtitle">تفعيل صلاحية المالك (Device Owner) ذاتياً بدون كمبيوتر بأقل احتكاك</string>
 
-    <!-- Stepper Navigation -->
+    <!-- Stepper Navigation (2-Step Zero-Account Flow) -->
     <string name="stepper_number_1">1</string>
     <string name="stepper_number_2">2</string>
-    <string name="stepper_number_3">3</string>
-    <string name="stepper_step_1">1. الحسابات</string>
-    <string name="stepper_step_2">2. اللاسلكي</string>
-    <string name="stepper_step_3">3. الاقتران</string>
+    <string name="stepper_step_1">1. اللاسلكي</string>
+    <string name="stepper_step_2">2. الاقتران والتفعيل</string>
+
+    <string name="provisioning_zero_account_banner_title">تفعيل سيادي فوري بدون حذف الحسابات</string>
+    <string name="provisioning_zero_account_banner_desc">درع حِصْن يدعم التجاوز التلقائي؛ جميع حساباتك (Google، واتساب، تيليجرام) في أمان تام ولن تُمس إطلاقاً.</string>
+
+    <string name="provisioning_legacy_title">هواتف أندرويد 7 إلى 10</string>
+    <string name="provisioning_legacy_desc">نظراً لأن أندرويد 10 فما دون لا يدعم التصحيح اللاسلكي برمز إقران، يمكنك التفعيل بنقرة واحدة عبر كابل USB من موقع PureSite دون حذف أي حساب.</string>
+    <string name="provisioning_btn_open_puresite">فتح موقع التثبيت PureSite</string>
 
     <string name="provisioning_step1_title">الخطوة 1: فحص الحسابات (إلزامي لأندرويد)</string>
 
@@ -577,7 +582,7 @@
 
     <string name="provisioning_btn_open_accounts">فتح شاشة الحسابات للحذف المؤقت</string>
 
-    <string name="provisioning_step2_title">الخطوة 2: تشغيل تصحيح الأخطاء اللاسلكي</string>
+    <string name="provisioning_step2_title">الخطوة 1: تشغيل تصحيح الأخطاء اللاسلكي</string>
 
     <string name="provisioning_step2_desc">1. اضغط على الزر أدناه للانتقال المباشر لتصحيح الأخطاء اللاسلكي.\n2. فعّل خيار "تصحيح الأخطاء اللاسلكي" (Wireless Debugging).\n3. اضغط على "إقران الجهاز برمز إقران".</string>
     <string name="provisioning_step2_desc_disabled">خيارات المطور غير مفعلة على هاتفك بعد. اضغط أدناه لفتح شاشة "حول الهاتف" والنقر 7 مرات على "رقم الإصدار".</string>
@@ -589,7 +594,7 @@
     <string name="dialog_enable_dev_desc">1. سنفتح لك شاشة "حول الهاتف" (About Phone).\n2. انقر 7 مرات متتالية وسريعة على "رقم الإصدار" (Build Number).\n3. أدخل رمز قفل الشاشة عند طلبه.\n4. بعد ظهور رسالة "أنت الآن مطور"، عُد للتطبيق بنقرة رجوع.</string>
     <string name="dialog_enable_dev_btn_open">الانتقال إلى "حول الهاتف" الآن</string>
 
-    <string name="provisioning_step3_title">الخطوة 3: إدخال رمز الاقتران (6 أرقام)</string>
+    <string name="provisioning_step3_title">الخطوة 2: إدخال رمز الاقتران والتفعيل</string>
 
     <string name="provisioning_radar_waiting">الرادار يبحث عن إشارة الاقتران اللاسلكي...</string>
 
@@ -639,6 +644,11 @@
     <string name="provisioning_success_desc">أصبح التطبيق الآن مسؤول المالك. يمكنك إعادة إضافة حساباتك بأمان.</string>
 
     <string name="provisioning_failed_title">تعذر تفعيل صلاحية المالك</string>
+    <string name="provisioning_tap_to_retry">اضغط هنا لإعادة المحاولة من داخل المعالج</string>
+    <string name="provisioning_error_xiaomi_security_settings">تنبيه لأجهزة شاومي / ريدمي:\nيرجى الدخول إلى خيارات المطور وتفعيل خيار \'تصحيح أخطاء USB (إعدادات الأمان)\'، ثم إعادة المحاولة.</string>
+    <string name="provisioning_error_samsung_secure_folder">يرجى تعطيل \'المجلد الآمن\' (Secure Folder) في سامسونج أو إيقاف ميزة \'التطبيقات المزدوجة\' مؤقتاً أثناء التفعيل.</string>
+    <string name="provisioning_error_realme_precondition">لهواتف ريلمي وأوبو: يرجى تسجيل الخروج من حساب HeyTap/Realme في الإعدادات وتفعيل \'تعطيل مراقبة الأذونات\' بخيارات المطور.</string>
+    <string name="provisioning_error_already_device_owner">يوجد بالفعل تطبيق مالك مسجل على الجهاز، أو تم تفعيل الحماية مسبقاً.</string>
     <string name="provisioning_failed_accounts_title">تعذر التفعيل: يرجى حذف الحسابات أولاً</string>
     <string name="provisioning_failed_accounts_desc">يوجد %1$d حسابات مسجلة على الهاتف تمنع تفعيل صلاحية المالك.</string>
     <string name="provisioning_failed_accounts_action">اضغط هنا لفتح الحسابات وحذفها مؤقتاً ثم إعادة المحاولة.</string>
