@@ -2,6 +2,7 @@ package com.drmohammed.antiporn.ai.service
 
 import android.app.Notification
 import android.app.NotificationChannel
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -35,8 +36,8 @@ class ScreenAiProjectionService : Service() {
 
     companion object {
         private const val TAG = "ScreenAiProjectionSvc"
-        private const val CHANNEL_ID = "antiporn_ai_channel"
-        private const val NOTIFICATION_ID = 2001
+        private const val CHANNEL_ID = NotificationRegistry.CHANNEL_ID_AI
+        private const val NOTIFICATION_ID = NotificationRegistry.FGS_AI_PROJECTION_ID
 
         const val ACTION_START = "com.drmohammed.antiporn.ai.action.START"
         const val ACTION_STOP = "com.drmohammed.antiporn.ai.action.STOP"

@@ -6,8 +6,13 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
 import android.util.Log
+import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.ota.installer.OtaPackageInstaller
 import com.drmohammed.antiporn.ota.notification.OtaNotificationManager
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.model.NotificationActionType
+import com.drmohammed.antiporn.notification.model.NotificationCategory
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 
 /**
  * BroadcastReceiver listening for PackageInstaller session status callbacks.
@@ -59,6 +64,22 @@ class OtaInstallReceiver : BroadcastReceiver() {
                     "1.0"
                 }
                 OtaNotificationManager.showSuccessNotification(context, installedVersion)
+                try {
+                    AppNotificationManager.getInstance(context).postEventNotification(
+                        category = NotificationCategory.OTA,
+                        title = context.getString(R.string.notif_ota_success_title),
+                        message = context.getString(R.string.notif_ota_success_msg, installedVersion),
+                        dedupKey = "ota_success_$installedVersion",
+                        cooldownMs = 24 * 60 * 60 * 1000L,
+                        actionType = NotificationActionType.NONE,
+                        systemNotificationId = NotificationRegistry.EVENT_OTA_FAILED_ID,
+                        channelId = NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
+                        postSystemNotification = false,
+                        importance = 1
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error recording OTA success notification", e)
+                }
                 statusListener?.onInstallSuccess()
                 notifyInternalResult(context, status, message)
             }
@@ -83,6 +104,23 @@ class OtaInstallReceiver : BroadcastReceiver() {
             }
             else -> {
                 Log.e(TAG, "OTA installation failed with status $status: $message")
+                OtaNotificationManager.cancelNotification(context)
+                try {
+                    AppNotificationManager.getInstance(context).postEventNotification(
+                        category = NotificationCategory.OTA,
+                        title = context.getString(R.string.notif_ota_fail_title),
+                        message = context.getString(R.string.notif_ota_fail_msg, status),
+                        dedupKey = "ota_install_status_fail_$status",
+                        cooldownMs = 60 * 60 * 1000L,
+                        actionType = NotificationActionType.NONE,
+                        systemNotificationId = NotificationRegistry.EVENT_OTA_FAILED_ID,
+                        channelId = NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
+                        postSystemNotification = true,
+                        importance = 2
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error posting OTA failure notification", e)
+                }
                 statusListener?.onInstallFailure(status, message)
                 notifyInternalResult(context, status, message)
             }

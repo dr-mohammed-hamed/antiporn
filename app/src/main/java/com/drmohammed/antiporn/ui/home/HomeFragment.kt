@@ -31,6 +31,9 @@ import com.drmohammed.antiporn.ui.shields.ActiveShieldsBottomSheet
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import org.koin.android.ext.android.inject
+import com.drmohammed.antiporn.notification.repository.NotificationRepository
+import com.drmohammed.antiporn.ui.notification.NotificationCenterActivity
 
 /**
  * Modern Hero Dashboard Fragment.
@@ -49,10 +52,12 @@ class HomeFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val homeViewModel: HomeViewModel by viewModel()
+    private val notificationRepo: NotificationRepository by inject()
 
     private var lastShieldClickTime = 0L
     private var lastNapTapTime = 0L
     private var lastEnforceClickTime = 0L
+    private var lastBellClickTime = 0L
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -91,8 +96,20 @@ class HomeFragment : Fragment() {
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                homeViewModel.uiState.collect { state ->
-                    render(state)
+                launch {
+                    homeViewModel.uiState.collect { state ->
+                        render(state)
+                    }
+                }
+                launch {
+                    notificationRepo.unreadCountFlow.collect { count ->
+                        if (count > 0) {
+                            binding.tvNotificationBadge.visibility = View.VISIBLE
+                            binding.tvNotificationBadge.text = if (count > 99) "99+" else count.toString()
+                        } else {
+                            binding.tvNotificationBadge.visibility = View.GONE
+                        }
+                    }
                 }
             }
         }
@@ -108,6 +125,14 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupListeners() {
+        binding.btnNotificationBell.setOnClickListener {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastBellClickTime < 500L) return@setOnClickListener
+            lastBellClickTime = now
+            val intent = Intent(requireContext(), NotificationCenterActivity::class.java)
+            startActivity(intent)
+        }
+
         binding.layoutHeroShield.setOnClickListener {
             val now = SystemClock.elapsedRealtime()
             if (now - lastShieldClickTime >= 600L) {

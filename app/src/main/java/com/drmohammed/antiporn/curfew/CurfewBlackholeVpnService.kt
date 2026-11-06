@@ -16,6 +16,7 @@ import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.network.dns.DnsPacketParser
 import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import com.drmohammed.antiporn.data.repository.PolicyRepository
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -141,80 +142,85 @@ class CurfewBlackholeVpnService : VpnService() {
             builder.addRoute("::", 0)
         }
 
-        // Absolute self-exemption: AntiPorn must NEVER be trapped inside its own TUN interface
         try {
+            // Absolute self-exemption: AntiPorn must NEVER be trapped inside its own TUN interface
             builder.addDisallowedApplication(packageName)
-        } catch (e: Exception) {
-            Log.e(TAG, "CRITICAL: Cannot exempt self package from VPN. Aborting tunnel.", e)
-            isRunning = false
-            return
-        }
 
-        // Extensible Curfew Bypass Packages
-        if (targetMode == VpnMode.CURFEW_BLACKHOLE) {
-            val bypassedPackages = CurfewConfig.getVpnBypassedPackages(this)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                try {
-                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(this)) {
-                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAlwaysOnVpnPackageBlocking(
-                            context = this,
-                            vpnPackage = packageName,
-                            lockdown = true,
-                            bypassedPackages = bypassedPackages
-                        )
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Could not update Always-On VPN lockdown bypassed packages", e)
-                }
-            }
-            for (pkg in bypassedPackages) {
-                if (pkg == packageName) continue
-                try {
-                    builder.addDisallowedApplication(pkg)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to bypass package $pkg from VPN", e)
-                }
-            }
-        }
-
-        val newVpnInterface = try {
-            builder.establish()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to establish TUN interface for mode $targetMode", e)
-            null
-        }
-
-        if (newVpnInterface != null) {
-            // Architectural Requirement 3: Seamless Handover of the ParcelFileDescriptor
-            stopActiveIoLoop()
-            try {
-                oldVpnInterface?.close()
-            } catch (e: Exception) {
-                Log.w(TAG, "Error closing previous TUN interface during handover", e)
-            }
-
-            vpnInterface = newVpnInterface
-            currentMode = targetMode
-            Companion.currentMode = targetMode
-            isRunning = true
-
+            // Extensible Curfew Bypass Packages
             if (targetMode == VpnMode.CURFEW_BLACKHOLE) {
-                lastBypassedPackages = CurfewConfig.getVpnBypassedPackages(this)
+                val bypassedPackages = CurfewConfig.getVpnBypassedPackages(this)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    try {
+                        if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(this)) {
+                            com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAlwaysOnVpnPackageBlocking(
+                                context = this,
+                                vpnPackage = packageName,
+                                lockdown = true,
+                                bypassedPackages = bypassedPackages
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not update Always-On VPN lockdown bypassed packages", e)
+                    }
+                }
+                for (pkg in bypassedPackages) {
+                    if (pkg == packageName) continue
+                    try {
+                        builder.addDisallowedApplication(pkg)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to bypass package $pkg from VPN", e)
+                    }
+                }
+            }
+
+            val newVpnInterface = try {
+                builder.establish()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to establish TUN interface for mode $targetMode", e)
+                null
+            }
+
+            if (newVpnInterface != null) {
+                // Architectural Requirement 3: Seamless Handover of the ParcelFileDescriptor
+                stopActiveIoLoop()
+                try {
+                    oldVpnInterface?.close()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error closing previous TUN interface during handover", e)
+                }
+
+                vpnInterface = newVpnInterface
+                currentMode = targetMode
+                Companion.currentMode = targetMode
+                isRunning = true
+
+                if (targetMode == VpnMode.CURFEW_BLACKHOLE) {
+                    lastBypassedPackages = CurfewConfig.getVpnBypassedPackages(this)
+                } else {
+                    lastBypassedPackages = null
+                }
+
+                refreshBlockedUrlsCache()
+
+                if (targetMode == VpnMode.DNS_FILTERING_ONLY) {
+                    startDnsFilteringLoop(newVpnInterface)
+                }
+
+                Log.i(TAG, "Seamless Handover completed successfully to mode: $targetMode")
             } else {
-                lastBypassedPackages = null
+                Log.e(TAG, "builder.establish() returned null for mode $targetMode")
+                if (oldVpnInterface == null) {
+                    isRunning = false
+                    stopVpn()
+                    stopSelf()
+                }
             }
-
-            refreshBlockedUrlsCache()
-
-            if (targetMode == VpnMode.DNS_FILTERING_ONLY) {
-                startDnsFilteringLoop(newVpnInterface)
-            }
-
-            Log.i(TAG, "Seamless Handover completed successfully to mode: $targetMode")
-        } else {
-            Log.e(TAG, "builder.establish() returned null for mode $targetMode")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during tunnel establishment for mode $targetMode", e)
             if (oldVpnInterface == null) {
                 isRunning = false
+                stopVpn()
+                stopSelf()
             }
         }
     }
@@ -429,8 +435,8 @@ class CurfewBlackholeVpnService : VpnService() {
 
     companion object {
         private const val TAG = "AntiPorn_UnifiedVpn"
-        const val CHANNEL_ID = "antiporn_curfew_vpn"
-        const val NOTIFICATION_ID = 2001
+        const val CHANNEL_ID = NotificationRegistry.CHANNEL_ID_PROTECTION_VPN
+        const val NOTIFICATION_ID = NotificationRegistry.FGS_CURFEW_VPN_ID
 
         const val ACTION_START = "com.drmohammed.antiporn.curfew.ACTION_START_VPN"
         const val ACTION_STOP = "com.drmohammed.antiporn.curfew.ACTION_STOP_VPN"

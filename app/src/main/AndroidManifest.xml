@@ -203,6 +203,13 @@
             android:exported="false"
             android:label="@string/provisioning_wizard_title" />
 
+        <!-- In-App Notification Center -->
+        <activity
+            android:name=".ui.notification.NotificationCenterActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:label="@string/title_notification_center" />
+
         <service
             android:name=".provisioning.service.AdbPairingNotificationService"
             android:foregroundServiceType="specialUse"

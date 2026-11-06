@@ -26,6 +26,8 @@
     <string name="protection_vpn_channel_desc">Notifications for night curfew, nap mode, and guardian internet block</string>
     <string name="protection_events_channel_name">Protection &amp; Approval Alerts</string>
     <string name="protection_events_channel_desc">Alerts for guardian responses and timer completions</string>
+    <string name="critical_alerts_channel_name">Critical Security Alerts</string>
+    <string name="critical_alerts_channel_desc">Urgent alerts for security tampering and protection bypass attempts</string>
 
     <string name="notif_guardian_lockdown_title">Full Internet Blocked by Guardian</string>
     <string name="notif_guardian_lockdown_desc">The guardian has completely isolated device internet data. Calls and SMS work normally.</string>
@@ -132,7 +134,6 @@
     <string name="dialog_edit_ward_name_title">Edit Ward Device Name</string>
     <string name="dialog_edit_ward_name_hint">Enter a custom alias (e.g. Omar phone)</string>
     <string name="toast_name_saved">Name updated successfully</string>
-    <string name="toast_rename_failed">Failed to update name</string>
     <string name="btn_save">Save</string>
     <string name="btn_edit">Edit</string>
     <string name="btn_back">Back</string>
@@ -144,10 +145,15 @@
     <!-- Stepper Navigation -->
     <string name="stepper_number_1">1</string>
     <string name="stepper_number_2">2</string>
-    <string name="stepper_number_3">3</string>
-    <string name="stepper_step_1">1. Accounts</string>
-    <string name="stepper_step_2">2. Wireless</string>
-    <string name="stepper_step_3">3. Pairing</string>
+    <string name="stepper_step_1">1. Wireless</string>
+    <string name="stepper_step_2">2. Pairing &amp; Activate</string>
+
+    <string name="provisioning_zero_account_banner_title">Zero-Account Instant Activation</string>
+    <string name="provisioning_zero_account_banner_desc">AntiPorn automatically bypasses account restrictions; your Google, WhatsApp, and Telegram accounts remain 100%% safe and intact.</string>
+
+    <string name="provisioning_legacy_title">Android 7 to 10 Devices</string>
+    <string name="provisioning_legacy_desc">Because Android 10 and below do not support on-device Wireless Debugging pairing, please connect your phone via USB cable to PureSite to activate in 1 click without removing accounts.</string>
+    <string name="provisioning_btn_open_puresite">Open PureSite Installer</string>
     <string name="provisioning_step1_title">Step 1: Account Audit (Android Requirement)</string>
     <string name="provisioning_step1_ready">Device is ready for pairing (No active accounts)</string>
     <string name="provisioning_step1_success_title">Accounts verified and ready</string>
@@ -155,7 +161,7 @@
     <string name="provisioning_step1_warning_reassurance">Security note: Your cloud data is safe and you can re-add accounts immediately after setup.</string>
     <string name="provisioning_step1_accounts_found">Found %1$d active accounts that must be temporarily removed to set Device Owner.</string>
     <string name="provisioning_btn_open_accounts">Open Accounts Settings for Temporary Removal</string>
-    <string name="provisioning_step2_title">Step 2: Enable Wireless Debugging</string>
+    <string name="provisioning_step2_title">Step 1: Enable Wireless Debugging</string>
     <string name="provisioning_step2_desc">1. Tap button below to jump directly to Wireless Debugging.\n2. Enable "Wireless Debugging".\n3. Tap "Pair device with pairing code".</string>
     <string name="provisioning_step2_desc_disabled">Developer Options are not enabled yet. Tap below to open "About Phone" and tap "Build Number" 7 times.</string>
     <string name="provisioning_btn_open_dev_options">Open Wireless Debugging</string>
@@ -163,7 +169,7 @@
     <string name="dialog_enable_dev_title">How to Enable Developer Options (5 Seconds)</string>
     <string name="dialog_enable_dev_desc">1. We will open the "About Phone" screen.\n2. Tap rapidly 7 times on "Build Number".\n3. Enter your screen lock PIN if prompted.\n4. Once "You are now a developer!" appears, tap back to return here.</string>
     <string name="dialog_enable_dev_btn_open">Open "About Phone" Now</string>
-    <string name="provisioning_step3_title">Step 3: Enter 6-digit Pairing Code</string>
+    <string name="provisioning_step3_title">Step 2: Enter Pairing Code &amp; Activate</string>
     <string name="provisioning_radar_waiting">Radar searching for wireless pairing signal...</string>
     <string name="provisioning_radar_port_found">Captured port automatically (%1$d)</string>
     <string name="provisioning_input_hint">Enter 6-digit code here</string>
@@ -190,6 +196,11 @@
     <string name="provisioning_success_title">Maximum Protection Activated!</string>
     <string name="provisioning_success_desc">AntiPorn is now Device Owner. You can safely re-add your accounts.</string>
     <string name="provisioning_failed_title">Failed to activate Device Owner</string>
+    <string name="provisioning_tap_to_retry">Tap here to retry in the wizard</string>
+    <string name="provisioning_error_xiaomi_security_settings">Notice for Xiaomi/Redmi devices:\nPlease go to Developer Options and enable \'USB debugging (Security settings)\', then retry.</string>
+    <string name="provisioning_error_samsung_secure_folder">Please disable Samsung \'Secure Folder\' or \'Dual Messenger\' temporarily during activation.</string>
+    <string name="provisioning_error_realme_precondition">For Realme and Oppo devices: Please sign out of HeyTap/Realme account in Settings and enable \'Disable permission monitoring\' in Developer options.</string>
+    <string name="provisioning_error_already_device_owner">A Device Owner is already registered on this device, or protection was previously activated.</string>
     <string name="provisioning_failed_accounts_title">Activation Failed: Accounts Must Be Removed</string>
     <string name="provisioning_failed_accounts_desc">Found %1$d active accounts on device preventing Device Owner.</string>
     <string name="provisioning_failed_accounts_action">Tap here to open Settings and remove them temporarily.</string>
@@ -488,6 +499,7 @@
     <string name="btn_grant_usage_access">Grant Usage Access</string>
     <string name="card_curfew_usage_missing_subtext">Usage access permission required for foreground app detection.</string>
     <string name="toast_open_settings_failed">Failed opening system settings.</string>
+    <string name="toast_open_app_failed">Unable to open the requested app</string>
     <string name="curfew_google_search_blocked">Google Search app is restricted during curfew.</string>
     <string name="btn_nap_start">Start Nap Mode (1 Hour)</string>
     <string name="btn_nap_active">Nap Mode Active</string>
@@ -663,4 +675,48 @@
     <string name="policy_summary_format">v%1$d | %2$s (%3$02d:%4$02d)</string>
     <string name="log_latency_format">%1$d ms</string>
     <string name="telemetry_share_subject">AntiPorn Diagnostic Report</string>
+
+    <!-- Notification Center & History -->
+    <string name="title_notification_center">Notification Center</string>
+    <string name="action_mark_all_read">Mark all as read</string>
+    <string name="action_clear_notifications">Clear history</string>
+    <string name="filter_all">All</string>
+    <string name="filter_approvals">Approvals</string>
+    <string name="filter_guardian">Guardian</string>
+    <string name="filter_curfew">Curfew</string>
+    <string name="filter_shields">Shields</string>
+    <string name="filter_ai">AI &amp; Vision</string>
+    <string name="filter_ota">Updates</string>
+    <string name="filter_system">System</string>
+    <string name="empty_notifications_title">No notifications yet</string>
+    <string name="empty_notifications_desc">Notification history is empty. Events and alerts will appear here as they occur.</string>
+    <string name="confirm_clear_notifications_title">Clear notification history</string>
+    <string name="confirm_clear_notifications_msg">Are you sure you want to delete all recorded notifications?</string>
+    <string name="btn_confirm_clear">Clear</string>
+
+    <!-- Event Notification Strings -->
+    <string name="notif_curfew_pre_warn_title">Curfew starting soon</string>
+    <string name="notif_curfew_pre_warn_msg">Night curfew will begin in 15 minutes (at %1$s). Please wrap up your tasks and save your work.</string>
+    <string name="notif_curfew_start_title">Night curfew is now active</string>
+    <string name="notif_curfew_start_msg">Night curfew has been activated. Distraction apps and internet access are paused until morning.</string>
+    <string name="notif_curfew_end_title">Good morning! Night curfew ended</string>
+    <string name="notif_curfew_end_msg">Night curfew has concluded. Apps and internet connection are now restored.</string>
+    <string name="notif_tamper_alert_title">Protection shield modification detected</string>
+    <string name="notif_tamper_alert_msg">An attempt to disable or modify protection settings (DNS or time) was detected, and shield enforcement was automatically restored.</string>
+    <string name="notif_policy_update_title">Protection policy updated</string>
+    <string name="notif_policy_update_msg">Your guardian has updated device protection policies and configurations.</string>
+    <string name="notif_ota_success_title">Update completed successfully</string>
+    <string name="notif_ota_success_msg">Hisn has been successfully updated to version %1$s with all protection measures intact.</string>
+    <string name="notif_ota_fail_title">Automatic update failed</string>
+    <string name="notif_ota_fail_msg">Failed to install the update package (error code: %1$d).</string>
+    <string name="notif_ota_repo_fail_title">Unable to complete automatic update</string>
+    <string name="notif_ota_repo_fail_msg">Failed to install update (%1$s): %2$s</string>
+    <string name="notif_ota_repo_download_fail_title">Unable to download automatic update</string>
+    <string name="notif_ota_repo_download_fail_msg">An error occurred while downloading or verifying update package (%1$s).</string>
+    <string name="notif_approval_deferred_curfew_desc">%1$s was approved by %2$s, and will be unlocked as soon as morning curfew ends.</string>
+    <string name="notif_breakout_alert_title">Pending emergency breakout request</string>
+    <string name="notif_breakout_alert_desc">%1$s requested an emergency unlock (%2$s remaining). You can reject to protect your ward.</string>
+    <string name="notif_ward_approval_req_title">New application review request</string>
+    <string name="notif_ward_approval_req_desc">Ward is requesting permission to install and use (%1$s).</string>
+    <string name="default_web_client_id" translatable="false"></string>
 </resources>

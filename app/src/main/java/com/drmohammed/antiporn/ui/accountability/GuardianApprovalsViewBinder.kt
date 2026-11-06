@@ -15,6 +15,10 @@ import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.MaterialColors
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.model.NotificationActionType
+import com.drmohammed.antiporn.notification.model.NotificationCategory
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -32,6 +36,7 @@ class GuardianApprovalsViewBinder(
     private val processingPackages = mutableSetOf<String>()
 
     fun renderPendingApprovals(items: List<Pair<String, String>>) {
+        if (activity.isFinishing || activity.isDestroyed) return
         layoutPendingApps.removeAllViews()
         val cardParent = activity.findViewById<android.view.View>(R.id.cardPendingApps)
             ?: (layoutPendingApps.parent?.parent as? android.view.View)
@@ -44,6 +49,28 @@ class GuardianApprovalsViewBinder(
         cardParent?.visibility = android.view.View.VISIBLE
 
         val context = activity
+        val wardId = wardIdProvider()
+        if (wardId.isNotBlank()) {
+            for ((pkg, name) in items) {
+                try {
+                    AppNotificationManager.getInstance(context).postEventNotification(
+                        category = NotificationCategory.APPROVALS,
+                        title = context.getString(R.string.notif_ward_approval_req_title),
+                        message = context.getString(R.string.notif_ward_approval_req_desc, name),
+                        dedupKey = "guardian_req_${wardId}_${pkg}",
+                        cooldownMs = 60 * 60 * 1000L,
+                        actionType = NotificationActionType.OPEN_GUARDIAN_PANEL,
+                        actionPayload = wardId,
+                        systemNotificationId = NotificationRegistry.EVENT_WARD_REQUEST_ID,
+                        channelId = NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
+                        postSystemNotification = false,
+                        importance = 2
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error recording pending approval notification", e)
+                }
+            }
+        }
         for ((pkg, name) in items) {
             val card = MaterialCardView(context).apply {
                 radius = resources.displayMetrics.density * 8
@@ -118,6 +145,7 @@ class GuardianApprovalsViewBinder(
     }
 
     fun renderError() {
+        if (activity.isFinishing || activity.isDestroyed) return
         val cardParent = activity.findViewById<android.view.View>(R.id.cardPendingApps)
             ?: (layoutPendingApps.parent?.parent as? android.view.View)
         cardParent?.visibility = android.view.View.VISIBLE

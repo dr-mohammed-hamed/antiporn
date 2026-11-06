@@ -5,6 +5,7 @@ import com.drmohammed.antiporn.cloud.auth.GoogleAuthManager
 import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
 import com.drmohammed.antiporn.data.local.db.dao.DevicePolicyDao
 import com.drmohammed.antiporn.data.local.db.dao.DiagnosticEventDao
+import com.drmohammed.antiporn.data.local.db.dao.InAppNotificationDao
 import com.drmohammed.antiporn.data.local.db.dao.PartnerDao
 import com.drmohammed.antiporn.data.local.db.dao.PendingApprovalDao
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
@@ -21,6 +22,9 @@ import com.drmohammed.antiporn.ui.main.MainViewModel
 import com.drmohammed.antiporn.ui.settings.SettingsViewModel
 import com.drmohammed.antiporn.work.CloudSyncWorker
 import com.drmohammed.antiporn.work.OtaUpdateWorker
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.repository.NotificationRepository
+import com.drmohammed.antiporn.ui.notification.NotificationCenterViewModel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -49,7 +53,8 @@ class AppModuleTest : KoinTest {
             extraTypes = listOf(
                 android.content.Context::class,
                 android.app.Application::class,
-                WorkerParameters::class
+                WorkerParameters::class,
+                kotlinx.coroutines.CoroutineScope::class
             )
         )
     }
@@ -65,6 +70,7 @@ class AppModuleTest : KoinTest {
             PartnerDao::class,
             PendingApprovalDao::class,
             DiagnosticEventDao::class,
+            InAppNotificationDao::class,
             PolicyRepository::class,
             AccountabilityRepository::class,
             ApprovalRepository::class,
@@ -78,6 +84,9 @@ class AppModuleTest : KoinTest {
             RemoteAppManagerViewModel::class,
             GuardianControlViewModel::class,
             SettingsViewModel::class,
+            NotificationRepository::class,
+            AppNotificationManager::class,
+            NotificationCenterViewModel::class,
             OtaUpdateWorker::class,
             CloudSyncWorker::class
         )
@@ -88,7 +97,7 @@ class AppModuleTest : KoinTest {
                 registeredTypes.contains(expected)
             )
         }
-        assertEquals(20, registeredTypes.size)
+        assertEquals(24, registeredTypes.size)
     }
 
     @Test

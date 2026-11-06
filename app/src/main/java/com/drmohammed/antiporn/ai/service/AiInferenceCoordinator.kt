@@ -266,6 +266,20 @@ class AiInferenceCoordinator(
         mainHandler.post {
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
+
+        try {
+            com.drmohammed.antiporn.notification.manager.AppNotificationManager.getInstance(context).postEventNotification(
+                category = com.drmohammed.antiporn.notification.model.NotificationCategory.AI,
+                title = context.getString(R.string.ai_service_channel_name),
+                message = message,
+                dedupKey = "ai_porn_alert_hard",
+                cooldownMs = 15 * 60 * 1000L,
+                actionType = com.drmohammed.antiporn.notification.model.NotificationActionType.NONE,
+                postSystemNotification = false
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Error recording hard porn alert in in-app notification center", e)
+        }
     }
 
     private fun triggerSoftPornAlertThrottled(label: String, confidence: Float) {

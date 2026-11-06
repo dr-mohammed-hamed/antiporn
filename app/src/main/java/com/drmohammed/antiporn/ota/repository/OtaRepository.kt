@@ -10,6 +10,10 @@ import com.drmohammed.antiporn.ota.installer.OtaPackageInstaller
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
 import com.drmohammed.antiporn.ota.model.OtaVersionInfo
 import com.drmohammed.antiporn.ota.notification.OtaNotificationManager
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.model.NotificationActionType
+import com.drmohammed.antiporn.notification.model.NotificationCategory
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import com.drmohammed.antiporn.ota.receiver.OtaInstallReceiver
 import com.drmohammed.antiporn.ota.remote.OtaRemoteSource
 import com.drmohammed.antiporn.ota.security.OtaIntegrityVerifier
@@ -17,6 +21,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -196,6 +201,22 @@ class OtaRepository(private val appContext: Context) {
                 if (showNotification) {
                     OtaNotificationManager.cancelNotification(context)
                 }
+                try {
+                    AppNotificationManager.getInstance(context).postEventNotification(
+                        category = NotificationCategory.OTA,
+                        title = context.getString(R.string.notif_ota_repo_fail_title),
+                        message = context.getString(R.string.notif_ota_repo_fail_msg, info.versionName, installEx.message ?: ""),
+                        dedupKey = "ota_install_failed_${info.versionCode}",
+                        cooldownMs = 60 * 60 * 1000L,
+                        actionType = NotificationActionType.NONE,
+                        systemNotificationId = NotificationRegistry.EVENT_OTA_FAILED_ID,
+                        channelId = NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
+                        postSystemNotification = true,
+                        importance = 2
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error posting OTA failure notification", e)
+                }
                 Result.failure(installEx)
             }
         } catch (ce: CancellationException) {
@@ -212,6 +233,22 @@ class OtaRepository(private val appContext: Context) {
             )
             if (showNotification) {
                 OtaNotificationManager.cancelNotification(context)
+            }
+            try {
+                AppNotificationManager.getInstance(context).postEventNotification(
+                    category = NotificationCategory.OTA,
+                    title = context.getString(R.string.notif_ota_repo_download_fail_title),
+                    message = context.getString(R.string.notif_ota_repo_download_fail_msg, info.versionName),
+                    dedupKey = "ota_download_failed_${info.versionCode}",
+                    cooldownMs = 60 * 60 * 1000L,
+                    actionType = NotificationActionType.NONE,
+                    systemNotificationId = NotificationRegistry.EVENT_OTA_FAILED_ID,
+                    channelId = NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
+                    postSystemNotification = true,
+                    importance = 2
+                )
+            } catch (ex: Exception) {
+                Log.e(TAG, "Error posting OTA failure notification", ex)
             }
             Result.failure(e)
         } finally {
@@ -237,6 +274,20 @@ class OtaRepository(private val appContext: Context) {
         } else {
             Log.d(TAG, "Autonomous OTA check finished: no newer updates available")
             Result.success(Unit)
+        }
+    }
+
+    /**
+     * Non-blocking trigger executing autonomous OTA check & download on the repository singleton scope.
+     * Prevents short-lived service termination from killing background downloads.
+     */
+    fun checkForUpdatesAndAutoInstallAsync(context: Context) {
+        repositoryScope.launch {
+            try {
+                checkForUpdatesAndAutoInstall(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in checkForUpdatesAndAutoInstallAsync", e)
+            }
         }
     }
 

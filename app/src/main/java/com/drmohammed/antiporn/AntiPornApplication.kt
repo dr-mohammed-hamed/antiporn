@@ -75,25 +75,49 @@ class AntiPornApplication : Application(), Configuration.Provider {
         // Initialize PolicyRepository on cold boot so policy and approval sync listeners start reliably
         PolicyRepository.getInstance(this)
 
+        // Initialize central Notification Channels
+        com.drmohammed.antiporn.notification.manager.AppNotificationManager.getInstance(this).createNotificationChannels()
+
         // Synchronize Zero-Trust active foreground watcher state on startup
         ZeroTrustForegroundWatcher.syncWatcherState(this)
+
+        // Self-healing watchdog: check for stuck user_setup_complete state on cold boot
+        try {
+            val setupComplete = android.provider.Settings.Secure.getInt(contentResolver, "user_setup_complete", 1)
+            val provisioned = android.provider.Settings.Global.getInt(contentResolver, android.provider.Settings.Global.DEVICE_PROVISIONED, 1)
+            if (setupComplete == 0 && provisioned == 1) {
+                Timber.w("AntiPorn Boot Watchdog: Detected stuck user_setup_complete=0 on provisioned device.")
+                try {
+                    android.provider.Settings.Secure.putInt(contentResolver, "user_setup_complete", 1)
+                } catch (t: Throwable) {
+                    Timber.w(t, "Setup state watchdog: Failed to restore user_setup_complete")
+                }
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Setup state watchdog check failed")
+        }
 
         // Schedule periodic background workers with network constraints and ExistingPeriodicWorkPolicy.KEEP
         OtaUpdateWorker.schedule(this)
         CloudSyncWorker.schedule(this)
 
-        // Prune diagnostic events older than 30 days and enforce 5000 event cap in background (non-blocking)
+        // Prune diagnostic events and in-app notifications in background (non-blocking)
         applicationScope.launch {
             try {
                 val db = HisnRoomDatabase.getInstance(this@AntiPornApplication)
                 val cutoff = TrustedTimeProvider.currentTimeMillis(this@AntiPornApplication) - (30L * 24 * 60 * 60 * 1000)
                 val pruned = db.diagnosticEventDao().pruneEventsOlderThan(cutoff)
                 val capped = db.diagnosticEventDao().enforceMaxEventsCap(5000)
-                if (pruned > 0 || capped > 0) {
-                    Timber.i("Cleaned up diagnostic events: pruned=$pruned (>30 days), capped=$capped (>5000 events)")
+                val prunedNotifs = try {
+                    db.inAppNotificationDao().pruneOldNotifications(maxKeep = 200, olderThanMs = cutoff)
+                } catch (e: Exception) {
+                    0
+                }
+                if (pruned > 0 || capped > 0 || prunedNotifs > 0) {
+                    Timber.i("Cleaned up database: diagPruned=$pruned, diagCapped=$capped, notifsPruned=$prunedNotifs")
                 }
             } catch (e: Exception) {
-                Timber.w(e, "Failed to prune diagnostic events")
+                Timber.w(e, "Failed to prune diagnostic events / notifications")
             }
         }
     }

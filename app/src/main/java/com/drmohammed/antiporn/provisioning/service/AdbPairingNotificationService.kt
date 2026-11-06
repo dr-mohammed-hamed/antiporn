@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
 import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import com.drmohammed.antiporn.provisioning.engine.AdbMdnsDiscovery
 import com.drmohammed.antiporn.provisioning.receiver.PairingCodeReceiver
 
@@ -161,8 +162,8 @@ class AdbPairingNotificationService : Service() {
 
     companion object {
         private const val TAG = "AntiPorn_PairingSvc"
-        const val CHANNEL_ID = "anti_porn_pairing_channel"
-        const val NOTIFICATION_ID = 4004
+        const val CHANNEL_ID = NotificationRegistry.CHANNEL_ID_PAIRING
+        const val NOTIFICATION_ID = NotificationRegistry.ADB_PAIRING_ID
 
         @Volatile var capturedPairingPort: Int = 0
         @Volatile var capturedConnectPort: Int = 0

@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.ota.model.OtaVersionInfo
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 
 /**
  * Manages subtle, low-importance system notifications for OTA auto-update workflows.
@@ -18,8 +19,8 @@ import com.drmohammed.antiporn.ota.model.OtaVersionInfo
 object OtaNotificationManager {
 
     private const val TAG = "AntiPorn_OtaNotif"
-    const val CHANNEL_ID = "antiporn_ota_updates"
-    private const val NOTIFICATION_ID = 2005
+    const val CHANNEL_ID = NotificationRegistry.CHANNEL_ID_OTA
+    const val NOTIFICATION_ID = NotificationRegistry.OTA_PROGRESS_ID
 
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

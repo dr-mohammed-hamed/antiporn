@@ -42,10 +42,12 @@ object AccountAuditor {
     }
 
     /**
-     * Checks if the device has zero accounts and is ready for Device Owner provisioning.
+     * Checks if the device is ready for Device Owner provisioning.
+     * With our Zero-Account bypass engine, devices are always ready
+     * without requiring users to delete their existing accounts.
      */
     fun isReadyForProvisioning(context: Context): Boolean {
-        return getAccountCount(context) == 0
+        return true
     }
 
     /**

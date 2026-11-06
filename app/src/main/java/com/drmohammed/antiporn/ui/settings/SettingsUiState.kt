@@ -19,5 +19,6 @@ data class SettingsUiState(
     val appVersionCode: Long = 1L,
     val isGoogleLinked: Boolean = false,
     val googleAccountEmail: String? = null,
-    val isSharingTelemetry: Boolean = false
+    val isSharingTelemetry: Boolean = false,
+    val myDisplayName: String = ""
 )

@@ -124,8 +124,7 @@
                     android:id="@+id/stepperLine2"
                     android:layout_width="0dp"
                     android:layout_height="2dp"
-                    android:layout_marginHorizontal="8dp"
-                    android:layout_weight="1"
+                    android:visibility="gone"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Step 3 Circle -->
@@ -133,6 +132,7 @@
                     android:id="@+id/step3Circle"
                     android:layout_width="28dp"
                     android:layout_height="28dp"
+                    android:visibility="gone"
                     android:background="@drawable/bg_stepper_circle_inactive">
 
                     <TextView
@@ -140,7 +140,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
-                        android:text="@string/stepper_number_3"
+                        android:text="@string/stepper_number_2"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp"
                         android:textStyle="bold" />
@@ -181,22 +181,125 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:gravity="center"
+                    android:gravity="end"
                     android:text="@string/stepper_step_2"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/step3Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    android:text="@string/stepper_step_2" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Reassuring Zero-Account Banner -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardReassuringBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/status_green"
+            app:strokeWidth="1.5dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="14dp">
+
+                <FrameLayout
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@drawable/bg_stepper_circle_done">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_check_small"
+                        app:tint="@android:color/white"
+                        tools:ignore="ContentDescription" />
+                </FrameLayout>
+
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:gravity="end"
-                    android:text="@string/stepper_step_3"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="12sp" />
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/provisioning_zero_account_banner_title"
+                        android:textColor="@color/status_green"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:lineSpacingExtra="2dp"
+                        android:text="@string/provisioning_zero_account_banner_desc"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+                </LinearLayout>
             </LinearLayout>
-        </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Legacy Android 7-10 PureSite Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardLegacyPureSite"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorPrimary"
+            app:strokeWidth="1.5dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/provisioning_legacy_title"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:lineSpacingExtra="3dp"
+                    android:text="@string/provisioning_legacy_desc"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOpenPureSite"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/provisioning_btn_open_puresite"
+                    app:cornerRadius="12dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- Optional Shizuku Fast Track Card -->
         <com.google.android.material.card.MaterialCardView
@@ -246,12 +349,13 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Step 1: Accounts Pre-flight Guard -->
+        <!-- Step 1: Accounts Pre-flight Guard (Archived / Replaced by Zero-Account Engine) -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardStep1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
+            android:visibility="gone"
             app:cardBackgroundColor="?attr/colorSurfaceContainer"
             app:cardCornerRadius="20dp"
             app:cardElevation="0dp"

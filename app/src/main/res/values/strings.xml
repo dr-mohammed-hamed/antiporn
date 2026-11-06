@@ -167,6 +167,7 @@
     <string name="card_curfew_usage_missing_subtext">إذن الوصول لبيانات الاستخدام مطلوب لتأمين إغلاق متجر Google Play أثناء الحظر.</string>
 
     <string name="toast_open_settings_failed">تعذر فتح شاشة الإعدادات</string>
+    <string name="toast_open_app_failed">تعذر فتح التطبيق المطلوب</string>
 
     <string name="curfew_google_search_blocked">بحث Google وتطبيق Gemini مغلقان أثناء حظر التجول الليلي!</string>
 
@@ -206,6 +207,8 @@
     <string name="protection_vpn_channel_desc">إشعارات أوضاع الحظر الليلي، وضع القيلولة، وعزل الإنترنت</string>
     <string name="protection_events_channel_name">تنبيهات وأحداث الحماية</string>
     <string name="protection_events_channel_desc">تنبيهات استجابات المشرف وانتهاء فترات الحظر</string>
+    <string name="critical_alerts_channel_name">تنبيهات الأمان الحرجة</string>
+    <string name="critical_alerts_channel_desc">إشعارات عاجلة لمحاولات التلاعب الأمني وتجاوز الحماية</string>
 
     <string name="notif_guardian_lockdown_title">تم حظر الإنترنت بالكامل من المشرف</string>
     <string name="notif_guardian_lockdown_desc">قام المشرف بعزل بيانات الإنترنت عن الجهاز. المكالمات وSMS تعمل بشكل طبيعي.</string>
@@ -555,13 +558,18 @@
 
     <string name="provisioning_wizard_subtitle">تفعيل صلاحية المالك (Device Owner) ذاتياً بدون كمبيوتر بأقل احتكاك</string>
 
-    <!-- Stepper Navigation -->
+    <!-- Stepper Navigation (2-Step Zero-Account Flow) -->
     <string name="stepper_number_1">1</string>
     <string name="stepper_number_2">2</string>
-    <string name="stepper_number_3">3</string>
-    <string name="stepper_step_1">1. الحسابات</string>
-    <string name="stepper_step_2">2. اللاسلكي</string>
-    <string name="stepper_step_3">3. الاقتران</string>
+    <string name="stepper_step_1">1. اللاسلكي</string>
+    <string name="stepper_step_2">2. الاقتران والتفعيل</string>
+
+    <string name="provisioning_zero_account_banner_title">تفعيل سيادي فوري بدون حذف الحسابات</string>
+    <string name="provisioning_zero_account_banner_desc">درع حِصْن يدعم التجاوز التلقائي؛ جميع حساباتك (Google، واتساب، تيليجرام) في أمان تام ولن تُمس إطلاقاً.</string>
+
+    <string name="provisioning_legacy_title">هواتف أندرويد 7 إلى 10</string>
+    <string name="provisioning_legacy_desc">نظراً لأن أندرويد 10 فما دون لا يدعم التصحيح اللاسلكي برمز إقران، يمكنك التفعيل بنقرة واحدة عبر كابل USB من موقع PureSite دون حذف أي حساب.</string>
+    <string name="provisioning_btn_open_puresite">فتح موقع التثبيت PureSite</string>
 
     <string name="provisioning_step1_title">الخطوة 1: فحص الحسابات (إلزامي لأندرويد)</string>
 
@@ -574,7 +582,7 @@
 
     <string name="provisioning_btn_open_accounts">فتح شاشة الحسابات للحذف المؤقت</string>
 
-    <string name="provisioning_step2_title">الخطوة 2: تشغيل تصحيح الأخطاء اللاسلكي</string>
+    <string name="provisioning_step2_title">الخطوة 1: تشغيل تصحيح الأخطاء اللاسلكي</string>
 
     <string name="provisioning_step2_desc">1. اضغط على الزر أدناه للانتقال المباشر لتصحيح الأخطاء اللاسلكي.\n2. فعّل خيار "تصحيح الأخطاء اللاسلكي" (Wireless Debugging).\n3. اضغط على "إقران الجهاز برمز إقران".</string>
     <string name="provisioning_step2_desc_disabled">خيارات المطور غير مفعلة على هاتفك بعد. اضغط أدناه لفتح شاشة "حول الهاتف" والنقر 7 مرات على "رقم الإصدار".</string>
@@ -586,7 +594,7 @@
     <string name="dialog_enable_dev_desc">1. سنفتح لك شاشة "حول الهاتف" (About Phone).\n2. انقر 7 مرات متتالية وسريعة على "رقم الإصدار" (Build Number).\n3. أدخل رمز قفل الشاشة عند طلبه.\n4. بعد ظهور رسالة "أنت الآن مطور"، عُد للتطبيق بنقرة رجوع.</string>
     <string name="dialog_enable_dev_btn_open">الانتقال إلى "حول الهاتف" الآن</string>
 
-    <string name="provisioning_step3_title">الخطوة 3: إدخال رمز الاقتران (6 أرقام)</string>
+    <string name="provisioning_step3_title">الخطوة 2: إدخال رمز الاقتران والتفعيل</string>
 
     <string name="provisioning_radar_waiting">الرادار يبحث عن إشارة الاقتران اللاسلكي...</string>
 
@@ -636,6 +644,11 @@
     <string name="provisioning_success_desc">أصبح التطبيق الآن مسؤول المالك. يمكنك إعادة إضافة حساباتك بأمان.</string>
 
     <string name="provisioning_failed_title">تعذر تفعيل صلاحية المالك</string>
+    <string name="provisioning_tap_to_retry">اضغط هنا لإعادة المحاولة من داخل المعالج</string>
+    <string name="provisioning_error_xiaomi_security_settings">تنبيه لأجهزة شاومي / ريدمي:\nيرجى الدخول إلى خيارات المطور وتفعيل خيار \'تصحيح أخطاء USB (إعدادات الأمان)\'، ثم إعادة المحاولة.</string>
+    <string name="provisioning_error_samsung_secure_folder">يرجى تعطيل \'المجلد الآمن\' (Secure Folder) في سامسونج أو إيقاف ميزة \'التطبيقات المزدوجة\' مؤقتاً أثناء التفعيل.</string>
+    <string name="provisioning_error_realme_precondition">لهواتف ريلمي وأوبو: يرجى تسجيل الخروج من حساب HeyTap/Realme في الإعدادات وتفعيل \'تعطيل مراقبة الأذونات\' بخيارات المطور.</string>
+    <string name="provisioning_error_already_device_owner">يوجد بالفعل تطبيق مالك مسجل على الجهاز، أو تم تفعيل الحماية مسبقاً.</string>
     <string name="provisioning_failed_accounts_title">تعذر التفعيل: يرجى حذف الحسابات أولاً</string>
     <string name="provisioning_failed_accounts_desc">يوجد %1$d حسابات مسجلة على الهاتف تمنع تفعيل صلاحية المالك.</string>
     <string name="provisioning_failed_accounts_action">اضغط هنا لفتح الحسابات وحذفها مؤقتاً ثم إعادة المحاولة.</string>
@@ -683,6 +696,15 @@
     <string name="status_online_recently">متصل مؤخراً</string>
     <string name="status_offline_hours">آخر ظهور: منذ %d ساعة</string>
     <string name="status_offline_days">آخر ظهور: منذ %d يوم</string>
+
+    <!-- Settings Device Display Name -->
+    <string name="settings_device_name_title">اسم الجهاز للشركاء</string>
+    <string name="settings_device_name_desc">الاسم الذي يظهر لمشرفك عند ربط الجهاز ومتابعته</string>
+    <string name="dialog_edit_device_name_title">تعديل اسم الجهاز للشركاء</string>
+    <string name="dialog_edit_device_name_hint">أدخل اسماً يميز هذا الجهاز للمشرف (مثال: هاتف أحمد)</string>
+    <string name="device_name_not_set">لم يُحدد بعد</string>
+    <string name="btn_request_unlink">طلب فك الارتباط</string>
+    <string name="guardian_status_active_verified">مشرف نشط ومعتمد</string>
 
     <!-- 24h Emergency Breakout -->
     <string name="btn_request_emergency_breakout">طلب فك ارتباط اضطراري (مهلة 24 ساعة)</string>
@@ -943,4 +965,47 @@
     <string name="policy_summary_format">v%1$d | %2$s (%3$02d:%4$02d)</string>
     <string name="log_latency_format">%1$d ms</string>
     <string name="telemetry_share_subject">تقرير تشخيص حِصْن</string>
+
+    <!-- Notification Center & History -->
+    <string name="title_notification_center">مركز الإشعارات</string>
+    <string name="action_mark_all_read">تحديد الكل كمقروء</string>
+    <string name="action_clear_notifications">مسح السجل</string>
+    <string name="filter_all">الكل</string>
+    <string name="filter_approvals">الموافقات</string>
+    <string name="filter_guardian">المشرف</string>
+    <string name="filter_curfew">الحظر الليلي</string>
+    <string name="filter_shields">الدروع</string>
+    <string name="filter_ai">الرؤية والذكاء</string>
+    <string name="filter_ota">التحديثات</string>
+    <string name="filter_system">النظام</string>
+    <string name="empty_notifications_title">لا توجد إشعارات حالياً</string>
+    <string name="empty_notifications_desc">سجل الإشعارات فارغ. ستظهر هنا كافة الأحداث والتنبيهات فور ورودها.</string>
+    <string name="confirm_clear_notifications_title">مسح سجل الإشعارات</string>
+    <string name="confirm_clear_notifications_msg">هل أنت متأكد من رغبتك في حذف كافة الإشعارات المسجلة؟</string>
+    <string name="btn_confirm_clear">مسح</string>
+
+    <!-- Event Notification Strings -->
+    <string name="notif_curfew_pre_warn_title">اقتراب موعد حظر التجوال</string>
+    <string name="notif_curfew_pre_warn_msg">سيبدأ حظر التجوال الليلي خلال 15 دقيقة (الساعة %1$s). يُرجى إنهاء مهامك وحفظ عملك.</string>
+    <string name="notif_curfew_start_title">بدء سريان حظر التجوال الليلي</string>
+    <string name="notif_curfew_start_msg">تم تفعيل حظر التجوال الليلي. التطبيقات والإنترنت محظورة الآن حتى الصباح.</string>
+    <string name="notif_curfew_end_title">صباح الخير! انتهى موعد حظر التجوال</string>
+    <string name="notif_curfew_end_msg">انتهت فترة حظر التجوال الليلي، وفُتحت التطبيقات والإنترنت بنجاح.</string>
+    <string name="notif_tamper_alert_title">رصد محاولة تعديل دروع الحماية</string>
+    <string name="notif_tamper_alert_msg">تم رصد محاولة تعطيل أو تغيير إعدادات الحماية (مثل DNS أو الوقت) وتمت إعادة فرض الحصانة تلقائياً.</string>
+    <string name="notif_policy_update_title">تحديث إعدادات الحماية</string>
+    <string name="notif_policy_update_msg">قام المشرف بتحديث إعدادات الحماية والسياسات الخاصة بجهازك.</string>
+    <string name="notif_ota_success_title">اكتمل تحديث التطبيق بنجاح</string>
+    <string name="notif_ota_success_msg">تم تحديث تطبيق «حِصْن» إلى الإصدار %1$s بنجاح وتطبيق كافة تدابير الحماية.</string>
+    <string name="notif_ota_fail_title">تعذر تثبيت التحديث التلقائي</string>
+    <string name="notif_ota_fail_msg">فشل تثبيت حزمة التحديث (رمز الخطأ: %1$d).</string>
+    <string name="notif_ota_repo_fail_title">تعذر إكمال التحديث التلقائي</string>
+    <string name="notif_ota_repo_fail_msg">فشل تثبيت التحديث (%1$s): %2$s</string>
+    <string name="notif_ota_repo_download_fail_title">تعذر تنزيل التحديث التلقائي</string>
+    <string name="notif_ota_repo_download_fail_msg">حدث خطأ أثناء تنزيل أو معالجة التحديث (%1$s).</string>
+    <string name="notif_approval_deferred_curfew_desc">تمت الموافقة على %1$s من قِبل %2$s، وسيُتاح للاستخدام فور انتهاء موعد الحظر الصباحي.</string>
+    <string name="notif_breakout_alert_title">طلب كسر طوارئ معلّق</string>
+    <string name="notif_breakout_alert_desc">طلب %1$s فك حظر الطوارئ (متبقي %2$s). يمكنك الرفض لحماية المكفول.</string>
+    <string name="notif_ward_approval_req_title">طلب تطبيق جديد للمراجعة</string>
+    <string name="notif_ward_approval_req_desc">يطلب المكفول تثبيت واستخدام تطبيق (%1$s).</string>
 </resources>

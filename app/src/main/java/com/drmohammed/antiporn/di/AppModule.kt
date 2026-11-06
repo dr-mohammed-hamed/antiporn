@@ -5,6 +5,7 @@ import com.drmohammed.antiporn.cloud.auth.GoogleAuthManager
 import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
 import com.drmohammed.antiporn.data.local.db.dao.DevicePolicyDao
 import com.drmohammed.antiporn.data.local.db.dao.DiagnosticEventDao
+import com.drmohammed.antiporn.data.local.db.dao.InAppNotificationDao
 import com.drmohammed.antiporn.data.local.db.dao.PartnerDao
 import com.drmohammed.antiporn.data.local.db.dao.PendingApprovalDao
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
@@ -12,12 +13,15 @@ import com.drmohammed.antiporn.data.repository.AppInventoryManager
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.ota.repository.OtaRepository
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.repository.NotificationRepository
 import com.drmohammed.antiporn.ui.accountability.AccountabilityViewModel
 import com.drmohammed.antiporn.ui.accountability.GuardianControlViewModel
 import com.drmohammed.antiporn.ui.accountability.RemoteAppManagerViewModel
 import com.drmohammed.antiporn.ui.control.SelfControlViewModel
 import com.drmohammed.antiporn.ui.home.HomeViewModel
 import com.drmohammed.antiporn.ui.main.MainViewModel
+import com.drmohammed.antiporn.ui.notification.NotificationCenterViewModel
 import com.drmohammed.antiporn.ui.settings.SettingsViewModel
 import com.drmohammed.antiporn.work.CloudSyncWorker
 import com.drmohammed.antiporn.work.OtaUpdateWorker
@@ -39,6 +43,7 @@ val appModule = module {
     single { get<HisnRoomDatabase>().partnerDao() }
     single { get<HisnRoomDatabase>().pendingApprovalDao() }
     single { get<HisnRoomDatabase>().diagnosticEventDao() }
+    single { get<HisnRoomDatabase>().inAppNotificationDao() }
 
     // Repositories and Enterprise Managers
     single { PolicyRepository(androidContext(), get(), get()) }
@@ -47,6 +52,8 @@ val appModule = module {
     single { AppInventoryManager.getInstance(androidContext()) }
     single { GoogleAuthManager.getInstance(androidContext()) }
     single { OtaRepository.getInstance(androidContext()) }
+    single { NotificationRepository(get()) }
+    single { AppNotificationManager.getInstance(androidContext()) }
 
     // ViewModels
     viewModel { MainViewModel() }
@@ -55,7 +62,8 @@ val appModule = module {
     viewModel { AccountabilityViewModel(androidApplication(), get(), get(), get(), get()) }
     viewModel { RemoteAppManagerViewModel(androidApplication(), get(), get(), get()) }
     viewModel { GuardianControlViewModel(androidApplication(), get(), get(), get()) }
-    viewModel { SettingsViewModel(androidApplication(), get(), get()) }
+    viewModel { SettingsViewModel(androidApplication(), get(), get(), get()) }
+    viewModel { NotificationCenterViewModel(get()) }
 
     // Background Workers
     worker { (workerParams: WorkerParameters) ->

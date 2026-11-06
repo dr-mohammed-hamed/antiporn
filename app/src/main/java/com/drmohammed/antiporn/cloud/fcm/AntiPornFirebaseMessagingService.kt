@@ -2,11 +2,14 @@ package com.drmohammed.antiporn.cloud.fcm
 
 import android.content.Context
 import android.util.Log
+import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
-import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.model.NotificationActionType
+import com.drmohammed.antiporn.notification.model.NotificationCategory
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -15,7 +18,6 @@ import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -25,13 +27,13 @@ import kotlinx.coroutines.tasks.await
  */
 class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
 
-    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Log.i(TAG, "New FCM Token received: $token")
         persistToken(applicationContext, token)
-        uploadFcmToken(token)
+        fcmScope.launch {
+            uploadFcmToken(token)
+        }
     }
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
@@ -57,6 +59,20 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
                 } else {
                     PolicyRepository.getInstance(applicationContext).startFirestoreSync()
                 }
+
+                try {
+                    AppNotificationManager.getInstance(applicationContext).postEventNotification(
+                        category = NotificationCategory.GUARDIAN,
+                        title = getString(R.string.notif_policy_update_title),
+                        message = getString(R.string.notif_policy_update_msg),
+                        dedupKey = "policy_update_fcm",
+                        cooldownMs = 60_000L,
+                        actionType = NotificationActionType.NONE,
+                        postSystemNotification = true
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error posting policy update notification", e)
+                }
             }
 
             ACTION_APPROVAL_RESPONSE -> {
@@ -77,24 +93,12 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
                     ApprovalRepository.getInstance(applicationContext).recordRejection(packageName, decidedBy)
                     Log.i(TAG, "Application $packageName rejection recorded from $decidedBy")
                 }
-                ProtectionNotificationCoordinator.postAppApprovalDecisionNotification(
-                    applicationContext,
-                    packageName,
-                    actuallyApproved,
-                    decidedBy
-                )
             }
 
             ACTION_OTA_CHECK_UPDATE, ACTION_TRIGGER_OTA_UPDATE -> {
-                Log.i(TAG, "Processing OTA update trigger ($action) from FCM")
-                serviceScope.launch {
-                    try {
-                        com.drmohammed.antiporn.ota.repository.OtaRepository.getInstance(applicationContext)
-                            .checkForUpdatesAndAutoInstall(applicationContext)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error handling OTA trigger from FCM", e)
-                    }
-                }
+                Log.i(TAG, "Processing OTA update trigger ($action) from FCM asynchronously")
+                com.drmohammed.antiporn.ota.repository.OtaRepository.getInstance(applicationContext)
+                    .checkForUpdatesAndAutoInstallAsync(applicationContext)
             }
 
             else -> {
@@ -103,30 +107,24 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
         }
     }
 
-    private fun uploadFcmToken(token: String) {
-        serviceScope.launch {
-            try {
-                val uid = FirebaseAuth.getInstance().currentUser?.uid
-                    ?: AccountabilityRepository.getInstance(applicationContext).getCachedUid()
-                FirebaseFirestore.getInstance().collection("users").document(uid)
-                    .set(
-                        mapOf("fcmToken" to token, "tokenUpdatedAt" to System.currentTimeMillis()),
-                        SetOptions.merge()
-                    ).await()
-                Log.i(TAG, "Updated FCM token in Firestore for UID $uid")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error updating FCM token in Firestore", e)
-            }
+    private suspend fun uploadFcmToken(token: String) {
+        try {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid
+                ?: AccountabilityRepository.getInstance(applicationContext).getCachedUid()
+            FirebaseFirestore.getInstance().collection("users").document(uid)
+                .set(
+                    mapOf("fcmToken" to token, "tokenUpdatedAt" to System.currentTimeMillis()),
+                    SetOptions.merge()
+                ).await()
+            Log.i(TAG, "Updated FCM token in Firestore for UID $uid")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating FCM token in Firestore", e)
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        serviceScope.cancel()
     }
 
     companion object {
         private const val TAG = "AntiPorn_FCM"
+        private val fcmScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         const val PREFS_NAME = "antiporn_fcm_prefs"
         const val KEY_FCM_TOKEN = "key_fcm_token"
         const val KEY_LAST_SYNCED_TOKEN_UID = "key_last_synced_token_uid"
@@ -155,7 +153,7 @@ class AntiPornFirebaseMessagingService : FirebaseMessagingService() {
                 // Token already synced to Firestore for this UID; skip redundant cloud write
                 return
             }
-            CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            fcmScope.launch {
                 try {
                     FirebaseFirestore.getInstance().collection("users").document(uid)
                         .set(

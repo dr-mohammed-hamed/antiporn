@@ -14,6 +14,10 @@ import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.model.NotificationActionType
+import com.drmohammed.antiporn.notification.model.NotificationCategory
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -161,6 +165,7 @@ class GuardianAlertsViewBinder(
     }
 
     fun renderPolicyAlerts(policy: DevicePolicyBundle) {
+        if (activity.isFinishing || activity.isDestroyed) return
         val wardName = wardNameProvider()
         if (!policy.guardianPolicySnapshot.isNullOrBlank() || policy.lastSelfModifiedAt != null) {
             cardSelfControlAlertBanner.visibility = View.VISIBLE
@@ -183,6 +188,27 @@ class GuardianAlertsViewBinder(
             val mins = (remainingMs % (1000 * 3600)) / (1000 * 60)
             val timeStr = String.format(Locale.US, "%02d:%02d", hours, mins)
             tvBreakoutAlertMsg.text = activity.getString(R.string.guardian_breakout_alert_msg, wardName, timeStr)
+
+            val wardId = wardIdProvider()
+            if (wardId.isNotBlank()) {
+                try {
+                    AppNotificationManager.getInstance(activity.applicationContext).postEventNotification(
+                        category = NotificationCategory.GUARDIAN,
+                        title = activity.getString(R.string.notif_breakout_alert_title),
+                        message = activity.getString(R.string.notif_breakout_alert_desc, wardName, timeStr),
+                        dedupKey = "breakout_alert_${wardId}_${policy.breakoutUnlockAt}",
+                        cooldownMs = 60 * 60 * 1000L,
+                        actionType = NotificationActionType.OPEN_GUARDIAN_PANEL,
+                        actionPayload = wardId,
+                        systemNotificationId = NotificationRegistry.EVENT_BREAKOUT_REQUEST_ID,
+                        channelId = NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
+                        postSystemNotification = true,
+                        importance = 3
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error logging breakout alert notification", e)
+                }
+            }
         } else {
             cardBreakoutAlertBanner.visibility = View.GONE
         }

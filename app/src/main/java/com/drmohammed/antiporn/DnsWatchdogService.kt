@@ -26,6 +26,10 @@ import com.drmohammed.antiporn.curfew.CurfewForegroundWatcher
 import com.drmohammed.antiporn.services.NetworkWatchdog
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
+import com.drmohammed.antiporn.notification.manager.AppNotificationManager
+import com.drmohammed.antiporn.notification.model.NotificationActionType
+import com.drmohammed.antiporn.notification.model.NotificationCategory
+import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -38,8 +42,8 @@ class DnsWatchdogService : Service() {
 
     companion object {
         private const val TAG = "AntiPorn_Watchdog"
-        const val CHANNEL_ID = "antiporn_watchdog"
-        const val NOTIFICATION_ID = 1001
+        const val CHANNEL_ID = NotificationRegistry.CHANNEL_ID_WATCHDOG
+        const val NOTIFICATION_ID = NotificationRegistry.FGS_WATCHDOG_ID
         private const val DEBOUNCE_DELAY_MS = 500L
         private const val SCREEN_DEBOUNCE_DELAY_MS = 500L
         // صمام أمان دوري مريح للبطارية (15 دقيقة):
@@ -454,6 +458,22 @@ class DnsWatchdogService : Service() {
         if (needsEnforce) {
             Log.i(TAG, "Tampering or desync detected in protection shields! Re-enforcing via ProtectionEngine...")
             ProtectionEngine.applyAllAsync(applicationContext)
+            try {
+                AppNotificationManager.getInstance(applicationContext).postEventNotification(
+                    category = NotificationCategory.SHIELDS,
+                    title = getString(R.string.notif_tamper_alert_title),
+                    message = getString(R.string.notif_tamper_alert_msg),
+                    dedupKey = "tamper_alert_enforce",
+                    cooldownMs = 15 * 60 * 1000L,
+                    actionType = NotificationActionType.NONE,
+                    systemNotificationId = NotificationRegistry.EVENT_SYSTEM_TAMPER_ID,
+                    channelId = NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
+                    postSystemNotification = true,
+                    importance = 3
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error posting tamper alert notification", e)
+            }
         }
         com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).reconcileUnapprovedInstalledAppsAsync()
     }

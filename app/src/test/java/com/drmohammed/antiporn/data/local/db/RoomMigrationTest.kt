@@ -91,15 +91,18 @@ class RoomMigrationTest {
         assertTrue("Migration 4->5 must execute DDL statements", executedSqlList.isNotEmpty())
 
         val allSql = executedSqlList.joinToString(separator = "\n")
-        assertTrue("Must drop legacy in_app_notifications table", allSql.contains("DROP TABLE IF EXISTS `in_app_notifications`"))
+        assertTrue("Must swap legacy in_app_notifications table", allSql.contains("DROP TABLE IF EXISTS `in_app_notifications`"))
+        assertTrue("Must create in_app_notifications_new", allSql.contains("in_app_notifications_new"))
         assertTrue("Must create device_policies_new", allSql.contains("device_policies_new"))
         assertTrue("Must create partners_new", allSql.contains("partners_new"))
         assertTrue("Must create pending_approvals_new", allSql.contains("pending_approvals_new"))
         assertTrue("Must create diagnostic_events_new", allSql.contains("diagnostic_events_new"))
+        assertTrue("Must create idx_notif_timestamp", allSql.contains("idx_notif_timestamp"))
+        assertTrue("Must create idx_notif_dedup", allSql.contains("idx_notif_dedup"))
     }
 
     @Test
-    fun testMigration3To5ExecutionChainsCorrectly() {
+    fun testMigration3To5ExecutionDirectSinglePass() {
         val executedSqlList = mutableListOf<String>()
         val dummyDb = Proxy.newProxyInstance(
             SupportSQLiteDatabase::class.java.classLoader,
@@ -115,8 +118,13 @@ class RoomMigrationTest {
 
         assertTrue("Migration 3->5 must execute DDL statements", executedSqlList.isNotEmpty())
         val allSql = executedSqlList.joinToString(separator = "\n")
-        assertTrue("Must drop legacy in_app_notifications table", allSql.contains("DROP TABLE IF EXISTS `in_app_notifications`"))
+        assertTrue("Must create in_app_notifications table", allSql.contains("in_app_notifications"))
         assertTrue("Must create device_policies_new", allSql.contains("device_policies_new"))
+        assertTrue("Must create partners_new", allSql.contains("partners_new"))
+        assertTrue("Must create pending_approvals_new", allSql.contains("pending_approvals_new"))
+        assertTrue("Must create diagnostic_events_new", allSql.contains("diagnostic_events_new"))
+        assertTrue("Must create idx_notif_timestamp", allSql.contains("idx_notif_timestamp"))
+        assertTrue("Must create idx_notif_dedup", allSql.contains("idx_notif_dedup"))
     }
 
     @Test
