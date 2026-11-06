@@ -8,6 +8,8 @@ import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.ota.repository.OtaRepository
 import com.drmohammed.antiporn.ui.accountability.AccountabilityViewModel
+import com.drmohammed.antiporn.ui.accountability.GuardianControlViewModel
+import com.drmohammed.antiporn.ui.accountability.RemoteAppManagerViewModel
 import com.drmohammed.antiporn.ui.control.SelfControlViewModel
 import com.drmohammed.antiporn.ui.home.HomeViewModel
 import com.drmohammed.antiporn.ui.main.MainViewModel
@@ -37,5 +39,7 @@ val appModule = module {
     viewModel { HomeViewModel(androidApplication(), get()) }
     viewModel { SelfControlViewModel(androidApplication(), get(), get()) }
     viewModel { AccountabilityViewModel(androidApplication(), get(), get(), get(), get()) }
+    viewModel { RemoteAppManagerViewModel(androidApplication(), get(), get(), get()) }
+    viewModel { GuardianControlViewModel(androidApplication(), get(), get(), get()) }
     viewModel { SettingsViewModel(androidApplication(), get(), get()) }
 }

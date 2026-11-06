@@ -26,7 +26,7 @@ import com.drmohammed.antiporn.core.model.IslamicTimeZoneRegistry
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
-import com.drmohammed.antiporn.databinding.ActivitySelfControlBinding
+import com.drmohammed.antiporn.databinding.FragmentSelfControlBinding
 import com.drmohammed.antiporn.ui.accountability.RemoteAppManagerActivity
 import com.drmohammed.antiporn.ui.browser.BrowserUrlFilterActivity
 import com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry
@@ -45,7 +45,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-typealias FragmentSelfControlBinding = ActivitySelfControlBinding
 
 /**
  * Self Control Fragment embedded in the main navigation hub.
