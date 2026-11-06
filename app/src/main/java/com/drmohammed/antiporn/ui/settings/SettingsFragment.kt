@@ -17,9 +17,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.databinding.BottomSheetDiagnosticLogsBinding
 import com.drmohammed.antiporn.databinding.FragmentSettingsBinding
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
+import com.drmohammed.antiporn.provisioning.ui.ProvisioningWizardActivity
 import com.drmohammed.antiporn.telemetry.AiTelemetryReporter
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.color.MaterialColors
@@ -56,6 +58,7 @@ class SettingsFragment : Fragment() {
 
     private var lastViewLogsClickTime = 0L
     private var lastEditNameClickTime = 0L
+    private var lastDeviceOwnerClickTime = 0L
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -303,6 +306,22 @@ class SettingsFragment : Fragment() {
 
         binding.btnLinkGoogle.setOnClickListener {
             actionListener?.onLinkGoogleRequested()
+        }
+
+        binding.layoutDeviceOwnerPreference.setOnClickListener {
+            val currentTime = SystemClock.elapsedRealtime()
+            if (currentTime - lastDeviceOwnerClickTime < 800L) return@setOnClickListener
+            lastDeviceOwnerClickTime = currentTime
+
+            val ctx = context ?: return@setOnClickListener
+            if (!ProtectionEngine.isDeviceOwner(ctx)) {
+                val intent = Intent(ctx, ProvisioningWizardActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                startActivity(intent)
+            } else {
+                Toast.makeText(ctx, R.string.toast_device_owner_already_active, Toast.LENGTH_SHORT).show()
+            }
         }
 
         binding.layoutDeviceOwnerPreference.setOnLongClickListener { view ->
