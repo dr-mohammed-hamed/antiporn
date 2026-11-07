@@ -214,23 +214,20 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
         isExporting = true
         lifecycleScope.launch {
             try {
-                val report = withContext(Dispatchers.IO) {
-                    AiTelemetryReporter.generateMarkdownReport(applicationContext)
+                val reportFile = withContext(Dispatchers.IO) {
+                    AiTelemetryReporter.exportReportToFile(applicationContext)
                 }
                 if (isFinishing || isDestroyed) return@launch
-                AiTelemetryReporter.copyReportToClipboard(applicationContext, report)
-                Toast.makeText(applicationContext, R.string.toast_telemetry_copied, Toast.LENGTH_SHORT).show()
-
-                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(android.content.Intent.EXTRA_SUBJECT, getString(R.string.telemetry_share_subject))
-                    putExtra(android.content.Intent.EXTRA_TEXT, report)
-                }
+                val chooser = AiTelemetryReporter.createShareFileIntent(applicationContext, reportFile)
                 try {
-                    startActivity(android.content.Intent.createChooser(shareIntent, getString(R.string.share_telemetry_chooser_title)))
+                    startActivity(chooser)
                 } catch (e: Exception) {
                     Timber.e(e, "Error launching share chooser")
+                    Toast.makeText(applicationContext, R.string.error_share_report_failed, Toast.LENGTH_SHORT).show()
                 }
+            } catch (e: Exception) {
+                Timber.e(e, "Error generating telemetry report file")
+                Toast.makeText(applicationContext, R.string.error_share_report_failed, Toast.LENGTH_SHORT).show()
             } finally {
                 isExporting = false
             }

@@ -353,28 +353,21 @@ class SettingsFragment : Fragment() {
             val appContext = currentCtx.applicationContext
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
-                    val report = withContext(Dispatchers.IO) {
-                        AiTelemetryReporter.generateMarkdownReport(appContext)
+                    val reportFile = withContext(Dispatchers.IO) {
+                        AiTelemetryReporter.exportReportToFile(appContext)
                     }
                     if (!isAdded || _binding == null) return@launch
 
-                    AiTelemetryReporter.copyReportToClipboard(appContext, report)
-                    Toast.makeText(appContext, R.string.toast_telemetry_copied, Toast.LENGTH_SHORT).show()
-
                     try {
-                        val sendIntent = Intent().apply {
-                            action = Intent.ACTION_SEND
-                            putExtra(Intent.EXTRA_SUBJECT, "AntiPorn Diagnostic Report")
-                            putExtra(Intent.EXTRA_TEXT, report)
-                            type = "text/plain"
-                        }
-                        val chooser = Intent.createChooser(sendIntent, getString(R.string.share_telemetry_chooser_title))
+                        val chooser = AiTelemetryReporter.createShareFileIntent(appContext, reportFile)
                         startActivity(chooser)
                     } catch (e: Exception) {
                         Log.e(TAG, "Error launching share chooser", e)
+                        Toast.makeText(appContext, R.string.error_share_report_failed, Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error generating telemetry report", e)
+                    Log.e(TAG, "Error generating telemetry report file", e)
+                    Toast.makeText(appContext, R.string.error_share_report_failed, Toast.LENGTH_SHORT).show()
                 }
             }
         }

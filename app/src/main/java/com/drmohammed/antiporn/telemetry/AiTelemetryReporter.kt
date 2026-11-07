@@ -5,12 +5,16 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.util.Log
+import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import com.drmohammed.antiporn.AdminReceiver
+import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
 import java.io.File
@@ -234,6 +238,50 @@ Please analyze the telemetry and black-box log above and provide an actionable d
         } catch (e: Exception) {
             Log.e(TAG, "Error clearing latest crash dump", e)
             false
+        }
+    }
+
+    /**
+     * Exports the diagnostic report to a clean UTF-8 text file in internal cache storage.
+     * Automatically prunes older report files to prevent cache storage leaks.
+     */
+    fun exportReportToFile(context: Context, preGeneratedReport: String? = null): File {
+        val reportText = preGeneratedReport ?: generateMarkdownReport(context)
+        val reportsDir = File(context.cacheDir, "reports").apply { mkdirs() }
+
+        // Prune older diagnostic report files to prevent cache accumulation
+        try {
+            reportsDir.listFiles()?.filter {
+                it.name.startsWith("AntiPorn_Diagnostic_Report") && it.isFile
+            }?.forEach { it.delete() }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed cleaning previous diagnostic report cache", e)
+        }
+
+        val reportFile = File(reportsDir, "AntiPorn_Diagnostic_Report.txt")
+        reportFile.writeText(reportText, Charsets.UTF_8)
+        return reportFile
+    }
+
+    /**
+     * Creates a hardened, system-wide share Intent for the exported diagnostic report file.
+     * Grants URI read permissions and attaches ClipData for full OEM Android 10+ compatibility.
+     */
+    fun createShareFileIntent(context: Context, reportFile: File): Intent {
+        val authority = "${context.packageName}.fileprovider"
+        val contentUri: Uri = FileProvider.getUriForFile(context, authority, reportFile)
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, contentUri)
+            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.telemetry_share_subject))
+            clipData = ClipData.newRawUri("AntiPorn Diagnostic Report", contentUri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        return Intent.createChooser(shareIntent, context.getString(R.string.share_telemetry_chooser_title)).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
     }
 

@@ -943,6 +943,7 @@
     <string name="btn_share_telemetry">مشاركة السجل</string>
     <string name="share_telemetry_chooser_title">مشاركة تقرير الفحص والتشخيص</string>
     <string name="toast_telemetry_copied">تم نسخ تقرير الفحص للحافظة وجارٍ فتح نافذة المشاركة</string>
+    <string name="error_share_report_failed">تعذر فتح نافذة مشاركة ملف التقرير</string>
     <!-- Self Control Locked Gate State -->
     <string name="self_control_locked_title">التحكم الذاتي مقفل</string>
     <string name="self_control_locked_desc">قام المشرف أو شريك التعافي بقفل إعدادات التحكم الذاتي لحمايتك وضمان ثباتك.</string>
