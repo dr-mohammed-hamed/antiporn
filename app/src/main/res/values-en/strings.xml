@@ -736,4 +736,14 @@
     <string name="notif_ward_approval_req_title">New application review request</string>
     <string name="notif_ward_approval_req_desc">Ward is requesting permission to install and use (%1$s).</string>
     <string name="default_web_client_id" translatable="false"></string>
+
+    <!-- Partner & Device Name Strings -->
+    <string name="toast_rename_failed">Failed to update device name</string>
+    <string name="settings_device_name_title">Device Name for Partners</string>
+    <string name="settings_device_name_desc">Name displayed to your guardian when paired and supervised</string>
+    <string name="dialog_edit_device_name_title">Edit Device Name for Partners</string>
+    <string name="dialog_edit_device_name_hint">Enter a name that identifies this device for your guardian (e.g., Ahmed\'s Phone)</string>
+    <string name="device_name_not_set">Not set yet</string>
+    <string name="btn_request_unlink">Request Unlink</string>
+    <string name="guardian_status_active_verified">Active &amp; Verified Guardian</string>
 </resources>

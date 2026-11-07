@@ -22,7 +22,6 @@ import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
-import com.drmohammed.antiporn.curfew.CurfewForegroundWatcher
 import com.drmohammed.antiporn.services.NetworkWatchdog
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
@@ -195,12 +194,14 @@ class DnsWatchdogService : Service() {
         checkAndEnforceProtection()
         AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
         com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncZeroTrustBaselineAndReconcileAsync()
+        com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher.syncWatcherStateAsync(applicationContext)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         isRunning = true
         Log.i(TAG, "DnsWatchdogService started")
         startForegroundNotification()
+        com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher.syncWatcherStateAsync(applicationContext)
         return START_STICKY
     }
 
@@ -216,7 +217,6 @@ class DnsWatchdogService : Service() {
         unregisterDnsObserver()
         unregisterPackageReceiver()
         unregisterScreenReceiver()
-        CurfewForegroundWatcher.stop()
         networkWatchdog.unregister()
         serviceScope.cancel()
         // Service cleanup complete
@@ -447,12 +447,9 @@ class DnsWatchdogService : Service() {
         if (CurfewEnforcer.isEffectiveBlockActive(this)) {
             try {
                 CurfewEnforcer.syncBlockStateAsync(this)
-                CurfewForegroundWatcher.start(this)
             } catch (e: Exception) {
                 Log.e(TAG, "Error synchronizing block state in watchdog", e)
             }
-        } else {
-            CurfewForegroundWatcher.stop()
         }
 
         if (needsEnforce) {

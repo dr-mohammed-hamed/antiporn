@@ -52,6 +52,7 @@ class CurfewBootReceiver : BroadcastReceiver() {
                     rescheduleNapIfNeeded(appContext)
                     rescheduleSnoozeIfNeeded(appContext)
                     CurfewEnforcer.repairStuckSuspendedApps(appContext)
+                    ZeroTrustForegroundWatcher.syncWatcherState(appContext)
                 }
 
                 if (action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_TIMEZONE_CHANGED) {

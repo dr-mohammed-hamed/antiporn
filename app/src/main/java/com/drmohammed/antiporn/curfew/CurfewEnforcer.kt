@@ -279,22 +279,17 @@ object CurfewEnforcer {
                 }
             }
 
-            // Ensure Google Play Store and Google Search are NOT hidden and NOT suspended so games can use background IPC
-            try {
-                if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(context, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE).getOrNull() == true) {
-                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(context, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, false)
+            // 1.1 Suspend Google Play Store and Google Search natively during curfew (eliminates polling loop)
+            val curfewStoresToSuspend = arrayOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, CurfewConfig.GOOGLE_SEARCH_PACKAGE)
+            for (pkg in curfewStoresToSuspend) {
+                try {
+                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() != true) {
+                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, arrayOf(pkg), true)
+                        Log.i(TAG, "Curfew enforcement: Suspended $pkg natively via SafeDpmGateway")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not suspend store package $pkg during curfew", e)
                 }
-                if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE).getOrNull() == true) {
-                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, arrayOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE), false)
-                }
-                if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(context, CurfewConfig.GOOGLE_SEARCH_PACKAGE).getOrNull() == true) {
-                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(context, CurfewConfig.GOOGLE_SEARCH_PACKAGE, false)
-                }
-                if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, CurfewConfig.GOOGLE_SEARCH_PACKAGE).getOrNull() == true) {
-                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, arrayOf(CurfewConfig.GOOGLE_SEARCH_PACKAGE), false)
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not ensure Play Store / Google Search unhidden/unsuspended", e)
             }
 
             // 2. Suspend target applications (excluding already suspended)
@@ -357,15 +352,14 @@ object CurfewEnforcer {
                 }
             }
 
-            // Ensure DISALLOW_INSTALL_APPS is NOT active, preserving ADB developer workflow.
+            // Ensure DISALLOW_INSTALL_APPS is NOT active, preserving ADB developer workflow (Constitution Article 1).
+            // Zero-Trust architecture intercepts all unauthorized installations instantly via PackageChangeReceiver.
             try {
                 com.drmohammed.antiporn.telemetry.SafeDpmGateway.clearUserRestrictionBlocking(context, UserManager.DISALLOW_INSTALL_APPS)
+                Log.d(TAG, "Curfew enforcement: Ensured UserManager.DISALLOW_INSTALL_APPS is cleared to preserve ADB")
             } catch (e: Exception) {
-                Log.w(TAG, "Could not clear DISALLOW_INSTALL_APPS restriction", e)
+                Log.w(TAG, "Could not ensure DISALLOW_INSTALL_APPS restriction is cleared", e)
             }
-
-            // 4. Start foreground watcher for instant auto-kickout if Play Store UI is launched
-            CurfewForegroundWatcher.start(context)
 
             // Save set of curfew-suspended packages (only apps actually suspended during this enforcement cycle)
             val savedSet = prefs.getStringSet(CurfewConfig.KEY_CURFEW_SUSPENDED_PACKAGES, emptySet())?.toMutableSet()
@@ -404,14 +398,37 @@ object CurfewEnforcer {
                 Log.w(TAG, "Could not clear DISALLOW_INSTALL_APPS restriction", e)
             }
 
-            // 3. Stop foreground watcher
-            CurfewForegroundWatcher.stop()
+            // 3. Unsuspend Google Play Store and Google Search on curfew release
+            var fetchPolicyFailed = false
+            val currentPolicy = try {
+                PolicyRepository.getInstance(context).getCurrentPolicy()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching policy for curfew release - failing secure", e)
+                fetchPolicyFailed = true
+                null
+            }
+            val customBlacklist = currentPolicy?.customBlacklistPackages ?: emptySet()
+
+            val curfewStoresToUnsuspend = arrayOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, CurfewConfig.GOOGLE_SEARCH_PACKAGE)
+            for (pkg in curfewStoresToUnsuspend) {
+                if (AppSuspensionShield.isBlacklisted(pkg) || customBlacklist.contains(pkg)) {
+                    Log.i(TAG, "Preserving suspension of $pkg on curfew release as it is in blacklist/customBlacklist")
+                    continue
+                }
+                try {
+                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() == true) {
+                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, arrayOf(pkg), false)
+                        Log.i(TAG, "Curfew released: Unsuspended $pkg via SafeDpmGateway")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not unsuspend store package $pkg on curfew release", e)
+                }
+            }
 
             // 4. Unsuspend curfew targets
             val recordedCurfewPackages = prefs.getStringSet(CurfewConfig.KEY_CURFEW_SUSPENDED_PACKAGES, emptySet()) ?: emptySet()
-            val allInstalledTargets = CurfewAppResolver.getCurfewTargetPackages(context)
             val immunePackages = CurfewAppResolver.resolveImmunePackages(context)
-            val candidates = (recordedCurfewPackages + allInstalledTargets + immunePackages).toSet()
+            val candidates = (recordedCurfewPackages + immunePackages).toSet()
 
             // Retrieve pending/rejected unapproved packages and custom blacklisted packages (Fail-Secure)
             var fetchApprovalsFailed = false
@@ -425,15 +442,7 @@ object CurfewEnforcer {
             val approvedPackages = localApprovals.filter { it.isApproved }.map { it.packageName }.toSet()
             val unapprovedPackages = localApprovals.filter { !it.isApproved }.map { it.packageName }.toSet()
 
-            var fetchPolicyFailed = false
-            val currentPolicy = try {
-                PolicyRepository.getInstance(context).getCurrentPolicy()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error fetching policy for curfew release - failing secure", e)
-                fetchPolicyFailed = true
-                null
-            }
-            val customBlacklistPackages = currentPolicy?.customBlacklistPackages ?: emptySet()
+            val customBlacklistPackages = customBlacklist
             val isZeroTrustActive = currentPolicy?.lockNewInstallsUntilApproved ?: true
 
             if (fetchApprovalsFailed || fetchPolicyFailed) {
@@ -453,6 +462,7 @@ object CurfewEnforcer {
                     val isImmuneOrStore = CurfewAppResolver.isSystemCriticalOrImmune(context, pkg) ||
                         immunePackages.contains(pkg) ||
                         pkg == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE ||
+                        pkg == CurfewConfig.GOOGLE_SEARCH_PACKAGE ||
                         CurfewConfig.KNOWN_APP_STORES.contains(pkg)
                     val isSystemOrUpdatedApp = try {
                         val pm = context.packageManager
@@ -665,6 +675,7 @@ object CurfewEnforcer {
             if (isZeroTrustActive) {
                 val isImmune = immunePackages.contains(pkg) ||
                     pkg == CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE ||
+                    pkg == CurfewConfig.GOOGLE_SEARCH_PACKAGE ||
                     CurfewConfig.KNOWN_APP_STORES.contains(pkg)
                 val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM != 0) ||
                     (app.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0)

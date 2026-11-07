@@ -13,8 +13,6 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.camera.core.Camera
@@ -24,64 +22,37 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.databinding.BottomSheetQrScannerBinding
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.util.concurrent.ExecutorService
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asExecutor
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Modern Material 3 BottomSheet dialog providing real-time camera scanning of
- * Self-Control barrier QR codes using CameraX and ML Kit Barcode Scanning.
+ * Self-Control barrier QR codes using CameraX, ML Kit Barcode Scanning, and ViewBinding.
  */
 class QrScannerBottomSheet : BottomSheetDialogFragment() {
 
     var onVerified: (() -> Unit)? = null
     var onEmergencyBypassTriggered: (() -> Unit)? = null
 
-    private var _previewViewQrScanner: PreviewView? = null
-    private val previewViewQrScanner get() = _previewViewQrScanner!!
-
-    private var _btnToggleTorch: MaterialButton? = null
-    private val btnToggleTorch get() = _btnToggleTorch!!
-
-    private var _tvScanStatus: TextView? = null
-    private val tvScanStatus get() = _tvScanStatus!!
-
-    private var _btnCloseScanner: MaterialButton? = null
-    private val btnCloseScanner get() = _btnCloseScanner!!
-
-    private var _layoutEmergencyBypass: MaterialCardView? = null
-    private val layoutEmergencyBypass get() = _layoutEmergencyBypass!!
-
-    private var _tvEmergencyBypassInfo: TextView? = null
-    private val tvEmergencyBypassInfo get() = _tvEmergencyBypassInfo!!
-
-    private var _btnEmergencyBypass: MaterialButton? = null
-    private val btnEmergencyBypass get() = _btnEmergencyBypass!!
-
-    private var _layoutPermissionFallback: View? = null
-    private val layoutPermissionFallback get() = _layoutPermissionFallback!!
-
-    private var _btnGrantPermission: Button? = null
-    private val btnGrantPermission get() = _btnGrantPermission!!
+    private var _binding: BottomSheetQrScannerBinding? = null
+    private val binding get() = _binding ?: throw IllegalStateException("QrScannerBottomSheet binding accessed outside view lifecycle")
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var camera: Camera? = null
@@ -100,12 +71,13 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        if (_binding == null) return@registerForActivityResult
         if (granted) {
-            layoutPermissionFallback.isVisible = false
+            binding.layoutPermissionFallback.isVisible = false
             startCamera()
         } else {
-            layoutPermissionFallback.isVisible = true
-            tvScanStatus.text = getString(R.string.qr_scan_camera_permission_required)
+            binding.layoutPermissionFallback.isVisible = true
+            binding.tvScanStatus.text = getString(R.string.qr_scan_camera_permission_required)
         }
     }
 
@@ -113,25 +85,15 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(R.layout.bottom_sheet_qr_scanner, container, false)
+    ): View {
+        _binding = BottomSheetQrScannerBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        _previewViewQrScanner = view.findViewById(R.id.previewViewQrScanner)
-        _btnToggleTorch = view.findViewById(R.id.btnToggleTorch)
-        _tvScanStatus = view.findViewById(R.id.tvScanStatus)
-        _btnCloseScanner = view.findViewById(R.id.btnCloseScanner)
-        _layoutEmergencyBypass = view.findViewById(R.id.layoutEmergencyBypass)
-        _tvEmergencyBypassInfo = view.findViewById(R.id.tvEmergencyBypassInfo)
-        _btnEmergencyBypass = view.findViewById(R.id.btnEmergencyBypass)
-        _layoutPermissionFallback = view.findViewById(R.id.layoutPermissionFallback)
-        _btnGrantPermission = view.findViewById(R.id.btnGrantPermission)
-
-        defaultStatusColor = tvScanStatus.currentTextColor
-
+        defaultStatusColor = binding.tvScanStatus.currentTextColor
         cameraExecutor = Dispatchers.Default.asExecutor()
 
         try {
@@ -142,31 +104,31 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize BarcodeScanner client", e)
             barcodeScanner = null
-            tvScanStatus.text = getString(R.string.qr_scan_error_init)
-            tvScanStatus.setTextColor(Color.parseColor("#EF4444"))
+            binding.tvScanStatus.text = getString(R.string.qr_scan_error_init)
+            binding.tvScanStatus.setTextColor(Color.parseColor("#EF4444"))
         }
 
-        btnCloseScanner.setOnClickListener {
+        binding.btnCloseScanner.setOnClickListener {
             dismiss()
         }
 
-        btnToggleTorch.setOnClickListener {
+        binding.btnToggleTorch.setOnClickListener {
             toggleTorch()
         }
 
-        btnGrantPermission.setOnClickListener {
+        binding.btnGrantPermission.setOnClickListener {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
 
         setupEmergencyBypassUi()
 
         if (barcodeScanner == null) {
-            layoutPermissionFallback.isVisible = false
+            binding.layoutPermissionFallback.isVisible = false
         } else if (hasCameraPermission()) {
-            layoutPermissionFallback.isVisible = false
+            binding.layoutPermissionFallback.isVisible = false
             startCamera()
         } else {
-            layoutPermissionFallback.isVisible = true
+            binding.layoutPermissionFallback.isVisible = true
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
@@ -188,14 +150,16 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
                 bindCameraUseCases()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize CameraX provider", e)
-                tvScanStatus.text = getString(R.string.qr_scan_camera_permission_required)
+                if (isAdded) {
+                    _binding?.tvScanStatus?.text = getString(R.string.qr_scan_camera_permission_required)
+                }
             }
         }, ContextCompat.getMainExecutor(context))
     }
 
     private fun bindCameraUseCases() {
         val provider = cameraProvider ?: return
-        if (!isAdded) {
+        if (!isAdded || _binding == null) {
             try {
                 provider.unbindAll()
             } catch (e: Exception) {
@@ -207,7 +171,7 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
         val preview = Preview.Builder()
             .build()
             .also {
-                it.surfaceProvider = previewViewQrScanner.surfaceProvider
+                it.surfaceProvider = binding.previewViewQrScanner.surfaceProvider
             }
 
         val imageAnalysis = ImageAnalysis.Builder()
@@ -278,7 +242,7 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
         }
 
         val currentActivity = activity
-        if (currentActivity == null || !isAdded) {
+        if (currentActivity == null || !isAdded || _binding == null) {
             isCodeProcessing.set(false)
             return
         }
@@ -286,19 +250,23 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
         val isValid = qrManager.verifyToken(token)
 
         currentActivity.runOnUiThread {
-            if (!isAdded) {
+            if (!isAdded || _binding == null) {
                 isCodeProcessing.set(false)
                 return@runOnUiThread
             }
 
             if (isValid) {
                 triggerHapticFeedback()
-                tvScanStatus.text = getString(R.string.qr_scan_success)
-                tvScanStatus.setTextColor(Color.parseColor("#1CD076")) // Emerald Green
+                try {
+                    cameraProvider?.unbindAll()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error unbinding camera on successful scan", e)
+                }
+                binding.tvScanStatus.text = getString(R.string.qr_scan_success)
+                binding.tvScanStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.status_green))
 
                 viewLifecycleOwner.lifecycleScope.launch {
                     delay(400)
-                    cameraProvider?.unbindAll()
                     val reqKey = arguments?.getString(EXTRA_REQUEST_KEY)
                     if (reqKey != null) {
                         parentFragmentManager.setFragmentResult(reqKey, Bundle().apply { putBoolean(RESULT_KEY_VERIFIED, true) })
@@ -308,14 +276,14 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
                     dismissAllowingStateLoss()
                 }
             } else {
-                tvScanStatus.text = getString(R.string.qr_scan_invalid)
-                tvScanStatus.setTextColor(Color.parseColor("#EF4444")) // Crimson Red
+                binding.tvScanStatus.text = getString(R.string.qr_scan_invalid)
+                binding.tvScanStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.status_red))
 
                 viewLifecycleOwner.lifecycleScope.launch {
                     delay(1500)
-                    if (isAdded) {
-                        tvScanStatus.text = getString(R.string.qr_scan_aim_camera)
-                        tvScanStatus.setTextColor(defaultStatusColor)
+                    if (isAdded && _binding != null) {
+                        binding.tvScanStatus.text = getString(R.string.qr_scan_aim_camera)
+                        binding.tvScanStatus.setTextColor(defaultStatusColor)
                         isCodeProcessing.set(false)
                     }
                 }
@@ -324,18 +292,19 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun updateTorchAvailability() {
+        if (_binding == null) return
         val hasFlash = camera?.cameraInfo?.hasFlashUnit() == true
-        btnToggleTorch.isVisible = hasFlash
-        btnToggleTorch.setIconResource(if (isTorchOn) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
+        binding.btnToggleTorch.isVisible = hasFlash
+        binding.btnToggleTorch.setIconResource(if (isTorchOn) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
     }
 
     private fun toggleTorch() {
         val cam = camera ?: return
-        if (cam.cameraInfo.hasFlashUnit()) {
+        if (cam.cameraInfo.hasFlashUnit() && _binding != null) {
             isTorchOn = !isTorchOn
             cam.cameraControl.enableTorch(isTorchOn)
-            btnToggleTorch.setIconResource(if (isTorchOn) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
-            btnToggleTorch.contentDescription = getString(if (isTorchOn) R.string.qr_torch_off else R.string.qr_torch_on)
+            binding.btnToggleTorch.setIconResource(if (isTorchOn) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
+            binding.btnToggleTorch.contentDescription = getString(if (isTorchOn) R.string.qr_torch_off else R.string.qr_torch_on)
         }
     }
 
@@ -364,19 +333,20 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
     // --- Emergency Delay Handling ---
 
     private fun setupEmergencyBypassUi() {
+        if (_binding == null) return
         if (!qrManager.isEmergencyDelayEnabled()) {
-            layoutEmergencyBypass.isVisible = false
+            binding.layoutEmergencyBypass.isVisible = false
             return
         }
 
-        layoutEmergencyBypass.isVisible = true
+        binding.layoutEmergencyBypass.isVisible = true
         refreshEmergencyDelayState()
 
         countdownJob?.cancel()
         countdownJob = viewLifecycleOwner.lifecycleScope.launch {
             while (isActive) {
                 delay(30_000L)
-                if (isAdded) {
+                if (isAdded && _binding != null) {
                     refreshEmergencyDelayState()
                 }
             }
@@ -384,21 +354,22 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun refreshEmergencyDelayState() {
+        if (_binding == null) return
         val isRequested = qrManager.isEmergencyDelayRequested()
         val delayHours = qrManager.getEmergencyDelayHours()
 
         if (!isRequested) {
-            tvEmergencyBypassInfo.text = getString(R.string.qr_emergency_confirm_message, delayHours)
-            btnEmergencyBypass.text = getString(R.string.qr_emergency_bypass_action, delayHours)
-            btnEmergencyBypass.setOnClickListener {
+            binding.tvEmergencyBypassInfo.text = getString(R.string.qr_emergency_confirm_message, delayHours)
+            binding.btnEmergencyBypass.text = getString(R.string.qr_emergency_bypass_action, delayHours)
+            binding.btnEmergencyBypass.setOnClickListener {
                 showEmergencyConfirmationDialog(delayHours)
             }
         } else {
             val isElapsed = qrManager.isEmergencyDelayActiveAndElapsed()
             if (isElapsed) {
-                tvEmergencyBypassInfo.text = getString(R.string.qr_emergency_bypass_ready)
-                btnEmergencyBypass.text = getString(R.string.qr_emergency_bypass_ready)
-                btnEmergencyBypass.setOnClickListener {
+                binding.tvEmergencyBypassInfo.text = getString(R.string.qr_emergency_bypass_ready)
+                binding.btnEmergencyBypass.text = getString(R.string.qr_emergency_bypass_ready)
+                binding.btnEmergencyBypass.setOnClickListener {
                     val reqKey = arguments?.getString(EXTRA_REQUEST_KEY)
                     if (reqKey != null) {
                         parentFragmentManager.setFragmentResult(reqKey, Bundle().apply { putBoolean(RESULT_KEY_EMERGENCY_BYPASS, true) })
@@ -418,9 +389,9 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
                     getString(R.string.qr_emergency_time_minutes, minutes.toInt())
                 }
 
-                tvEmergencyBypassInfo.text = getString(R.string.qr_emergency_bypass_active_format, formattedTime)
-                btnEmergencyBypass.text = getString(R.string.qr_emergency_cancel)
-                btnEmergencyBypass.setOnClickListener {
+                binding.tvEmergencyBypassInfo.text = getString(R.string.qr_emergency_bypass_active_format, formattedTime)
+                binding.btnEmergencyBypass.text = getString(R.string.qr_emergency_cancel)
+                binding.btnEmergencyBypass.setOnClickListener {
                     qrManager.cancelEmergencyDelay()
                     refreshEmergencyDelayState()
                 }
@@ -461,16 +432,7 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
         }
 
         cameraExecutor = null
-
-        _previewViewQrScanner = null
-        _btnToggleTorch = null
-        _tvScanStatus = null
-        _btnCloseScanner = null
-        _layoutEmergencyBypass = null
-        _tvEmergencyBypassInfo = null
-        _btnEmergencyBypass = null
-        _layoutPermissionFallback = null
-        _btnGrantPermission = null
+        _binding = null
     }
 
     companion object {

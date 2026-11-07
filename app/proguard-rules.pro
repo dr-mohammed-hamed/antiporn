@@ -44,3 +44,14 @@
 -keep class androidx.camera.view.** { *; }
 -keep class androidx.camera.lifecycle.** { *; }
 -keep,allowobfuscation,allowshrinking class ** implements androidx.camera.core.impl.Quirk { *; }
+
+# ====================================================================
+# Release Log Stripping (Prevent sensitive system & package telemetry leaks)
+# ====================================================================
+-assumenosideeffects class android.util.Log {
+    public static boolean isLoggable(java.lang.String, int);
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}
+
