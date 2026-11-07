@@ -24,6 +24,7 @@ enum class NotificationCategory(val key: String) {
 enum class NotificationActionType(val key: String) {
     OPEN_SELF_APPROVALS("OPEN_SELF_APPROVALS"), // Open pending approvals / self-control tab
     OPEN_GUARDIAN_PANEL("OPEN_GUARDIAN_PANEL"), // Open GuardianControlActivity
+    OPEN_APPROVALS_HUB("OPEN_APPROVALS_HUB"),   // Open dedicated GuardianApprovalsHubActivity
     OPEN_CURFEW("OPEN_CURFEW"),                 // Open Curfew / Nap settings
     OPEN_OTA("OPEN_OTA"),                       // Open OTA update checker
     LAUNCH_APP("LAUNCH_APP"),                   // Launch approved application package

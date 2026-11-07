@@ -622,12 +622,29 @@ class AccountabilityRepository(
                     val partnerUid = resolveActivePartnerUid(rawPartnerUid, pairingCode)
                     if (partnerUid != rawPartnerUid) {
                         try {
-                            firestore.collection("users").document(myUid)
-                                .collection("partners").document(rawPartnerUid)
-                                .delete().await()
-                            Log.d(TAG, "Pruned obsolete migrated partner doc $rawPartnerUid from cloud")
+                            val partnersColl = firestore.collection("users").document(myUid).collection("partners")
+                            partnersColl.document(doc.id).delete().await()
+                            if (rawPartnerUid != doc.id) {
+                                partnersColl.document(rawPartnerUid).delete().await()
+                            }
+                            Log.d(TAG, "Pruned obsolete migrated partner doc ${doc.id} / $rawPartnerUid from cloud")
                         } catch (e: Exception) {
-                            Log.w(TAG, "Failed to prune stale partner doc $rawPartnerUid: ${e.message}")
+                            Log.w(TAG, "Failed to prune stale partner doc ${doc.id} / $rawPartnerUid: ${e.message}")
+                        }
+                        try {
+                            val updatedDocData = mapOf(
+                                "partnerUid" to partnerUid,
+                                "partnerName" to partnerName,
+                                "role" to role,
+                                "pairingCode" to pairingCode,
+                                "pairedAt" to pairedAt
+                            )
+                            firestore.collection("users").document(myUid)
+                                .collection("partners").document(partnerUid)
+                                .set(updatedDocData, com.google.firebase.firestore.SetOptions.merge()).await()
+                            Log.d(TAG, "Uploaded synchronized partner doc $partnerUid to cloud")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed writing updated partner doc $partnerUid to cloud: ${e.message}")
                         }
                     }
 

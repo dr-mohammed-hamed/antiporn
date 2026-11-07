@@ -73,10 +73,23 @@ class GuardianControlViewModel(
             val partner = partnerDao.getPartnerById(state.wardId)
             val resolvedWardId = accountabilityRepository.resolveActivePartnerUid(state.wardId, partner?.pairingCode)
             val activeWardId = if (resolvedWardId.isNotBlank()) resolvedWardId else state.wardId
+            val activePartner = if (activeWardId != state.wardId) {
+                partnerDao.getPartnerById(activeWardId) ?: partner
+            } else {
+                partner
+            }
 
-            if (activeWardId != state.wardId) {
-                Log.i(TAG, "[UidMigration] GuardianControlViewModel switched wardId from ${state.wardId} to $activeWardId")
-                _uiState.update { it.copy(wardId = activeWardId) }
+            val app = getApplication<Application>()
+            val fallbackPlaceholder = app.getString(R.string.status_ward_badge)
+            val resolvedWardName = if ((state.wardName.isBlank() || state.wardName == fallbackPlaceholder) && activePartner != null && activePartner.displayName.isNotBlank()) {
+                activePartner.displayName
+            } else {
+                state.wardName
+            }
+
+            if (activeWardId != state.wardId || resolvedWardName != state.wardName) {
+                Log.i(TAG, "[UidMigration] GuardianControlViewModel switched wardId from ${state.wardId} to $activeWardId (name: $resolvedWardName)")
+                _uiState.update { it.copy(wardId = activeWardId, wardName = resolvedWardName) }
             }
 
             var isOffline = false
@@ -97,11 +110,19 @@ class GuardianControlViewModel(
             }
 
             val snapshotData = snapshot?.data
-            val policy = if (snapshot != null && snapshot.exists() && snapshotData != null) {
+            val isLivePolicy = (snapshot != null && snapshot.exists() && snapshotData != null)
+            val policy = if (isLivePolicy) {
                 DevicePolicyBundle.fromMap(snapshotData)
             } else {
                 DevicePolicyBundle.defaultPolicy()
             }
+
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
+                app,
+                "WARD_POLICY_FETCH",
+                isSuccess = isLivePolicy && !isOffline,
+                details = "wardId=$activeWardId, isLive=$isLivePolicy, offline=$isOffline, curfew=${policy.curfewStartHour}:${policy.curfewStartMinute}-${policy.curfewEndHour}:${policy.curfewEndMinute}, selfControl=${policy.isSelfControlAllowed}"
+            )
 
             val version = snapshot?.getLong("version") ?: policy.version
             val acknowledgedVersion = snapshot?.getLong("acknowledgedVersion") ?: 0L

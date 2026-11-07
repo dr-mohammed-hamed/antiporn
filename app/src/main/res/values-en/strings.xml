@@ -736,6 +736,19 @@
     <string name="notif_breakout_alert_desc">%1$s requested an emergency unlock (%2$s remaining). You can reject to protect your ward.</string>
     <string name="notif_ward_approval_req_title">New application review request</string>
     <string name="notif_ward_approval_req_desc">Ward is requesting permission to install and use (%1$s).</string>
+    <string name="title_approvals_hub">Application Approvals Center</string>
+    <string name="tab_approvals_pending">Pending Review</string>
+    <string name="tab_approvals_approved">Approved</string>
+    <string name="tab_approvals_rejected">Rejected</string>
+    <string name="empty_approvals_pending">No pending review requests - all devices are secure</string>
+    <string name="empty_approvals_approved">No approved applications yet</string>
+    <string name="empty_approvals_rejected">No rejected applications</string>
+    <string name="btn_revoke_approval">Revoke &amp; Block</string>
+    <string name="btn_reapprove">Re-Approve</string>
+    <string name="label_ward_prefix">Ward: %1$s</string>
+    <string name="label_requested_time">Requested: %1$s</string>
+    <string name="label_decided_time">Decided: %1$s</string>
+    <string name="filter_all_wards">All Wards</string>
     <string name="default_web_client_id" translatable="false"></string>
 
     <!-- Partner & Device Name Strings -->

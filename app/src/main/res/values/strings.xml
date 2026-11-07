@@ -1025,4 +1025,17 @@
     <string name="notif_breakout_alert_desc">طلب %1$s فك حظر الطوارئ (متبقي %2$s). يمكنك الرفض لحماية المكفول.</string>
     <string name="notif_ward_approval_req_title">طلب تطبيق جديد للمراجعة</string>
     <string name="notif_ward_approval_req_desc">يطلب المكفول تثبيت واستخدام تطبيق (%1$s).</string>
+    <string name="title_approvals_hub">مركز مراجعة التطبيقات</string>
+    <string name="tab_approvals_pending">معلقة للمراجعة</string>
+    <string name="tab_approvals_approved">تمت الموافقة</string>
+    <string name="tab_approvals_rejected">مرفوضة / ملغية</string>
+    <string name="empty_approvals_pending">لا توجد طلبات معلقة حالياً - هاتف المكفول في أمان</string>
+    <string name="empty_approvals_approved">لا توجد تطبيقات تمت الموافقة عليها بعد</string>
+    <string name="empty_approvals_rejected">لا توجد تطبيقات مرفوضة</string>
+    <string name="btn_revoke_approval">إلغاء الموافقة وحظر</string>
+    <string name="btn_reapprove">إعادة النظر والموافقة</string>
+    <string name="label_ward_prefix">المكفول: %1$s</string>
+    <string name="label_requested_time">وقت الطلب: %1$s</string>
+    <string name="label_decided_time">وقت القرار: %1$s</string>
+    <string name="filter_all_wards">جميع المكفولين</string>
 </resources>

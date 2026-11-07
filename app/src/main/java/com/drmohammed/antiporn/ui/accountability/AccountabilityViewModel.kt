@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 /**
@@ -144,9 +145,32 @@ class AccountabilityViewModel(
     fun loadPendingApprovals() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val pending = approvalRepo.getLocalPendingApprovals()
+                val localPending = approvalRepo.getLocalPendingApprovals()
+                var totalPending = localPending.size
+
+                val wards = accountabilityRepo.getWards()
+                if (wards.isNotEmpty()) {
+                    val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    val resolvedWardIds = wards.map { ward ->
+                        accountabilityRepo.resolveActivePartnerUid(ward.id, ward.pairingCode)
+                    }.distinct()
+
+                    for (wardId in resolvedWardIds) {
+                        try {
+                            val snap = firestore.collection("policies").document(wardId)
+                                .collection("approvals")
+                                .whereEqualTo("status", "PENDING")
+                                .get()
+                                .await()
+                            totalPending += snap.size()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed loading pending approvals count for ward $wardId", e)
+                        }
+                    }
+                }
+
                 withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(pendingApprovalsCount = pending.size) }
+                    _uiState.update { it.copy(pendingApprovalsCount = totalPending) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed loading approvals", e)

@@ -42,6 +42,14 @@ class AccountabilityIdentityMigrator(
                 details = "from=$oldUid, to=$newUid"
             )
 
+            // 0. Preemptively delete any existing mapping on newUid to ensure no reverse cycle can exist
+            try {
+                firestore.collection("uid_mappings").document(newUid).delete().await()
+                Log.i(TAG, "[UidMigration] Cleared any potential reverse mapping for target newUid: $newUid")
+            } catch (e: Exception) {
+                Log.w(TAG, "[UidMigration] Non-fatal error clearing /uid_mappings/$newUid: ${e.message}")
+            }
+
             // 1. Write forwarding record to /uid_mappings/$oldUid
             val forwardingRecord = mapOf(
                 "activeUid" to newUid,
@@ -129,47 +137,61 @@ class AccountabilityIdentityMigrator(
 
     /**
      * Resolves the current canonical UID for a partner by checking Firestore alias mappings.
+     * Follows forward alias chains recursively (up to 5 hops) without ever querying stale
+     * static pairing documents which cause regression / identity downgrade ping-pong loops.
      */
     suspend fun resolveActivePartnerUid(partnerUid: String, pairingCode: String? = null): String = withContext(Dispatchers.IO) {
         if (partnerUid.isBlank()) return@withContext partnerUid
         try {
-            var resolvedUid: String? = null
-
-            // 1. Check Firestore /uid_mappings/$partnerUid
-            try {
-                val mappingDoc = firestore.collection("uid_mappings").document(partnerUid).get().await()
-                if (mappingDoc.exists()) {
-                    val activeUid = mappingDoc.getString("activeUid")
-                    if (!activeUid.isNullOrBlank()) {
-                        resolvedUid = activeUid
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "[UidMigration] Failed checking /uid_mappings/$partnerUid: ${e.message}")
-            }
-
-            // 2. Check pairings if available
-            if (resolvedUid.isNullOrBlank() && !pairingCode.isNullOrBlank() && pairingCode != AccountabilityRepository.CODE_LOCKED) {
+            var currentCandidate = partnerUid
+            val visited = mutableSetOf(partnerUid)
+            var hops = 0
+            while (hops < 5) {
                 try {
-                    val pairingDoc = firestore.collection("pairings").document(pairingCode).get().await()
-                    if (pairingDoc.exists()) {
-                        val ownerUid = pairingDoc.getString("ownerUid")
-                        if (!ownerUid.isNullOrBlank()) {
-                            resolvedUid = ownerUid
+                    val mappingDoc = firestore.collection("uid_mappings").document(currentCandidate).get().await()
+                    if (mappingDoc.exists()) {
+                        val activeUid = mappingDoc.getString("activeUid")
+                        if (!activeUid.isNullOrBlank() && activeUid != currentCandidate) {
+                            if (visited.contains(activeUid)) {
+                                Log.w(TAG, "[UidMigration] Circular mapping cycle detected between $currentCandidate and $activeUid! Breaking cycle safely.")
+                                com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
+                                    appContext,
+                                    "UID_MAPPING_CYCLE_DETECTED",
+                                    isSuccess = false,
+                                    error = "Cycle detected: $currentCandidate <-> $activeUid"
+                                )
+                                // Fallback directly to trusted initial partnerUid without applying ghost alias
+                                currentCandidate = partnerUid
+                                hops = 0
+                                break
+                            }
+                            visited.add(activeUid)
+                            currentCandidate = activeUid
+                            hops++
+                            continue
                         }
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "[UidMigration] Failed checking /pairings/$pairingCode: ${e.message}")
+                    Log.w(TAG, "[UidMigration] Failed checking /uid_mappings/$currentCandidate: ${e.message}")
                 }
+                break
             }
 
-            // 3. If resolvedUid != null && resolvedUid != partnerUid
+            val resolvedUid = if (hops > 0) currentCandidate else null
+
+            // If resolvedUid != null && resolvedUid != partnerUid
             if (!resolvedUid.isNullOrBlank() && resolvedUid != partnerUid) {
                 if (resolvedUid.startsWith("dev_") && !partnerUid.startsWith("dev_")) {
                     Log.w(TAG, "[UidMigration] Refusing to downgrade authenticated UID $partnerUid to legacy $resolvedUid")
                     return@withContext partnerUid
                 }
-                Log.i(TAG, "[UidMigration] Partner UID resolved from $partnerUid to $resolvedUid")
+                Log.i(TAG, "[UidMigration] Partner UID resolved from $partnerUid to $resolvedUid (hops: $hops)")
+                com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
+                    appContext,
+                    "PARTNER_UID_RESOLVED",
+                    isSuccess = true,
+                    details = "partnerUid upgraded from $partnerUid to $resolvedUid (hops: $hops)"
+                )
                 com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordIdentity(
                     appContext,
                     "PARTNER_UID_RESOLVED",

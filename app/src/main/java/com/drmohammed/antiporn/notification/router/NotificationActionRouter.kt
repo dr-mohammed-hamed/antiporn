@@ -56,11 +56,42 @@ object NotificationActionRouter {
                 context.startActivity(intent)
             }
 
+            NotificationActionType.OPEN_APPROVALS_HUB -> {
+                val intent = Intent(context, com.drmohammed.antiporn.ui.accountability.GuardianApprovalsHubActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    if (!payload.isNullOrBlank()) {
+                        if (payload.contains("|")) {
+                            val parts = payload.split("|")
+                            putExtra(com.drmohammed.antiporn.ui.accountability.GuardianApprovalsHubActivity.EXTRA_WARD_ID, parts[0])
+                            if (parts.size > 1) {
+                                putExtra(com.drmohammed.antiporn.ui.accountability.GuardianApprovalsHubActivity.EXTRA_TARGET_PACKAGE, parts[1])
+                            }
+                        } else {
+                            putExtra(com.drmohammed.antiporn.ui.accountability.GuardianApprovalsHubActivity.EXTRA_WARD_ID, payload)
+                        }
+                    }
+                }
+                context.startActivity(intent)
+            }
+
             NotificationActionType.OPEN_GUARDIAN_PANEL -> {
+                if (payload != null && payload.contains("|")) {
+                    route(context, NotificationActionType.OPEN_APPROVALS_HUB, payload)
+                    return
+                }
                 val intent = Intent(context, GuardianControlActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                     if (!payload.isNullOrBlank()) {
                         putExtra(GuardianControlActivity.EXTRA_WARD_ID, payload)
+                        try {
+                            val partner = com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
+                                .getInstance(context).partnerDao().getPartnerByIdBlocking(payload)
+                            if (partner != null && partner.displayName.isNotBlank()) {
+                                putExtra(GuardianControlActivity.EXTRA_WARD_NAME, partner.displayName)
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed pre-fetching ward name for notification route", e)
+                        }
                     }
                 }
                 context.startActivity(intent)

@@ -63,6 +63,7 @@ class AccountabilityFragment : Fragment() {
     private var lastManageClickTime = 0L
     private var lastEditNameClickTime = 0L
     private var lastBreakoutClickTime = 0L
+    private var lastApprovalsHubClickTime = 0L
     private var lastSecureAccountClickTime = 0L
     private var lastCancelBreakoutClickTime = 0L
     private var lastCompleteBreakoutClickTime = 0L
@@ -146,9 +147,25 @@ class AccountabilityFragment : Fragment() {
 
         // 4. Wards Section
         renderWards(state.wards)
+
+        // 5. Approvals Hub Badge
+        if (state.pendingApprovalsCount > 0) {
+            binding.tvApprovalsBadge.visibility = View.VISIBLE
+            binding.tvApprovalsBadge.text = if (state.pendingApprovalsCount > 99) "99+" else state.pendingApprovalsCount.toString()
+        } else {
+            binding.tvApprovalsBadge.visibility = View.GONE
+        }
     }
 
     private fun setupListeners() {
+        binding.btnApprovalsHub.setOnClickListener {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastApprovalsHubClickTime < 800L) return@setOnClickListener
+            lastApprovalsHubClickTime = now
+            val intent = Intent(requireContext(), GuardianApprovalsHubActivity::class.java)
+            startActivity(intent)
+        }
+
         binding.btnSecureAccount.setOnClickListener {
             val now = SystemClock.elapsedRealtime()
             if (now - lastSecureAccountClickTime < 1000L) return@setOnClickListener

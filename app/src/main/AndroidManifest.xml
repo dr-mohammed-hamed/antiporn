@@ -182,6 +182,11 @@
             android:windowSoftInputMode="adjustResize"
             android:label="@string/title_guardian_control" />
         <activity
+            android:name=".ui.accountability.GuardianApprovalsHubActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:label="@string/title_approvals_hub" />
+        <activity
             android:name=".ui.accountability.RemoteAppManagerActivity"
             android:exported="false" />
         <activity
