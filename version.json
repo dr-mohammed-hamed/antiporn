@@ -1,11 +1,11 @@
 {
-  "versionCode": 14,
-  "versionName": "1.76",
+  "versionCode": 15,
+  "versionName": "1.77",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 33497296,
+  "fileSizeBytes": 33501392,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.76: تدشين مركز موافقات الحارس الجديد (Guardian Approvals Hub)، فرض تعليق التطبيقات الأصلي خلال ساعات حظر التجوال (Curfew)، وتأمين فائق لسرعة الإقلاع البارد واستقرار قاعدة البيانات ومراقبة الدروع.",
+  "releaseNotes": "إصدار 1.77: إصلاح شامل للتبديل بين الوضع النهاري والليلي (Light/Dark Mode)، منع الظهور المفاجئ لنافذة رمز الـ QR، حماية مفاتيح الحظر والسياسات من استعادة الحالة التلقائية، وتعزيز استقرار دروع الحماية.",
   "releaseDate": "2026-11-07"
 }
