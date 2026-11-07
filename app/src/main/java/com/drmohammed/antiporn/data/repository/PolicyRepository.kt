@@ -812,15 +812,20 @@ class PolicyRepository(
         private var instance: PolicyRepository? = null
 
         fun getInstance(context: Context): PolicyRepository {
-            return try {
-                org.koin.core.context.GlobalContext.getOrNull()?.get<PolicyRepository>()
-            } catch (e: Exception) {
-                null
-            } ?: (instance ?: synchronized(this) {
-                instance ?: PolicyRepository(context.applicationContext).also {
+            return instance ?: synchronized(this) {
+                instance ?: try {
+                    org.koin.core.context.GlobalContext.getOrNull()?.get<PolicyRepository>()
+                } catch (t: Throwable) {
+                    null
+                } ?: PolicyRepository(context.applicationContext).also {
                     instance = it
                 }
-            })
+            }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        fun setInstance(repo: PolicyRepository?) {
+            instance = repo
         }
     }
 }

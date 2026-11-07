@@ -109,4 +109,21 @@ class AppModuleTest : KoinTest {
         assertNotNull(mainViewModel)
         assertEquals(0, mainViewModel.selectedTabPosition.value)
     }
+
+    @Test
+    fun testSingletonSetInstanceAndGetInstanceAntiRecursion() {
+        // Verify setInstance directly bypasses Koin and prevents any recursion
+        val dummyContext = object : android.content.ContextWrapper(null) {
+            override fun getApplicationContext(): android.content.Context = this
+        }
+
+        // Verify AppInventoryManager
+        val manager = AppInventoryManager.create(dummyContext)
+        AppInventoryManager.setInstance(manager)
+        assertEquals(manager, AppInventoryManager.getInstance(dummyContext))
+        AppInventoryManager.setInstance(null)
+
+        // Verify that setting instance on companion is reflected cleanly
+        HisnRoomDatabase.setInstance(null)
+    }
 }

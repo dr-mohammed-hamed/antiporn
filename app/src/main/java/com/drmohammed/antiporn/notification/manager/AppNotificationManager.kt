@@ -287,11 +287,20 @@ class AppNotificationManager(
 
         fun getInstance(context: Context): AppNotificationManager {
             return instance ?: synchronized(this) {
-                instance ?: AppNotificationManager(
+                instance ?: try {
+                    org.koin.core.context.GlobalContext.getOrNull()?.get<AppNotificationManager>()
+                } catch (t: Throwable) {
+                    null
+                } ?: AppNotificationManager(
                     context.applicationContext,
                     NotificationRepository.getInstance(context.applicationContext)
                 ).also { instance = it }
             }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        fun setInstance(manager: AppNotificationManager?) {
+            instance = manager
         }
     }
 }

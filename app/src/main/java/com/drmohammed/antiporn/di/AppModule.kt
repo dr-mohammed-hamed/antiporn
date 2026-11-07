@@ -38,7 +38,7 @@ import org.koin.dsl.module
  */
 val appModule = module {
     // Room Database and DAOs Singletons
-    single { HisnRoomDatabase.getInstance(androidContext()) }
+    single { HisnRoomDatabase.build(androidContext()) }
     single { get<HisnRoomDatabase>().devicePolicyDao() }
     single { get<HisnRoomDatabase>().partnerDao() }
     single { get<HisnRoomDatabase>().pendingApprovalDao() }
@@ -46,14 +46,30 @@ val appModule = module {
     single { get<HisnRoomDatabase>().inAppNotificationDao() }
 
     // Repositories and Enterprise Managers
-    single { PolicyRepository(androidContext(), get(), get()) }
-    single { AccountabilityRepository(androidContext(), get(), get()) }
-    single { ApprovalRepository(androidContext(), get()) }
-    single { AppInventoryManager.getInstance(androidContext()) }
+    single {
+        PolicyRepository(androidContext(), get(), get()).also {
+            PolicyRepository.setInstance(it)
+        }
+    }
+    single {
+        AccountabilityRepository(androidContext(), get(), get()).also {
+            AccountabilityRepository.setInstance(it)
+        }
+    }
+    single {
+        ApprovalRepository(androidContext(), get()).also {
+            ApprovalRepository.setInstance(it)
+        }
+    }
+    single { AppInventoryManager.create(androidContext()) }
     single { GoogleAuthManager.getInstance(androidContext()) }
     single { OtaRepository.getInstance(androidContext()) }
     single { NotificationRepository(get()) }
-    single { AppNotificationManager.getInstance(androidContext()) }
+    single {
+        AppNotificationManager(androidContext(), get()).also {
+            AppNotificationManager.setInstance(it)
+        }
+    }
 
     // ViewModels
     viewModel { MainViewModel() }

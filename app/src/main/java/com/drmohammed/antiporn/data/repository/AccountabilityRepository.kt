@@ -1049,15 +1049,20 @@ class AccountabilityRepository(
         private var instance: AccountabilityRepository? = null
 
         fun getInstance(context: Context): AccountabilityRepository {
-            return try {
-                org.koin.core.context.GlobalContext.getOrNull()?.get<AccountabilityRepository>()
-            } catch (e: Exception) {
-                null
-            } ?: (instance ?: synchronized(this) {
-                instance ?: AccountabilityRepository(context.applicationContext).also {
+            return instance ?: synchronized(this) {
+                instance ?: try {
+                    org.koin.core.context.GlobalContext.getOrNull()?.get<AccountabilityRepository>()
+                } catch (t: Throwable) {
+                    null
+                } ?: AccountabilityRepository(context.applicationContext).also {
                     instance = it
                 }
-            })
+            }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        fun setInstance(repo: AccountabilityRepository?) {
+            instance = repo
         }
     }
 }

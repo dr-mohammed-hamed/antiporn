@@ -283,15 +283,13 @@ abstract class HisnRoomDatabase : RoomDatabase() {
         }
 
         fun getInstance(context: Context): HisnRoomDatabase {
-            return try {
-                org.koin.core.context.GlobalContext.getOrNull()?.get<HisnRoomDatabase>()
-            } catch (e: Exception) {
-                null
-            } ?: (instance ?: synchronized(this) {
-                instance ?: build(context.applicationContext).also {
-                    instance = it
-                }
-            })
+            return instance ?: synchronized(this) {
+                instance ?: try {
+                    org.koin.core.context.GlobalContext.getOrNull()?.get<HisnRoomDatabase>()
+                } catch (t: Throwable) {
+                    null
+                } ?: build(context.applicationContext)
+            }
         }
 
         fun build(context: Context): HisnRoomDatabase {
@@ -300,6 +298,9 @@ abstract class HisnRoomDatabase : RoomDatabase() {
                 HisnRoomDatabase::class.java,
                 DATABASE_NAME
             )
+            .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+            .allowMainThreadQueries()
+            .fallbackToDestructiveMigrationOnDowngrade(true)
             .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_3_5)
             .fallbackToDestructiveMigrationFrom(true, 1, 2)
             .addCallback(object : Callback() {
@@ -317,6 +318,14 @@ abstract class HisnRoomDatabase : RoomDatabase() {
                 }
             })
             .build()
+            .also {
+                instance = it
+            }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        fun setInstance(db: HisnRoomDatabase?) {
+            instance = db
         }
     }
 }

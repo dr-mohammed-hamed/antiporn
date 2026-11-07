@@ -932,15 +932,20 @@ class ApprovalRepository(
         private var instance: ApprovalRepository? = null
 
         fun getInstance(context: Context): ApprovalRepository {
-            return try {
-                org.koin.core.context.GlobalContext.getOrNull()?.get<ApprovalRepository>()
-            } catch (e: Exception) {
-                null
-            } ?: (instance ?: synchronized(this) {
-                instance ?: ApprovalRepository(context.applicationContext).also {
+            return instance ?: synchronized(this) {
+                instance ?: try {
+                    org.koin.core.context.GlobalContext.getOrNull()?.get<ApprovalRepository>()
+                } catch (t: Throwable) {
+                    null
+                } ?: ApprovalRepository(context.applicationContext).also {
                     instance = it
                 }
-            })
+            }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        fun setInstance(repo: ApprovalRepository?) {
+            instance = repo
         }
     }
 }

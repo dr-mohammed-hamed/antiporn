@@ -24,7 +24,7 @@ import kotlinx.coroutines.withContext
  * tracking their policy states (suspended, protected, curfew whitelist),
  * and synchronizing the app inventory with Firestore for guardian oversight.
  */
-class AppInventoryManager private constructor(context: Context) {
+class AppInventoryManager internal constructor(context: Context) {
 
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -183,15 +183,24 @@ class AppInventoryManager private constructor(context: Context) {
         private var instance: AppInventoryManager? = null
 
         fun getInstance(context: Context): AppInventoryManager {
-            return try {
-                org.koin.core.context.GlobalContext.getOrNull()?.get<AppInventoryManager>()
-            } catch (e: Exception) {
-                null
-            } ?: (instance ?: synchronized(this) {
-                instance ?: AppInventoryManager(context.applicationContext).also {
-                    instance = it
-                }
-            })
+            return instance ?: synchronized(this) {
+                instance ?: try {
+                    org.koin.core.context.GlobalContext.getOrNull()?.get<AppInventoryManager>()
+                } catch (t: Throwable) {
+                    null
+                } ?: create(context.applicationContext)
+            }
+        }
+
+        fun create(context: Context): AppInventoryManager {
+            return AppInventoryManager(context.applicationContext).also {
+                instance = it
+            }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        fun setInstance(manager: AppInventoryManager?) {
+            instance = manager
         }
     }
 }
