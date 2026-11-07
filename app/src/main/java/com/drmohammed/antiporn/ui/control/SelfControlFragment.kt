@@ -12,10 +12,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.CompoundButton
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -97,6 +99,14 @@ class SelfControlFragment : Fragment() {
         }
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            // Dismiss any retained/restored QrExportDialog to prevent unauthorized QR key exposure across theme changes
+            (childFragmentManager.findFragmentByTag(QrExportDialog.TAG) as? DialogFragment)?.dismissAllowingStateLoss()
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -107,9 +117,17 @@ class SelfControlFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        isQrPolicyLoading = true
+        isBindingPolicy = true
         initViews()
         setupListeners()
         observeViewModel()
+    }
+
+    override fun onViewStateRestored(savedInstanceState: Bundle?) {
+        super.onViewStateRestored(savedInstanceState)
+        isQrPolicyLoading = false
+        isBindingPolicy = false
     }
 
     override fun onResume() {
@@ -226,11 +244,17 @@ class SelfControlFragment : Fragment() {
     }
 
     private fun setupListeners() {
-        binding.switchQrLockEnabled.setOnCheckedChangeListener { _, isChecked ->
-            if (isQrPolicyLoading) return@setOnCheckedChangeListener
+        binding.switchQrLockEnabled.setOnCheckedChangeListener { buttonView, isChecked ->
+            // Standard Android Touch Guard: ignore programmatic updates and state restorations
+            if (isQrPolicyLoading || !buttonView.isPressed) return@setOnCheckedChangeListener
             val ctx = context?.applicationContext ?: return@setOnCheckedChangeListener
             val qrManager = SelfControlQrManager.getInstance(ctx)
             if (isChecked) {
+                // If QR lock is already active, this is a state sync — NEVER show export dialog!
+                if (qrManager.isQrLockEnabled()) {
+                    _binding?.layoutQrActionButtons?.isVisible = true
+                    return@setOnCheckedChangeListener
+                }
                 if (!qrManager.hasToken()) {
                     qrManager.generateAndSaveNewToken()
                 }
@@ -456,8 +480,8 @@ class SelfControlFragment : Fragment() {
             binding.etDnsHost.setText(DevicePolicyBundle.LEGACY_DEFAULT_NEXTDNS_HOST)
         }
 
-        val switchListener = { _: View, _: Boolean ->
-            if (!isBindingPolicy) {
+        val switchListener = { view: View, _: Boolean ->
+            if (!isBindingPolicy && (view as? CompoundButton)?.isPressed == true) {
                 onUserDraftChanged()
             }
         }
@@ -467,8 +491,8 @@ class SelfControlFragment : Fragment() {
         binding.switchInstantInternetKill.setOnCheckedChangeListener(switchListener)
         binding.switchIncognitoBlocked.setOnCheckedChangeListener(switchListener)
         binding.switchLockNewInstalls.setOnCheckedChangeListener(switchListener)
-        binding.switchLockDateTime.setOnCheckedChangeListener { _, _ ->
-            if (!isBindingPolicy) {
+        binding.switchLockDateTime.setOnCheckedChangeListener { view, _ ->
+            if (!isBindingPolicy && (view as? CompoundButton)?.isPressed == true) {
                 onUserDraftChanged()
             }
         }

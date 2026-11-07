@@ -39,6 +39,14 @@ class QrExportDialog : DialogFragment() {
 
     private var currentBitmap: Bitmap? = null
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            // Dismiss immediately upon configuration change / theme recreation to prevent unauthorized QR key exposure
+            dismissAllowingStateLoss()
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,

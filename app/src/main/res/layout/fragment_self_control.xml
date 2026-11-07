@@ -189,6 +189,7 @@
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switchCurfewMaster"
+                            android:saveEnabled="false"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp" />
@@ -311,6 +312,7 @@
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switchWeekendCurfew"
+                            android:saveEnabled="false"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp" />
@@ -480,6 +482,7 @@
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switchVpnBlackhole"
+                            android:saveEnabled="false"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp" />
@@ -534,6 +537,7 @@
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switchInstantInternetKill"
+                            android:saveEnabled="false"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp" />
@@ -879,6 +883,7 @@
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switchLockDateTime"
+                            android:saveEnabled="false"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp" />
@@ -1134,6 +1139,7 @@
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switchIncognitoBlocked"
+                            android:saveEnabled="false"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp" />
@@ -1188,6 +1194,7 @@
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switchLockNewInstalls"
+                            android:saveEnabled="false"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp" />
@@ -1248,6 +1255,7 @@
 
                             <com.google.android.material.materialswitch.MaterialSwitch
                                 android:id="@+id/switchQrLockEnabled"
+                                android:saveEnabled="false"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="8dp" />
