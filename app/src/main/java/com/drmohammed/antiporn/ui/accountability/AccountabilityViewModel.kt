@@ -13,6 +13,8 @@ import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -145,35 +147,55 @@ class AccountabilityViewModel(
     fun loadPendingApprovals() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val localPending = approvalRepo.getLocalPendingApprovals()
-                var totalPending = localPending.size
+                val activeWards = accountabilityRepo.getWards()
+                    .filter { it.status == PartnerEntity.STATUS_ACTIVE }
 
-                val wards = accountabilityRepo.getWards()
-                if (wards.isNotEmpty()) {
-                    val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                    val resolvedWardIds = wards.map { ward ->
-                        accountabilityRepo.resolveActivePartnerUid(ward.id, ward.pairingCode)
-                    }.distinct()
+                if (activeWards.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update { it.copy(pendingApprovalsCount = 0) }
+                    }
+                    return@launch
+                }
 
-                    for (wardId in resolvedWardIds) {
+                val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val resolvedWardIds = activeWards.mapNotNull { ward ->
+                    val resolved = accountabilityRepo.resolveActivePartnerUid(ward.id, ward.pairingCode)
+                    resolved.takeIf { it.isNotBlank() }
+                }.distinct()
+
+                if (resolvedWardIds.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update { it.copy(pendingApprovalsCount = 0) }
+                    }
+                    return@launch
+                }
+
+                val countDeferreds = resolvedWardIds.map { wardId ->
+                    async {
                         try {
                             val snap = firestore.collection("policies").document(wardId)
                                 .collection("approvals")
                                 .whereEqualTo("status", "PENDING")
                                 .get()
                                 .await()
-                            totalPending += snap.size()
+                            snap.size()
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed loading pending approvals count for ward $wardId", e)
+                            0
                         }
                     }
                 }
+
+                val totalPending = countDeferreds.awaitAll().sum()
 
                 withContext(Dispatchers.Main) {
                     _uiState.update { it.copy(pendingApprovalsCount = totalPending) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed loading approvals", e)
+                withContext(Dispatchers.Main) {
+                    _uiState.update { it.copy(pendingApprovalsCount = 0) }
+                }
             }
         }
     }

@@ -23,6 +23,12 @@ interface PendingApprovalDao {
     @Query("SELECT * FROM pending_approvals ORDER BY requested_at DESC")
     fun getPendingApprovalsBlocking(): List<PendingApprovalEntity>
 
+    @Query("SELECT * FROM pending_approvals WHERE status = 'PENDING' OR status = 'FALLBACK_HIDDEN' ORDER BY requested_at DESC")
+    suspend fun getActualPendingApprovals(): List<PendingApprovalEntity>
+
+    @Query("SELECT * FROM pending_approvals WHERE status = 'PENDING' OR status = 'FALLBACK_HIDDEN' ORDER BY requested_at DESC")
+    fun getActualPendingApprovalsBlocking(): List<PendingApprovalEntity>
+
     @Query("SELECT * FROM pending_approvals WHERE is_synced = 0 ORDER BY requested_at ASC")
     suspend fun getUnsyncedApprovals(): List<PendingApprovalEntity>
 

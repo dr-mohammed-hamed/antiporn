@@ -611,6 +611,8 @@ class ApprovalRepository(
 
     fun getLocalPendingApprovals(): List<PendingApprovalEntity> = approvalDao.getPendingApprovalsBlocking()
 
+    fun getActualLocalPendingApprovals(): List<PendingApprovalEntity> = approvalDao.getActualPendingApprovalsBlocking()
+
     /**
      * Seeds all pre-existing installed applications as the Initial Approved Baseline.
      * Prevents existing applications from being frozen when AntiPorn is set up on an already-in-use device

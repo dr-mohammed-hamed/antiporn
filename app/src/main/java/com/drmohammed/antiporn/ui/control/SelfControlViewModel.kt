@@ -167,8 +167,7 @@ class SelfControlViewModel(
     fun loadPendingApprovals() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val pending = approvalRepository.getLocalPendingApprovals()
-                    .filter { !it.isApproved && !it.isRejected }
+                val pending = approvalRepository.getActualLocalPendingApprovals()
                 withContext(Dispatchers.Main) {
                     _uiState.update { it.copy(pendingApprovalsCount = pending.size) }
                 }
