@@ -1,11 +1,11 @@
 {
-  "versionCode": 13,
-  "versionName": "1.75",
+  "versionCode": 14,
+  "versionName": "1.76",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 42056801,
+  "fileSizeBytes": 33497296,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.75: القضاء على مشكلة الحراس الأشباح (Ghost Guardians)، فرض محرك الوقت الموثوق لجميع عمليات الاقتران، وتزويد الصندوق الأسود بتتبع دقيق لأحداث الاقتران والربط السحابي.",
-  "releaseDate": "2026-11-05"
+  "releaseNotes": "إصدار 1.76: تدشين مركز موافقات الحارس الجديد (Guardian Approvals Hub)، فرض تعليق التطبيقات الأصلي خلال ساعات حظر التجوال (Curfew)، وتأمين فائق لسرعة الإقلاع البارد واستقرار قاعدة البيانات ومراقبة الدروع.",
+  "releaseDate": "2026-11-07"
 }
