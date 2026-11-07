@@ -25,10 +25,13 @@ import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.services.NetworkWatchdog
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
+import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.notification.manager.AppNotificationManager
 import com.drmohammed.antiporn.notification.model.NotificationActionType
 import com.drmohammed.antiporn.notification.model.NotificationCategory
 import com.drmohammed.antiporn.notification.registry.NotificationRegistry
+import com.drmohammed.antiporn.telemetry.BlackBoxRecorder
+import com.drmohammed.antiporn.ui.shields.ActiveShieldsEvaluator
 import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -392,24 +395,45 @@ class DnsWatchdogService : Service() {
             return
         }
 
-        var needsEnforce = !ProtectionEngine.isSystemFullyProtected(this)
+        val desyncReasons = mutableListOf<String>()
 
-        // Verify Settings.Global directly for DNS settings
+        // 1. Surgical inspection of all registered security shields
+        val shieldStatuses = ProtectionEngine.evaluateSystemStatus(this)
+        for ((shieldId, status) in shieldStatuses) {
+            when (status) {
+                is ShieldStatus.Active -> { /* In fully active and enforced state */ }
+                is ShieldStatus.Unsupported -> {
+                    // System/OS hardware limitation - not a tamper event and cannot be fixed by re-enforcing
+                    Log.d(TAG, "Shield [$shieldId] is unsupported on current OS API level (${status.minSdkRequired})")
+                }
+                is ShieldStatus.NeedsEnforcement -> {
+                    desyncReasons.add("[$shieldId: ${status.reason}]")
+                }
+                is ShieldStatus.Disabled -> {
+                    desyncReasons.add("[$shieldId: ${status.warning}]")
+                }
+            }
+        }
+
+        // 2. Direct Settings.Global verification for Private DNS (aware of case and adult filter whitelists)
         try {
             val mode = Settings.Global.getString(contentResolver, "private_dns_mode")
             val specifier = Settings.Global.getString(contentResolver, "private_dns_specifier")
-            if (mode != null && specifier != null) {
+            if (mode != null) {
                 val expectedHost = DnsShield.getEffectiveDnsHost(this)
-                if (mode != "hostname" || specifier != expectedHost) {
-                    Log.w(TAG, "Settings.Global reports DNS mismatch: mode=$mode, specifier=$specifier, expected=$expectedHost")
-                    needsEnforce = true
+                val isHostMatching = specifier?.equals(expectedHost, ignoreCase = true) == true
+                val isAdultFiltering = specifier != null && ActiveShieldsEvaluator.isHostAdultFiltering(specifier)
+                if (mode != "hostname" || (!isHostMatching && !isAdultFiltering)) {
+                    val reason = "Settings.Global DNS mismatch (mode=$mode, specifier=$specifier, expected=$expectedHost)"
+                    Log.w(TAG, reason)
+                    desyncReasons.add("[DNS_GLOBAL: $reason]")
                 }
             }
         } catch (e: Exception) {
             Log.d(TAG, "Could not read Settings.Global directly", e)
         }
 
-        // Verify Target Timezone and Network Auto Time directly (only if time lock is active in policy)
+        // 3. Verify Target Timezone and Network Auto Time directly (only if time lock is active in policy)
         val isTimeLocked = try {
             com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(this)
                 .getCurrentPolicy().isDateTimeLocked
@@ -424,19 +448,21 @@ class DnsWatchdogService : Service() {
                 val targetTz = TimeZone.getTimeZone(targetTzId)
                 TimeZone.setDefault(null)
                 val currentTz = TimeZone.getDefault()
-                val trustedTime = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(this)
+                val trustedTime = TrustedTimeProvider.currentTimeMillis(this)
                 val isTargetTz = currentTz.id == targetTzId || currentTz.hasSameRules(targetTz) ||
                     currentTz.getOffset(trustedTime) == targetTz.getOffset(trustedTime)
                 if (!isTargetTz) {
-                    Log.w(TAG, "Timezone mismatch detected in watchdog: current=${currentTz.id}, expected=$targetTzId")
-                    needsEnforce = true
+                    val tzReason = "Timezone mismatch (current=${currentTz.id}, expected=$targetTzId)"
+                    Log.w(TAG, tzReason)
+                    desyncReasons.add("[TIMEZONE: $tzReason]")
                 }
 
+                // Check auto-time (network clock synchronization)
                 val autoTime = Settings.Global.getInt(contentResolver, Settings.Global.AUTO_TIME, 1)
-                val autoTimeZone = Settings.Global.getInt(contentResolver, Settings.Global.AUTO_TIME_ZONE, 0)
-                if (autoTime != 1 || autoTimeZone != 0) {
-                    Log.w(TAG, "Auto time settings mismatch in watchdog: autoTime=$autoTime, autoTimeZone=$autoTimeZone")
-                    needsEnforce = true
+                if (autoTime != 1) {
+                    val autoTimeReason = "Auto time disabled (autoTime=$autoTime)"
+                    Log.w(TAG, autoTimeReason)
+                    desyncReasons.add("[AUTO_TIME: $autoTimeReason]")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Could not verify Timezone or Auto Time directly in watchdog", e)
@@ -452,8 +478,21 @@ class DnsWatchdogService : Service() {
             }
         }
 
+        val needsEnforce = desyncReasons.isNotEmpty()
         if (needsEnforce) {
-            Log.i(TAG, "Tampering or desync detected in protection shields! Re-enforcing via ProtectionEngine...")
+            val detailedReasons = desyncReasons.joinToString(" | ")
+            Log.i(TAG, "Tampering or desync detected in protection shields: $detailedReasons. Re-enforcing via ProtectionEngine...")
+
+            // Forensic recording into Black Box Flight Recorder
+            BlackBoxRecorder.record(
+                context = applicationContext,
+                tag = BlackBoxRecorder.TAG_SHIELD,
+                actionName = "WATCHDOG_TAMPER_DETECTED",
+                isSuccess = false,
+                errorDetails = detailedReasons,
+                metadata = "failedCount=${desyncReasons.size}"
+            )
+
             ProtectionEngine.applyAllAsync(applicationContext)
             try {
                 AppNotificationManager.getInstance(applicationContext).postEventNotification(

@@ -73,9 +73,28 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
         }
 
         initViews()
+        handleInitialFilterIntent()
         setupListeners()
         loadLogs()
         loadPolicySummary()
+    }
+
+    private fun handleInitialFilterIntent() {
+        intent?.getStringExtra(EXTRA_FILTER_TAG)?.let { initialTag ->
+            val chipId = when (initialTag) {
+                BlackBoxRecorder.TAG_SHIELD -> R.id.chipFilterShield
+                BlackBoxRecorder.TAG_CURFEW -> R.id.chipFilterCurfew
+                BlackBoxRecorder.TAG_CLOUD_SYNC -> R.id.chipFilterCloud
+                BlackBoxRecorder.TAG_TIME -> R.id.chipFilterTime
+                BlackBoxRecorder.TAG_DPM -> R.id.chipFilterDpm
+                BlackBoxRecorder.TAG_PAIRING -> R.id.chipFilterPairing
+                else -> null
+            }
+            if (chipId != null) {
+                currentFilter = initialTag
+                chipGroupFilters.check(chipId)
+            }
+        }
     }
 
     private fun initViews() {
@@ -121,6 +140,7 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
         chipGroupFilters.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
             currentFilter = when (checkedIds.first()) {
+                R.id.chipFilterShield -> BlackBoxRecorder.TAG_SHIELD
                 R.id.chipFilterCurfew -> BlackBoxRecorder.TAG_CURFEW
                 R.id.chipFilterCloud -> BlackBoxRecorder.TAG_CLOUD_SYNC
                 R.id.chipFilterTime -> BlackBoxRecorder.TAG_TIME
@@ -245,6 +265,7 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
     }
 
     companion object {
+        const val EXTRA_FILTER_TAG = "extra_filter_tag"
         private const val MENU_SHARE = 101
         private const val MENU_CLEAR = 102
     }

@@ -69,9 +69,10 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
         actionName: String,
         metadata: String?,
         requireDeviceOwner: Boolean,
+        recordSuccess: Boolean,
         action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
     ): DpmExecutionResult<T> = withContext(Dispatchers.IO) {
-        executeInternal(context, tag, actionName, metadata, requireDeviceOwner, action)
+        executeInternal(context, tag, actionName, metadata, requireDeviceOwner, recordSuccess, action)
     }
 
     /**
@@ -85,12 +86,13 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
         actionName: String,
         metadata: String?,
         requireDeviceOwner: Boolean,
+        recordSuccess: Boolean,
         action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
     ): DpmExecutionResult<T> {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             Log.w(TAG, "[WARN] SafeDpmGateway.executeBlocking called on Main Thread for action [$actionName]. Consider migrating to suspend execute()!")
         }
-        return executeInternal(context, tag, actionName, metadata, requireDeviceOwner, action)
+        return executeInternal(context, tag, actionName, metadata, requireDeviceOwner, recordSuccess, action)
     }
 
     suspend fun <T> executeRaw(
@@ -99,6 +101,7 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
         actionName: String,
         metadata: String? = null,
         requireDeviceOwner: Boolean = true,
+        recordSuccess: Boolean = true,
         action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
     ): DpmExecutionResult<T> = execute(
         context = context,
@@ -106,6 +109,7 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
         actionName = actionName,
         metadata = metadata,
         requireDeviceOwner = requireDeviceOwner,
+        recordSuccess = recordSuccess,
         action = action
     )
 
@@ -115,6 +119,7 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
         actionName: String,
         metadata: String? = null,
         requireDeviceOwner: Boolean = true,
+        recordSuccess: Boolean = true,
         action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
     ): DpmExecutionResult<T> = executeBlocking(
         context = context,
@@ -122,6 +127,7 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
         actionName = actionName,
         metadata = metadata,
         requireDeviceOwner = requireDeviceOwner,
+        recordSuccess = recordSuccess,
         action = action
     )
 
@@ -131,6 +137,7 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
         actionName: String,
         metadata: String?,
         requireDeviceOwner: Boolean,
+        recordSuccess: Boolean,
         action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
     ): DpmExecutionResult<T> {
         val appContext = context.applicationContext
@@ -212,7 +219,9 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
             val result = action(dpm, admin)
             val duration = SystemClock.elapsedRealtime() - startTime
 
-            recordTelemetry(appContext, tag, actionName, duration, true, null, metadata)
+            if (recordSuccess) {
+                recordTelemetry(appContext, tag, actionName, duration, true, null, metadata)
+            }
             Log.d(TAG, "[SUCCESS] DPM Action [$actionName] executed successfully in ${duration}ms")
 
             DpmExecutionResult.Success(

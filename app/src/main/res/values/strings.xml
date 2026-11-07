@@ -964,6 +964,7 @@
     <string name="ai_shield_status_stopped_short">متوقف حالياً</string>
     <string name="ai_shield_status_running_short">يعمل بنشاط</string>
     <string name="filter_chip_all">الكل</string>
+    <string name="filter_chip_shields">دروع الحماية</string>
     <string name="filter_chip_curfew">الحظر والليلي</string>
     <string name="filter_chip_cloud">المزامنة والسحابة</string>
     <string name="filter_chip_time">التوقيت</string>

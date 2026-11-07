@@ -45,6 +45,13 @@
                 android:text="@string/filter_chip_all" />
 
             <com.google.android.material.chip.Chip
+                android:id="@+id/chipFilterShield"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/filter_chip_shields" />
+
+            <com.google.android.material.chip.Chip
                 android:id="@+id/chipFilterCurfew"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"

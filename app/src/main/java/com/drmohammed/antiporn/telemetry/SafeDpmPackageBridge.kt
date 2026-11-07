@@ -52,12 +52,14 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
     suspend fun isPackageSuspended(
         context: Context,
         packageName: String,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Boolean> = execute(
         context = context,
         tag = tag,
         actionName = "isPackageSuspended",
-        metadata = "pkg=$packageName"
+        metadata = "pkg=$packageName",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             dpm.isPackageSuspended(admin, packageName)
@@ -69,12 +71,14 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
     fun isPackageSuspendedBlocking(
         context: Context,
         packageName: String,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Boolean> = executeBlocking(
         context = context,
         tag = tag,
         actionName = "isPackageSuspendedBlocking",
-        metadata = "pkg=$packageName"
+        metadata = "pkg=$packageName",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             dpm.isPackageSuspended(admin, packageName)
@@ -114,12 +118,14 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
     suspend fun isApplicationHidden(
         context: Context,
         packageName: String,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Boolean> = execute(
         context = context,
         tag = tag,
         actionName = "isApplicationHidden",
-        metadata = "pkg=$packageName"
+        metadata = "pkg=$packageName",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         dpm.isApplicationHidden(admin, packageName)
     }
@@ -127,12 +133,14 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
     fun isApplicationHiddenBlocking(
         context: Context,
         packageName: String,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Boolean> = executeBlocking(
         context = context,
         tag = tag,
         actionName = "isApplicationHiddenBlocking",
-        metadata = "pkg=$packageName"
+        metadata = "pkg=$packageName",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         dpm.isApplicationHidden(admin, packageName)
     }

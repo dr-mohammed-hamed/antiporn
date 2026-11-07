@@ -675,6 +675,7 @@
     <string name="ai_shield_status_stopped_short">Currently inactive</string>
     <string name="ai_shield_status_running_short">Active</string>
     <string name="filter_chip_all">All</string>
+    <string name="filter_chip_shields">Protection Shields</string>
     <string name="filter_chip_curfew">Curfew</string>
     <string name="filter_chip_cloud">Cloud Sync</string>
     <string name="filter_chip_time">Time</string>

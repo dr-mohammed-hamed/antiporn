@@ -15,6 +15,7 @@ interface SafeDpmBaseGateway {
         actionName: String,
         metadata: String? = null,
         requireDeviceOwner: Boolean = true,
+        recordSuccess: Boolean = true,
         action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
     ): DpmExecutionResult<T>
 
@@ -24,6 +25,7 @@ interface SafeDpmBaseGateway {
         actionName: String,
         metadata: String? = null,
         requireDeviceOwner: Boolean = true,
+        recordSuccess: Boolean = true,
         action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
     ): DpmExecutionResult<T>
 }
