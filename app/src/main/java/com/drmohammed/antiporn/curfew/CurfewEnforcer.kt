@@ -679,6 +679,7 @@ object CurfewEnforcer {
             if (AppSuspensionShield.isBlacklisted(pkg)) continue
             if (customBlacklist.contains(pkg)) continue
             if (unapproved.contains(pkg)) continue
+            if (com.drmohammed.antiporn.waqfa.engine.WaqfaCooldownStore.isPackageInCooldown(appContext, pkg)) continue
 
             // If curfew is running, only unsuspend if immune/whitelisted
             if (isCurfewRunning && !immunePackages.contains(pkg)) continue

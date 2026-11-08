@@ -792,4 +792,64 @@
     <string name="device_name_not_set">Not set yet</string>
     <string name="btn_request_unlink">Request Unlink</string>
     <string name="guardian_status_active_verified">Active &amp; Verified Guardian</string>
+
+    <!-- Waqfa Mindful Intervention System Tokens -->
+    <string name="waqfa_title">Waqfa</string>
+    <string name="waqfa_mindful_prompt">Pause a moment... Set your intention and define your goal</string>
+    <string name="waqfa_attempting_open">You are trying to open: %1$s</string>
+    <string name="waqfa_intent_purposeful">For a specific, intentional task</string>
+    <string name="waqfa_intent_escapism">Aimless browsing / Escapism</string>
+    <string name="waqfa_escapism_reflection">What are you really trying to escape from? Take a deep breath... Distraction does not resolve emotions.</string>
+    <string name="waqfa_reason_hint">Write the task or current emotion...</string>
+    <string name="waqfa_reason_required_error">Entering a reason or emotion is required to proceed</string>
+    <string name="waqfa_duration_label">Select allowed session duration:</string>
+    <string name="waqfa_start_session_button">Start Mindful Session</string>
+    <string name="waqfa_retreat_button">Retreat to Home Screen</string>
+    <string name="waqfa_minutes_format">%1$d min</string>
+    <string name="waqfa_question_intent">What is your intention and purpose right now?</string>
+    <string name="waqfa_label_reason_header">Reason for opening or underlying feeling:</string>
+
+    <!-- Waqfa Settings & Cards -->
+    <string name="waqfa_settings_title">«Waqfa» Mindful System</string>
+    <string name="waqfa_settings_desc">Intercept distracting apps, guide mindfulness, and enforce intentional use</string>
+    <string name="waqfa_switch_master">Enable «Waqfa» System</string>
+    <string name="waqfa_switch_master_desc">Instantly intercept selected apps and enforce the mindful intention gate</string>
+    <string name="waqfa_target_apps_title">Apps subject to Waqfa</string>
+    <string name="waqfa_target_apps_desc">%1$d apps subject to Waqfa</string>
+    <string name="waqfa_btn_select_apps">Select Apps</string>
+    <string name="waqfa_reason_required_title">Require Reason / Feeling</string>
+    <string name="waqfa_reason_required_desc">Prevent opening the app until an explicit purpose or emotion is entered</string>
+    <string name="waqfa_timeout_reaction_title">Action upon timeout</string>
+    <string name="waqfa_timeout_reaction_desc">Action triggered as soon as the session time expires</string>
+    <string name="waqfa_reaction_exit_only">Return to Home Screen only</string>
+    <string name="waqfa_reaction_exit_and_freeze">Exit and temporarily cooldown</string>
+    <string name="waqfa_reaction_notify_only">Notification alert only</string>
+    <string name="waqfa_cooldown_duration_title">Cooldown freeze duration</string>
+    <string name="waqfa_cooldown_duration_desc">Duration to freeze the app when exit &amp; freeze is selected (minutes)</string>
+    <string name="waqfa_unit_minutes">minutes</string>
+    <string name="waqfa_quick_durations_title">Quick duration options (minutes)</string>
+    <string name="waqfa_quick_durations_desc">Default duration chips shown to user during interception</string>
+    <string name="waqfa_btn_save_settings">Save and apply Waqfa settings</string>
+    <string name="waqfa_settings_saved_toast">Waqfa settings saved and applied successfully</string>
+    <string name="waqfa_settings_save_failed_toast">Failed to save settings, please try again</string>
+    <string name="waqfa_card_status_active">Active (%1$d apps)</string>
+    <string name="waqfa_card_status_inactive">Disabled</string>
+    <string name="waqfa_btn_manage">Manage Waqfa</string>
+    <string name="waqfa_guardian_card_title">«Waqfa» System (Remote Control)</string>
+    <string name="waqfa_guardian_card_desc">Configure app interception and mindful gate rules for the ward</string>
+
+    <!-- Waqfa App Picker Bottom Sheet -->
+    <string name="waqfa_picker_title">Select Apps for Waqfa</string>
+    <string name="waqfa_picker_desc">Choose apps you want to intercept and require a mindful gate upon launch</string>
+    <string name="waqfa_picker_search_hint">Search apps...</string>
+    <string name="waqfa_btn_confirm_selection">Confirm Selection</string>
+    <string name="waqfa_btn_confirm_selection_count">Confirm Selection (%1$d selected)</string>
+
+    <!-- Waqfa Notifications -->
+    <string name="waqfa_notif_cooldown_started_title">App Temporarily Frozen</string>
+    <string name="waqfa_notif_cooldown_started_msg">%1$s is frozen for %2$d minutes to cooldown and regain focus.</string>
+    <string name="waqfa_notif_cooldown_ended_title">App Unfrozen</string>
+    <string name="waqfa_notif_cooldown_ended_msg">Cooldown ended for %1$s. You may now use it mindfully.</string>
+    <string name="waqfa_notif_session_timeout_title">«Waqfa» Session Ended</string>
+    <string name="waqfa_notif_session_timeout_msg">The %1$d minute limit for %2$s has expired.</string>
 </resources>

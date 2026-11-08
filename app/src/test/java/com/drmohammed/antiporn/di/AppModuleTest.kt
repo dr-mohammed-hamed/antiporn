@@ -25,6 +25,11 @@ import com.drmohammed.antiporn.work.OtaUpdateWorker
 import com.drmohammed.antiporn.notification.manager.AppNotificationManager
 import com.drmohammed.antiporn.notification.repository.NotificationRepository
 import com.drmohammed.antiporn.ui.notification.NotificationCenterViewModel
+import com.drmohammed.antiporn.waqfa.data.WaqfaDao
+import com.drmohammed.antiporn.waqfa.data.WaqfaRepository
+import com.drmohammed.antiporn.waqfa.engine.WaqfaSessionManager
+import com.drmohammed.antiporn.waqfa.ui.gate.WaqfaGateViewModel
+import com.drmohammed.antiporn.waqfa.ui.settings.WaqfaSettingsViewModel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -71,6 +76,9 @@ class AppModuleTest : KoinTest {
             PendingApprovalDao::class,
             DiagnosticEventDao::class,
             InAppNotificationDao::class,
+            WaqfaDao::class,
+            WaqfaRepository::class,
+            WaqfaSessionManager::class,
             PolicyRepository::class,
             AccountabilityRepository::class,
             ApprovalRepository::class,
@@ -87,6 +95,8 @@ class AppModuleTest : KoinTest {
             NotificationRepository::class,
             AppNotificationManager::class,
             NotificationCenterViewModel::class,
+            WaqfaGateViewModel::class,
+            WaqfaSettingsViewModel::class,
             OtaUpdateWorker::class,
             CloudSyncWorker::class
         )
@@ -97,7 +107,7 @@ class AppModuleTest : KoinTest {
                 registeredTypes.contains(expected)
             )
         }
-        assertEquals(24, registeredTypes.size)
+        assertEquals(29, registeredTypes.size)
     }
 
     @Test

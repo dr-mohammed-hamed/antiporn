@@ -19,6 +19,8 @@ import com.drmohammed.antiporn.data.local.db.entity.DiagnosticEventEntity
 import com.drmohammed.antiporn.data.local.db.entity.InAppNotificationEntity
 import com.drmohammed.antiporn.data.local.db.entity.PartnerEntity
 import com.drmohammed.antiporn.data.local.db.entity.PendingApprovalEntity
+import com.drmohammed.antiporn.waqfa.data.WaqfaDao
+import com.drmohammed.antiporn.waqfa.data.WaqfaSessionEntity
 
 /**
  * Modern Jetpack Room Database for Project Hisn.
@@ -30,9 +32,10 @@ import com.drmohammed.antiporn.data.local.db.entity.PendingApprovalEntity
         PartnerEntity::class,
         PendingApprovalEntity::class,
         DiagnosticEventEntity::class,
-        InAppNotificationEntity::class
+        InAppNotificationEntity::class,
+        WaqfaSessionEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class HisnRoomDatabase : RoomDatabase() {
@@ -42,6 +45,7 @@ abstract class HisnRoomDatabase : RoomDatabase() {
     abstract fun pendingApprovalDao(): PendingApprovalDao
     abstract fun diagnosticEventDao(): DiagnosticEventDao
     abstract fun inAppNotificationDao(): InAppNotificationDao
+    abstract fun waqfaDao(): WaqfaDao
 
     companion object {
         const val DATABASE_NAME = "antiporn_guard.db"
@@ -282,6 +286,36 @@ abstract class HisnRoomDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migration from Room version 5 to Room version 6.
+         * Creates table [waqfa_sessions] for the Waqfa Mindful Intervention System.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `waqfa_sessions` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `session_uuid` TEXT NOT NULL,
+                        `package_name` TEXT NOT NULL,
+                        `app_name` TEXT NOT NULL,
+                        `intent_type` TEXT NOT NULL,
+                        `reason_or_feeling` TEXT,
+                        `duration_minutes` INTEGER NOT NULL,
+                        `started_at_trusted_ms` INTEGER NOT NULL,
+                        `planned_end_at_trusted_ms` INTEGER NOT NULL,
+                        `actual_end_at_trusted_ms` INTEGER,
+                        `end_action_applied` TEXT,
+                        `is_active` INTEGER NOT NULL DEFAULT 1
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `idx_waqfa_sessions_pkg` ON `waqfa_sessions` (`package_name`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `idx_waqfa_sessions_start` ON `waqfa_sessions` (`started_at_trusted_ms` DESC)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `idx_waqfa_sessions_active` ON `waqfa_sessions` (`package_name`, `is_active`)")
+            }
+        }
+
         fun getInstance(context: Context): HisnRoomDatabase {
             return instance ?: synchronized(this) {
                 instance ?: try {
@@ -301,7 +335,7 @@ abstract class HisnRoomDatabase : RoomDatabase() {
             .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
             .allowMainThreadQueries()
             .fallbackToDestructiveMigrationOnDowngrade(true)
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_3_5)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_3_5, MIGRATION_5_6)
             .fallbackToDestructiveMigrationFrom(true, 1, 2)
             .addCallback(object : Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {

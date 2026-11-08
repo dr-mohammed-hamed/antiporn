@@ -15,6 +15,11 @@ import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.ota.repository.OtaRepository
 import com.drmohammed.antiporn.notification.manager.AppNotificationManager
 import com.drmohammed.antiporn.notification.repository.NotificationRepository
+import com.drmohammed.antiporn.waqfa.data.WaqfaDao
+import com.drmohammed.antiporn.waqfa.data.WaqfaRepository
+import com.drmohammed.antiporn.waqfa.engine.WaqfaSessionManager
+import com.drmohammed.antiporn.waqfa.ui.gate.WaqfaGateViewModel
+import com.drmohammed.antiporn.waqfa.ui.settings.WaqfaSettingsViewModel
 import com.drmohammed.antiporn.ui.accountability.AccountabilityViewModel
 import com.drmohammed.antiporn.ui.accountability.GuardianControlViewModel
 import com.drmohammed.antiporn.ui.accountability.RemoteAppManagerViewModel
@@ -44,8 +49,15 @@ val appModule = module {
     single { get<HisnRoomDatabase>().pendingApprovalDao() }
     single { get<HisnRoomDatabase>().diagnosticEventDao() }
     single { get<HisnRoomDatabase>().inAppNotificationDao() }
+    single { get<HisnRoomDatabase>().waqfaDao() }
 
     // Repositories and Enterprise Managers
+    single { WaqfaRepository(get(), androidContext()) }
+    single {
+        WaqfaSessionManager(androidContext(), get()).also {
+            WaqfaSessionManager.setInstance(it)
+        }
+    }
     single {
         PolicyRepository(androidContext(), get(), get()).also {
             PolicyRepository.setInstance(it)
@@ -80,6 +92,8 @@ val appModule = module {
     viewModel { GuardianControlViewModel(androidApplication(), get(), get(), get()) }
     viewModel { SettingsViewModel(androidApplication(), get(), get(), get()) }
     viewModel { NotificationCenterViewModel(get()) }
+    viewModel { WaqfaGateViewModel(androidApplication(), get(), get()) }
+    viewModel { WaqfaSettingsViewModel(androidApplication(), get(), get()) }
 
     // Background Workers
     worker { (workerParams: WorkerParameters) ->

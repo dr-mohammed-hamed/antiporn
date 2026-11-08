@@ -180,6 +180,9 @@ class DnsWatchdogService : Service() {
                 Log.d(TAG, "Layer 2 - Screen event observed ($action). Debouncing scan...")
                 debounceHandler.removeCallbacks(screenDebounceRunnable)
                 debounceHandler.postDelayed(screenDebounceRunnable, SCREEN_DEBOUNCE_DELAY_MS)
+                com.drmohammed.antiporn.waqfa.engine.WaqfaForegroundWatcher.getInstance(applicationContext).onScreenStateChanged(true)
+            } else if (action == Intent.ACTION_SCREEN_OFF) {
+                com.drmohammed.antiporn.waqfa.engine.WaqfaForegroundWatcher.getInstance(applicationContext).onScreenStateChanged(false)
             }
         }
     }
@@ -198,6 +201,7 @@ class DnsWatchdogService : Service() {
         AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
         com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncZeroTrustBaselineAndReconcileAsync()
         com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher.syncWatcherStateAsync(applicationContext)
+        com.drmohammed.antiporn.waqfa.engine.WaqfaForegroundWatcher.getInstance(applicationContext).start()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -220,6 +224,7 @@ class DnsWatchdogService : Service() {
         unregisterDnsObserver()
         unregisterPackageReceiver()
         unregisterScreenReceiver()
+        com.drmohammed.antiporn.waqfa.engine.WaqfaForegroundWatcher.getInstance(applicationContext).stop()
         networkWatchdog.unregister()
         serviceScope.cancel()
         // Service cleanup complete
@@ -356,6 +361,7 @@ class DnsWatchdogService : Service() {
         try {
             val filter = IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
                 addAction(Intent.ACTION_USER_PRESENT)
             }
             // Explicit NOT_EXPORTED required for targetSdk=36 / API 33+.

@@ -1,6 +1,7 @@
 package com.drmohammed.antiporn.core.model
 
 import android.util.Log
+import com.drmohammed.antiporn.waqfa.model.WaqfaConfig
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -42,6 +43,7 @@ data class DevicePolicyBundle(
     val breakoutUnlockAt: Long? = null,
     val guardianPolicySnapshot: String? = null,
     val lastSelfModifiedAt: Long? = null,
+    val waqfaConfig: WaqfaConfig = WaqfaConfig(),
     val version: Long = 1L,
     val updatedAt: Long = System.currentTimeMillis()
 ) {
@@ -83,6 +85,7 @@ data class DevicePolicyBundle(
             "breakoutUnlockAt" to breakoutUnlockAt,
             "guardianPolicySnapshot" to guardianPolicySnapshot,
             "lastSelfModifiedAt" to lastSelfModifiedAt,
+            "waqfaConfig" to waqfaConfig.toMap(),
             "version" to version,
             "updatedAt" to updatedAt
         )
@@ -140,6 +143,7 @@ data class DevicePolicyBundle(
         if (breakoutUnlockAt != null) json.put("breakoutUnlockAt", breakoutUnlockAt)
         if (guardianPolicySnapshot != null) json.put("guardianPolicySnapshot", guardianPolicySnapshot)
         if (lastSelfModifiedAt != null) json.put("lastSelfModifiedAt", lastSelfModifiedAt)
+        json.put("waqfaConfig", waqfaConfig.toJson())
         json.put("version", version)
         json.put("updatedAt", updatedAt)
         return json.toString()
@@ -237,6 +241,7 @@ data class DevicePolicyBundle(
             val breakoutUnlockAt = (map["breakoutUnlockAt"] as? Number)?.toLong()
             val guardianPolicySnapshot = (map["guardianPolicySnapshot"] as? String)?.takeIf { it.isNotBlank() }
             val lastSelfModifiedAt = (map["lastSelfModifiedAt"] as? Number)?.toLong()
+            val waqfa = WaqfaConfig.fromMap(map["waqfaConfig"])
 
             val version = (map["version"] as? Number)?.toLong() ?: 1L
             val updatedAt = (map["updatedAt"] as? Number)?.toLong() ?: 0L
@@ -271,73 +276,36 @@ data class DevicePolicyBundle(
                 breakoutRequestedAt = breakoutRequestedAt, breakoutUnlockAt = breakoutUnlockAt,
                 guardianPolicySnapshot = guardianPolicySnapshot,
                 lastSelfModifiedAt = lastSelfModifiedAt,
+                waqfaConfig = waqfa,
                 version = version, updatedAt = updatedAt
             )
+        }
+
+        private fun org.json.JSONArray?.toStringSet(): Set<String> {
+            if (this == null) return emptySet()
+            val set = mutableSetOf<String>()
+            for (i in 0 until length()) {
+                val s = optString(i)
+                if (!s.isNullOrBlank() && s != "null") set.add(s)
+            }
+            return set
         }
 
         fun fromJson(jsonStr: String): DevicePolicyBundle {
             return try {
                 val json = JSONObject(jsonStr)
-                val blacklist = mutableSetOf<String>()
-                val blacklistArr = json.optJSONArray("customBlacklistPackages")
-                if (blacklistArr != null) {
-                    for (i in 0 until blacklistArr.length()) {
-                        blacklist.add(blacklistArr.getString(i))
-                    }
-                }
-
-                val whitelist = mutableSetOf<String>()
-                if (json.has("customCurfewWhitelistPackages")) {
-                    val whitelistArr = json.optJSONArray("customCurfewWhitelistPackages")
-                    if (whitelistArr != null) {
-                        for (i in 0 until whitelistArr.length()) {
-                            whitelist.add(whitelistArr.getString(i))
-                        }
-                    }
+                val blacklist = json.optJSONArray("customBlacklistPackages").toStringSet()
+                val whitelist = if (json.has("customCurfewWhitelistPackages")) {
+                    json.optJSONArray("customCurfewWhitelistPackages").toStringSet()
                 } else {
-                    whitelist.addAll(com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST)
+                    com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST
                 }
-
-                val vpnBypass = mutableSetOf<String>()
-                val vpnBypassArr = json.optJSONArray("curfewVpnBypassPackages")
-                if (vpnBypassArr != null) {
-                    for (i in 0 until vpnBypassArr.length()) {
-                        vpnBypass.add(vpnBypassArr.getString(i))
-                    }
-                }
-
-                val protectedApps = mutableSetOf<String>()
-                val protectedArr = json.optJSONArray("protectedAppPackages")
-                if (protectedArr != null) {
-                    for (i in 0 until protectedArr.length()) {
-                        protectedApps.add(protectedArr.getString(i))
-                    }
-                }
-
+                val vpnBypass = json.optJSONArray("curfewVpnBypassPackages").toStringSet()
+                val protectedApps = json.optJSONArray("protectedAppPackages").toStringSet()
                 val browserFilterMode = json.optInt("browserFilterMode", BROWSER_FILTER_OFF).coerceIn(0, 2)
                 val isFullSystemFilteringEnabled = json.optBoolean("isFullSystemFilteringEnabled", false)
-
-                val customBlockedUrls = mutableSetOf<String>()
-                val blockedUrlsArr = json.optJSONArray("customBlockedUrls")
-                if (blockedUrlsArr != null) {
-                    for (i in 0 until blockedUrlsArr.length()) {
-                        val url = blockedUrlsArr.optString(i)
-                        if (!url.isNullOrBlank() && url != "null") {
-                            customBlockedUrls.add(url)
-                        }
-                    }
-                }
-
-                val customAllowedUrls = mutableSetOf<String>()
-                val allowedUrlsArr = json.optJSONArray("customAllowedUrls")
-                if (allowedUrlsArr != null) {
-                    for (i in 0 until allowedUrlsArr.length()) {
-                        val url = allowedUrlsArr.optString(i)
-                        if (!url.isNullOrBlank() && url != "null") {
-                            customAllowedUrls.add(url)
-                        }
-                    }
-                }
+                val customBlockedUrls = json.optJSONArray("customBlockedUrls").toStringSet()
+                val customAllowedUrls = json.optJSONArray("customAllowedUrls").toStringSet()
 
                 val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: CONTROLD_FAMILY_DNS_HOST
                 val ytRestricted = json.optBoolean("isYouTubeRestrictedModeEnabled", false)
@@ -354,6 +322,7 @@ data class DevicePolicyBundle(
                 val breakoutUnlockAt = if (json.has("breakoutUnlockAt") && !json.isNull("breakoutUnlockAt")) json.optLong("breakoutUnlockAt") else null
                 val guardianPolicySnapshot = json.optString("guardianPolicySnapshot", "").takeIf { it.isNotBlank() }
                 val lastSelfModifiedAt = if (json.has("lastSelfModifiedAt") && !json.isNull("lastSelfModifiedAt")) json.optLong("lastSelfModifiedAt") else null
+                val waqfa = WaqfaConfig.fromJson(json.optJSONObject("waqfaConfig"))
 
                 DevicePolicyBundle(
                     curfewStartHour = json.optInt("curfewStartHour", com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR).coerceIn(0, 23),
@@ -390,6 +359,7 @@ data class DevicePolicyBundle(
                     breakoutRequestedAt = breakoutRequestedAt, breakoutUnlockAt = breakoutUnlockAt,
                     guardianPolicySnapshot = guardianPolicySnapshot,
                     lastSelfModifiedAt = lastSelfModifiedAt,
+                    waqfaConfig = waqfa,
                     version = json.optLong("version", 1L),
                     updatedAt = json.optLong("updatedAt", System.currentTimeMillis())
                 )

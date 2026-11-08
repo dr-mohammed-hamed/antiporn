@@ -275,6 +275,13 @@ class GuardianControlViewModel(
         }
     }
 
+    fun updateWaqfaConfig(waqfaConfig: com.drmohammed.antiporn.waqfa.model.WaqfaConfig) {
+        _uiState.update { current ->
+            val updated = current.currentPolicy.copy(waqfaConfig = waqfaConfig)
+            current.copy(currentPolicy = updated)
+        }
+    }
+
     fun onPolicyReverted(reverted: DevicePolicyBundle) {
         _uiState.update {
             it.copy(

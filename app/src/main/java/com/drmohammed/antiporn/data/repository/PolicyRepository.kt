@@ -270,7 +270,8 @@ class PolicyRepository(
                                         cloudPolicy.browserFilterMode != current.browserFilterMode ||
                                         cloudPolicy.customBlockedUrls != current.customBlockedUrls ||
                                         cloudPolicy.customAllowedUrls != current.customAllowedUrls ||
-                                        cloudPolicy.guardianUid != current.guardianUid
+                                        cloudPolicy.guardianUid != current.guardianUid ||
+                                        cloudPolicy.waqfaConfig != current.waqfaConfig
                                     )
                                     val statusChanged = cloudPolicy.breakoutStatus != current.breakoutStatus
                                     val isTimeNewer = cloudPolicy.updatedAt > current.updatedAt
@@ -628,6 +629,9 @@ class PolicyRepository(
 
                 // 6. Synchronize Unified Local DNS Filter and Curfew VPN engine
                 com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.syncPolicy(appContext)
+
+                // 7. Synchronize Waqfa Mindful Intervention System config
+                com.drmohammed.antiporn.waqfa.engine.WaqfaSessionManager.getInstance(appContext).updateConfig(bundle.waqfaConfig)
 
                 Log.i(TAG, "Successfully applied policy bundle v${bundle.version} to system engines")
             } catch (e: Exception) {

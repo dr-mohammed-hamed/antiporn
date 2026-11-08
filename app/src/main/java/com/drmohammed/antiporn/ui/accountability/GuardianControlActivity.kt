@@ -14,6 +14,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
@@ -26,6 +27,7 @@ import com.drmohammed.antiporn.ui.browser.BrowserUrlFilterActivity
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
@@ -126,6 +128,18 @@ class GuardianControlActivity : AppCompatActivity() {
                     customAllowed = updated.customAllowedUrls,
                     isFullSystemFilteringEnabled = updated.isFullSystemFilteringEnabled
                 )
+            }
+        }
+    }
+
+    private val waqfaSettingsLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val updatedJson = result.data?.getStringExtra(com.drmohammed.antiporn.waqfa.ui.settings.WaqfaSettingsActivity.EXTRA_POLICY_JSON)
+            if (!updatedJson.isNullOrBlank()) {
+                val updated = DevicePolicyBundle.fromJson(updatedJson)
+                viewModel.updateWaqfaConfig(updated.waqfaConfig)
             }
         }
     }
@@ -407,6 +421,20 @@ class GuardianControlActivity : AppCompatActivity() {
             if (btnManageBrowserUrls.isEnabled) btnManageBrowserUrls.performClick()
         }
 
+        val btnManageGuardianWaqfa = findViewById<com.google.android.material.button.MaterialButton>(R.id.btnManageGuardianWaqfa)
+        btnManageGuardianWaqfa?.setOnClickListener {
+            val state = viewModel.uiState.value
+            val intent = Intent(this@GuardianControlActivity, com.drmohammed.antiporn.waqfa.ui.settings.WaqfaSettingsActivity::class.java).apply {
+                putExtra(com.drmohammed.antiporn.waqfa.ui.settings.WaqfaSettingsActivity.EXTRA_IS_REMOTE, true)
+                putExtra(com.drmohammed.antiporn.waqfa.ui.settings.WaqfaSettingsActivity.EXTRA_WARD_ID, state.wardId)
+                putExtra(com.drmohammed.antiporn.waqfa.ui.settings.WaqfaSettingsActivity.EXTRA_POLICY_JSON, state.currentPolicy.toJson())
+            }
+            waqfaSettingsLauncher.launch(intent)
+        }
+        findViewById<View>(R.id.cardGuardianWaqfa)?.setOnClickListener {
+            if (btnManageGuardianWaqfa?.isEnabled == true) btnManageGuardianWaqfa.performClick()
+        }
+
         btnPresetControlD.setOnClickListener {
             etDnsHost.setText(DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST)
             tilDnsHost.error = null
@@ -526,6 +554,18 @@ class GuardianControlActivity : AppCompatActivity() {
 
         alertsViewBinder.renderPolicyAlerts(state.currentPolicy)
 
+        val tvGuardianWaqfaStatus = findViewById<TextView>(R.id.tvGuardianWaqfaStatus)
+        val waqfa = state.currentPolicy.waqfaConfig
+        if (waqfa.isEnabled) {
+            tvGuardianWaqfaStatus?.text = getString(R.string.waqfa_card_status_active, waqfa.targetPackages.size)
+            tvGuardianWaqfaStatus?.setTextColor(ContextCompat.getColor(this, R.color.status_green))
+        } else {
+            tvGuardianWaqfaStatus?.text = getString(R.string.waqfa_card_status_inactive)
+            tvGuardianWaqfaStatus?.let { tv ->
+                tv.setTextColor(MaterialColors.getColor(tv, com.google.android.material.R.attr.colorOutline))
+            }
+        }
+
         liveSyncViewBinder.updateLiveSyncBadge(
             version = state.version,
             acknowledgedVersion = state.acknowledgedVersion,
@@ -582,6 +622,8 @@ class GuardianControlActivity : AppCompatActivity() {
         btnManageBrowserUrls.isEnabled = enabled
         findViewById<View>(R.id.cardAppManager)?.isEnabled = enabled
         findViewById<View>(R.id.cardBrowserUrlFilter)?.isEnabled = enabled
+        findViewById<View>(R.id.btnManageGuardianWaqfa)?.isEnabled = enabled
+        findViewById<View>(R.id.cardGuardianWaqfa)?.isEnabled = enabled
         etDnsHost.isEnabled = enabled
         btnPresetControlD.isEnabled = enabled
         btnPresetAdguard.isEnabled = enabled

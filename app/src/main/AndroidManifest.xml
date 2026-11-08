@@ -94,6 +94,22 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".waqfa.ui.gate.WaqfaGateActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:resizeableActivity="false"
+            android:theme="@style/Theme.Antiporn"
+            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".waqfa.ui.settings.WaqfaSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Antiporn"
+            android:screenOrientation="portrait" />
+
         <receiver
             android:name=".PackageChangeReceiver"
             android:enabled="true"
@@ -116,6 +132,15 @@
                 <action android:name="com.drmohammed.antiporn.ACTION_CURFEW_START" />
                 <action android:name="com.drmohammed.antiporn.ACTION_CURFEW_END" />
                 <action android:name="com.drmohammed.antiporn.ACTION_NAP_END" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".waqfa.engine.WaqfaAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.drmohammed.antiporn.waqfa.ACTION_SESSION_TIMEOUT" />
+                <action android:name="com.drmohammed.antiporn.waqfa.ACTION_COOLDOWN_EXPIRED" />
             </intent-filter>
         </receiver>
 

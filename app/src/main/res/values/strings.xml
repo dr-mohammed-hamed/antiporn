@@ -1074,4 +1074,64 @@
     <string name="label_requested_time">وقت الطلب: %1$s</string>
     <string name="label_decided_time">وقت القرار: %1$s</string>
     <string name="filter_all_wards">جميع المكفولين</string>
+
+    <!-- Waqfa Mindful Intervention System Tokens -->
+    <string name="waqfa_title">وَقْفَة</string>
+    <string name="waqfa_mindful_prompt">توقف لحظة... اضبط نيتك وحدد هدفك</string>
+    <string name="waqfa_attempting_open">أنت تحاول فتح: %1$s</string>
+    <string name="waqfa_intent_purposeful">لوظيفة معينة ومحددة</string>
+    <string name="waqfa_intent_escapism">بدون هدف أو بدافع الهروب</string>
+    <string name="waqfa_escapism_reflection">ما الذي تحاول الهروب منه حقاً؟ خذ نفساً عميقاً... التشتت لا يحل المشاعر.</string>
+    <string name="waqfa_reason_hint">اكتب اسم المهمة أو الشعور الحالي...</string>
+    <string name="waqfa_reason_required_error">كتابة السبب أو الشعور إجبارية للمتابعة</string>
+    <string name="waqfa_duration_label">حدد مدة البقاء المسموحة:</string>
+    <string name="waqfa_start_session_button">بدء الجلسة بوعي</string>
+    <string name="waqfa_retreat_button">تراجع للشاشة الرئيسية</string>
+    <string name="waqfa_minutes_format">%1$d دقيقة</string>
+    <string name="waqfa_question_intent">ما هي نيتك وهدفك الآن؟</string>
+    <string name="waqfa_label_reason_header">سبب الدخول أو الشعور الدافع:</string>
+
+    <!-- Waqfa Settings & Cards -->
+    <string name="waqfa_settings_title">نظام «وَقْفَة» للوعي الذاتي</string>
+    <string name="waqfa_settings_desc">اعتراض التطبيقات المشتتة وتوجيه الوعي وإلزامية النية المحددة</string>
+    <string name="waqfa_switch_master">تفعيل نظام «وَقْفَة»</string>
+    <string name="waqfa_switch_master_desc">اعتراض التطبيقات المحددة لحظياً وفرض بوابة تحديد النية والوقت</string>
+    <string name="waqfa_target_apps_title">التطبيقات الخاضعة لوقفة</string>
+    <string name="waqfa_target_apps_desc">%1$d تطبيق خاضع لنظام وقفة</string>
+    <string name="waqfa_btn_select_apps">اختيار التطبيقات</string>
+    <string name="waqfa_reason_required_title">إلزامية كتابة السبب / الشعور</string>
+    <string name="waqfa_reason_required_desc">منع الدخول للتطبيق إلا بعد كتابة وظيفة الدخول أو الشعور النفسي</string>
+    <string name="waqfa_timeout_reaction_title">إجراء النظام عند انتهاء الوقت</string>
+    <string name="waqfa_timeout_reaction_desc">الإجراء المتخذ فور انتهاء الدقائق المحددة للجلسة</string>
+    <string name="waqfa_reaction_exit_only">إخراج للشاشة الرئيسية فقط</string>
+    <string name="waqfa_reaction_exit_and_freeze">إخراج وتجميد مؤقت للتهدئة</string>
+    <string name="waqfa_reaction_notify_only">تنبيه فقط دون إخراج</string>
+    <string name="waqfa_cooldown_duration_title">مدة التجميد المؤقت (التهدئة)</string>
+    <string name="waqfa_cooldown_duration_desc">فترة تجميد التطبيق عند اختيار الطرد والتجميد (بالدقائق)</string>
+    <string name="waqfa_unit_minutes">دقائق</string>
+    <string name="waqfa_quick_durations_title">خيارات المدد السريعة (بالدقائق)</string>
+    <string name="waqfa_quick_durations_desc">أزرار المدد الافتراضية المعروضة للمستخدم أثناء الاعتراض</string>
+    <string name="waqfa_btn_save_settings">حفظ وتطبيق إعدادات وَقْفَة</string>
+    <string name="waqfa_settings_saved_toast">تم حفظ وتطبيق إعدادات وَقْفَة بنجاح</string>
+    <string name="waqfa_settings_save_failed_toast">تعذر حفظ الإعدادات، يرجى إعادة المحاولة</string>
+    <string name="waqfa_card_status_active">مفعّل (%1$d تطبيق)</string>
+    <string name="waqfa_card_status_inactive">معطّل</string>
+    <string name="waqfa_btn_manage">إدارة نظام وقفة</string>
+    <string name="waqfa_guardian_card_title">نظام «وَقْفَة» (التحكم عن بُعد)</string>
+    <string name="waqfa_guardian_card_desc">ضبط اعتراض التطبيقات وتحديد شروط الوعي للمكفول</string>
+
+    <!-- Waqfa App Picker Bottom Sheet -->
+    <string name="waqfa_picker_title">اختيار التطبيقات الخاضعة لوقفة</string>
+    <string name="waqfa_picker_desc">حدد التطبيقات التي ترغب في اعتراضها وفرض نافذة الوعي عند فتحها</string>
+    <string name="waqfa_picker_search_hint">بحث في التطبيقات...</string>
+    <string name="waqfa_btn_confirm_selection">تأكيد الاختيار</string>
+    <string name="waqfa_btn_confirm_selection_count">تأكيد الاختيار (%1$d تطبيق محدد)</string>
+
+    <!-- Waqfa Notifications -->
+    <string name="waqfa_notif_cooldown_started_title">تم تجميد التطبيق مؤقتاً</string>
+    <string name="waqfa_notif_cooldown_started_msg">تم تجميد تطبيق %1$s لمدة %2$d دقائق للتهدئة واستعادة التركيز.</string>
+    <string name="waqfa_notif_cooldown_ended_title">فك تجميد التطبيق</string>
+    <string name="waqfa_notif_cooldown_ended_msg">انتهت فترة التهدئة لتطبيق %1$s وأصبح بإمكانك استخدامه بوعي.</string>
+    <string name="waqfa_notif_session_timeout_title">انتهى وقت جلسة «وَقْفَة»</string>
+    <string name="waqfa_notif_session_timeout_msg">انتهت مدة الـ %1$d دقيقة المحددة لتطبيق %2$s.</string>
 </resources>

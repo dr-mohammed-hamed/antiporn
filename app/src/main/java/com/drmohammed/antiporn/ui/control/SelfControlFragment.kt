@@ -33,6 +33,7 @@ import com.drmohammed.antiporn.ui.accountability.RemoteAppManagerActivity
 import com.drmohammed.antiporn.ui.browser.BrowserUrlFilterActivity
 import com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry
 import com.drmohammed.antiporn.ui.control.qr.QrExportDialog
+import com.google.android.material.color.MaterialColors
 import com.drmohammed.antiporn.ui.control.qr.QrScannerBottomSheet
 import com.drmohammed.antiporn.ui.control.qr.SelfControlQrManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -568,6 +569,23 @@ class SelfControlFragment : Fragment() {
             }
         }
 
+        binding.btnOpenWaqfaSettings.setOnClickListener {
+            val ctx = context ?: return@setOnClickListener
+            val launchAction = {
+                val intent = Intent(ctx, com.drmohammed.antiporn.waqfa.ui.settings.WaqfaSettingsActivity::class.java)
+                startActivity(intent)
+            }
+            val qrManager = SelfControlQrManager.getInstance(ctx)
+            if (qrManager.isQrLockEnabled()) {
+                showQrScannerWithFallback("qr_scanner_waqfa") { launchAction() }
+            } else {
+                launchAction()
+            }
+        }
+        binding.tileWaqfaControl.setOnClickListener {
+            binding.btnOpenWaqfaSettings.performClick()
+        }
+
         binding.btnSaveSelfControlChanges.setOnClickListener {
             saveChanges()
         }
@@ -605,6 +623,15 @@ class SelfControlFragment : Fragment() {
             }
             updateTimingLabels()
             updateTimezoneViews()
+
+            val waqfa = policy.waqfaConfig
+            if (waqfa.isEnabled) {
+                b.tvWaqfaStatus.text = getString(R.string.waqfa_card_status_active, waqfa.targetPackages.size)
+                b.tvWaqfaStatus.setTextColor(androidx.core.content.ContextCompat.getColor(ctx, R.color.status_green))
+            } else {
+                b.tvWaqfaStatus.text = getString(R.string.waqfa_card_status_inactive)
+                b.tvWaqfaStatus.setTextColor(MaterialColors.getColor(b.tvWaqfaStatus, com.google.android.material.R.attr.colorOutline))
+            }
 
             val qrManager = SelfControlQrManager.getInstance(ctx)
             val isQrEnabled = qrManager.isQrLockEnabled()
