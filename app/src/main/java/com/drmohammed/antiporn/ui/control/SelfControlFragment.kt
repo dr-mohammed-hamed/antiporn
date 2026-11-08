@@ -491,6 +491,8 @@ class SelfControlFragment : Fragment() {
         binding.switchInstantInternetKill.setOnCheckedChangeListener(switchListener)
         binding.switchIncognitoBlocked.setOnCheckedChangeListener(switchListener)
         binding.switchLockNewInstalls.setOnCheckedChangeListener(switchListener)
+        binding.switchYouTubeRestricted.setOnCheckedChangeListener(switchListener)
+        binding.switchTelegramWeb.setOnCheckedChangeListener(switchListener)
         binding.switchLockDateTime.setOnCheckedChangeListener { view, _ ->
             if (!isBindingPolicy && (view as? CompoundButton)?.isPressed == true) {
                 onUserDraftChanged()
@@ -590,6 +592,8 @@ class SelfControlFragment : Fragment() {
             b.switchInstantInternetKill.isChecked = policy.isInstantInternetKillEnabled
             b.switchIncognitoBlocked.isChecked = policy.isIncognitoBlocked
             b.switchLockNewInstalls.isChecked = policy.lockNewInstallsUntilApproved
+            b.switchYouTubeRestricted.isChecked = policy.isYouTubeRestrictedModeEnabled
+            b.switchTelegramWeb.isChecked = policy.isTelegramWebBlocked
             b.switchLockDateTime.isChecked = policy.isDateTimeLocked
 
             if (b.etDnsHost.text?.toString() != policy.dnsHost) {
@@ -738,6 +742,8 @@ class SelfControlFragment : Fragment() {
             isInstantInternetKillEnabled = _binding?.switchInstantInternetKill?.isChecked == true,
             isIncognitoBlocked = _binding?.switchIncognitoBlocked?.isChecked == true,
             lockNewInstallsUntilApproved = _binding?.switchLockNewInstalls?.isChecked == true,
+            isYouTubeRestrictedModeEnabled = _binding?.switchYouTubeRestricted?.isChecked == true,
+            isTelegramWebBlocked = _binding?.switchTelegramWeb?.isChecked == true,
             isDateTimeLocked = _binding?.switchLockDateTime?.isChecked == true,
             timeZoneId = selectedTimeZoneId,
             dnsHost = dnsToSave

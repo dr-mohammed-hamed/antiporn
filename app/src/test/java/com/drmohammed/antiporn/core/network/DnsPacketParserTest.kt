@@ -175,13 +175,79 @@ class DnsPacketParserTest {
         assertNull("Unterminated QNAME must be rejected", parsed)
     }
 
+    @Test
+    fun testYouTubeSafeSearchVipResponseForIpv4A() {
+        val queryPacket = buildSyntheticDnsQueryPacket(
+            srcIp = byteArrayOf(10, 0, 0, 1),
+            dstIp = byteArrayOf(10, (-1).toByte(), (-1).toByte(), 1),
+            srcPort = 54321,
+            dstPort = 53,
+            txId = 0x5678.toShort(),
+            domain = "www.youtube.com",
+            qType = 1 // A record
+        )
+
+        val parsed = DnsPacketParser.parseDnsQuery(queryPacket, queryPacket.size)
+        assertNotNull(parsed)
+        assertEquals(1, parsed?.qType)
+        assertEquals("www.youtube.com", parsed?.qName)
+
+        val vipResponse = DnsPacketParser.buildSafeSearchVipResponse(parsed!!)
+        assertNotNull(vipResponse)
+
+        val buf = ByteBuffer.wrap(vipResponse)
+        // Check DNS Header at byte 28
+        buf.position(28)
+        assertEquals(0x5678.toShort(), buf.short) // Transaction ID
+        assertEquals(0x8180.toShort(), buf.short) // Flags: NOERROR
+        assertEquals(1.toShort(), buf.short)      // QDCOUNT
+        assertEquals(1.toShort(), buf.short)      // ANCOUNT = 1 (A record present)
+
+        // Check last 4 bytes: 216.239.38.120
+        val last4 = ByteArray(4)
+        buf.position(vipResponse.size - 4)
+        buf.get(last4)
+        assertEquals(216.toByte(), last4[0])
+        assertEquals(239.toByte(), last4[1])
+        assertEquals(38.toByte(), last4[2])
+        assertEquals(120.toByte(), last4[3])
+    }
+
+    @Test
+    fun testYouTubeSafeSearchVipResponseForIpv6AaaaNodata() {
+        val queryPacket = buildSyntheticDnsQueryPacket(
+            srcIp = byteArrayOf(10, 0, 0, 1),
+            dstIp = byteArrayOf(10, (-1).toByte(), (-1).toByte(), 1),
+            srcPort = 54321,
+            dstPort = 53,
+            txId = 0x9ABC.toShort(),
+            domain = "www.youtube.com",
+            qType = 28 // AAAA IPv6 record
+        )
+
+        val parsed = DnsPacketParser.parseDnsQuery(queryPacket, queryPacket.size)
+        assertNotNull(parsed)
+        assertEquals(28, parsed?.qType)
+
+        val nodataResponse = DnsPacketParser.buildSafeSearchVipResponse(parsed!!)
+        assertNotNull(nodataResponse)
+
+        val buf = ByteBuffer.wrap(nodataResponse)
+        buf.position(28)
+        assertEquals(0x9ABC.toShort(), buf.short) // Transaction ID
+        assertEquals(0x8180.toShort(), buf.short) // Flags: NOERROR
+        assertEquals(1.toShort(), buf.short)      // QDCOUNT = 1
+        assertEquals(0.toShort(), buf.short)      // ANCOUNT = 0 (Standard NODATA to prevent IPv6 bypass)
+    }
+
     private fun buildSyntheticDnsQueryPacket(
         srcIp: ByteArray,
         dstIp: ByteArray,
         srcPort: Int,
         dstPort: Int,
         txId: Short,
-        domain: String
+        domain: String,
+        qType: Short = 1
     ): ByteArray {
         val labels = domain.split(".")
         var qNameLen = 1 // trailing 0
@@ -229,7 +295,7 @@ class DnsPacketParserTest {
             buf.put(label.toByteArray(Charsets.US_ASCII))
         }
         buf.put(0x00.toByte())
-        buf.putShort(1.toShort()) // QTYPE: A (IPv4)
+        buf.putShort(qType)       // QTYPE: A (1) or AAAA (28)
         buf.putShort(1.toShort()) // QCLASS: IN (Internet)
 
         return packet

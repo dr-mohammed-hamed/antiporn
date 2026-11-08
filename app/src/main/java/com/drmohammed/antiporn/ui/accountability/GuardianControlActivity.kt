@@ -76,6 +76,8 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var switchInstantInternetKill: MaterialSwitch
     private lateinit var switchIncognitoBlocked: MaterialSwitch
     private lateinit var switchLockNewInstalls: MaterialSwitch
+    private lateinit var switchYouTubeRestricted: MaterialSwitch
+    private lateinit var switchTelegramWeb: MaterialSwitch
 
     // Remote App Manager
     private lateinit var btnOpenAppManager: MaterialButton
@@ -262,6 +264,8 @@ class GuardianControlActivity : AppCompatActivity() {
         switchInstantInternetKill = findViewById(R.id.switchInstantInternetKill)
         switchIncognitoBlocked = findViewById(R.id.switchIncognitoBlocked)
         switchLockNewInstalls = findViewById(R.id.switchLockNewInstalls)
+        switchYouTubeRestricted = findViewById(R.id.switchYouTubeRestricted)
+        switchTelegramWeb = findViewById(R.id.switchTelegramWeb)
 
         btnOpenAppManager = findViewById(R.id.btnOpenAppManager)
         tvBrowserFilterStatus = findViewById(R.id.tvBrowserFilterStatus)
@@ -341,6 +345,12 @@ class GuardianControlActivity : AppCompatActivity() {
         }
         switchLockNewInstalls.setOnCheckedChangeListener { _, isChecked ->
             viewModel.toggleLockNewInstalls(isChecked)
+        }
+        switchYouTubeRestricted.setOnCheckedChangeListener { _, isChecked ->
+            viewModel.toggleYouTubeRestricted(isChecked)
+        }
+        switchTelegramWeb.setOnCheckedChangeListener { _, isChecked ->
+            viewModel.toggleTelegramWeb(isChecked)
         }
         switchLockDateTime.setOnCheckedChangeListener { _, isChecked ->
             viewModel.toggleLockDateTime(isChecked)
@@ -453,6 +463,8 @@ class GuardianControlActivity : AppCompatActivity() {
         switchInstantInternetKill.setOnCheckedChangeListener(null)
         switchIncognitoBlocked.setOnCheckedChangeListener(null)
         switchLockNewInstalls.setOnCheckedChangeListener(null)
+        switchYouTubeRestricted.setOnCheckedChangeListener(null)
+        switchTelegramWeb.setOnCheckedChangeListener(null)
         switchLockDateTime.setOnCheckedChangeListener(null)
 
         switchAllowSelfControl.isChecked = state.isSelfControlAllowed
@@ -462,6 +474,8 @@ class GuardianControlActivity : AppCompatActivity() {
         switchInstantInternetKill.isChecked = state.isInstantInternetKillEnabled
         switchIncognitoBlocked.isChecked = state.isIncognitoBlocked
         switchLockNewInstalls.isChecked = state.lockNewInstallsUntilApproved
+        switchYouTubeRestricted.isChecked = state.isYouTubeRestrictedModeEnabled
+        switchTelegramWeb.isChecked = state.isTelegramWebBlocked
         switchLockDateTime.isChecked = state.isDateTimeLocked
 
         // Re-attach listeners
@@ -472,6 +486,8 @@ class GuardianControlActivity : AppCompatActivity() {
         switchInstantInternetKill.setOnCheckedChangeListener { _, isChecked -> viewModel.toggleInstantInternetKill(isChecked) }
         switchIncognitoBlocked.setOnCheckedChangeListener { _, isChecked -> viewModel.toggleIncognitoBlocked(isChecked) }
         switchLockNewInstalls.setOnCheckedChangeListener { _, isChecked -> viewModel.toggleLockNewInstalls(isChecked) }
+        switchYouTubeRestricted.setOnCheckedChangeListener { _, isChecked -> viewModel.toggleYouTubeRestricted(isChecked) }
+        switchTelegramWeb.setOnCheckedChangeListener { _, isChecked -> viewModel.toggleTelegramWeb(isChecked) }
         switchLockDateTime.setOnCheckedChangeListener { _, isChecked -> viewModel.toggleLockDateTime(isChecked) }
 
         if (etDnsHost.text?.toString()?.trim() != state.dnsHost) {
@@ -551,6 +567,8 @@ class GuardianControlActivity : AppCompatActivity() {
         switchInstantInternetKill.isEnabled = enabled
         switchIncognitoBlocked.isEnabled = enabled
         switchLockNewInstalls.isEnabled = enabled
+        switchYouTubeRestricted.isEnabled = enabled
+        switchTelegramWeb.isEnabled = enabled
         switchLockDateTime.isEnabled = enabled
         btnOpenAppManager.isEnabled = enabled
         btnManageBrowserUrls.isEnabled = enabled

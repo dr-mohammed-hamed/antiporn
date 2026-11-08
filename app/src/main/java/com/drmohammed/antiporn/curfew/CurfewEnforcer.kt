@@ -232,9 +232,11 @@ object CurfewEnforcer {
                 val requiredMode = CurfewBlackholeVpnService.evaluateRequiredMode(context)
                 if (requiredMode == CurfewBlackholeVpnService.VpnMode.DNS_FILTERING_ONLY) {
                     CurfewBlackholeVpnService.syncPolicy(context)
-                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.getAlwaysOnVpnPackageBlocking(context).getOrNull() == context.packageName) {
+                    val currentVpn = com.drmohammed.antiporn.telemetry.SafeDpmGateway.getAlwaysOnVpnPackageBlocking(context).getOrNull()
+                    val isLockdown = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isAlwaysOnVpnLockdownEnabledBlocking(context).getOrNull() == true
+                    if (currentVpn != context.packageName || isLockdown) {
                         com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAlwaysOnVpnPackageBlocking(context, context.packageName, false)
-                        Log.i(TAG, "Always-on VPN transitioned to DNS-only filtering mode (lockdown=false) via SafeDpmGateway")
+                        Log.i(TAG, "Always-on VPN configured to DNS-only filtering mode (lockdown=false) via SafeDpmGateway")
                     }
                 } else {
                     CurfewBlackholeVpnService.forceReleaseVpn(context)

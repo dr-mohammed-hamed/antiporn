@@ -666,6 +666,12 @@
     <string name="browser_filter_info_title">Enterprise Browser URL Policy</string>
     <string name="browser_filter_info_desc">Enforced at the OS level (Device Owner) across Chromium browsers such as Google Chrome, Brave, and Edge.</string>
 
+    <!-- YouTube Restricted Mode & Telegram Web Shield -->
+    <string name="youtube_restricted_switch_title">YouTube Restricted Mode (Strict SafeSearch)</string>
+    <string name="youtube_restricted_switch_desc">Enforce YouTube Restricted Mode via local DNS VIP synthesis and browser policies</string>
+    <string name="telegram_web_switch_title">Block Telegram Web (Anti-Bypass Shield)</string>
+    <string name="telegram_web_switch_desc">Block all Telegram Web domains to prevent circumvention via browser (t.me, web.telegram.org)</string>
+
     <!-- Telemetry & Diagnostic Report -->
     <string name="settings_telemetry_title">Diagnostic &amp; Telemetry Log</string>
     <string name="settings_telemetry_desc">Generate and share detailed system performance &amp; error reports for AI analysis</string>

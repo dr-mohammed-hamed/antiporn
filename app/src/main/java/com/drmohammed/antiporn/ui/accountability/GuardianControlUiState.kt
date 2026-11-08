@@ -30,6 +30,8 @@ data class GuardianControlUiState(
     val isIncognitoBlocked: Boolean = true,
     val lockNewInstallsUntilApproved: Boolean = true,
     val isDateTimeLocked: Boolean = true,
+    val isYouTubeRestrictedModeEnabled: Boolean = false,
+    val isTelegramWebBlocked: Boolean = true,
     val dnsHost: String = "",
     val version: Long = 0L,
     val acknowledgedVersion: Long = 0L,
@@ -57,6 +59,8 @@ data class GuardianControlUiState(
                     isIncognitoBlocked != initial.isIncognitoBlocked ||
                     lockNewInstallsUntilApproved != initial.lockNewInstallsUntilApproved ||
                     isDateTimeLocked != initial.isDateTimeLocked ||
+                    isYouTubeRestrictedModeEnabled != initial.isYouTubeRestrictedModeEnabled ||
+                    isTelegramWebBlocked != initial.isTelegramWebBlocked ||
                     dnsHost.trim() != initial.dnsHost.trim() ||
                     currentPolicy.customBlockedUrls != initial.customBlockedUrls ||
                     currentPolicy.customAllowedUrls != initial.customAllowedUrls ||

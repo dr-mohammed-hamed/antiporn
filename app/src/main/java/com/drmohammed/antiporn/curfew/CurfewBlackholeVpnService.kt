@@ -1,44 +1,28 @@
 package com.drmohammed.antiporn.curfew
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
-import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.core.model.DevicePolicyBundle
+import com.drmohammed.antiporn.core.network.dns.BinaryDomainFilter
 import com.drmohammed.antiporn.core.network.dns.DnsPacketParser
+import com.drmohammed.antiporn.core.network.dns.DnsTunnelWorker
+import com.drmohammed.antiporn.core.network.dns.DnsUpstreamForwarder
 import com.drmohammed.antiporn.curfew.notification.ProtectionNotificationCoordinator
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.IOException
 import java.lang.ref.WeakReference
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
-import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Unified Protection VPN Service coordinating daytime Local DNS Sinkhole filtering
- * and nighttime Curfew blackout.
- *
- * Architecture Highlights:
- * 1. Mode Seamless Handover: Seamlessly transitions between DNS-Only route (/32 & /128)
- *    and Curfew Blackhole (0.0.0.0/0 & ::/0) using atomic ParcelFileDescriptor exchange.
- * 2. IPv6 Leak Prevention: Enforces dummy IPv6 route (fd00::1/128) in DNS-Only mode.
- * 3. Zero-Delay Local DNS: Intercepts port 53 UDP; blocks prohibited domains (e.g. YouTube)
- *    instantly via synthetic NXDOMAIN, and passes allowed queries to safe upstream DNS (1.1.1.3).
+ * Unified 24/7 Protection VPN Service coordinating daytime Local DNS Sinkhole
+ * inspection and nighttime Curfew blackout.
  */
 class CurfewBlackholeVpnService : VpnService() {
 
@@ -51,13 +35,41 @@ class CurfewBlackholeVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var dnsWorkerJob: Job? = null
-    private val outStreamLock = Any()
 
     @Volatile
     private var currentMode: VpnMode = VpnMode.IDLE
 
     @Volatile
     private var lastBypassedPackages: Set<String>? = null
+
+    private var dnsForwarder: DnsUpstreamForwarder? = null
+    private var dnsTunnelWorker: DnsTunnelWorker? = null
+
+    @Volatile
+    private var activePolicy: DevicePolicyBundle = DevicePolicyBundle.defaultPolicy()
+
+    @Volatile
+    private var compiledBlockedDomainsCache: Set<String> = emptySet()
+
+    override fun onCreate() {
+        super.onCreate()
+        try {
+            BinaryDomainFilter.init(applicationContext)
+        } catch (e: Exception) {
+            Log.w(TAG, "BinaryDomainFilter pre-init failed", e)
+        }
+        val forwarder = DnsUpstreamForwarder(
+            vpnService = this,
+            policyProvider = { activePolicy }
+        )
+        dnsForwarder = forwarder
+        dnsTunnelWorker = DnsTunnelWorker(
+            forwarder = forwarder,
+            policyProvider = { activePolicy },
+            customBlockedProvider = { compiledBlockedDomainsCache },
+            isRunningProvider = { currentMode == VpnMode.DNS_FILTERING_ONLY }
+        )
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         activeService = WeakReference(this)
@@ -73,16 +85,15 @@ class CurfewBlackholeVpnService : VpnService() {
                 establishTunnel(VpnMode.CURFEW_BLACKHOLE)
                 return START_STICKY
             }
-            Log.i(TAG, "Received ACTION_STOP and curfew blackout is not active. Stopping VPN.")
+            Log.i(TAG, "Received ACTION_STOP. Tearing down VPN tunnel and stopping service.")
             stopVpn()
             stopSelf()
             return START_NOT_STICKY
         }
 
         val targetMode = evaluateRequiredMode(this)
-        Log.i(TAG, "CurfewBlackholeVpnService evaluating targetMode: $targetMode (currentMode=$currentMode)")
+        Log.i(TAG, "Evaluating targetMode: $targetMode (currentMode=$currentMode)")
         if (targetMode == VpnMode.IDLE) {
-            Log.i(TAG, "CurfewBlackholeVpnService evaluated targetMode as IDLE; stopping service")
             stopVpn()
             stopSelf()
             return START_NOT_STICKY
@@ -107,9 +118,7 @@ class CurfewBlackholeVpnService : VpnService() {
                     refreshBlockedUrlsCache()
                     return
                 }
-                Log.i(TAG, "Curfew bypassed packages changed ($lastBypassedPackages -> $currentBypassed), refreshing blackhole tunnel")
             } else {
-                Log.d(TAG, "VPN already in targetMode: $targetMode, updating in-memory filter cache only")
                 refreshBlockedUrlsCache()
                 return
             }
@@ -129,12 +138,21 @@ class CurfewBlackholeVpnService : VpnService() {
             .setMtu(1500)
             .setBlocking(true)
 
-        // Architectural Requirement: DNS Filtering only intercepts DNS IPv4, Curfew takes all routes
         if (targetMode == VpnMode.DNS_FILTERING_ONLY) {
             builder.addRoute("10.255.255.1", 32)
+
+            // IPv6 Leak Prevention without 5-second DNS Timeout:
+            // 1. Add dummy IPv6 address and route (sinkhole) WITHOUT registering fd00::1 as a DNS server
             builder.addAddress("fd00::1", 128)
-            builder.addDnsServer("fd00::1")
             builder.addRoute("fd00::1", 128)
+
+            // 2. Blackhole routes to well-known public IPv6 DNS servers to prevent direct IPv6 resolution bypass
+            builder.addRoute("2001:4860:4860::8888", 128)
+            builder.addRoute("2001:4860:4860::8844", 128)
+            builder.addRoute("2606:4700:4700::1111", 128)
+            builder.addRoute("2606:4700:4700::1001", 128)
+            builder.addRoute("2606:4700:4700::1113", 128)
+            builder.addRoute("2606:4700:4700::1003", 128)
         } else {
             builder.addAddress("fd00::1", 126)
             builder.addDnsServer("fd00::1")
@@ -143,10 +161,8 @@ class CurfewBlackholeVpnService : VpnService() {
         }
 
         try {
-            // Absolute self-exemption: AntiPorn must NEVER be trapped inside its own TUN interface
             builder.addDisallowedApplication(packageName)
 
-            // Extensible Curfew Bypass Packages
             if (targetMode == VpnMode.CURFEW_BLACKHOLE) {
                 val bypassedPackages = CurfewConfig.getVpnBypassedPackages(this)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -181,7 +197,6 @@ class CurfewBlackholeVpnService : VpnService() {
             }
 
             if (newVpnInterface != null) {
-                // Architectural Requirement 3: Seamless Handover of the ParcelFileDescriptor
                 stopActiveIoLoop()
                 try {
                     oldVpnInterface?.close()
@@ -194,26 +209,20 @@ class CurfewBlackholeVpnService : VpnService() {
                 Companion.currentMode = targetMode
                 isRunning = true
 
-                if (targetMode == VpnMode.CURFEW_BLACKHOLE) {
-                    lastBypassedPackages = CurfewConfig.getVpnBypassedPackages(this)
-                } else {
-                    lastBypassedPackages = null
-                }
+                lastBypassedPackages = if (targetMode == VpnMode.CURFEW_BLACKHOLE) {
+                    CurfewConfig.getVpnBypassedPackages(this)
+                } else null
 
                 refreshBlockedUrlsCache()
 
                 if (targetMode == VpnMode.DNS_FILTERING_ONLY) {
                     startDnsFilteringLoop(newVpnInterface)
                 }
-
                 Log.i(TAG, "Seamless Handover completed successfully to mode: $targetMode")
-            } else {
-                Log.e(TAG, "builder.establish() returned null for mode $targetMode")
-                if (oldVpnInterface == null) {
-                    isRunning = false
-                    stopVpn()
-                    stopSelf()
-                }
+            } else if (oldVpnInterface == null) {
+                isRunning = false
+                stopVpn()
+                stopSelf()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error during tunnel establishment for mode $targetMode", e)
@@ -225,50 +234,15 @@ class CurfewBlackholeVpnService : VpnService() {
         }
     }
 
-    private val queryPermits = Semaphore(32)
-
-    @Volatile
-    private var cachedUpstreamAddress: InetAddress? = null
-    @Volatile
-    private var lastUpstreamResolveTime: Long = 0L
-
-    private fun getUpstreamResolver(): InetAddress {
-        val now = android.os.SystemClock.elapsedRealtime()
-        val cached = cachedUpstreamAddress
-        if (cached != null && (now - lastUpstreamResolveTime < 60_000L)) {
-            return cached
-        }
-
-        val configuredHost = try {
-            com.drmohammed.antiporn.shields.DnsShield.getEffectiveDnsHost(this)
-        } catch (e: Exception) {
-            DEFAULT_SAFE_UPSTREAM_DNS_IPV4
-        }
-
-        return try {
-            InetAddress.getByName(configuredHost).also {
-                cachedUpstreamAddress = it
-                lastUpstreamResolveTime = now
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed resolving DNS host $configuredHost, falling back to safe IPv4", e)
-            lastUpstreamResolveTime = now
-            cached ?: try {
-                InetAddress.getByName(DEFAULT_SAFE_UPSTREAM_DNS_IPV4)
-            } catch (ex: Exception) {
-                InetAddress.getByName("1.1.1.3")
-            }
-        }
-    }
-
     private fun refreshBlockedUrlsCache() {
         try {
             val policy = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+            activePolicy = policy
             cachedBlockedUrls = policy.customBlockedUrls
             compiledBlockedDomainsCache = DnsPacketParser.compileEffectiveBlockedDomains(policy.customBlockedUrls)
-            Log.d(TAG, "Refreshed in-memory blocked URLs cache: ${compiledBlockedDomainsCache.size} compiled rules")
+            dnsForwarder?.setCustomDnsHost(policy.dnsHost)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to refresh blocked URLs from PolicyRepository", e)
+            Log.w(TAG, "Failed to refresh policy cache", e)
         }
     }
 
@@ -277,115 +251,13 @@ class CurfewBlackholeVpnService : VpnService() {
         dnsWorkerJob = null
     }
 
-    /**
-     * Simplified, non-blocking local DNS sinkhole loop.
-     * Extracts QNAME, generates immediate NXDOMAIN for blocked domains,
-     * and forwards raw query payload to safe upstream DNS using protected bounded sockets.
-     */
     private fun startDnsFilteringLoop(pfd: ParcelFileDescriptor) {
-        dnsWorkerJob = serviceScope.launch(Dispatchers.IO) {
-            coroutineScope {
-                val inStream = FileInputStream(pfd.fileDescriptor)
-                val outStream = FileOutputStream(pfd.fileDescriptor)
-                val packetBuffer = ByteArray(32767)
-
-                Log.i(TAG, "DNS Filtering Loop started on TUN interface")
-
-                try {
-                    while (isActive && currentMode == VpnMode.DNS_FILTERING_ONLY) {
-                        val bytesRead = try {
-                            inStream.read(packetBuffer)
-                        } catch (e: IOException) {
-                            break // Interface closed or handover initiated
-                        }
-                        if (bytesRead <= 0) continue
-
-                        val parsedQuery = DnsPacketParser.parseDnsQuery(packetBuffer, bytesRead) ?: continue
-                        val blockedDomains = compiledBlockedDomainsCache
-
-                        if (DnsPacketParser.isDomainBlockedCompiled(parsedQuery.qName, blockedDomains)) {
-                            // Instant local block: Generate synthetic NXDOMAIN and reply
-                            val nxResponsePacket = DnsPacketParser.buildNxDomainResponse(parsedQuery)
-                            synchronized(outStreamLock) {
-                                try {
-                                    outStream.write(nxResponsePacket)
-                                } catch (e: IOException) {
-                                    Log.w(TAG, "Failed writing NXDOMAIN to TUN", e)
-                                }
-                            }
-                            Log.d(TAG, "Blocked domain intercepted: ${parsedQuery.qName} -> NXDOMAIN delivered")
-                        } else {
-                            // Allowed domain: Forward raw DNS payload directly to upstream resolver via bounded protected socket
-                            launch(Dispatchers.IO) {
-                                queryPermits.withPermit {
-                                    var querySocket: DatagramSocket? = null
-                                    try {
-                                        val socket = DatagramSocket().apply {
-                                            soTimeout = 3500
-                                        }
-                                        querySocket = socket
-                                        if (!protect(socket)) {
-                                            Log.w(TAG, "VpnService.protect() failed for socket, dropping query")
-                                            socket.close()
-                                            return@withPermit
-                                        }
-
-                                        val upstream = getUpstreamResolver()
-                                        val sendPacket = DatagramPacket(
-                                            parsedQuery.rawDnsPayload,
-                                            parsedQuery.rawDnsPayload.size,
-                                            upstream,
-                                            DnsPacketParser.DNS_PORT
-                                        )
-                                        socket.send(sendPacket)
-
-                                        val receiveBuffer = ByteArray(4096)
-                                        val recvPacket = DatagramPacket(receiveBuffer, receiveBuffer.size)
-                                        socket.receive(recvPacket)
-
-                                        val dnsReplyPayload = ByteArray(recvPacket.length)
-                                        System.arraycopy(receiveBuffer, 0, dnsReplyPayload, 0, recvPacket.length)
-
-                                        val clientPacket = DnsPacketParser.wrapUpstreamDnsResponse(
-                                            clientIp = parsedQuery.srcIp,
-                                            serverIp = parsedQuery.dstIp,
-                                            clientPort = parsedQuery.srcPort,
-                                            serverPort = parsedQuery.dstPort,
-                                            dnsResponsePayload = dnsReplyPayload
-                                        )
-
-                                        if (isActive && currentMode == VpnMode.DNS_FILTERING_ONLY) {
-                                            synchronized(outStreamLock) {
-                                                try {
-                                                    outStream.write(clientPacket)
-                                                } catch (e: IOException) {
-                                                    Log.w(TAG, "Failed writing upstream DNS reply to TUN", e)
-                                                }
-                                            }
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.w(TAG, "Upstream DNS query failed for ${parsedQuery.qName}: ${e.message}")
-                                    } finally {
-                                        try {
-                                            querySocket?.close()
-                                        } catch (e: Exception) {
-                                            Log.w(TAG, "Failed closing query socket", e)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.d(TAG, "DNS Filtering Loop terminated: ${e.message}")
-                }
-            }
-        }
+        val worker = dnsTunnelWorker ?: return
+        dnsWorkerJob = worker.start(serviceScope, pfd)
     }
 
     private fun startForegroundNotification() {
         val notification = ProtectionNotificationCoordinator.buildProtectionNotification(this)
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
@@ -441,9 +313,6 @@ class CurfewBlackholeVpnService : VpnService() {
         const val ACTION_START = "com.drmohammed.antiporn.curfew.ACTION_START_VPN"
         const val ACTION_STOP = "com.drmohammed.antiporn.curfew.ACTION_STOP_VPN"
 
-        // Cloudflare Family IPv4 (Malware & Adult Content Blocking)
-        const val DEFAULT_SAFE_UPSTREAM_DNS_IPV4 = "1.1.1.3"
-
         @Volatile
         private var activeService: WeakReference<CurfewBlackholeVpnService>? = null
 
@@ -458,28 +327,14 @@ class CurfewBlackholeVpnService : VpnService() {
         @Volatile
         private var cachedBlockedUrls: Set<String> = emptySet()
 
-        @Volatile
-        private var compiledBlockedDomainsCache: Set<String> = emptySet()
-
         fun evaluateRequiredMode(context: Context): VpnMode {
             val isCurfewOrKill = CurfewConfig.isInstantInternetKillEnabled(context) ||
                     (CurfewEnforcer.isEffectiveBlockActive(context) && CurfewConfig.isVpnBlackholeEnabled(context))
             if (isCurfewOrKill) {
                 return VpnMode.CURFEW_BLACKHOLE
             }
-
-            val policy = try {
-                PolicyRepository.getInstance(context.applicationContext).getCurrentPolicy()
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed reading policy in evaluateRequiredMode", e)
-                null
-            }
-
-            if (policy != null && policy.customBlockedUrls.isNotEmpty()) {
-                return VpnMode.DNS_FILTERING_ONLY
-            }
-
-            return VpnMode.IDLE
+            // 24/7 Always-On Local DNS Filter in daytime
+            return VpnMode.DNS_FILTERING_ONLY
         }
 
         fun syncPolicy(context: Context) {
@@ -487,11 +342,13 @@ class CurfewBlackholeVpnService : VpnService() {
             try {
                 val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
                 cachedBlockedUrls = policy.customBlockedUrls
-                compiledBlockedDomainsCache = DnsPacketParser.compileEffectiveBlockedDomains(policy.customBlockedUrls)
-                Log.d(TAG, "Synchronized policy in Unified VPN: ${compiledBlockedDomainsCache.size} compiled rules")
+                val compiled = DnsPacketParser.compileEffectiveBlockedDomains(policy.customBlockedUrls)
 
                 val targetMode = evaluateRequiredMode(appContext)
                 activeService?.get()?.let { service ->
+                    service.activePolicy = policy
+                    service.compiledBlockedDomainsCache = compiled
+                    service.dnsForwarder?.setCustomDnsHost(policy.dnsHost)
                     service.establishTunnel(targetMode)
                 } ?: run {
                     if (targetMode != VpnMode.IDLE) {
@@ -525,7 +382,6 @@ class CurfewBlackholeVpnService : VpnService() {
                 } else {
                     appContext.startService(intent)
                 }
-                Log.i(TAG, "Requested start of CurfewBlackholeVpnService")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start CurfewBlackholeVpnService", e)
             }
@@ -538,9 +394,7 @@ class CurfewBlackholeVpnService : VpnService() {
                     action = ACTION_STOP
                 }
                 appContext.startService(intent)
-                Log.i(TAG, "Requested stop of CurfewBlackholeVpnService via ACTION_STOP")
             } catch (e: IllegalStateException) {
-                Log.w(TAG, "Cannot startService with ACTION_STOP in background; stopping service directly", e)
                 try {
                     appContext.stopService(Intent(appContext, CurfewBlackholeVpnService::class.java))
                 } catch (stopEx: Exception) {
@@ -548,11 +402,6 @@ class CurfewBlackholeVpnService : VpnService() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to stop CurfewBlackholeVpnService", e)
-                try {
-                    appContext.stopService(Intent(appContext, CurfewBlackholeVpnService::class.java))
-                } catch (stopEx: Exception) {
-                    Log.e(TAG, "Failed emergency stop of CurfewBlackholeVpnService", stopEx)
-                }
             }
         }
     }

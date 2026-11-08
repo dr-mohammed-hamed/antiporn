@@ -129,6 +129,7 @@ android {
     androidResources {
         noCompress += "tflite"
         noCompress += "onnx"
+        noCompress += "bin"
     }
 
     packaging {
@@ -210,3 +211,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
         freeCompilerArgs.add("-Xskip-metadata-version-check")
     }
 }
+
+apply(from = "filter_generator.gradle.kts")
+

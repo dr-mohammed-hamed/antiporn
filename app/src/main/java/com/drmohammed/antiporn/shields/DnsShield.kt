@@ -59,47 +59,68 @@ object DnsShield : ProtectionShield {
         val targetHost = getEffectiveDnsHost(context)
 
         try {
-            // Constitutional Law (Article 2): Primary protection is enforced encrypted DNS (DoT)
-            // Check-Before-Write: Only set if not already matching target host and mode
-            val currentMode = try { dpm.getGlobalPrivateDnsMode(admin) } catch (e: Exception) { -1 }
-            val currentHost = try { dpm.getGlobalPrivateDnsHost(admin) } catch (e: Exception) { null }
-
-            var dpmSucceeded = false
-            if (dpm.isDeviceOwnerApp(context.packageName)) {
-                if (currentMode != DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME || currentHost != targetHost) {
-                    dnsSetResult = try {
-                        dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, targetHost)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "DPM setGlobalPrivateDnsModeSpecifiedHost failed: ${e.message}")
-                        DevicePolicyManager.PRIVATE_DNS_SET_ERROR_FAILURE_SETTING
-                    }
-                    Log.i(TAG, "setGlobalPrivateDnsModeSpecifiedHost to $targetHost, result: $dnsSetResult")
-                    dpmSucceeded = (dnsSetResult == DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR)
-                } else {
-                    Log.d(TAG, "Private DNS already set to $targetHost via DPM, skipping redundant write")
-                    dpmSucceeded = true
-                }
+            // 1. Sync and activate Unified VPN in local 24/7 DNS filtering mode
+            try {
+                com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.syncPolicy(context)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to sync Unified VPN policy from DnsShield", e)
             }
 
-            // Dual-Tier Fallback: If DPM failed (e.g. ColorOS error code 1) or running under Profile Owner,
-            // enforce via Settings.Global with WRITE_SECURE_SETTINGS.
+            val isVpnActive = com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.isRunning
             var usedFallback = false
-            if (!dpmSucceeded) {
-                Log.i(TAG, "DPM direct set unsuccessful ($dnsSetResult). Attempting Settings.Global fallback...")
-                try {
-                    val globalMode = android.provider.Settings.Global.getString(context.contentResolver, "private_dns_mode")
-                    val globalHost = android.provider.Settings.Global.getString(context.contentResolver, "private_dns_specifier")
-                    if (globalMode != "hostname" || globalHost != targetHost) {
-                        android.provider.Settings.Global.putString(context.contentResolver, "private_dns_mode", "hostname")
-                        android.provider.Settings.Global.putString(context.contentResolver, "private_dns_specifier", targetHost)
-                        Log.i(TAG, "Enforced private DNS via Settings.Global to $targetHost")
+
+            if (isVpnActive) {
+                // Port 853 DoT Bypass Fix: Set Private DNS to 'off' so Android doesn't bypass local TUN UDP 53
+                val globalMode = try {
+                    android.provider.Settings.Global.getString(context.contentResolver, "private_dns_mode")
+                } catch (e: Exception) { null }
+
+                if (globalMode != "off") {
+                    try {
+                        android.provider.Settings.Global.putString(context.contentResolver, "private_dns_mode", "off")
+                        Log.i(TAG, "Port 853 DoT bypass fix applied: private_dns_mode set to 'off'")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed writing private_dns_mode to 'off'", e)
                     }
-                    dnsSetResult = DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR
-                    usedFallback = true
-                } catch (e: Exception) {
-                    Log.w(TAG, "Could not write Settings.Global for private DNS, falling back to local VPN filter", e)
-                    // Local VPN will handle the filtering seamlessly
-                    dnsSetResult = DevicePolicyManager.PRIVATE_DNS_SET_ERROR_FAILURE_SETTING
+                }
+            } else {
+                // Fallback: If VPN is not active, enforce DoT via DPM or Settings.Global
+                val currentMode = try { dpm.getGlobalPrivateDnsMode(admin) } catch (e: Exception) { -1 }
+                val currentHost = try { dpm.getGlobalPrivateDnsHost(admin) } catch (e: Exception) { null }
+
+                var dpmSucceeded = false
+                if (dpm.isDeviceOwnerApp(context.packageName)) {
+                    if (currentMode != DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME || currentHost != targetHost) {
+                        dnsSetResult = try {
+                            dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, targetHost)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "DPM setGlobalPrivateDnsModeSpecifiedHost failed: ${e.message}")
+                            DevicePolicyManager.PRIVATE_DNS_SET_ERROR_FAILURE_SETTING
+                        }
+                        Log.i(TAG, "setGlobalPrivateDnsModeSpecifiedHost to $targetHost, result: $dnsSetResult")
+                        dpmSucceeded = (dnsSetResult == DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR)
+                    } else {
+                        Log.d(TAG, "Private DNS already set to $targetHost via DPM, skipping redundant write")
+                        dpmSucceeded = true
+                    }
+                }
+
+                if (!dpmSucceeded) {
+                    Log.i(TAG, "DPM direct set unsuccessful ($dnsSetResult). Attempting Settings.Global fallback...")
+                    try {
+                        val globalMode = android.provider.Settings.Global.getString(context.contentResolver, "private_dns_mode")
+                        val globalHost = android.provider.Settings.Global.getString(context.contentResolver, "private_dns_specifier")
+                        if (globalMode != "hostname" || globalHost != targetHost) {
+                            android.provider.Settings.Global.putString(context.contentResolver, "private_dns_mode", "hostname")
+                            android.provider.Settings.Global.putString(context.contentResolver, "private_dns_specifier", targetHost)
+                            Log.i(TAG, "Enforced private DNS via Settings.Global to $targetHost")
+                        }
+                        dnsSetResult = DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR
+                        usedFallback = true
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not write Settings.Global for private DNS", e)
+                        dnsSetResult = DevicePolicyManager.PRIVATE_DNS_SET_ERROR_FAILURE_SETTING
+                    }
                 }
             }
 
@@ -112,15 +133,9 @@ object DnsShield : ProtectionShield {
                 try { dpm.addUserRestriction(admin, UserManager.DISALLOW_NETWORK_RESET) } catch (e: Exception) { Log.w(TAG, "Lock network reset failed: ${e.message}") }
             }
 
-            // Sync and activate Unified VPN in local DNS filtering mode
-            try {
-                com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.syncPolicy(context)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to sync Unified VPN policy from DnsShield", e)
-            }
-
-            val success = dnsSetResult == DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR
+            val success = isVpnActive || dnsSetResult == DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR
             val msg = when {
+                isVpnActive -> context.getString(R.string.shield_dns_local_filter_active)
                 success && !usedFallback -> context.getString(R.string.shield_dns_success)
                 success && usedFallback -> context.getString(R.string.shield_dns_fallback_active)
                 else -> context.getString(R.string.shield_dns_local_filter_active)
@@ -153,27 +168,39 @@ object DnsShield : ProtectionShield {
 
         return try {
             val targetHost = getEffectiveDnsHost(context)
-            val modeFromDpm = try { dpm.getGlobalPrivateDnsMode(admin) } catch (e: Exception) { -1 }
-            val hostFromDpm = try { dpm.getGlobalPrivateDnsHost(admin) } catch (e: Exception) { null }
+            val isVpnActive = com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.isRunning
+            val currentRestrictions = try { dpm.getUserRestrictions(admin) } catch (e: Exception) { null }
+            val isDnsLocked = currentRestrictions?.getBoolean(UserManager.DISALLOW_CONFIG_PRIVATE_DNS, false) == true
 
             val globalMode = try {
                 android.provider.Settings.Global.getString(context.contentResolver, "private_dns_mode")
             } catch (e: Exception) { null }
-            val globalSpecifier = try {
-                android.provider.Settings.Global.getString(context.contentResolver, "private_dns_specifier")
-            } catch (e: Exception) { null }
 
-            val activeHost = hostFromDpm ?: globalSpecifier
-            val isConfigured = (modeFromDpm == DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME && !hostFromDpm.isNullOrBlank()) ||
-                    (globalMode == "hostname" && !globalSpecifier.isNullOrBlank())
-            val isHostMatching = activeHost.equals(targetHost, ignoreCase = true)
-            val isFilteringAdult = ActiveShieldsEvaluator.isHostAdultFiltering(activeHost ?: "")
-
-            if (isConfigured && (isHostMatching || isFilteringAdult) && !activeHost.isNullOrBlank()) {
-                ShieldStatus.Active(context.getString(R.string.card_nextdns_active, activeHost))
+            if (isVpnActive) {
+                if (globalMode == "off" && isDnsLocked) {
+                    ShieldStatus.Active(context.getString(R.string.shield_dns_local_filter_active))
+                } else {
+                    ShieldStatus.NeedsEnforcement("Local DNS Filter active but Private DNS or restrictions need sync")
+                }
             } else {
-                val currentHostDisplay = activeHost ?: context.getString(R.string.default_dns_text)
-                ShieldStatus.NeedsEnforcement(context.getString(R.string.card_nextdns_pending, currentHostDisplay, targetHost))
+                val modeFromDpm = try { dpm.getGlobalPrivateDnsMode(admin) } catch (e: Exception) { -1 }
+                val hostFromDpm = try { dpm.getGlobalPrivateDnsHost(admin) } catch (e: Exception) { null }
+                val globalSpecifier = try {
+                    android.provider.Settings.Global.getString(context.contentResolver, "private_dns_specifier")
+                } catch (e: Exception) { null }
+
+                val activeHost = hostFromDpm ?: globalSpecifier
+                val isConfigured = (modeFromDpm == DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME && !hostFromDpm.isNullOrBlank()) ||
+                        (globalMode == "hostname" && !globalSpecifier.isNullOrBlank())
+                val isHostMatching = activeHost.equals(targetHost, ignoreCase = true)
+                val isFilteringAdult = ActiveShieldsEvaluator.isHostAdultFiltering(activeHost ?: "")
+
+                if (isConfigured && (isHostMatching || isFilteringAdult) && !activeHost.isNullOrBlank() && isDnsLocked) {
+                    ShieldStatus.Active(context.getString(R.string.card_nextdns_active, activeHost))
+                } else {
+                    val currentHostDisplay = activeHost ?: context.getString(R.string.default_dns_text)
+                    ShieldStatus.NeedsEnforcement(context.getString(R.string.card_nextdns_pending, currentHostDisplay, targetHost))
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking DNS status", e)

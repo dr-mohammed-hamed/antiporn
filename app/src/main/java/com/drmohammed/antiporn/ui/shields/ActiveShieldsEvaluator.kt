@@ -56,12 +56,18 @@ object ActiveShieldsEvaluator {
         val isDnsActive = systemStatuses[DnsShield.id] is ShieldStatus.Active
         val effectiveHost = DnsShield.getEffectiveDnsHost(context)
         val isAdultBlockingDns = isHostAdultFiltering(effectiveHost)
-        if (isDnsActive && isAdultBlockingDns) {
+        val isLocalVpnFiltering = com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.isRunning
+        if (isDnsActive && (isAdultBlockingDns || isLocalVpnFiltering)) {
+            val desc = if (isLocalVpnFiltering) {
+                context.getString(R.string.shield_dns_local_filter_active)
+            } else {
+                context.getString(R.string.shield_active_dns_desc, effectiveHost)
+            }
             activeList.add(
                 ActiveShieldInfo(
                     id = "dns",
                     title = context.getString(R.string.shield_active_dns_title),
-                    description = context.getString(R.string.shield_active_dns_desc, effectiveHost),
+                    description = desc,
                     iconRes = R.drawable.ic_shield_dns,
                     badgeText = badgeText
                 )

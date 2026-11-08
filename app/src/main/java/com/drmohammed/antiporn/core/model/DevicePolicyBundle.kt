@@ -9,17 +9,13 @@ import org.json.JSONObject
  * configured by the user's accountability partner/guardian.
  */
 data class DevicePolicyBundle(
-    val curfewStartHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR,
-    val curfewStartMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE,
-    val curfewEndHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR,
-    val curfewEndMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE,
+    val curfewStartHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR, val curfewStartMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE,
+    val curfewEndHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR, val curfewEndMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE,
     val isCurfewEnabled: Boolean = true,
     val isInstantInternetKillEnabled: Boolean = false,
     val isWeekendCurfewEnabled: Boolean = false,
-    val weekendCurfewStartHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR,
-    val weekendCurfewStartMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE,
-    val weekendCurfewEndHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR,
-    val weekendCurfewEndMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE,
+    val weekendCurfewStartHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR, val weekendCurfewStartMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE,
+    val weekendCurfewEndHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR, val weekendCurfewEndMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE,
     val isVpnBlackholeEnabled: Boolean = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED,
     val isIncognitoBlocked: Boolean = true,
     val lockNewInstallsUntilApproved: Boolean = true,
@@ -31,6 +27,8 @@ data class DevicePolicyBundle(
     val customBlockedUrls: Set<String> = emptySet(),
     val customAllowedUrls: Set<String> = emptySet(),
     val dnsHost: String = ADGUARD_FAMILY_DNS_HOST,
+    val isYouTubeRestrictedModeEnabled: Boolean = false,
+    val isTelegramWebBlocked: Boolean = true,
     val guardianUid: String? = null,
     val guardianName: String? = null,
     val isSupervised: Boolean = false,
@@ -71,6 +69,8 @@ data class DevicePolicyBundle(
             "customBlockedUrls" to customBlockedUrls.toList(),
             "customAllowedUrls" to customAllowedUrls.toList(),
             "dnsHost" to dnsHost,
+            "isYouTubeRestrictedModeEnabled" to isYouTubeRestrictedModeEnabled,
+            "isTelegramWebBlocked" to isTelegramWebBlocked,
             "isSupervised" to isSupervised,
             "isSelfControlAllowed" to isSelfControlAllowed,
             "isDateTimeLocked" to isDateTimeLocked,
@@ -91,48 +91,40 @@ data class DevicePolicyBundle(
 
     fun toJson(): String {
         val json = JSONObject()
-        json.put("curfewStartHour", curfewStartHour)
-        json.put("curfewStartMinute", curfewStartMinute)
-        json.put("curfewEndHour", curfewEndHour)
-        json.put("curfewEndMinute", curfewEndMinute)
+        json.put("curfewStartHour", curfewStartHour); json.put("curfewStartMinute", curfewStartMinute)
+        json.put("curfewEndHour", curfewEndHour); json.put("curfewEndMinute", curfewEndMinute)
         json.put("isCurfewEnabled", isCurfewEnabled)
         json.put("isInstantInternetKillEnabled", isInstantInternetKillEnabled)
         json.put("isWeekendCurfewEnabled", isWeekendCurfewEnabled)
-        json.put("weekendCurfewStartHour", weekendCurfewStartHour)
-        json.put("weekendCurfewStartMinute", weekendCurfewStartMinute)
-        json.put("weekendCurfewEndHour", weekendCurfewEndHour)
-        json.put("weekendCurfewEndMinute", weekendCurfewEndMinute)
+        json.put("weekendCurfewStartHour", weekendCurfewStartHour); json.put("weekendCurfewStartMinute", weekendCurfewStartMinute)
+        json.put("weekendCurfewEndHour", weekendCurfewEndHour); json.put("weekendCurfewEndMinute", weekendCurfewEndMinute)
         json.put("isVpnBlackholeEnabled", isVpnBlackholeEnabled)
         json.put("isIncognitoBlocked", isIncognitoBlocked)
         json.put("lockNewInstallsUntilApproved", lockNewInstallsUntilApproved)
 
-        val blacklistArr = JSONArray()
-        customBlacklistPackages.forEach { blacklistArr.put(it) }
+        val blacklistArr = JSONArray().apply { customBlacklistPackages.forEach { put(it) } }
         json.put("customBlacklistPackages", blacklistArr)
 
-        val whitelistArr = JSONArray()
-        customCurfewWhitelistPackages.forEach { whitelistArr.put(it) }
+        val whitelistArr = JSONArray().apply { customCurfewWhitelistPackages.forEach { put(it) } }
         json.put("customCurfewWhitelistPackages", whitelistArr)
 
-        val vpnBypassArr = JSONArray()
-        curfewVpnBypassPackages.forEach { vpnBypassArr.put(it) }
+        val vpnBypassArr = JSONArray().apply { curfewVpnBypassPackages.forEach { put(it) } }
         json.put("curfewVpnBypassPackages", vpnBypassArr)
 
-        val protectedArr = JSONArray()
-        protectedAppPackages.forEach { protectedArr.put(it) }
+        val protectedArr = JSONArray().apply { protectedAppPackages.forEach { put(it) } }
         json.put("protectedAppPackages", protectedArr)
 
         json.put("browserFilterMode", browserFilterMode)
 
-        val blockedUrlsArr = JSONArray()
-        customBlockedUrls.forEach { blockedUrlsArr.put(it) }
+        val blockedUrlsArr = JSONArray().apply { customBlockedUrls.forEach { put(it) } }
         json.put("customBlockedUrls", blockedUrlsArr)
 
-        val allowedUrlsArr = JSONArray()
-        customAllowedUrls.forEach { allowedUrlsArr.put(it) }
+        val allowedUrlsArr = JSONArray().apply { customAllowedUrls.forEach { put(it) } }
         json.put("customAllowedUrls", allowedUrlsArr)
 
         json.put("dnsHost", dnsHost)
+        json.put("isYouTubeRestrictedModeEnabled", isYouTubeRestrictedModeEnabled)
+        json.put("isTelegramWebBlocked", isTelegramWebBlocked)
         if (guardianUid != null) json.put("guardianUid", guardianUid)
         if (guardianName != null) json.put("guardianName", guardianName)
         json.put("isSupervised", isSupervised)
@@ -173,6 +165,8 @@ data class DevicePolicyBundle(
             customAllowedUrls = emptySet(),
             customCurfewWhitelistPackages = com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST,
             dnsHost = ADGUARD_FAMILY_DNS_HOST,
+            isYouTubeRestrictedModeEnabled = false,
+            isTelegramWebBlocked = true,
             guardianUid = null,
             guardianName = null,
             isSupervised = false,
@@ -222,6 +216,8 @@ data class DevicePolicyBundle(
             val customAllowedUrls = (map["customAllowedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
             val dns = (map["dnsHost"] as? String)?.takeIf { it.isNotBlank() } ?: ADGUARD_FAMILY_DNS_HOST
+            val ytRestricted = (map["isYouTubeRestrictedModeEnabled"] as? Boolean) ?: false
+            val tgBlocked = (map["isTelegramWebBlocked"] as? Boolean) ?: true
 
             val gUid = (map["guardianUid"] as? String)?.takeIf { it.isNotBlank() }
             val gName = (map["guardianName"] as? String)?.takeIf { it.isNotBlank() }
@@ -240,42 +236,35 @@ data class DevicePolicyBundle(
             val updatedAt = (map["updatedAt"] as? Number)?.toLong() ?: 0L
 
             return DevicePolicyBundle(
-                curfewStartHour = startHour,
-                curfewStartMinute = startMin,
-                curfewEndHour = endHour,
-                curfewEndMinute = endMin,
+                curfewStartHour = startHour, curfewStartMinute = startMin,
+                curfewEndHour = endHour, curfewEndMinute = endMin,
                 isCurfewEnabled = isCurfew,
                 isInstantInternetKillEnabled = isInstantKill,
                 isWeekendCurfewEnabled = isWeekendCurfew,
-                weekendCurfewStartHour = wkStartHour,
-                weekendCurfewStartMinute = wkStartMin,
-                weekendCurfewEndHour = wkEndHour,
-                weekendCurfewEndMinute = wkEndMin,
-                isVpnBlackholeEnabled = vpn,
-                isIncognitoBlocked = incognito,
+                weekendCurfewStartHour = wkStartHour, weekendCurfewStartMinute = wkStartMin,
+                weekendCurfewEndHour = wkEndHour, weekendCurfewEndMinute = wkEndMin,
+                isVpnBlackholeEnabled = vpn, isIncognitoBlocked = incognito,
                 lockNewInstallsUntilApproved = lockNew,
                 customBlacklistPackages = blacklist,
                 customCurfewWhitelistPackages = whitelist,
-                    curfewVpnBypassPackages = vpnBypass,
+                curfewVpnBypassPackages = vpnBypass,
                 protectedAppPackages = protectedApps,
                 browserFilterMode = browserFilterMode,
                 customBlockedUrls = customBlockedUrls,
                 customAllowedUrls = customAllowedUrls,
                 dnsHost = dns,
-                guardianUid = gUid,
-                guardianName = gName,
+                isYouTubeRestrictedModeEnabled = ytRestricted,
+                isTelegramWebBlocked = tgBlocked,
+                guardianUid = gUid, guardianName = gName,
                 isSupervised = supervised,
                 isSelfControlAllowed = isSelfControlAllowed,
                 isDateTimeLocked = isDateTimeLocked,
-                timeZoneId = timeZoneId,
-                lastHeartbeat = lastHeartbeat,
+                timeZoneId = timeZoneId, lastHeartbeat = lastHeartbeat,
                 breakoutStatus = breakoutStatus,
-                breakoutRequestedAt = breakoutRequestedAt,
-                breakoutUnlockAt = breakoutUnlockAt,
+                breakoutRequestedAt = breakoutRequestedAt, breakoutUnlockAt = breakoutUnlockAt,
                 guardianPolicySnapshot = guardianPolicySnapshot,
                 lastSelfModifiedAt = lastSelfModifiedAt,
-                version = version,
-                updatedAt = updatedAt
+                version = version, updatedAt = updatedAt
             )
         }
 
@@ -343,6 +332,8 @@ data class DevicePolicyBundle(
                 }
 
                 val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: ADGUARD_FAMILY_DNS_HOST
+                val ytRestricted = json.optBoolean("isYouTubeRestrictedModeEnabled", false)
+                val tgBlocked = json.optBoolean("isTelegramWebBlocked", true)
                 val gUid = json.optString("guardianUid", "").takeIf { it.isNotBlank() }
                 val gName = json.optString("guardianName", "").takeIf { it.isNotBlank() }
                 val supervised = json.optBoolean("isSupervised", !gUid.isNullOrBlank())
@@ -379,18 +370,17 @@ data class DevicePolicyBundle(
                     customBlockedUrls = customBlockedUrls,
                     customAllowedUrls = customAllowedUrls,
                     dnsHost = dns,
-                    guardianUid = gUid,
-                    guardianName = gName,
+                    isYouTubeRestrictedModeEnabled = ytRestricted,
+                    isTelegramWebBlocked = tgBlocked,
+                    guardianUid = gUid, guardianName = gName,
                     isSupervised = supervised,
                     isSelfControlAllowed = isSelfControlAllowed,
                     isDateTimeLocked = isDateTimeLocked,
-                    timeZoneId = timeZoneId,
-                    lastHeartbeat = lastHeartbeat,
+                    timeZoneId = timeZoneId, lastHeartbeat = lastHeartbeat,
                     breakoutStatus = breakoutStatus,
-                    breakoutRequestedAt = breakoutRequestedAt,
-                    breakoutUnlockAt = breakoutUnlockAt,
-                guardianPolicySnapshot = guardianPolicySnapshot,
-                lastSelfModifiedAt = lastSelfModifiedAt,
+                    breakoutRequestedAt = breakoutRequestedAt, breakoutUnlockAt = breakoutUnlockAt,
+                    guardianPolicySnapshot = guardianPolicySnapshot,
+                    lastSelfModifiedAt = lastSelfModifiedAt,
                     version = json.optLong("version", 1L),
                     updatedAt = json.optLong("updatedAt", System.currentTimeMillis())
                 )

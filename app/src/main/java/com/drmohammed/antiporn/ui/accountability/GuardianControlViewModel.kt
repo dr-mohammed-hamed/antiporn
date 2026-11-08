@@ -147,6 +147,8 @@ class GuardianControlViewModel(
                     isIncognitoBlocked = policy.isIncognitoBlocked,
                     lockNewInstallsUntilApproved = policy.lockNewInstallsUntilApproved,
                     isDateTimeLocked = policy.isDateTimeLocked,
+                    isYouTubeRestrictedModeEnabled = policy.isYouTubeRestrictedModeEnabled,
+                    isTelegramWebBlocked = policy.isTelegramWebBlocked,
                     dnsHost = policy.dnsHost.trim(),
                     timeZoneId = policy.timeZoneId.ifBlank { CurfewConfig.DEFAULT_TIMEZONE_ID }
                 )
@@ -174,6 +176,8 @@ class GuardianControlViewModel(
                     isIncognitoBlocked = policy.isIncognitoBlocked,
                     lockNewInstallsUntilApproved = policy.lockNewInstallsUntilApproved,
                     isDateTimeLocked = policy.isDateTimeLocked,
+                    isYouTubeRestrictedModeEnabled = policy.isYouTubeRestrictedModeEnabled,
+                    isTelegramWebBlocked = policy.isTelegramWebBlocked,
                     dnsHost = policy.dnsHost.trim(),
                     version = version,
                     acknowledgedVersion = acknowledgedVersion,
@@ -246,6 +250,14 @@ class GuardianControlViewModel(
         _uiState.update { it.copy(isDateTimeLocked = locked) }
     }
 
+    fun toggleYouTubeRestricted(enabled: Boolean) {
+        _uiState.update { it.copy(isYouTubeRestrictedModeEnabled = enabled) }
+    }
+
+    fun toggleTelegramWeb(enabled: Boolean) {
+        _uiState.update { it.copy(isTelegramWebBlocked = enabled) }
+    }
+
     fun updateBrowserFilter(filterMode: Int, customBlocked: Set<String>, customAllowed: Set<String>) {
         _uiState.update { current ->
             val updated = current.currentPolicy.copy(
@@ -279,6 +291,8 @@ class GuardianControlViewModel(
                 isIncognitoBlocked = reverted.isIncognitoBlocked,
                 lockNewInstallsUntilApproved = reverted.lockNewInstallsUntilApproved,
                 isDateTimeLocked = reverted.isDateTimeLocked,
+                isYouTubeRestrictedModeEnabled = reverted.isYouTubeRestrictedModeEnabled,
+                isTelegramWebBlocked = reverted.isTelegramWebBlocked,
                 dnsHost = reverted.dnsHost.trim()
             )
         }
@@ -395,6 +409,8 @@ class GuardianControlViewModel(
                 lockNewInstallsUntilApproved = state.lockNewInstallsUntilApproved,
                 isSelfControlAllowed = state.isSelfControlAllowed,
                 isDateTimeLocked = state.isDateTimeLocked,
+                isYouTubeRestrictedModeEnabled = state.isYouTubeRestrictedModeEnabled,
+                isTelegramWebBlocked = state.isTelegramWebBlocked,
                 browserFilterMode = state.currentPolicy.browserFilterMode,
                 customBlockedUrls = state.currentPolicy.customBlockedUrls,
                 customAllowedUrls = state.currentPolicy.customAllowedUrls,

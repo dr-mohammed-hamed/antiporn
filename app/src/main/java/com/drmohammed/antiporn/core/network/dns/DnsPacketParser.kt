@@ -19,6 +19,11 @@ object DnsPacketParser {
     // RFC 1035 RCODE 3: Non-Existent Domain (NXDOMAIN)
     // Flags 0x8183: QR=1 (Response), Opcode=0 (Query), AA=0, TC=0, RD=1, RA=1, RCODE=3 (NXDOMAIN)
     private const val FLAGS_NXDOMAIN: Short = 0x8183.toShort()
+    private const val FLAGS_NOERROR: Short = 0x8180.toShort()
+
+    val YOUTUBE_RESTRICTED_VIP_IPV4: ByteArray = byteArrayOf(
+        216.toByte(), 239.toByte(), 38.toByte(), 120.toByte() // 216.239.38.120
+    )
 
     // Smart mapping: If user blocks the primary service, automatically associate its core CDN/auxiliary domains
     private val SMART_SERVICE_EXPANSIONS = mapOf(
@@ -36,19 +41,16 @@ object DnsPacketParser {
         val ipId: Int,
         val transactionId: Short,
         val qName: String,
+        val qType: Int = 1,
         val questionSection: ByteArray,
         val rawDnsPayload: ByteArray
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is ParsedDnsQuery) return false
-            return srcPort == other.srcPort &&
-                    dstPort == other.dstPort &&
-                    transactionId == other.transactionId &&
-                    qName == other.qName &&
-                    srcIp.contentEquals(other.srcIp) &&
-                    dstIp.contentEquals(other.dstIp) &&
-                    questionSection.contentEquals(other.questionSection) &&
+            return srcPort == other.srcPort && dstPort == other.dstPort && transactionId == other.transactionId &&
+                    qName == other.qName && qType == other.qType && srcIp.contentEquals(other.srcIp) &&
+                    dstIp.contentEquals(other.dstIp) && questionSection.contentEquals(other.questionSection) &&
                     rawDnsPayload.contentEquals(other.rawDnsPayload)
         }
 
@@ -57,6 +59,7 @@ object DnsPacketParser {
             result = 31 * result + dstPort
             result = 31 * result + transactionId
             result = 31 * result + qName.hashCode()
+            result = 31 * result + qType
             result = 31 * result + srcIp.contentHashCode()
             result = 31 * result + dstIp.contentHashCode()
             result = 31 * result + questionSection.contentHashCode()
@@ -147,7 +150,8 @@ object DnsPacketParser {
 
         // Read QTYPE and QCLASS (4 bytes)
         if (dnsBuffer.remaining() < 4) return null
-        dnsBuffer.position(dnsBuffer.position() + 4)
+        val qType = dnsBuffer.short.toInt() and 0xFFFF
+        dnsBuffer.short // skip QCLASS
         val questionEnd = dnsBuffer.position()
 
         val questionSection = ByteArray(questionEnd - questionStart)
@@ -161,6 +165,7 @@ object DnsPacketParser {
             ipId = ipId,
             transactionId = transactionId,
             qName = qName,
+            qType = qType,
             questionSection = questionSection,
             rawDnsPayload = rawDnsPayload
         )
@@ -251,42 +256,93 @@ object DnsPacketParser {
         val response = ByteArray(ipTotalLen)
         val buffer = ByteBuffer.wrap(response)
 
-        // 1. IPv4 Header (20 bytes)
-        buffer.put(0x45.toByte()) // Version 4, IHL 5 (20 bytes)
-        buffer.put(0x00.toByte()) // DSCP/ECN
-        buffer.putShort(ipTotalLen.toShort()) // Total Length
-        buffer.putShort(query.ipId.toShort()) // Identification
-        buffer.putShort(0x4000.toShort()) // Flags: Don't Fragment
-        buffer.put(64.toByte()) // TTL
-        buffer.put(17.toByte()) // Protocol: UDP
-        buffer.putShort(0.toShort()) // Header Checksum placeholder
-        buffer.put(query.dstIp) // Src IP = Query's Dst IP
-        buffer.put(query.srcIp) // Dst IP = Query's Src IP
-
-        // Calculate IPv4 Header Checksum
-        val ipChecksum = calculateIpChecksum(response, 0, IP_HEADER_MIN_LEN)
-        buffer.putShort(10, ipChecksum)
-
-        // 2. UDP Header (8 bytes)
-        buffer.position(IP_HEADER_MIN_LEN)
-        buffer.putShort(query.dstPort.toShort()) // Src Port = 53
-        buffer.putShort(query.srcPort.toShort()) // Dst Port = Client Port
-        buffer.putShort(udpTotalLen.toShort()) // UDP Length
-        buffer.putShort(0.toShort()) // UDP Checksum (0 = omitted for IPv4 UDP)
+        writeHeaders(buffer, response, ipTotalLen, udpTotalLen, query.ipId, query.dstIp, query.srcIp, query.dstPort, query.srcPort)
 
         // 3. DNS Header (12 bytes)
         buffer.position(IP_HEADER_MIN_LEN + UDP_HEADER_LEN)
-        buffer.putShort(query.transactionId) // ID
-        buffer.putShort(FLAGS_NXDOMAIN) // Flags: Response, NXDOMAIN
+        buffer.putShort(query.transactionId)
+        buffer.putShort(FLAGS_NXDOMAIN)
         buffer.putShort(1.toShort()) // QDCOUNT = 1
         buffer.putShort(0.toShort()) // ANCOUNT = 0
         buffer.putShort(0.toShort()) // NSCOUNT = 0
         buffer.putShort(0.toShort()) // ARCOUNT = 0
-
-        // 4. DNS Question Section
         buffer.put(query.questionSection)
 
         return response
+    }
+
+    /**
+     * Constructs a synthetic IPv4/UDP packet containing a SafeSearch / Restricted Mode VIP response.
+     * - For A queries (qType == 1): Returns NOERROR with ANCOUNT=1 pointing to 216.239.38.120 (TTL=300s).
+     * - For AAAA (qType == 28), HTTPS (qType == 65), or others: Returns a standard NODATA response
+     *   (NOERROR with ANCOUNT=0), preventing IPv6/SVCB bypass and forcing instant IPv4 fallback.
+     */
+    fun buildSafeSearchVipResponse(query: ParsedDnsQuery): ByteArray {
+        val isTypeA = query.qType == 1
+        val answerLen = if (isTypeA) 16 else 0
+        val dnsHeaderAndQuestionLen = DNS_HEADER_LEN + query.questionSection.size + answerLen
+        val udpTotalLen = UDP_HEADER_LEN + dnsHeaderAndQuestionLen
+        val ipTotalLen = IP_HEADER_MIN_LEN + udpTotalLen
+
+        val response = ByteArray(ipTotalLen)
+        val buffer = ByteBuffer.wrap(response)
+
+        writeHeaders(buffer, response, ipTotalLen, udpTotalLen, query.ipId, query.dstIp, query.srcIp, query.dstPort, query.srcPort)
+
+        // 3. DNS Header (12 bytes)
+        buffer.position(IP_HEADER_MIN_LEN + UDP_HEADER_LEN)
+        buffer.putShort(query.transactionId)
+        buffer.putShort(FLAGS_NOERROR)
+        buffer.putShort(1.toShort()) // QDCOUNT = 1
+        buffer.putShort(if (isTypeA) 1.toShort() else 0.toShort()) // ANCOUNT
+        buffer.putShort(0.toShort()) // NSCOUNT = 0
+        buffer.putShort(0.toShort()) // ARCOUNT = 0
+        buffer.put(query.questionSection)
+
+        if (isTypeA) {
+            buffer.put(0xC0.toByte())
+            buffer.put(0x0C.toByte()) // Compression pointer to QNAME at offset 12
+            buffer.putShort(1.toShort()) // TYPE: A (1)
+            buffer.putShort(1.toShort()) // CLASS: IN (1)
+            buffer.putInt(300) // TTL: 300 seconds
+            buffer.putShort(4.toShort()) // RDLENGTH: 4
+            buffer.put(YOUTUBE_RESTRICTED_VIP_IPV4) // 216.239.38.120
+        }
+
+        return response
+    }
+
+    private fun writeHeaders(
+        buffer: ByteBuffer,
+        response: ByteArray,
+        ipTotalLen: Int,
+        udpTotalLen: Int,
+        ipId: Int,
+        srcIp: ByteArray,
+        dstIp: ByteArray,
+        srcPort: Int,
+        dstPort: Int
+    ) {
+        // IPv4 Header (20 bytes)
+        buffer.put(0x45.toByte())
+        buffer.put(0x00.toByte())
+        buffer.putShort(ipTotalLen.toShort())
+        buffer.putShort(ipId.toShort())
+        buffer.putShort(0x4000.toShort())
+        buffer.put(64.toByte())
+        buffer.put(17.toByte())
+        buffer.putShort(0.toShort())
+        buffer.put(srcIp)
+        buffer.put(dstIp)
+        val ipChecksum = calculateIpChecksum(response, 0, IP_HEADER_MIN_LEN)
+        buffer.putShort(10, ipChecksum)
+
+        // UDP Header (8 bytes)
+        buffer.position(IP_HEADER_MIN_LEN)
+        buffer.putShort(srcPort.toShort())
+        buffer.putShort(dstPort.toShort())
+        buffer.putShort(udpTotalLen.toShort())
+        buffer.putShort(0.toShort())
     }
 
     /**
@@ -305,27 +361,7 @@ object DnsPacketParser {
         val response = ByteArray(ipTotalLen)
         val buffer = ByteBuffer.wrap(response)
 
-        // IPv4 Header
-        buffer.put(0x45.toByte())
-        buffer.put(0x00.toByte())
-        buffer.putShort(ipTotalLen.toShort())
-        buffer.putShort(0.toShort())
-        buffer.putShort(0x4000.toShort())
-        buffer.put(64.toByte())
-        buffer.put(17.toByte())
-        buffer.putShort(0.toShort())
-        buffer.put(serverIp)
-        buffer.put(clientIp)
-
-        val ipChecksum = calculateIpChecksum(response, 0, IP_HEADER_MIN_LEN)
-        buffer.putShort(10, ipChecksum)
-
-        // UDP Header
-        buffer.position(IP_HEADER_MIN_LEN)
-        buffer.putShort(serverPort.toShort())
-        buffer.putShort(clientPort.toShort())
-        buffer.putShort(udpTotalLen.toShort())
-        buffer.putShort(0.toShort())
+        writeHeaders(buffer, response, ipTotalLen, udpTotalLen, 0, serverIp, clientIp, serverPort, clientPort)
 
         // DNS Payload
         buffer.position(IP_HEADER_MIN_LEN + UDP_HEADER_LEN)

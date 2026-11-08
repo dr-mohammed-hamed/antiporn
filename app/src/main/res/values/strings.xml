@@ -956,6 +956,12 @@
     <string name="browser_filter_info_title">سياسة تصفية عناوين الويب للمتصفحات</string>
     <string name="browser_filter_info_desc">يتم تطبيق هذه القواعد إجبارياً على مستوى نظام التشغيل (Device Owner) في كافة المتصفحات المتوافقة مثل Google Chrome، Brave، و Edge.</string>
 
+    <!-- YouTube Restricted Mode & Telegram Web Shield -->
+    <string name="youtube_restricted_switch_title">وضع يوتيوب الآمن الصارم (Restricted Mode)</string>
+    <string name="youtube_restricted_switch_desc">إجبار وضع تقييد المحتوى الصارم لليوتيوب على مستوى DNS والمتصفح لمنع المقاطع غير الملائمة</string>
+    <string name="telegram_web_switch_title">حجب تليجرام ويب (Telegram Web Shield)</string>
+    <string name="telegram_web_switch_desc">حجب كافة نطاقات تليجرام ويب لمنع الالتفاف عبر المتصفح (t.me, web.telegram.org)</string>
+
     <!-- Telemetry & Diagnostic Report -->
     <string name="settings_telemetry_title">سجل الفحص والتشخيص</string>
     <string name="settings_telemetry_desc">توليد ومشاركة تقرير تفصيلي للأخطاء وأداء النظام للذكاء الاصطناعي</string>

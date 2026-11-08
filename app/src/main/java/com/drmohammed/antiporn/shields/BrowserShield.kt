@@ -33,18 +33,30 @@ object BrowserShield : ProtectionShield {
             putInt("IncognitoModeAvailability", if (policy.isIncognitoBlocked) 1 else 0)
             putInt("InPrivateModeAvailability", if (policy.isIncognitoBlocked) 1 else 0)
             putBoolean("ForceGoogleSafeSearch", true)
-            putBoolean("ForceYouTubeSafetyMode", true)
-            putInt("ForceYouTubeRestrict", 2)
+            putBoolean("ForceYouTubeSafetyMode", policy.isYouTubeRestrictedModeEnabled)
+            putInt("ForceYouTubeRestrict", if (policy.isYouTubeRestrictedModeEnabled) 2 else 0)
             putInt("SafeSitesFilterBehavior", 1)
             putBoolean("BrowserGuestModeEnabled", false)
+            putBoolean("BuiltInDnsClientEnabled", false)
+            putString("DnsOverHttpsMode", "off")
+
+            val baseBlocked = if (policy.isTelegramWebBlocked) {
+                policy.customBlockedUrls + com.drmohammed.antiporn.core.network.dns.DnsPolicyEvaluator.TELEGRAM_WEB_DOMAINS
+            } else {
+                policy.customBlockedUrls
+            }
 
             val (blocklist, allowlist) = when (policy.browserFilterMode) {
                 DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST ->
-                    policy.customBlockedUrls.toTypedArray() to emptyArray()
+                    baseBlocked.toTypedArray() to emptyArray()
                 DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY ->
                     arrayOf("*") to (policy.customAllowedUrls + BrowserUrlSanitizer.CAPTIVE_PORTAL_EXEMPTIONS).distinct().toTypedArray()
                 else ->
-                    emptyArray<String>() to emptyArray()
+                    if (policy.isTelegramWebBlocked) {
+                        com.drmohammed.antiporn.core.network.dns.DnsPolicyEvaluator.TELEGRAM_WEB_DOMAINS.toTypedArray() to emptyArray()
+                    } else {
+                        emptyArray<String>() to emptyArray()
+                    }
             }
             putStringArray("URLBlocklist", blocklist)
             putStringArray("URLBlacklist", blocklist)
