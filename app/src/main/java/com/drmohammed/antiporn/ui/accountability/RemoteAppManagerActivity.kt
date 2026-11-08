@@ -48,6 +48,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
     private lateinit var toolbar: MaterialToolbar
     private lateinit var tvWardName: TextView
     private lateinit var etSearch: TextInputEditText
+    private lateinit var switchLockNewInstalls: MaterialSwitch
     private lateinit var progressBar: ProgressBar
     private lateinit var tvEmptyState: TextView
     private lateinit var rvAppsList: RecyclerView
@@ -146,6 +147,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         }
 
         etSearch = findViewById(R.id.etSearch)
+        switchLockNewInstalls = findViewById(R.id.switchLockNewInstalls)
         progressBar = findViewById(R.id.progressBar)
         tvEmptyState = findViewById(R.id.tvEmptyState)
         rvAppsList = findViewById(R.id.rvAppsList)
@@ -172,6 +174,9 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {}
         })
 
+        switchLockNewInstalls.setOnCheckedChangeListener { _, isChecked ->
+            viewModel.setLockNewInstalls(isChecked)
+        }
         tvEmptyState.setOnClickListener { viewModel.loadData() }
         btnSaveAppManagerChanges.setOnClickListener { viewModel.saveChanges() }
     }
@@ -211,6 +216,12 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         btnSaveAppManagerChanges.isEnabled = state.isSaveEnabled
         btnSaveAppManagerChanges.alpha = if (dirty) 1.0f else 0.5f
         backPressedCallback.isEnabled = dirty
+
+        switchLockNewInstalls.setOnCheckedChangeListener(null)
+        switchLockNewInstalls.isChecked = state.lockNewInstallsUntilApproved
+        switchLockNewInstalls.setOnCheckedChangeListener { _, isChecked ->
+            viewModel.setLockNewInstalls(isChecked)
+        }
 
         adapter.submitData(
             apps = state.displayedApps,

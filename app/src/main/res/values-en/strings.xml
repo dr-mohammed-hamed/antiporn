@@ -852,4 +852,44 @@
     <string name="waqfa_notif_cooldown_ended_msg">Cooldown ended for %1$s. You may now use it mindfully.</string>
     <string name="waqfa_notif_session_timeout_title">«Waqfa» Session Ended</string>
     <string name="waqfa_notif_session_timeout_msg">The %1$d minute limit for %2$s has expired.</string>
+
+    <!-- Modern Distributed Hub & Sub-Screens -->
+    <string name="hub_title_curfew">Night Curfew</string>
+    <string name="hub_title_web_filter">Sites &amp; Network</string>
+    <string name="hub_title_app_manager">App Management</string>
+    <string name="hub_title_waqfa">Waqfa System</string>
+    <string name="hub_title_other_settings">Other Settings</string>
+    <string name="qr_card_title_concise">QR Code Lock</string>
+    <string name="qr_card_desc_concise">Require QR scan to edit settings</string>
+
+    <!-- Curfew Sub-Screen -->
+    <string name="curfew_title">Night Curfew</string>
+    <string name="curfew_master_switch">Enable Night Curfew</string>
+    <string name="curfew_weekday_label">Weekdays</string>
+    <string name="curfew_weekend_switch">Weekend Curfew</string>
+    <string name="curfew_weekend_label">Weekend</string>
+    <string name="curfew_internet_kill_switch">Cut Internet During Curfew</string>
+
+    <!-- Web & Network Sub-Screen -->
+    <string name="web_filter_title">Sites &amp; Network</string>
+    <string name="dns_host_title">Encrypted DNS Host</string>
+    <string name="switch_block_incognito">Block Incognito Browsing</string>
+    <string name="switch_block_vpn">Block VPN Applications</string>
+    <string name="switch_block_telegram_web">Block Telegram Web</string>
+    <string name="blocked_urls_section_title">Blocked Websites</string>
+    <string name="btn_add_blocked_url">Add Website</string>
+    <string name="dialog_add_url_title">Block Website</string>
+    <string name="dialog_add_url_hint">example.com</string>
+
+    <!-- Other Settings Sub-Screen -->
+    <string name="other_settings_title">Other Settings</string>
+    <string name="switch_lock_date_time">Lock Phone Date &amp; Time</string>
+    <string name="timezone_section_title">Curfew Timezone</string>
+    <string name="switch_total_internet_kill">Total Device Internet Cutoff</string>
+    <string name="dialog_total_internet_kill_title">Severe Warning: Total Internet Cutoff</string>
+    <string name="dialog_total_internet_kill_message">Internet access (Mobile Data &amp; Wi-Fi) will be completely cut off from this device until you disable this switch from this exact screen. Are you sure?</string>
+
+    <!-- App Manager Additions -->
+    <string name="switch_freeze_new_installs">Auto-Freeze New Installs</string>
+    <string name="btn_save_changes">Save Changes</string>
 </resources>

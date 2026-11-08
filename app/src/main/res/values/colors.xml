@@ -13,6 +13,7 @@
     <color name="shield_emerald_soft_bg">#1F26E07F</color>
     <color name="shield_amber_calm">#FFF59E0B</color>
     <color name="shield_amber_soft_bg">#1FF59E0B</color>
+    <color name="shield_amber_subtle">#1FF59E0B</color>
     <color name="shield_hero_desc">#FF94A3B8</color>
 
     <!-- Material 3 Sleek Modern Slate Light Theme Tokens -->

@@ -1134,4 +1134,44 @@
     <string name="waqfa_notif_cooldown_ended_msg">انتهت فترة التهدئة لتطبيق %1$s وأصبح بإمكانك استخدامه بوعي.</string>
     <string name="waqfa_notif_session_timeout_title">انتهى وقت جلسة «وَقْفَة»</string>
     <string name="waqfa_notif_session_timeout_msg">انتهت مدة الـ %1$d دقيقة المحددة لتطبيق %2$s.</string>
+
+    <!-- Modern Distributed Hub & Sub-Screens -->
+    <string name="hub_title_curfew">الحظر الليلي</string>
+    <string name="hub_title_web_filter">المواقع والشبكة</string>
+    <string name="hub_title_app_manager">إدارة التطبيقات</string>
+    <string name="hub_title_waqfa">نظام وَقْفَة</string>
+    <string name="hub_title_other_settings">إعدادات إضافية</string>
+    <string name="qr_card_title_concise">قفل الباركود</string>
+    <string name="qr_card_desc_concise">منع تعديل الحماية إلا بمسح الرمز</string>
+
+    <!-- Curfew Sub-Screen -->
+    <string name="curfew_title">الحظر الليلي</string>
+    <string name="curfew_master_switch">تفعيل الحظر الليلي</string>
+    <string name="curfew_weekday_label">أيام الأسبوع</string>
+    <string name="curfew_weekend_switch">حظر عطلة نهاية الأسبوع</string>
+    <string name="curfew_weekend_label">عطلة نهاية الأسبوع</string>
+    <string name="curfew_internet_kill_switch">قطع الإنترنت أثناء الحظر</string>
+
+    <!-- Web & Network Sub-Screen -->
+    <string name="web_filter_title">المواقع والشبكة</string>
+    <string name="dns_host_title">خادم DNS المشفر</string>
+    <string name="switch_block_incognito">منع التصفح الخفي</string>
+    <string name="switch_block_vpn">منع تطبيقات الـ VPN</string>
+    <string name="switch_block_telegram_web">حظر تيليجرام ويب</string>
+    <string name="blocked_urls_section_title">المواقع المحظورة</string>
+    <string name="btn_add_blocked_url">إضافة موقع</string>
+    <string name="dialog_add_url_title">حظر موقع</string>
+    <string name="dialog_add_url_hint">example.com</string>
+
+    <!-- Other Settings Sub-Screen -->
+    <string name="other_settings_title">إعدادات إضافية</string>
+    <string name="switch_lock_date_time">قفل التاريخ والوقت للهاتف</string>
+    <string name="timezone_section_title">المنطقة الزمنية للحظر</string>
+    <string name="switch_total_internet_kill">قطع الإنترنت بالكامل عن الجهاز</string>
+    <string name="dialog_total_internet_kill_title">تنبيه شديد: قطع الإنترنت بالكامل</string>
+    <string name="dialog_total_internet_kill_message">سيتم قطع الإنترنت نهائياً عن الهاتف (بيانات الهاتف والواي فاي) ولن يعود الإنترنت حتى تقوم بإلغاء تفعيل هذا الخيار من نفس هذه الشاشة. هل أنت متأكد؟</string>
+
+    <!-- App Manager Additions -->
+    <string name="switch_freeze_new_installs">تجميد التطبيقات الجديدة تلقائياً</string>
+    <string name="btn_save_changes">حفظ التعديلات</string>
 </resources>

@@ -21,17 +21,20 @@ data class RemoteAppManagerUiState(
     val customCurfewWhitelist: Set<String> = emptySet(),
     val curfewVpnBypass: Set<String> = emptySet(),
     val protectedApps: Set<String> = emptySet(),
+    val lockNewInstallsUntilApproved: Boolean = true,
     val initialBlacklist: Set<String> = emptySet(),
     val initialCurfewWhitelist: Set<String> = emptySet(),
     val initialCurfewVpnBypass: Set<String> = emptySet(),
     val initialProtectedApps: Set<String> = emptySet(),
+    val initialLockNewInstalls: Boolean = true,
     val errorMessage: String? = null
 ) {
     val hasUnsavedChanges: Boolean
         get() = customBlacklist != initialBlacklist ||
                 customCurfewWhitelist != initialCurfewWhitelist ||
                 curfewVpnBypass != initialCurfewVpnBypass ||
-                protectedApps != initialProtectedApps
+                protectedApps != initialProtectedApps ||
+                lockNewInstallsUntilApproved != initialLockNewInstalls
 
     val isSaveEnabled: Boolean
         get() = hasUnsavedChanges && !isSaving

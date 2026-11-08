@@ -230,6 +230,37 @@ class GuardianControlViewModel(
         _uiState.update { it.copy(isSelfControlAllowed = allowed) }
     }
 
+    fun updateSelfControlPermissionImmediately(allowed: Boolean) {
+        val state = _uiState.value
+        if (state.wardId.isBlank()) return
+        _uiState.update { it.copy(isSelfControlAllowed = allowed) }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = getApplication<android.app.Application>()
+            val updated = state.currentPolicy.copy(
+                isSelfControlAllowed = allowed,
+                version = state.currentPolicy.version + 1,
+                updatedAt = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(context)
+            )
+            val success = policyRepository.pushPolicyToWard(state.wardId, updated)
+            withContext(Dispatchers.Main) {
+                if (success) {
+                    _uiState.update {
+                        it.copy(
+                            currentPolicy = updated,
+                            initialPolicySnapshot = updated.copy(),
+                            version = updated.version
+                        )
+                    }
+                    _events.emit(GuardianControlEvent.ShowToastRes(R.string.toast_self_policy_saved))
+                } else {
+                    _uiState.update { it.copy(isSelfControlAllowed = !allowed) }
+                    _events.emit(GuardianControlEvent.ShowToastRes(R.string.toast_self_policy_save_failed))
+                }
+            }
+        }
+    }
+
     fun toggleVpnBlackhole(enabled: Boolean) {
         _uiState.update { it.copy(isVpnBlackholeEnabled = enabled) }
     }

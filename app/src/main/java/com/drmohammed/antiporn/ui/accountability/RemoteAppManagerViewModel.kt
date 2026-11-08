@@ -100,10 +100,12 @@ class RemoteAppManagerViewModel(
                     customCurfewWhitelist = policy.customCurfewWhitelistPackages.toSet(),
                     curfewVpnBypass = policy.curfewVpnBypassPackages.toSet(),
                     protectedApps = policy.protectedAppPackages.toSet(),
+                    lockNewInstallsUntilApproved = policy.lockNewInstallsUntilApproved,
                     initialBlacklist = policy.customBlacklistPackages.toSet(),
                     initialCurfewWhitelist = policy.customCurfewWhitelistPackages.toSet(),
                     initialCurfewVpnBypass = policy.curfewVpnBypassPackages.toSet(),
                     initialProtectedApps = policy.protectedAppPackages.toSet(),
+                    initialLockNewInstalls = policy.lockNewInstallsUntilApproved,
                     allApps = sortedList,
                     displayedApps = filtered
                 )
@@ -165,10 +167,12 @@ class RemoteAppManagerViewModel(
                 customCurfewWhitelist = policy.customCurfewWhitelistPackages.toSet(),
                 curfewVpnBypass = policy.curfewVpnBypassPackages.toSet(),
                 protectedApps = policy.protectedAppPackages.toSet(),
+                lockNewInstallsUntilApproved = policy.lockNewInstallsUntilApproved,
                 initialBlacklist = policy.customBlacklistPackages.toSet(),
                 initialCurfewWhitelist = policy.customCurfewWhitelistPackages.toSet(),
                 initialCurfewVpnBypass = policy.curfewVpnBypassPackages.toSet(),
                 initialProtectedApps = policy.protectedAppPackages.toSet(),
+                initialLockNewInstalls = policy.lockNewInstallsUntilApproved,
                 allApps = sortedList,
                 displayedApps = filtered
             )
@@ -319,6 +323,10 @@ class RemoteAppManagerViewModel(
             }
             state.copy(protectedApps = protected)
         }
+    }
+
+    fun setLockNewInstalls(enabled: Boolean) {
+        _uiState.update { it.copy(lockNewInstallsUntilApproved = enabled) }
     }
 
     fun executeQuickUnsuspend(app: InstalledAppDto) {
@@ -492,6 +500,7 @@ class RemoteAppManagerViewModel(
                 customCurfewWhitelistPackages = state.customCurfewWhitelist,
                 curfewVpnBypassPackages = state.curfewVpnBypass,
                 protectedAppPackages = state.protectedApps,
+                lockNewInstallsUntilApproved = state.lockNewInstallsUntilApproved,
                 version = state.currentPolicy.version + 1,
                 updatedAt = TrustedTimeProvider.currentTimeMillis(context)
             )
@@ -526,7 +535,8 @@ class RemoteAppManagerViewModel(
                             initialBlacklist = state.customBlacklist,
                             initialCurfewWhitelist = state.customCurfewWhitelist,
                             initialCurfewVpnBypass = state.curfewVpnBypass,
-                            initialProtectedApps = state.protectedApps
+                            initialProtectedApps = state.protectedApps,
+                            initialLockNewInstalls = state.lockNewInstallsUntilApproved
                         )
                     }
                     _events.emit(RemoteAppManagerEvent.ShowToastRes(R.string.toast_app_manager_saved))
