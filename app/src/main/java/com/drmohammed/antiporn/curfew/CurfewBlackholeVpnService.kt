@@ -365,8 +365,18 @@ class CurfewBlackholeVpnService : VpnService() {
             if (isCurfewOrKill) {
                 return VpnMode.CURFEW_BLACKHOLE
             }
-            // 24/7 Always-On Local DNS Filter in daytime
-            return VpnMode.DNS_FILTERING_ONLY
+            val isFullSystemEnabled = try {
+                val policy = PolicyRepository.getInstance(context).getCurrentPolicy()
+                policy.isFullSystemFilteringEnabled && policy.browserFilterMode != DevicePolicyBundle.BROWSER_FILTER_OFF
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed reading policy for VPN mode evaluation; defaulting to IDLE", e)
+                false
+            }
+            return if (isFullSystemEnabled) {
+                VpnMode.DNS_FILTERING_ONLY
+            } else {
+                VpnMode.IDLE
+            }
         }
 
         fun syncPolicy(context: Context) {
@@ -385,6 +395,8 @@ class CurfewBlackholeVpnService : VpnService() {
                 } ?: run {
                     if (targetMode != VpnMode.IDLE) {
                         start(appContext)
+                    } else if (isRunning) {
+                        stop(appContext)
                     }
                 }
             } catch (e: Exception) {

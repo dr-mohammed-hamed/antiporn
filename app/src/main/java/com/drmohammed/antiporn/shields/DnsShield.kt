@@ -23,7 +23,7 @@ import com.drmohammed.antiporn.ui.shields.ActiveShieldsEvaluator
 object DnsShield : ProtectionShield {
 
     private const val TAG = "AntiPorn_DnsShield"
-    const val DEFAULT_DNS_HOST = com.drmohammed.antiporn.core.model.DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST
+    const val DEFAULT_DNS_HOST = com.drmohammed.antiporn.core.model.DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST
     const val NEXTDNS_HOST = "family.cloudflare-dns.com"
 
     override val id: String = "dns"

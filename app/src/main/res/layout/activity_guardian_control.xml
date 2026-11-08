@@ -878,7 +878,7 @@
                             android:orientation="horizontal">
 
                             <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnPresetAdguard"
+                                android:id="@+id/btnPresetControlD"
                                 style="@style/Widget.Material3.Button.TonalButton"
                                 android:layout_width="0dp"
                                 android:layout_height="38dp"
@@ -886,9 +886,24 @@
                                 android:insetTop="0dp"
                                 android:insetBottom="0dp"
                                 android:minHeight="38dp"
-                                android:paddingHorizontal="8dp"
+                                android:paddingHorizontal="4dp"
+                                android:text="@string/btn_dns_preset_controld"
+                                android:textSize="10sp"
+                                app:cornerRadius="10dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnPresetAdguard"
+                                style="@style/Widget.Material3.Button.TonalButton"
+                                android:layout_width="0dp"
+                                android:layout_height="38dp"
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minHeight="38dp"
+                                android:paddingHorizontal="4dp"
                                 android:text="@string/btn_dns_preset_adguard"
-                                android:textSize="11sp"
+                                android:textSize="10sp"
                                 app:cornerRadius="10dp" />
 
                             <com.google.android.material.button.MaterialButton
@@ -896,14 +911,14 @@
                                 style="@style/Widget.Material3.Button.TonalButton"
                                 android:layout_width="0dp"
                                 android:layout_height="38dp"
-                                android:layout_marginStart="8dp"
+                                android:layout_marginStart="6dp"
                                 android:layout_weight="1"
                                 android:insetTop="0dp"
                                 android:insetBottom="0dp"
                                 android:minHeight="38dp"
-                                android:paddingHorizontal="8dp"
+                                android:paddingHorizontal="4dp"
                                 android:text="@string/btn_dns_preset_cloudflare"
-                                android:textSize="11sp"
+                                android:textSize="10sp"
                                 app:cornerRadius="10dp" />
 
                             <!-- Hidden button for btnPresetNextDns to guarantee 100% binary safety in GuardianControlActivity -->

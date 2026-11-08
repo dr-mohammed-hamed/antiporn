@@ -55,6 +55,12 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
     private lateinit var rbModeWhitelist: MaterialRadioButton
     private lateinit var tvModeDescription: TextView
 
+    private lateinit var cardFilterScope: MaterialCardView
+    private lateinit var rgFilterScope: RadioGroup
+    private lateinit var rbScopeBrowserOnly: MaterialRadioButton
+    private lateinit var rbScopeFullSystem: MaterialRadioButton
+    private lateinit var tvScopeDescription: TextView
+
     private lateinit var cardPresets: MaterialCardView
     private lateinit var btnPresetSocial: MaterialButton
 
@@ -76,12 +82,14 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
     private lateinit var basePolicy: DevicePolicyBundle
 
     private var selectedMode: Int = DevicePolicyBundle.BROWSER_FILTER_OFF
+    private var isFullSystemFilteringEnabled: Boolean = false
     private val blockedUrls = mutableListOf<String>()
     private val allowedUrls = mutableListOf<String>()
 
     private var activeSnackbar: Snackbar? = null
     private var lastAddClickTime = 0L
     private var lastPresetClickTime = 0L
+    private var lastSaveClickTime = 0L
     private var isSavingPolicy = false
 
     private lateinit var adapter: FilteredUrlAdapter
@@ -159,6 +167,7 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
         }
 
         selectedMode = basePolicy.browserFilterMode
+        isFullSystemFilteringEnabled = basePolicy.isFullSystemFilteringEnabled
         blockedUrls.clear()
         blockedUrls.addAll(basePolicy.customBlockedUrls.sorted())
         allowedUrls.clear()
@@ -172,6 +181,12 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
         rbModeBlocklist = findViewById(R.id.rbModeBlocklist)
         rbModeWhitelist = findViewById(R.id.rbModeWhitelist)
         tvModeDescription = findViewById(R.id.tvModeDescription)
+
+        cardFilterScope = findViewById(R.id.cardFilterScope)
+        rgFilterScope = findViewById(R.id.rgFilterScope)
+        rbScopeBrowserOnly = findViewById(R.id.rbScopeBrowserOnly)
+        rbScopeFullSystem = findViewById(R.id.rbScopeFullSystem)
+        tvScopeDescription = findViewById(R.id.tvScopeDescription)
 
         cardPresets = findViewById(R.id.cardPresets)
         btnPresetSocial = findViewById(R.id.btnPresetSocial)
@@ -215,6 +230,15 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
             updateModeUi()
         }
 
+        rgFilterScope.setOnCheckedChangeListener { _, checkedId ->
+            isFullSystemFilteringEnabled = (checkedId == R.id.rbScopeFullSystem)
+            tvScopeDescription.text = if (isFullSystemFilteringEnabled) {
+                getString(R.string.browser_filter_scope_full_system_desc)
+            } else {
+                getString(R.string.browser_filter_scope_browser_only_desc)
+            }
+        }
+
         btnAddDomain.setOnClickListener {
             val now = SystemClock.elapsedRealtime()
             if (now - lastAddClickTime < 300L) return@setOnClickListener
@@ -253,6 +277,13 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
             DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY -> rbModeWhitelist.isChecked = true
             else -> rbModeOff.isChecked = true
         }
+        if (isFullSystemFilteringEnabled) {
+            rbScopeFullSystem.isChecked = true
+            tvScopeDescription.text = getString(R.string.browser_filter_scope_full_system_desc)
+        } else {
+            rbScopeBrowserOnly.isChecked = true
+            tvScopeDescription.text = getString(R.string.browser_filter_scope_browser_only_desc)
+        }
         updateModeUi()
     }
 
@@ -273,12 +304,14 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
         when (selectedMode) {
             DevicePolicyBundle.BROWSER_FILTER_OFF -> {
                 tvModeDescription.text = getString(R.string.browser_filter_desc_off)
+                cardFilterScope.visibility = View.GONE
                 cardPresets.visibility = View.GONE
                 cardAddDomain.visibility = View.GONE
                 cardUrlList.visibility = View.GONE
             }
             DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST -> {
                 tvModeDescription.text = getString(R.string.browser_filter_desc_blocklist)
+                cardFilterScope.visibility = View.VISIBLE
                 cardPresets.visibility = View.VISIBLE
                 cardAddDomain.visibility = View.VISIBLE
                 cardUrlList.visibility = View.VISIBLE
@@ -287,6 +320,7 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
             }
             DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY -> {
                 tvModeDescription.text = getString(R.string.browser_filter_desc_whitelist)
+                cardFilterScope.visibility = View.VISIBLE
                 cardPresets.visibility = View.GONE
                 cardAddDomain.visibility = View.VISIBLE
                 cardUrlList.visibility = View.VISIBLE
@@ -391,6 +425,11 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
     }
 
     private fun saveAndApplyPolicy() {
+        if (isSavingPolicy) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastSaveClickTime < 500L) return
+        lastSaveClickTime = now
+
         if (selectedMode == DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY && allowedUrls.isEmpty()) {
             MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.title_browser_url_filter)
@@ -403,6 +442,7 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
         if (isRemote) {
             val updated = basePolicy.copy(
                 browserFilterMode = selectedMode,
+                isFullSystemFilteringEnabled = isFullSystemFilteringEnabled,
                 customBlockedUrls = blockedUrls.toSet(),
                 customAllowedUrls = allowedUrls.toSet(),
                 version = basePolicy.version + 1,
@@ -421,6 +461,7 @@ class BrowserUrlFilterActivity : AppCompatActivity() {
                     val freshPersisted = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
                     val updated = freshPersisted.copy(
                         browserFilterMode = selectedMode,
+                        isFullSystemFilteringEnabled = isFullSystemFilteringEnabled,
                         customBlockedUrls = blockedUrls.toSet(),
                         customAllowedUrls = allowedUrls.toSet(),
                         version = freshPersisted.version + 1,

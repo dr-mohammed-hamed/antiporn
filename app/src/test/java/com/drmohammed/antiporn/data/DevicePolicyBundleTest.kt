@@ -31,11 +31,12 @@ class DevicePolicyBundleTest {
         assertTrue(policy.curfewVpnBypassPackages.isEmpty())
         assertTrue(policy.protectedAppPackages.isEmpty())
         assertEquals(DevicePolicyBundle.BROWSER_FILTER_OFF, policy.browserFilterMode)
+        assertFalse(policy.isFullSystemFilteringEnabled)
         assertTrue(policy.customBlockedUrls.isEmpty())
         assertTrue(policy.customAllowedUrls.isEmpty())
         assertTrue(policy.isSelfControlAllowed)
         assertFalse(policy.isDateTimeLocked)
-        assertEquals(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST, policy.dnsHost)
+        assertEquals(DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST, policy.dnsHost)
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.getDefaultFallbackTimeZone(), policy.timeZoneId)
         assertEquals(1L, policy.version)
     }
@@ -64,6 +65,7 @@ class DevicePolicyBundleTest {
             curfewVpnBypassPackages = setOf("com.bypass.app1"),
             protectedAppPackages = setOf("com.vital.app1", "com.vital.app2"),
             browserFilterMode = DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST,
+            isFullSystemFilteringEnabled = true,
             customBlockedUrls = setOf("badsite.com", "gambling.org"),
             customAllowedUrls = setOf("safe.org"),
             dnsHost = "custom.dns.nextdns.io",
@@ -102,6 +104,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.curfewVpnBypassPackages, restored.curfewVpnBypassPackages)
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
         assertEquals(original.browserFilterMode, restored.browserFilterMode)
+        assertEquals(original.isFullSystemFilteringEnabled, restored.isFullSystemFilteringEnabled)
         assertEquals(original.customBlockedUrls, restored.customBlockedUrls)
         assertEquals(original.customAllowedUrls, restored.customAllowedUrls)
         assertEquals(original.dnsHost, restored.dnsHost)
@@ -140,6 +143,7 @@ class DevicePolicyBundleTest {
             curfewVpnBypassPackages = setOf("pkg.vpn.bypass"),
             protectedAppPackages = setOf("pkg.c"),
             browserFilterMode = DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY,
+            isFullSystemFilteringEnabled = true,
             customBlockedUrls = setOf("blocked1.com", "blocked2.com"),
             customAllowedUrls = setOf("allowed1.com"),
             dnsHost = "custom.dns.nextdns.io",
@@ -178,6 +182,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.curfewVpnBypassPackages, restored.curfewVpnBypassPackages)
         assertEquals(original.protectedAppPackages, restored.protectedAppPackages)
         assertEquals(original.browserFilterMode, restored.browserFilterMode)
+        assertEquals(original.isFullSystemFilteringEnabled, restored.isFullSystemFilteringEnabled)
         assertEquals(original.customBlockedUrls, restored.customBlockedUrls)
         assertEquals(original.customAllowedUrls, restored.customAllowedUrls)
         assertEquals(original.dnsHost, restored.dnsHost)

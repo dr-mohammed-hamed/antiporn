@@ -89,6 +89,7 @@ class GuardianControlActivity : AppCompatActivity() {
     // DNS controls
     private lateinit var tilDnsHost: TextInputLayout
     private lateinit var etDnsHost: TextInputEditText
+    private lateinit var btnPresetControlD: MaterialButton
     private lateinit var btnPresetAdguard: MaterialButton
     private lateinit var btnPresetCloudflare: MaterialButton
     private lateinit var btnPresetNextDns: MaterialButton
@@ -122,7 +123,8 @@ class GuardianControlActivity : AppCompatActivity() {
                 viewModel.updateBrowserFilter(
                     filterMode = updated.browserFilterMode,
                     customBlocked = updated.customBlockedUrls,
-                    customAllowed = updated.customAllowedUrls
+                    customAllowed = updated.customAllowedUrls,
+                    isFullSystemFilteringEnabled = updated.isFullSystemFilteringEnabled
                 )
             }
         }
@@ -273,6 +275,7 @@ class GuardianControlActivity : AppCompatActivity() {
 
         tilDnsHost = findViewById(R.id.tilDnsHost)
         etDnsHost = findViewById(R.id.etDnsHost)
+        btnPresetControlD = findViewById(R.id.btnPresetControlD)
         btnPresetAdguard = findViewById(R.id.btnPresetAdguard)
         btnPresetCloudflare = findViewById(R.id.btnPresetCloudflare)
         btnPresetNextDns = findViewById(R.id.btnPresetNextDns)
@@ -402,6 +405,11 @@ class GuardianControlActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.cardBrowserUrlFilter)?.setOnClickListener {
             if (btnManageBrowserUrls.isEnabled) btnManageBrowserUrls.performClick()
+        }
+
+        btnPresetControlD.setOnClickListener {
+            etDnsHost.setText(DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST)
+            tilDnsHost.error = null
         }
 
         btnPresetAdguard.setOnClickListener {
@@ -575,6 +583,7 @@ class GuardianControlActivity : AppCompatActivity() {
         findViewById<View>(R.id.cardAppManager)?.isEnabled = enabled
         findViewById<View>(R.id.cardBrowserUrlFilter)?.isEnabled = enabled
         etDnsHost.isEnabled = enabled
+        btnPresetControlD.isEnabled = enabled
         btnPresetAdguard.isEnabled = enabled
         btnPresetCloudflare.isEnabled = enabled
         btnPresetNextDns.isEnabled = enabled

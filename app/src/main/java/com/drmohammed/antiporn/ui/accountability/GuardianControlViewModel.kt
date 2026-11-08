@@ -258,10 +258,16 @@ class GuardianControlViewModel(
         _uiState.update { it.copy(isTelegramWebBlocked = enabled) }
     }
 
-    fun updateBrowserFilter(filterMode: Int, customBlocked: Set<String>, customAllowed: Set<String>) {
+    fun updateBrowserFilter(
+        filterMode: Int,
+        customBlocked: Set<String>,
+        customAllowed: Set<String>,
+        isFullSystemFilteringEnabled: Boolean = false
+    ) {
         _uiState.update { current ->
             val updated = current.currentPolicy.copy(
                 browserFilterMode = filterMode,
+                isFullSystemFilteringEnabled = isFullSystemFilteringEnabled,
                 customBlockedUrls = customBlocked,
                 customAllowedUrls = customAllowed
             )
@@ -412,6 +418,7 @@ class GuardianControlViewModel(
                 isYouTubeRestrictedModeEnabled = state.isYouTubeRestrictedModeEnabled,
                 isTelegramWebBlocked = state.isTelegramWebBlocked,
                 browserFilterMode = state.currentPolicy.browserFilterMode,
+                isFullSystemFilteringEnabled = state.currentPolicy.isFullSystemFilteringEnabled,
                 customBlockedUrls = state.currentPolicy.customBlockedUrls,
                 customAllowedUrls = state.currentPolicy.customAllowedUrls,
                 dnsHost = rawDns,

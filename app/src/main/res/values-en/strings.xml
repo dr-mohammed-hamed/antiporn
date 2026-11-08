@@ -589,6 +589,7 @@
     <string name="guardian_dns_title">Custom DNS Host</string>
     <string name="guardian_dns_desc">Enforce a specific NextDNS or AdGuard TLS hostname.</string>
     <string name="guardian_dns_hint">e.g. your-id.dns.nextdns.io</string>
+    <string name="btn_dns_preset_controld">Control D (Default)</string>
     <string name="btn_dns_preset_adguard">AdGuard Family</string>
     <string name="btn_dns_preset_cloudflare">Cloudflare Family</string>
     <string name="btn_dns_preset_nextdns">Default NextDNS</string>
@@ -638,6 +639,11 @@
     <string name="title_browser_url_filter">Browser URL Filtering</string>
     <string name="browser_filter_card_title">Browser URL Filtering &amp; Rules</string>
     <string name="browser_filter_card_desc">Specify allowed or blocked websites across supported Chromium browsers via Device Owner</string>
+    <string name="browser_filter_scope_title">Filtering Scope &amp; Power</string>
+    <string name="browser_filter_scope_browser_only">Browser-Only (Lightweight - No VPN)</string>
+    <string name="browser_filter_scope_browser_only_desc">Restricts blocked websites inside Chrome and supported browsers only. The device runs pure high-speed Private DNS with 0% extra battery drain and no daytime VPN.</string>
+    <string name="browser_filter_scope_full_system">Full-System (Extreme Filtering - Local VPN)</string>
+    <string name="browser_filter_scope_full_system_desc">Runs 24/7 local inspection tunnel to filter and block domains across all apps, games, and browsers on the device.</string>
     <string name="browser_filter_btn_manage">Manage Browser Websites</string>
     <string name="browser_filter_mode_off">Disabled (Standard browsing with SafeSearch)</string>
     <string name="browser_filter_mode_blocklist">Blocklist (Block specific websites)</string>

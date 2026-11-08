@@ -53,7 +53,8 @@ object DnsFilteringValidator {
      */
     fun isKnownFamilyPreset(host: String): Boolean {
         val lower = host.trim().lowercase()
-        return lower == DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST.lowercase() ||
+        return lower == DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST.lowercase() ||
+               lower == DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST.lowercase() ||
                lower == DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST.lowercase() ||
                lower == "family-filter-dns.cleanbrowsing.org" ||
                lower == "dns-family.adguard.com"

@@ -64,7 +64,8 @@ data class GuardianControlUiState(
                     dnsHost.trim() != initial.dnsHost.trim() ||
                     currentPolicy.customBlockedUrls != initial.customBlockedUrls ||
                     currentPolicy.customAllowedUrls != initial.customAllowedUrls ||
-                    currentPolicy.browserFilterMode != initial.browserFilterMode
+                    currentPolicy.browserFilterMode != initial.browserFilterMode ||
+                    currentPolicy.isFullSystemFilteringEnabled != initial.isFullSystemFilteringEnabled
         }
 
     val isSaveEnabled: Boolean

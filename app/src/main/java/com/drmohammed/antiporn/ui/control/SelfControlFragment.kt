@@ -83,6 +83,7 @@ class SelfControlFragment : Fragment() {
             val current = selfControlViewModel.uiState.value.policy
             val updated = current.copy(
                 browserFilterMode = latest.browserFilterMode,
+                isFullSystemFilteringEnabled = latest.isFullSystemFilteringEnabled,
                 customBlockedUrls = latest.customBlockedUrls,
                 customAllowedUrls = latest.customAllowedUrls
             )
@@ -470,6 +471,9 @@ class SelfControlFragment : Fragment() {
             }
         }
 
+        binding.btnPresetControlD.setOnClickListener {
+            binding.etDnsHost.setText(DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST)
+        }
         binding.btnPresetAdguard.setOnClickListener {
             binding.etDnsHost.setText(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST)
         }
@@ -726,7 +730,7 @@ class SelfControlFragment : Fragment() {
     private fun buildDraftPolicyFromViews(): DevicePolicyBundle {
         val basePolicy = selfControlViewModel.uiState.value.policy
         val hostInput = _binding?.etDnsHost?.text?.toString()?.trim().orEmpty()
-        val dnsToSave = hostInput.ifBlank { DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST }
+        val dnsToSave = hostInput.ifBlank { DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST }
         return basePolicy.copy(
             curfewStartHour = selectedStartHour,
             curfewStartMinute = selectedStartMinute,

@@ -11,11 +11,14 @@ class DnsFilteringValidatorTest {
 
     @Test
     fun testIsKnownFamilyPreset() {
+        assertTrue(DnsFilteringValidator.isKnownFamilyPreset(DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST))
         assertTrue(DnsFilteringValidator.isKnownFamilyPreset(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST))
         assertTrue(DnsFilteringValidator.isKnownFamilyPreset(DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST))
         assertTrue(DnsFilteringValidator.isKnownFamilyPreset("FAMILY-FILTER-DNS.CLEANBROWSING.ORG"))
         assertTrue(DnsFilteringValidator.isKnownFamilyPreset("dns-family.adguard.com"))
 
+        assertFalse(DnsFilteringValidator.isKnownFamilyPreset("p0.freedns.controld.com"))
+        assertFalse(DnsFilteringValidator.isKnownFamilyPreset("custom.controld.com"))
         assertFalse(DnsFilteringValidator.isKnownFamilyPreset("google.com"))
         assertFalse(DnsFilteringValidator.isKnownFamilyPreset("custom.dns.nextdns.io"))
         assertFalse(DnsFilteringValidator.isKnownFamilyPreset("1.1.1.1"))

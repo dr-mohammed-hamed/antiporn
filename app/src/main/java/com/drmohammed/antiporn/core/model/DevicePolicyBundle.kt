@@ -24,9 +24,10 @@ data class DevicePolicyBundle(
     val curfewVpnBypassPackages: Set<String> = emptySet(),
     val protectedAppPackages: Set<String> = emptySet(),
     val browserFilterMode: Int = BROWSER_FILTER_OFF,
+    val isFullSystemFilteringEnabled: Boolean = false,
     val customBlockedUrls: Set<String> = emptySet(),
     val customAllowedUrls: Set<String> = emptySet(),
-    val dnsHost: String = ADGUARD_FAMILY_DNS_HOST,
+    val dnsHost: String = CONTROLD_FAMILY_DNS_HOST,
     val isYouTubeRestrictedModeEnabled: Boolean = false,
     val isTelegramWebBlocked: Boolean = true,
     val guardianUid: String? = null,
@@ -66,6 +67,7 @@ data class DevicePolicyBundle(
             "curfewVpnBypassPackages" to curfewVpnBypassPackages.toList(),
             "protectedAppPackages" to protectedAppPackages.toList(),
             "browserFilterMode" to browserFilterMode,
+            "isFullSystemFilteringEnabled" to isFullSystemFilteringEnabled,
             "customBlockedUrls" to customBlockedUrls.toList(),
             "customAllowedUrls" to customAllowedUrls.toList(),
             "dnsHost" to dnsHost,
@@ -115,6 +117,7 @@ data class DevicePolicyBundle(
         json.put("protectedAppPackages", protectedArr)
 
         json.put("browserFilterMode", browserFilterMode)
+        json.put("isFullSystemFilteringEnabled", isFullSystemFilteringEnabled)
 
         val blockedUrlsArr = JSONArray().apply { customBlockedUrls.forEach { put(it) } }
         json.put("customBlockedUrls", blockedUrlsArr)
@@ -149,6 +152,7 @@ data class DevicePolicyBundle(
         const val BROWSER_FILTER_BLOCKLIST_ONLY = 1
         const val BROWSER_FILTER_WHITELIST_ONLY = 2
 
+        const val CONTROLD_FAMILY_DNS_HOST = "no-ads-drugs-malware-porn-gambling-dating-typo.freedns.controld.com"
         const val ADGUARD_FAMILY_DNS_HOST = "family.adguard-dns.com"
         const val CLOUDFLARE_FAMILY_DNS_HOST = "family.cloudflare-dns.com"
         const val LEGACY_DEFAULT_NEXTDNS_HOST = "family.cloudflare-dns.com"
@@ -161,10 +165,11 @@ data class DevicePolicyBundle(
 
         fun defaultPolicy(): DevicePolicyBundle = DevicePolicyBundle(
             browserFilterMode = BROWSER_FILTER_OFF,
+            isFullSystemFilteringEnabled = false,
             customBlockedUrls = emptySet(),
             customAllowedUrls = emptySet(),
             customCurfewWhitelistPackages = com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST,
-            dnsHost = ADGUARD_FAMILY_DNS_HOST,
+            dnsHost = CONTROLD_FAMILY_DNS_HOST,
             isYouTubeRestrictedModeEnabled = false,
             isTelegramWebBlocked = true,
             guardianUid = null,
@@ -212,10 +217,11 @@ data class DevicePolicyBundle(
             val browserFilterMode = ((map["browserFilterMode"] as? Number)?.toInt()
                 ?: (map["browserFilterMode"] as? String)?.toIntOrNull()
                 ?: BROWSER_FILTER_OFF).coerceIn(0, 2)
+            val isFullSystemFilteringEnabled = (map["isFullSystemFilteringEnabled"] as? Boolean) ?: false
             val customBlockedUrls = (map["customBlockedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
             val customAllowedUrls = (map["customAllowedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
-            val dns = (map["dnsHost"] as? String)?.takeIf { it.isNotBlank() } ?: ADGUARD_FAMILY_DNS_HOST
+            val dns = (map["dnsHost"] as? String)?.takeIf { it.isNotBlank() } ?: CONTROLD_FAMILY_DNS_HOST
             val ytRestricted = (map["isYouTubeRestrictedModeEnabled"] as? Boolean) ?: false
             val tgBlocked = (map["isTelegramWebBlocked"] as? Boolean) ?: true
 
@@ -250,6 +256,7 @@ data class DevicePolicyBundle(
                 curfewVpnBypassPackages = vpnBypass,
                 protectedAppPackages = protectedApps,
                 browserFilterMode = browserFilterMode,
+                isFullSystemFilteringEnabled = isFullSystemFilteringEnabled,
                 customBlockedUrls = customBlockedUrls,
                 customAllowedUrls = customAllowedUrls,
                 dnsHost = dns,
@@ -308,6 +315,7 @@ data class DevicePolicyBundle(
                 }
 
                 val browserFilterMode = json.optInt("browserFilterMode", BROWSER_FILTER_OFF).coerceIn(0, 2)
+                val isFullSystemFilteringEnabled = json.optBoolean("isFullSystemFilteringEnabled", false)
 
                 val customBlockedUrls = mutableSetOf<String>()
                 val blockedUrlsArr = json.optJSONArray("customBlockedUrls")
@@ -331,7 +339,7 @@ data class DevicePolicyBundle(
                     }
                 }
 
-                val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: ADGUARD_FAMILY_DNS_HOST
+                val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: CONTROLD_FAMILY_DNS_HOST
                 val ytRestricted = json.optBoolean("isYouTubeRestrictedModeEnabled", false)
                 val tgBlocked = json.optBoolean("isTelegramWebBlocked", true)
                 val gUid = json.optString("guardianUid", "").takeIf { it.isNotBlank() }
@@ -367,6 +375,7 @@ data class DevicePolicyBundle(
                     curfewVpnBypassPackages = vpnBypass,
                     protectedAppPackages = protectedApps,
                     browserFilterMode = browserFilterMode,
+                    isFullSystemFilteringEnabled = isFullSystemFilteringEnabled,
                     customBlockedUrls = customBlockedUrls,
                     customAllowedUrls = customAllowedUrls,
                     dnsHost = dns,

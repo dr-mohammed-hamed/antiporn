@@ -412,6 +412,8 @@
 
     <string name="guardian_dns_hint">عنوان خادم DNS المشفر (DoT Hostname)</string>
 
+    <string name="btn_dns_preset_controld">Control D (شامل - افتراضي)</string>
+
     <string name="btn_dns_preset_adguard">AdGuard Family (إعلانات + بورن)</string>
 
     <string name="btn_dns_preset_cloudflare">Cloudflare Family</string>
@@ -929,6 +931,11 @@
     <string name="title_browser_url_filter">التحكم في مواقع المتصفح</string>
     <string name="browser_filter_card_title">فلترة وحظر مواقع المتصفح</string>
     <string name="browser_filter_card_desc">تحديد المواقع المسموحة أو المحظورة في المتصفحات المدعومة عبر Device Owner</string>
+    <string name="browser_filter_scope_title">نطاق وقوة التصفية</string>
+    <string name="browser_filter_scope_browser_only">تصفية بسيطة على المتصفحات (الوضع الخفيف - بدون VPN)</string>
+    <string name="browser_filter_scope_browser_only_desc">يتم حظر المواقع المحددة داخل متصفح Chrome والمتصفحات المتوافقة فقط، مع استمرار عمل Private DNS عالي السرعة على الهاتف بنسبة 100% بدون تشغيل نفق VPN وبدون أي استهلاك زائد للبطارية.</string>
+    <string name="browser_filter_scope_full_system">تصفية قوية فائقة لكل الهاتف (النظام الكامل - Local VPN)</string>
+    <string name="browser_filter_scope_full_system_desc">تفعيل نفق الحماية المحلي (Local VPN Split-Tunnel) على مدار الساعة لفحص وتصفية كل استعلام DNS يخرج من الهاتف بالكامل (تطبيقات، ألعاب، متصفحات، تليجرام ويب) مع الفلتر المحلي الصارم.</string>
     <string name="browser_filter_btn_manage">إدارة مواقع المتصفح</string>
     <string name="browser_filter_mode_off">معطل (تصفح اعتيادي مع البحث الآمن)</string>
     <string name="browser_filter_mode_blocklist">قائمة الحظر (حظر مواقع محددة)</string>
