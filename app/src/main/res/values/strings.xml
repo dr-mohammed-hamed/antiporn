@@ -16,6 +16,7 @@
     <string name="status_active_desc">درع الـ DNS المضاد للإباحية والإعلانات مفروض على كامل الجهاز مع حظر الـ VPN وقفل التصفح المتخفي وفرض البحث الآمن.</string>
 
     <string name="status_need_enforce_title">الحماية بحاجة لتأكيد التطبيق</string>
+    <string name="status_shield_need_enforce_format">%s بحاجة لتأكيد التطبيق</string>
 
     <string name="status_need_enforce_desc">صلاحية Device Owner نشطة، اضغط على الزر أدناه لتطبيق وتثبيت درع الـ DNS وحماية المتصفحات.</string>
 
@@ -145,6 +146,8 @@
     <string name="card_curfew_scheduled_desc">مجدول يومياً (8:00 م - 7:00 ص) - جميع التطبيقات المسموحة نشطة</string>
 
     <string name="card_curfew_inactive_desc">غير مفعل (يتطلب صلاحية Device Owner)</string>
+
+    <string name="card_curfew_pending">حظر التجوال الليلي بحاجة لتأكيد تعليق التطبيقات وعزل الإنترنت</string>
 
     <string name="card_curfew_subtext">تعليق تلقائي لتطبيقات التشتيت (يوتيوب، المتجر، الألعاب) واستثناء تطبيقات العمل والقرآن والأدوات الأساسية</string>
 

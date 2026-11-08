@@ -430,6 +430,7 @@
     <string name="status_active_title">Hisn Fortress Active</string>
     <string name="status_active_desc">All protection shields are active and enforced.</string>
     <string name="status_need_enforce_title">Protection Needs Enforcement</string>
+    <string name="status_shield_need_enforce_format">%s Needs Enforcement</string>
     <string name="status_need_enforce_desc">One or more protection shields require enforcement.</string>
     <string name="status_no_device_owner_title">Device Owner Authority Required</string>
     <string name="status_no_device_owner_desc">Hisn requires Device Owner permission via computer to lock down the system.</string>
@@ -491,6 +492,7 @@
     <string name="card_curfew_active_desc_test">Curfew test mode active.</string>
     <string name="card_curfew_scheduled_desc">Scheduled daily (8:00 PM - 7:00 AM) - Allowed apps active</string>
     <string name="card_curfew_inactive_desc">Curfew is currently inactive.</string>
+    <string name="card_curfew_pending">Curfew active: store suspension and VPN blackhole require enforcement.</string>
     <string name="card_curfew_subtext">Focus and bedtime restriction.</string>
     <string name="shield_curfew_active_applied">Curfew active: restrictions applied.</string>
     <string name="shield_curfew_scheduled_applied">Curfew schedule registered.</string>

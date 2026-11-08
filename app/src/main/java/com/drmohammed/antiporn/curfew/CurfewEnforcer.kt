@@ -266,29 +266,28 @@ object CurfewEnforcer {
                 details = "targets=${targets.size}, vpnEnabled=$vpnEnabled, instantKill=$instantKill, nap=${NapController.isNapActive(context)}"
             )
 
-            // 1. Lockdown OEM App Stores & Search loophole apps completely (Hide from launcher and apps list)
-            val packagesToHide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
-            for (pkg in packagesToHide) {
+            // 1. Suspend all OEM App Stores, Google Play, and search loophole apps natively (Zero Hiding policy)
+            val curfewStoresToSuspend = (CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS +
+                    setOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, CurfewConfig.GOOGLE_SEARCH_PACKAGE))
+            val pm = context.packageManager
+            val storesBatchToSuspend = curfewStoresToSuspend.filter { pkg ->
                 try {
-                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(context, pkg).getOrNull() != true) {
-                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(context, pkg, true)
-                        Log.i(TAG, "Hidden store/search package: $pkg")
-                    }
+                    val isInstalled = try { pm.getPackageInfo(pkg, 0); true } catch (e: Exception) { false }
+                    isInstalled && com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() != true
                 } catch (e: Exception) {
-                    Log.w(TAG, "Could not hide package $pkg", e)
+                    false
                 }
             }
-
-            // 1.1 Suspend Google Play Store and Google Search natively during curfew (eliminates polling loop)
-            val curfewStoresToSuspend = arrayOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, CurfewConfig.GOOGLE_SEARCH_PACKAGE)
-            for (pkg in curfewStoresToSuspend) {
+            if (storesBatchToSuspend.isNotEmpty()) {
                 try {
-                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() != true) {
-                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, arrayOf(pkg), true)
-                        Log.i(TAG, "Curfew enforcement: Suspended $pkg natively via SafeDpmGateway")
-                    }
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(
+                        context,
+                        storesBatchToSuspend.toTypedArray(),
+                        true
+                    )
+                    Log.i(TAG, "Curfew enforcement: Suspended ${storesBatchToSuspend.size} store/search packages in single batch")
                 } catch (e: Exception) {
-                    Log.w(TAG, "Could not suspend store package $pkg during curfew", e)
+                    Log.w(TAG, "Could not batch suspend store/search packages during curfew", e)
                 }
             }
 
@@ -377,13 +376,15 @@ object CurfewEnforcer {
                 details = "Daytime apps and stores released"
             )
 
-            // 1. Restore OEM App Stores & Search apps (Unhide)
+            // 1. Legacy cleanup: Ensure no OEM stores remain hidden from earlier builds
             val packagesToUnhide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
+            val pm = context.packageManager
             for (pkg in packagesToUnhide) {
                 try {
-                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(context, pkg).getOrNull() == true) {
+                    val isInstalled = try { pm.getPackageInfo(pkg, 0); true } catch (e: Exception) { false }
+                    if (isInstalled && com.drmohammed.antiporn.telemetry.SafeDpmGateway.isApplicationHiddenBlocking(context, pkg).getOrNull() == true) {
                         com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(context, pkg, false)
-                        Log.i(TAG, "Unhid store/search package: $pkg")
+                        Log.i(TAG, "Legacy cleanup: Unhid store/search package: $pkg")
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Could not unhide package $pkg", e)
@@ -398,7 +399,7 @@ object CurfewEnforcer {
                 Log.w(TAG, "Could not clear DISALLOW_INSTALL_APPS restriction", e)
             }
 
-            // 3. Unsuspend Google Play Store and Google Search on curfew release
+            // 3. Unsuspend all OEM App Stores, Google Play Store, and Google Search on curfew release
             var fetchPolicyFailed = false
             val currentPolicy = try {
                 PolicyRepository.getInstance(context).getCurrentPolicy()
@@ -409,19 +410,31 @@ object CurfewEnforcer {
             }
             val customBlacklist = currentPolicy?.customBlacklistPackages ?: emptySet()
 
-            val curfewStoresToUnsuspend = arrayOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, CurfewConfig.GOOGLE_SEARCH_PACKAGE)
-            for (pkg in curfewStoresToUnsuspend) {
+            val curfewStoresToUnsuspend = (CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS +
+                    setOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, CurfewConfig.GOOGLE_SEARCH_PACKAGE))
+            val storesBatchToUnsuspend = curfewStoresToUnsuspend.filter { pkg ->
                 if (AppSuspensionShield.isBlacklisted(pkg) || customBlacklist.contains(pkg)) {
                     Log.i(TAG, "Preserving suspension of $pkg on curfew release as it is in blacklist/customBlacklist")
-                    continue
-                }
-                try {
-                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() == true) {
-                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(context, arrayOf(pkg), false)
-                        Log.i(TAG, "Curfew released: Unsuspended $pkg via SafeDpmGateway")
+                    false
+                } else {
+                    try {
+                        val isInstalled = try { pm.getPackageInfo(pkg, 0); true } catch (e: Exception) { false }
+                        isInstalled && com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(context, pkg).getOrNull() == true
+                    } catch (e: Exception) {
+                        false
                     }
+                }
+            }
+            if (storesBatchToUnsuspend.isNotEmpty()) {
+                try {
+                    com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(
+                        context,
+                        storesBatchToUnsuspend.toTypedArray(),
+                        false
+                    )
+                    Log.i(TAG, "Curfew released: Unsuspended ${storesBatchToUnsuspend.size} store/search packages in single batch")
                 } catch (e: Exception) {
-                    Log.w(TAG, "Could not unsuspend store package $pkg on curfew release", e)
+                    Log.w(TAG, "Could not batch unsuspend store packages on curfew release", e)
                 }
             }
 
@@ -591,9 +604,6 @@ object CurfewEnforcer {
 
         try {
             com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackagesSuspendedBlocking(appContext, arrayOf(packageName), true)
-            if (CurfewConfig.OEM_APP_STORES.contains(packageName) || CurfewConfig.CURFEW_SEARCH_APPS.contains(packageName)) {
-                com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationHiddenBlocking(appContext, packageName, true)
-            }
             // Add to recorded curfew packages
             val prefs = appContext.getSharedPreferences(CurfewConfig.PREFS_NAME, Context.MODE_PRIVATE)
             val savedSet = prefs.getStringSet(CurfewConfig.KEY_CURFEW_SUSPENDED_PACKAGES, emptySet())?.toMutableSet()

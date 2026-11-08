@@ -59,9 +59,10 @@ object CurfewShield : ProtectionShield {
         return try {
             val isActive = CurfewEnforcer.isEffectiveBlockActive(context)
             if (isActive) {
-                // Ground-truth verification: Ensure OEM stores and search loophole apps are hidden
-                val packagesToHide = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
-                val allStoresHidden = packagesToHide.all { pkg ->
+                // Ground-truth verification: Ensure OEM stores, Google Play, and search loophole apps are suspended (Zero Hiding policy)
+                val packagesToVerify = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS +
+                        setOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, CurfewConfig.GOOGLE_SEARCH_PACKAGE)
+                val allStoresSuspended = packagesToVerify.all { pkg ->
                     try {
                         val isInstalled = try {
                             context.packageManager.getPackageInfo(pkg, 0)
@@ -69,9 +70,9 @@ object CurfewShield : ProtectionShield {
                         } catch (e: Exception) {
                             false
                         }
-                        if (isInstalled) dpm.isApplicationHidden(admin, pkg) else true
+                        if (isInstalled) dpm.isPackageSuspended(admin, pkg) else true
                     } catch (e: Exception) {
-                        Log.w(TAG, "Error checking application hidden state for $pkg", e)
+                        Log.w(TAG, "Error checking package suspension state for $pkg", e)
                         false
                     }
                 }
@@ -94,9 +95,14 @@ object CurfewShield : ProtectionShield {
                     true
                 }
 
-                if (!allStoresHidden || !isVpnEnforced) {
-                    Log.w(TAG, "Curfew is active but store hiding ($allStoresHidden) or Blackhole VPN ($isVpnEnforced) is not fully enforced!")
-                    ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_inactive_desc))
+                if (!allStoresSuspended || !isVpnEnforced) {
+                    val errorReason = when {
+                        !allStoresSuspended && !isVpnEnforced -> "Curfew active: stores suspension and VPN blackhole unverified"
+                        !allStoresSuspended -> "Curfew active: stores suspension unverified"
+                        else -> "Curfew active: VPN blackhole unverified"
+                    }
+                    Log.w(TAG, "Curfew is active but store suspension ($allStoresSuspended) or Blackhole VPN ($isVpnEnforced) is not fully enforced! ($errorReason)")
+                    ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_pending))
                 } else {
                     ShieldStatus.Active(context.getString(R.string.card_curfew_active_desc))
                 }
@@ -119,14 +125,14 @@ object CurfewShield : ProtectionShield {
 
                 if (isLockdownLingering) {
                     Log.w(TAG, "Curfew is inactive but Blackhole VPN lockdown is still active!")
-                    ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_inactive_desc))
+                    ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_pending))
                 } else {
                     ShieldStatus.Active(context.getString(R.string.card_curfew_scheduled_desc))
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking CurfewShield status", e)
-            ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_inactive_desc))
+            ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_pending))
         }
     }
 }

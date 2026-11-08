@@ -90,6 +90,18 @@ object AiTelemetryReporter {
             emptyList()
         }
 
+        val shieldEvents = try {
+            diagDao.getDiagnosticEventsBlocking(20, BlackBoxRecorder.TAG_SHIELD).map { it.toDto() }
+        } catch (e: Exception) {
+            emptyList()
+        }
+
+        val liveShields = try {
+            com.drmohammed.antiporn.core.engine.ProtectionEngine.evaluateSystemStatus(appContext)
+        } catch (e: Exception) {
+            emptyMap()
+        }
+
         val totalEventsCount = try {
             diagDao.getEventsCountBlocking()
         } catch (e: Exception) {
@@ -140,8 +152,45 @@ object AiTelemetryReporter {
         sb.appendLine("| **Total Logged Events in Black Box** | `${if (totalEventsCount >= 0) totalEventsCount else "Unknown"}` |")
         sb.appendLine()
 
+        // 3. Security Shields Invariants Audit
+        sb.appendLine("## 🛡️ 3. Security Shields Invariants Audit (فحص سلامة الدروع الأمنية الستة)")
+        sb.appendLine("| Shield ID | Shield Name | Current Live Status | Ground-Truth Invariant Details / Reason |")
+        sb.appendLine("| :--- | :--- | :---: | :--- |")
+        for (shield in com.drmohammed.antiporn.core.engine.ProtectionEngine.shields) {
+            val status = liveShields[shield.id]
+            val statusDisplay = when (status) {
+                is com.drmohammed.antiporn.core.model.ShieldStatus.Active -> "🟢 ACTIVE"
+                is com.drmohammed.antiporn.core.model.ShieldStatus.NeedsEnforcement -> "🟡 NEEDS ENFORCEMENT"
+                is com.drmohammed.antiporn.core.model.ShieldStatus.Disabled -> "🔴 DISABLED"
+                is com.drmohammed.antiporn.core.model.ShieldStatus.Unsupported -> "⚪ UNSUPPORTED"
+                null -> "❓ UNKNOWN"
+            }
+            val details = when (status) {
+                is com.drmohammed.antiporn.core.model.ShieldStatus.Active -> status.detail
+                is com.drmohammed.antiporn.core.model.ShieldStatus.NeedsEnforcement -> status.reason
+                is com.drmohammed.antiporn.core.model.ShieldStatus.Disabled -> status.warning
+                is com.drmohammed.antiporn.core.model.ShieldStatus.Unsupported -> "API < ${status.minSdkRequired}"
+                null -> "Not evaluated"
+            }
+            val shieldTitle = try { appContext.getString(shield.titleResId) } catch (e: Exception) { shield.id }
+            sb.appendLine("| `${shield.id}` | $shieldTitle | `$statusDisplay` | ${details.replace("|", "/")} |")
+        }
+        sb.appendLine()
+
+        if (shieldEvents.isNotEmpty()) {
+            sb.appendLine("### 🕒 Recent Shield Status & Failure Events (سجل الدروع المتعثرة)")
+            sb.appendLine("| Timestamp | Shield | Status | Details / Failure Reason |")
+            sb.appendLine("| :--- | :--- | :---: | :--- |")
+            for (event in shieldEvents.take(15)) {
+                val statusEmoji = if (event.isSuccess) "✅ OK" else "❌ FAIL"
+                val errOrMeta = event.errorDetails?.takeIf { it.isNotBlank() } ?: (event.contextMetadata ?: "-")
+                sb.appendLine("| `${event.formattedTime()}` | `${event.actionName}` | $statusEmoji | ${errOrMeta.replace("|", "/")} |")
+            }
+            sb.appendLine()
+        }
+
         // 4. Crash Status
-        sb.appendLine("## 💥 3. Latest Crash Incident")
+        sb.appendLine("## 💥 4. Latest Crash Incident")
         if (!latestCrash.isNullOrBlank()) {
             sb.appendLine("```text")
             sb.appendLine(latestCrash.trim())
@@ -152,7 +201,7 @@ object AiTelemetryReporter {
         sb.appendLine()
 
         // 5. Cloud Sync, Pairing & Identity Timeline
-        sb.appendLine("## 🔄 4. Cloud Sync, Pairing & Identity Timeline (آخر عمليات المزامنة والاقتران والهويات)")
+        sb.appendLine("## 🔄 5. Cloud Sync, Pairing & Identity Timeline (آخر عمليات المزامنة والاقتران والهويات)")
         if (cloudEvents.isNotEmpty()) {
             sb.appendLine("| Timestamp | Action | Status | Metadata / Error |")
             sb.appendLine("| :--- | :--- | :---: | :--- |")
@@ -167,7 +216,7 @@ object AiTelemetryReporter {
         sb.appendLine()
 
         // 6. Curfew, Nap & Alarm Lifecycle Events
-        sb.appendLine("## 🌙 5. Curfew & Alarm Lifecycle Events (أحداث الحظر الليلي والمنبهات)")
+        sb.appendLine("## 🌙 6. Curfew & Alarm Lifecycle Events (أحداث الحظر الليلي والمنبهات)")
         if (curfewEvents.isNotEmpty()) {
             sb.appendLine("| Timestamp | Action | Status | Details / Error |")
             sb.appendLine("| :--- | :--- | :---: | :--- |")
@@ -182,7 +231,7 @@ object AiTelemetryReporter {
         sb.appendLine()
 
         // 7. System DPM Operations
-        sb.appendLine("## ⚙️ 6. System & DPM Operations (أوامر حماية النظام)")
+        sb.appendLine("## ⚙️ 7. System & DPM Operations (أوامر حماية النظام)")
         if (dpmEvents.isNotEmpty()) {
             sb.appendLine("| Timestamp | Action | Latency | Status | Error Details |")
             sb.appendLine("| :--- | :--- | :---: | :---: | :--- |")
@@ -198,13 +247,14 @@ object AiTelemetryReporter {
 
         // 8. AI Prompt & Diagnosis Guidance
         sb.appendLine("---")
-        sb.appendLine("## 🤖 7. AI Diagnosis Instructions (تعليمات التحليل للذكاء الاصطناعي)")
+        sb.appendLine("## 🤖 8. AI Diagnosis Instructions (تعليمات التحليل للذكاء الاصطناعي)")
         sb.appendLine("""
 Please analyze the telemetry and black-box log above and provide an actionable diagnosis:
 1. **Curfew & Alarm Timing:** Verify if the scheduled curfew start/end matches the observed behavior and identify any alarm skips or drift.
-2. **Cloud Sync & Monotonic Guards:** Check for rejected stale policies, UID mismatches, or missing acknowledgments.
-3. **Permissions & Security:** Identify any DPM failures, SecurityExceptions, or unexpected state transitions.
-4. **Actionable Recommendations:** Provide a surgical diagnosis and concrete code/configuration recommendations.
+2. **Security Shields Audit:** Verify if any shield (DNS, VPN, Browser, Curfew, Tamper, AppSuspension) reported NEEDS ENFORCEMENT or DISABLED and check its ground truth reason.
+3. **Cloud Sync & Monotonic Guards:** Check for rejected stale policies, UID mismatches, or missing acknowledgments.
+4. **Permissions & Security:** Identify any DPM failures, SecurityExceptions, or unexpected state transitions.
+5. **Actionable Recommendations:** Provide a surgical diagnosis and concrete code/configuration recommendations.
 """.trimIndent())
 
         return sb.toString()

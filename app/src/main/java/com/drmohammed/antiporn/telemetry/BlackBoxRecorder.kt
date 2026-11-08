@@ -124,6 +124,16 @@ object BlackBoxRecorder {
         record(context, TAG_TIME, action, isSuccess, 0L, error, details)
     }
 
+    fun recordShield(
+        context: Context,
+        shieldId: String,
+        isSuccess: Boolean = true,
+        details: String? = null,
+        error: String? = null
+    ) {
+        record(context, TAG_SHIELD, shieldId, isSuccess, 0L, error, details)
+    }
+
     fun recordDpm(
         context: Context,
         action: String,

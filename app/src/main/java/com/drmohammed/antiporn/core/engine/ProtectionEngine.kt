@@ -44,6 +44,7 @@ object ProtectionEngine {
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val pendingCallbacks = CopyOnWriteArrayList<(List<ShieldResult>) -> Unit>()
     private val isEnforcing = AtomicBoolean(false)
+    private val lastRecordedShieldFailures = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     fun getAdminComponent(context: Context): ComponentName {
         return ComponentName(context, AdminReceiver::class.java)
@@ -192,6 +193,32 @@ object ProtectionEngine {
                     ShieldStatus.NeedsEnforcement(appContext.getString(R.string.card_device_owner_inactive))
                 }
                 statusMap[shield.id] = status
+
+                if (status !is ShieldStatus.Active && status !is ShieldStatus.Unsupported) {
+                    val failureKey = when (status) {
+                        is ShieldStatus.NeedsEnforcement -> "NEEDS_ENFORCEMENT: ${status.reason}"
+                        is ShieldStatus.Disabled -> "DISABLED: ${status.warning}"
+                        else -> "INACTIVE"
+                    }
+                    if (lastRecordedShieldFailures.put(shield.id, failureKey) != failureKey) {
+                        com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordShield(
+                            context = appContext,
+                            shieldId = shield.id,
+                            isSuccess = false,
+                            details = failureKey
+                        )
+                    }
+                } else if (status is ShieldStatus.Active) {
+                    val previousFailure = lastRecordedShieldFailures.remove(shield.id)
+                    if (previousFailure != null) {
+                        com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordShield(
+                            context = appContext,
+                            shieldId = shield.id,
+                            isSuccess = true,
+                            details = "RECOVERED"
+                        )
+                    }
+                }
             }
             statusMap
         }

@@ -253,14 +253,7 @@ class HomeFragment : Fragment() {
                 if (state.isDeviceOwner) {
                     binding.cardAdbHelp.visibility = View.GONE
 
-                    val dnsActive = state.shields[DnsShield.id] is ShieldStatus.Active
-                    val vpnActive = state.shields[VpnShield.id] is ShieldStatus.Active
-                    val browserActive = state.shields[BrowserShield.id] is ShieldStatus.Active
-                    val tamperActive = state.shields[SystemTamperShield.id] is ShieldStatus.Active
-                    val appSuspensionActive = state.shields[AppSuspensionShield.id] is ShieldStatus.Active
-                    val curfewActive = state.shields[CurfewShield.id] is ShieldStatus.Active
-
-                    val allActive = dnsActive && vpnActive && browserActive && tamperActive && appSuspensionActive && curfewActive
+                    val allActive = ProtectionEngine.shields.all { state.shields[it.id] is ShieldStatus.Active }
 
                     if (allActive) {
                         binding.cardHomeNotice.visibility = View.GONE
@@ -270,8 +263,26 @@ class HomeFragment : Fragment() {
                         binding.frameHeroShieldGlow.setBackgroundResource(R.drawable.bg_hero_shield_glow)
                     } else {
                         binding.cardHomeNotice.visibility = View.VISIBLE
-                        binding.tvHomeNoticeTitle.text = getString(R.string.status_need_enforce_title)
-                        binding.tvHomeNoticeDesc.text = getString(R.string.status_need_enforce_desc)
+
+                        val firstFailingShield = ProtectionEngine.shields.firstOrNull { shield ->
+                            state.shields[shield.id] !is ShieldStatus.Active
+                        }
+                        val failingStatus = firstFailingShield?.let { state.shields[it.id] }
+                        val shieldTitle = firstFailingShield?.let { getString(it.titleResId) }
+
+                        val noticeTitle = if (shieldTitle != null) {
+                            getString(R.string.status_shield_need_enforce_format, shieldTitle)
+                        } else {
+                            getString(R.string.status_need_enforce_title)
+                        }
+                        val noticeDesc = when (failingStatus) {
+                            is ShieldStatus.NeedsEnforcement -> failingStatus.reason
+                            is ShieldStatus.Disabled -> failingStatus.warning
+                            else -> getString(R.string.status_need_enforce_desc)
+                        }
+
+                        binding.tvHomeNoticeTitle.text = noticeTitle
+                        binding.tvHomeNoticeDesc.text = noticeDesc
                         binding.tvHeroShieldStatus.text = getString(R.string.home_shield_inactive)
                         binding.tvHeroShieldStatus.setTextColor(ContextCompat.getColor(ctx, R.color.shield_amber_calm))
                         binding.tvHeroShieldStatus.setBackgroundResource(R.drawable.bg_shield_status_badge_amber)
