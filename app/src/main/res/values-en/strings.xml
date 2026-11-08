@@ -206,6 +206,21 @@
     <string name="provisioning_failed_accounts_action">Tap here to open Settings and remove them temporarily.</string>
     <string name="toast_provisioning_success">Congratulations! Device Owner permission activated successfully</string>
     <string name="toast_provisioning_failed">Pairing failed: %1$s</string>
+
+    <!-- Provisioning Wi-Fi & Live Guide & OEM Strings -->
+    <string name="provisioning_wifi_required_title">Wi-Fi Connection Required</string>
+    <string name="provisioning_wifi_required_desc">Wireless Debugging does not work over mobile data and requires an active, reliable Wi-Fi connection to proceed.</string>
+    <string name="provisioning_wifi_btn_connect">Connect to Wi-Fi</string>
+    <string name="provisioning_guide_notif_title">AntiPorn Wireless Setup Guide</string>
+    <string name="provisioning_guide_notif_waiting_toggle">Waiting for \"Wireless Debugging\" to be enabled in Settings…</string>
+    <string name="provisioning_guide_notif_toggle_done">Great! Now tap on \"Wireless Debugging\" text to enter its menu, then tap \"Pair device with pairing code\".</string>
+    <string name="oem_xiaomi_title">Notice for Xiaomi, Redmi &amp; POCO Devices</string>
+    <string name="oem_xiaomi_desc">Xiaomi devices require enabling both \"USB Debugging\" and \"USB Debugging (Security settings)\" inside Developer Options.</string>
+    <string name="oem_samsung_multiuser_title">Notice for Samsung: Secure Folder / Dual Messenger Active</string>
+    <string name="oem_samsung_multiuser_desc">Secure Folder or Dual Messenger was detected. Please disable them temporarily to avoid setup interruptions.</string>
+    <string name="oem_realme_oppo_title">Notice for Realme &amp; OPPO Devices</string>
+    <string name="oem_realme_oppo_desc">It is recommended to enable \"Disable permission monitoring\" at the bottom of Developer Options for stable pairing.</string>
+    <string name="dialog_enable_dev_desc_miui">1. We will open \"About Phone\".\n2. Tap 7 consecutive times rapidly on \"OS / MIUI Version\".\n3. Enter your screen lock PIN if prompted.\n4. When \"You are now a developer!\" appears, return to the app.</string>
     <!-- DNS Probing & Validation Strings -->
     <string name="dns_probe_progress_title">Verifying DNS Server&#8230;</string>
     <string name="dns_probe_progress_message">Testing server response via encrypted DoT (port 853) and verifying adult content filtering&#8230;</string>

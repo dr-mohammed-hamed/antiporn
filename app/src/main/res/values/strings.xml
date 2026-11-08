@@ -591,7 +591,7 @@
 
     <string name="provisioning_step2_title">الخطوة 1: تشغيل تصحيح الأخطاء اللاسلكي</string>
 
-    <string name="provisioning_step2_desc">1. اضغط على الزر أدناه للانتقال المباشر لتصحيح الأخطاء اللاسلكي.\n2. فعّل خيار "تصحيح الأخطاء اللاسلكي" (Wireless Debugging).\n3. اضغط على "إقران الجهاز برمز إقران".</string>
+    <string name="provisioning_step2_desc">1. اضغط على الزر أدناه للانتقال لتصحيح الأخطاء اللاسلكي.\n2. فعّل مفتاح "تصحيح الأخطاء اللاسلكي" (Wireless Debugging).\n3. اضغط على اسم الخيار نفسه للدخول إلى صفحته، ثم اختر "إقران الجهاز برمز إقران".</string>
     <string name="provisioning_step2_desc_disabled">خيارات المطور غير مفعلة على هاتفك بعد. اضغط أدناه لفتح شاشة "حول الهاتف" والنقر 7 مرات على "رقم الإصدار".</string>
 
     <string name="provisioning_btn_open_dev_options">فتح تصحيح الأخطاء اللاسلكي</string>
@@ -663,6 +663,22 @@
     <string name="toast_provisioning_success">مبروك! تم تفعيل صلاحية المالك (Device Owner) بنجاح</string>
 
     <string name="toast_provisioning_failed">فشل الاقتران: %1$s</string>
+
+    <!-- Provisioning Wi-Fi & Live Guide & OEM Strings -->
+    <string name="provisioning_wifi_required_title">الاتصال بشبكة Wi-Fi مطلوب</string>
+    <string name="provisioning_wifi_required_desc">ميزة التصحيح اللاسلكي لا تعمل عبر بيانات الهاتف، وتتطلب اتصالاً نشطاً وموثوقاً بشبكة Wi-Fi للمتابعة.</string>
+    <string name="provisioning_wifi_btn_connect">تشغيل والاتصال بالـ Wi-Fi</string>
+    <string name="provisioning_guide_notif_title">معالج اقتران «حِصْن» اللاسلكي</string>
+    <string name="provisioning_guide_notif_waiting_toggle">بانتظار تفعيل مفتاح "تصحيح الأخطاء اللاسلكي" في الإعدادات...</string>
+    <string name="provisioning_guide_notif_toggle_done">رائع! الآن اضغط على نص «تصحيح الأخطاء اللاسلكي» للدخول، ثم اضغط «إقران برمز».</string>
+    <string name="oem_xiaomi_title">تنبيه لأجهزة شاومي وريدمي وبوكو</string>
+    <string name="oem_xiaomi_desc">يشترط نظام شاومي تفعيل خياري: (تصحيح أخطاء USB) و(تصحيح أخطاء USB - إعدادات الأمان) داخل خيارات المطور للمتابعة.</string>
+    <string name="oem_samsung_multiuser_title">تنبيه لسامسونج: وُجد مجلد آمن أو مستخدم إضافي</string>
+    <string name="oem_samsung_multiuser_desc">تم رصد «المجلد الآمن» (Secure Folder) أو «المرسال المزدوج». يُنصح بإيقافهما مؤقتاً لتجنب تعثر الترقية.</string>
+    <string name="oem_realme_oppo_title">تنبيه لأجهزة ريلمي وأوبو (Realme / OPPO)</string>
+    <string name="oem_realme_oppo_desc">يُوصى بتفعيل خيار «تعطيل مراقبة الأذونات» (Disable permission monitoring) بأسفل خيارات المطور لضمان استقرار الاقتران.</string>
+    <string name="dialog_enable_dev_desc_miui">1. سنفتح لك شاشة "حول الهاتف" (About Phone).\n2. انقر 7 مرات متتالية وسريعة على "إصدار OS / MIUI".\n3. أدخل رمز قفل الشاشة عند طلبه.\n4. بعد ظهور رسالة "أنت الآن مطور"، عُد للتطبيق بنقرة رجوع.</string>
+
 
 
     <!-- Accountability Supervision Additional Strings -->

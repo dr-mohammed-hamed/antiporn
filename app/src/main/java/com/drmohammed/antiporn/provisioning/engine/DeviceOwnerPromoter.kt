@@ -135,9 +135,26 @@ object DeviceOwnerPromoter {
         Timber.tag(TAG).i("Executing zero-account promotion on Android SDK $sdkVersion for user $userId")
 
         return if (sdkVersion >= 31) {
-            executeSetupBypassPromotion(context, client, adminComponent, userId)
+            val primaryResult = executeSetupBypassPromotion(context, client, adminComponent, userId)
+            if (primaryResult is PromotionResult.Success) {
+                disableWirelessAdbSilently(client)
+                primaryResult
+            } else {
+                Timber.tag(TAG).w("Setup bypass failed: ${(primaryResult as PromotionResult.Failure).message}. Attempting fallback to package freeze...")
+                val fallbackResult = executePackageFreezePromotion(context, client, adminComponent, userId)
+                if (fallbackResult is PromotionResult.Success) {
+                    disableWirelessAdbSilently(client)
+                    fallbackResult
+                } else {
+                    fallbackResult
+                }
+            }
         } else {
-            executePackageFreezePromotion(context, client, adminComponent, userId)
+            val result = executePackageFreezePromotion(context, client, adminComponent, userId)
+            if (result is PromotionResult.Success) {
+                disableWirelessAdbSilently(client)
+            }
+            result
         }
     }
 
@@ -149,9 +166,35 @@ object DeviceOwnerPromoter {
         val sdkVerStr = client.shell("getprop ro.build.version.sdk").stdoutText.trim()
         val sdkVersion = sdkVerStr.toIntOrNull() ?: android.os.Build.VERSION.SDK_INT
         return if (sdkVersion >= 31) {
-            executeSetupBypassPromotion(null, client, adminComponent, userId)
+            val primaryResult = executeSetupBypassPromotion(null, client, adminComponent, userId)
+            if (primaryResult is PromotionResult.Success) {
+                disableWirelessAdbSilently(client)
+                primaryResult
+            } else {
+                Timber.tag(TAG).w("Setup bypass failed without context. Attempting fallback to package freeze...")
+                val fallbackResult = executePackageFreezePromotion(null, client, adminComponent, userId)
+                if (fallbackResult is PromotionResult.Success) {
+                    disableWirelessAdbSilently(client)
+                    fallbackResult
+                } else {
+                    fallbackResult
+                }
+            }
         } else {
-            executePackageFreezePromotion(null, client, adminComponent, userId)
+            val result = executePackageFreezePromotion(null, client, adminComponent, userId)
+            if (result is PromotionResult.Success) {
+                disableWirelessAdbSilently(client)
+            }
+            result
+        }
+    }
+
+    private suspend fun disableWirelessAdbSilently(client: AdbClient) {
+        try {
+            Timber.tag(TAG).i("Disabling adb_wifi_enabled for security cleanup (leaving adb_enabled intact)...")
+            client.shell("settings put global adb_wifi_enabled 0")
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Failed disabling adb_wifi_enabled after promotion")
         }
     }
 
