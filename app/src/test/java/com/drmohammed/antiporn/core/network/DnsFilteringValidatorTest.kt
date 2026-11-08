@@ -19,6 +19,7 @@ class DnsFilteringValidatorTest {
 
         assertFalse(DnsFilteringValidator.isKnownFamilyPreset("p0.freedns.controld.com"))
         assertFalse(DnsFilteringValidator.isKnownFamilyPreset("custom.controld.com"))
+        assertFalse(DnsFilteringValidator.isKnownFamilyPreset("adguard-dns.com"))
         assertFalse(DnsFilteringValidator.isKnownFamilyPreset("google.com"))
         assertFalse(DnsFilteringValidator.isKnownFamilyPreset("custom.dns.nextdns.io"))
         assertFalse(DnsFilteringValidator.isKnownFamilyPreset("1.1.1.1"))

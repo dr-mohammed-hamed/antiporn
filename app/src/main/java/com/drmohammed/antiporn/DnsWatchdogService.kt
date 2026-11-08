@@ -427,14 +427,15 @@ class DnsWatchdogService : Service() {
             val specifier = Settings.Global.getString(contentResolver, "private_dns_specifier")
             val isVpnActive = com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.isRunning
             if (isVpnActive) {
-                // When 24/7 VPN is active, Private DNS is set to opportunistic (or off) to use local TUN UDP 53
+                // When 24/7 VPN is active, Private DNS is set to opportunistic (or off) with empty specifier to use local TUN UDP 53
                 val isAppropriate = mode == "opportunistic" || mode == "off" || mode == null
-                if (!isAppropriate) {
-                    val reason = "Settings.Global DNS mismatch: VPN is running, expected mode in (opportunistic, off) but found mode='$mode'"
+                val isSpecifierClean = specifier.isNullOrEmpty()
+                if (!isAppropriate || !isSpecifierClean) {
+                    val reason = "Settings.Global DNS mismatch: VPN is running, expected mode='opportunistic' and empty specifier but found mode='$mode', specifier='$specifier'"
                     Log.w(TAG, reason)
                     desyncReasons.add("[DNS_GLOBAL: $reason]")
                 }
-            } else if (mode != null) {
+            } else {
                 val expectedHost = DnsShield.getEffectiveDnsHost(this)
                 val isHostMatching = specifier?.equals(expectedHost, ignoreCase = true) == true
                 val isAdultFiltering = specifier != null && ActiveShieldsEvaluator.isHostAdultFiltering(specifier)

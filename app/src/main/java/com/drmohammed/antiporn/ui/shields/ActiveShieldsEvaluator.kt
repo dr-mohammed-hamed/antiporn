@@ -169,7 +169,6 @@ object ActiveShieldsEvaluator {
         return DnsFilteringValidator.isKnownFamilyPreset(clean) ||
                 clean.contains("nextdns") ||
                 clean.contains("family") ||
-                clean.contains("cleanbrowsing") ||
-                clean.contains("adguard")
+                clean.contains("cleanbrowsing")
     }
 }

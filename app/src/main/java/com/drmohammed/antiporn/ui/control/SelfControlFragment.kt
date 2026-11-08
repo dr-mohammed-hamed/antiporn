@@ -815,35 +815,82 @@ class SelfControlFragment : Fragment() {
             val updatedPolicy = buildDraftPolicyFromViews()
             val dnsToSave = updatedPolicy.dnsHost
 
+            // Lock button and show immediate feedback to prevent double-tap race conditions
+            binding.btnSaveSelfControlChanges.isEnabled = false
+            binding.btnSaveSelfControlChanges.alpha = 0.5f
+
             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
                 val validationResult = DnsFilteringValidator.validateDnsHost(dnsToSave)
-                if (validationResult is DnsFilteringValidator.ValidationResult.UnfilteredPorn) {
-                    withContext(Dispatchers.Main) {
-                        if (!isAdded || _binding == null) return@withContext
-                        binding.tilDnsHost.error = getString(R.string.dns_probe_error_not_blocking)
-                        binding.etDnsHost.requestFocus()
-                        context?.let { c ->
-                            MaterialAlertDialogBuilder(c)
-                                .setTitle(R.string.dns_probe_dialog_failed_title)
-                                .setMessage(getString(R.string.dns_probe_error_not_blocking_detail, validationResult.domain, validationResult.resolvedIp))
-                                .setPositiveButton(android.R.string.ok, null)
-                                .show()
-                        }
-                    }
-                    return@launch
-                }
-
                 withContext(Dispatchers.Main) {
-                    selfControlViewModel.savePolicy(updatedPolicy) { result ->
-                        if (!isAdded || _binding == null) return@savePolicy
-                        result.fold(
-                            onSuccess = {
-                                Toast.makeText(context ?: ctx, R.string.toast_self_policy_saved, Toast.LENGTH_SHORT).show()
-                            },
-                            onFailure = {
-                                Toast.makeText(context ?: ctx, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
+                    if (!isAdded || _binding == null || activity?.isFinishing == true || activity?.isDestroyed == true) return@withContext
+
+                    when (validationResult) {
+                        is DnsFilteringValidator.ValidationResult.Valid -> {
+                            binding.tilDnsHost.error = null
+                            selfControlViewModel.savePolicy(updatedPolicy) { result ->
+                                if (!isAdded || _binding == null) return@savePolicy
+                                result.fold(
+                                    onSuccess = {
+                                        Toast.makeText(context ?: ctx, R.string.toast_self_policy_saved, Toast.LENGTH_SHORT).show()
+                                    },
+                                    onFailure = {
+                                        Toast.makeText(context ?: ctx, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
+                                    }
+                                )
                             }
-                        )
+                        }
+                        is DnsFilteringValidator.ValidationResult.UnfilteredPorn -> {
+                            updateSaveButtonState()
+                            binding.tilDnsHost.error = getString(R.string.dns_probe_error_not_blocking)
+                            binding.etDnsHost.requestFocus()
+                            context?.let { c ->
+                                MaterialAlertDialogBuilder(c)
+                                    .setTitle(R.string.dns_probe_dialog_failed_title)
+                                    .setMessage(
+                                        getString(
+                                            R.string.dns_probe_error_not_blocking_detail,
+                                            validationResult.domain,
+                                            validationResult.resolvedIp
+                                        )
+                                    )
+                                    .setPositiveButton(android.R.string.ok, null)
+                                    .show()
+                            }
+                        }
+                        is DnsFilteringValidator.ValidationResult.Unreachable -> {
+                            updateSaveButtonState()
+                            binding.tilDnsHost.error = getString(R.string.dns_probe_error_unreachable)
+                            binding.etDnsHost.requestFocus()
+                            context?.let { c ->
+                                MaterialAlertDialogBuilder(c)
+                                    .setTitle(R.string.dns_probe_dialog_failed_title)
+                                    .setMessage(
+                                        getString(
+                                            R.string.dns_probe_error_unreachable_detail,
+                                            validationResult.reason
+                                        )
+                                    )
+                                    .setPositiveButton(android.R.string.ok, null)
+                                    .show()
+                            }
+                        }
+                        is DnsFilteringValidator.ValidationResult.ResolverBroken -> {
+                            updateSaveButtonState()
+                            binding.tilDnsHost.error = getString(R.string.dns_probe_error_broken)
+                            binding.etDnsHost.requestFocus()
+                            context?.let { c ->
+                                MaterialAlertDialogBuilder(c)
+                                    .setTitle(R.string.dns_probe_dialog_failed_title)
+                                    .setMessage(
+                                        getString(
+                                            R.string.dns_probe_error_broken_detail,
+                                            validationResult.reason
+                                        )
+                                    )
+                                    .setPositiveButton(android.R.string.ok, null)
+                                    .show()
+                            }
+                        }
                     }
                 }
             }
