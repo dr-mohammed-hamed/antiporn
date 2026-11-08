@@ -13,9 +13,10 @@
         android:layout_height="?attr/actionBarSize"
         app:navigationContentDescription="@string/btn_back"
         app:navigationIcon="?attr/homeAsUpIndicator"
-        app:title="@string/guardian_control_ward_name"
+        app:title="@string/title_guardian_control"
         app:titleCentered="false"
-        app:titleTextColor="?attr/colorOnSurface" />
+        app:titleTextColor="?attr/colorOnSurface"
+        tools:title="التحكم في حماية: أحمد" />
 
     <!-- Offline Alert Banner -->
     <com.google.android.material.card.MaterialCardView

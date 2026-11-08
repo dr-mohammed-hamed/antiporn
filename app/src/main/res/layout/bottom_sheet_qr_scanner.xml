@@ -220,7 +220,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:fontFamily="@font/tajawal"
-                    android:text="@string/qr_emergency_bypass_action"
+                    tools:text="@string/qr_emergency_bypass_action"
                     android:textSize="13sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

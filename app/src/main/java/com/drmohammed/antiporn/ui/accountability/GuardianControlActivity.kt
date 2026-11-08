@@ -116,8 +116,8 @@ class GuardianControlActivity : AppCompatActivity() {
         }
 
         tvWardName = findViewById(R.id.tvWardName)
-        tvWardName.text = getString(R.string.guardian_control_ward_name, wardName)
         btnEditWardName = findViewById(R.id.btnEditWardName)
+        updateWardTitle(wardName)
 
         layoutLiveSyncBadge = findViewById(R.id.layoutLiveSyncBadge)
         ivLiveSyncIcon = findViewById(R.id.ivLiveSyncIcon)
@@ -274,7 +274,7 @@ class GuardianControlActivity : AppCompatActivity() {
     }
 
     private fun renderUiState(state: GuardianControlUiState) {
-        tvWardName.text = getString(R.string.guardian_control_ward_name, state.wardName)
+        updateWardTitle(state.wardName)
         cardOfflineBanner.visibility = if (state.isOffline) View.VISIBLE else View.GONE
         btnRetryLoadPolicy.isEnabled = !state.isLoading
 
@@ -290,6 +290,17 @@ class GuardianControlActivity : AppCompatActivity() {
             lastAcknowledgedAt = state.lastAcknowledgedAt,
             lastHeartbeat = state.lastHeartbeat
         )
+    }
+
+    private fun updateWardTitle(name: String) {
+        val displayName = name.trim()
+        val title = if (displayName.isNotBlank()) {
+            getString(R.string.guardian_control_ward_name, displayName)
+        } else {
+            getString(R.string.title_guardian_control)
+        }
+        toolbar.title = title
+        tvWardName.text = title
     }
 
     private fun handleEvent(event: GuardianControlEvent) {
