@@ -206,6 +206,9 @@
 
     <string name="curfew_vpn_notification_desc">تم قطع اتصال الإنترنت بالكامل حتى 07:00 ص. المكالمات ورسائل SMS تعمل بشكل طبيعي.</string>
 
+    <string name="dns_vpn_notification_title">درع الفلترة والحماية الرقمية نشط</string>
+    <string name="dns_vpn_notification_desc">فلترة حماية شبكة DNS المحلية وحظر المحتوى الإباحي والإعلانات تعمل في الخلفية</string>
+
     <string name="curfew_vpn_session_name">AntiPorn Curfew Blackhole</string>
     <string name="curfew_vpn_dns_filter_session">فلترة حماية شبكة DNS المحلية</string>
 

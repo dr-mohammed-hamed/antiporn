@@ -11,6 +11,7 @@ import com.drmohammed.antiporn.core.contract.ProtectionShield
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
+import com.drmohammed.antiporn.telemetry.SafeDpmGateway
 import com.drmohammed.antiporn.ui.shields.ActiveShieldsEvaluator
 
 /**
@@ -70,17 +71,15 @@ object DnsShield : ProtectionShield {
             var usedFallback = false
 
             if (isVpnActive) {
-                // Port 853 DoT Bypass Fix: Set Private DNS to 'off' so Android doesn't bypass local TUN UDP 53
-                val globalMode = try {
-                    android.provider.Settings.Global.getString(context.contentResolver, "private_dns_mode")
-                } catch (e: Exception) { null }
-
-                if (globalMode != "off") {
+                // When 24/7 Local DNS VPN is active, set Private DNS to Opportunistic so Android
+                // resolves via the local TUN UDP 53 without hanging on Port 853 TLS to an unreachable host.
+                val dpmMode = try { dpm.getGlobalPrivateDnsMode(admin) } catch (e: Exception) { -1 }
+                if (dpmMode != DevicePolicyManager.PRIVATE_DNS_MODE_OPPORTUNISTIC) {
                     try {
-                        android.provider.Settings.Global.putString(context.contentResolver, "private_dns_mode", "off")
-                        Log.i(TAG, "Port 853 DoT bypass fix applied: private_dns_mode set to 'off'")
+                        SafeDpmGateway.setGlobalPrivateDnsOpportunisticBlocking(context)
+                        Log.i(TAG, "Private DNS switched to Opportunistic mode for Local DNS VPN")
                     } catch (e: Exception) {
-                        Log.w(TAG, "Failed writing private_dns_mode to 'off'", e)
+                        Log.w(TAG, "Failed setting Private DNS to Opportunistic mode", e)
                     }
                 }
             } else {
@@ -177,7 +176,12 @@ object DnsShield : ProtectionShield {
             } catch (e: Exception) { null }
 
             if (isVpnActive) {
-                if (globalMode == "off" && isDnsLocked) {
+                val dpmMode = try { dpm.getGlobalPrivateDnsMode(admin) } catch (e: Exception) { -1 }
+                val isAppropriateMode = dpmMode == DevicePolicyManager.PRIVATE_DNS_MODE_OPPORTUNISTIC ||
+                        globalMode == "opportunistic" ||
+                        dpmMode == DevicePolicyManager.PRIVATE_DNS_MODE_OFF ||
+                        globalMode == "off"
+                if (isAppropriateMode && isDnsLocked) {
                     ShieldStatus.Active(context.getString(R.string.shield_dns_local_filter_active))
                 } else {
                     ShieldStatus.NeedsEnforcement("Local DNS Filter active but Private DNS or restrictions need sync")

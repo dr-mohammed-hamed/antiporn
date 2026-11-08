@@ -139,6 +139,68 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
         }
     }
 
+    suspend fun setGlobalPrivateDnsOpportunistic(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Int> = execute(
+        context = context,
+        tag = tag,
+        actionName = "setGlobalPrivateDnsOpportunistic",
+        metadata = "mode=opportunistic"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            dpm.setGlobalPrivateDnsModeOpportunistic(admin)
+        } else {
+            0
+        }
+    }
+
+    fun setGlobalPrivateDnsOpportunisticBlocking(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Int> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "setGlobalPrivateDnsOpportunisticBlocking",
+        metadata = "mode=opportunistic"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            dpm.setGlobalPrivateDnsModeOpportunistic(admin)
+        } else {
+            0
+        }
+    }
+
+    suspend fun getGlobalPrivateDnsMode(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Int> = execute(
+        context = context,
+        tag = tag,
+        actionName = "getGlobalPrivateDnsMode"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            dpm.getGlobalPrivateDnsMode(admin)
+        } else {
+            -1
+        }
+    }
+
+    fun getGlobalPrivateDnsModeBlocking(
+        context: Context,
+        tag: String = BlackBoxRecorder.TAG_DPM
+    ): DpmExecutionResult<Int> = executeBlocking(
+        context = context,
+        tag = tag,
+        actionName = "getGlobalPrivateDnsModeBlocking"
+    ) { dpm, admin ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            dpm.getGlobalPrivateDnsMode(admin)
+        } else {
+            -1
+        }
+    }
+
     suspend fun getGlobalPrivateDnsHost(
         context: Context,
         tag: String = BlackBoxRecorder.TAG_DPM

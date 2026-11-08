@@ -421,9 +421,10 @@ class DnsWatchdogService : Service() {
             val specifier = Settings.Global.getString(contentResolver, "private_dns_specifier")
             val isVpnActive = com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.isRunning
             if (isVpnActive) {
-                // When 24/7 VPN is active, Private DNS must be 'off' to prevent port 853 DoT bypass
-                if (mode != null && mode != "off") {
-                    val reason = "Settings.Global DNS mismatch: VPN is running, expected mode='off' but found mode='$mode'"
+                // When 24/7 VPN is active, Private DNS is set to opportunistic (or off) to use local TUN UDP 53
+                val isAppropriate = mode == "opportunistic" || mode == "off" || mode == null
+                if (!isAppropriate) {
+                    val reason = "Settings.Global DNS mismatch: VPN is running, expected mode in (opportunistic, off) but found mode='$mode'"
                     Log.w(TAG, reason)
                     desyncReasons.add("[DNS_GLOBAL: $reason]")
                 }

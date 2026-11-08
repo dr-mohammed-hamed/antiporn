@@ -20,6 +20,8 @@
     <string name="curfew_vpn_channel_desc">Notification channel for full internet blackout during sleep hours</string>
     <string name="curfew_vpn_notification_title">Night Curfew Active: Internet Isolated</string>
     <string name="curfew_vpn_notification_desc">Internet connection completely cut off. Voice calls and SMS work normally.</string>
+    <string name="dns_vpn_notification_title">Digital Protection &amp; DNS Filter Active</string>
+    <string name="dns_vpn_notification_desc">Local DNS filtering and adult content blocking are active in the background</string>
 
     <!-- Unified Protection & Curfew Notification Strings -->
     <string name="protection_vpn_channel_name">Protection Network Isolation</string>

@@ -43,11 +43,20 @@ class DnsTunnelWorker(
                         val bytesRead = try {
                             inStream.read(packetBuffer)
                         } catch (e: IOException) {
+                            Log.d(TAG, "TUN read IOException: ${e.message}")
                             break // Interface closed or handover initiated
                         }
                         if (bytesRead <= 0) continue
 
-                        val parsedQuery = DnsPacketParser.parseDnsQuery(packetBuffer, bytesRead) ?: continue
+                        val version = (packetBuffer[0].toInt() and 0xFF) ushr 4
+                        Log.d(TAG, "TUN packet read: $bytesRead bytes, ipVersion=$version")
+
+                        val parsedQuery = DnsPacketParser.parseDnsQuery(packetBuffer, bytesRead)
+                        if (parsedQuery == null) {
+                            Log.d(TAG, "Non-DNS or unparsed packet received on TUN (version=$version, len=$bytesRead)")
+                            continue
+                        }
+                        Log.i(TAG, "DNS Query: ${parsedQuery.qName} (type=${parsedQuery.qType}) from ${parsedQuery.srcPort}")
                         val policy = policyProvider()
                         val customBlocked = customBlockedProvider()
                         val action = DnsPolicyEvaluator.evaluate(parsedQuery, policy, customBlocked)
@@ -105,6 +114,7 @@ class DnsTunnelWorker(
         synchronized(outStreamLock) {
             try {
                 outStream.write(packet)
+                Log.d(TAG, "Sent response packet to TUN (${packet.size} bytes)")
             } catch (e: IOException) {
                 Log.w(TAG, "Failed writing DNS response packet to TUN", e)
             }

@@ -91,6 +91,15 @@ class CurfewBlackholeVpnService : VpnService() {
             return START_NOT_STICKY
         }
 
+        try {
+            val policy = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+            activePolicy = policy
+            compiledBlockedDomainsCache = DnsPacketParser.compileEffectiveBlockedDomains(policy.customBlockedUrls)
+            dnsForwarder?.setCustomDnsHost(policy.dnsHost)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error refreshing policy in onStartCommand", e)
+        }
+
         val targetMode = evaluateRequiredMode(this)
         Log.i(TAG, "Evaluating targetMode: $targetMode (currentMode=$currentMode)")
         if (targetMode == VpnMode.IDLE) {
@@ -99,19 +108,20 @@ class CurfewBlackholeVpnService : VpnService() {
             return START_NOT_STICKY
         }
 
-        establishTunnel(targetMode)
+        val forceRebuild = intent?.getBooleanExtra("force_rebuild", false) == true
+        establishTunnel(targetMode, forceRebuild)
         return START_STICKY
     }
 
     @Synchronized
-    private fun establishTunnel(targetMode: VpnMode) {
+    private fun establishTunnel(targetMode: VpnMode, forceRebuild: Boolean = false) {
         if (targetMode == VpnMode.IDLE) {
             stopVpn()
             stopSelf()
             return
         }
 
-        if (vpnInterface != null && currentMode == targetMode) {
+        if (!forceRebuild && vpnInterface != null && currentMode == targetMode) {
             if (targetMode == VpnMode.CURFEW_BLACKHOLE) {
                 val currentBypassed = CurfewConfig.getVpnBypassedPackages(this)
                 if (currentBypassed == lastBypassedPackages) {
@@ -119,8 +129,10 @@ class CurfewBlackholeVpnService : VpnService() {
                     return
                 }
             } else {
-                refreshBlockedUrlsCache()
-                return
+                if (dnsWorkerJob?.isActive == true) {
+                    refreshBlockedUrlsCache()
+                    return
+                }
             }
         }
 
@@ -134,12 +146,14 @@ class CurfewBlackholeVpnService : VpnService() {
         val builder = Builder()
             .setSession(sessionName)
             .addAddress("10.255.255.1", 30)
-            .addDnsServer("10.255.255.1")
             .setMtu(1500)
             .setBlocking(true)
 
         if (targetMode == VpnMode.DNS_FILTERING_ONLY) {
-            builder.addRoute("10.255.255.1", 32)
+            // Decouple DNS server (10.255.255.2) from TUN interface IP (10.255.255.1)
+            // so Linux kernel table local does not consume DNS queries via local loopback
+            builder.addDnsServer("10.255.255.2")
+            builder.addRoute("10.255.255.2", 32)
 
             // IPv6 Leak Prevention without 5-second DNS Timeout:
             // 1. Add dummy IPv6 address and route (sinkhole) WITHOUT registering fd00::1 as a DNS server
@@ -154,6 +168,7 @@ class CurfewBlackholeVpnService : VpnService() {
             builder.addRoute("2606:4700:4700::1113", 128)
             builder.addRoute("2606:4700:4700::1003", 128)
         } else {
+            builder.addDnsServer("10.255.255.1")
             builder.addAddress("fd00::1", 126)
             builder.addDnsServer("fd00::1")
             builder.addRoute("0.0.0.0", 0)
@@ -186,6 +201,23 @@ class CurfewBlackholeVpnService : VpnService() {
                     } catch (e: Exception) {
                         Log.w(TAG, "Failed to bypass package $pkg from VPN", e)
                     }
+                }
+            } else {
+                // Daytime DNS-Only mode: Ensure lockdown is false so normal non-DNS traffic flows freely
+                try {
+                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(this)) {
+                        val isLockdown = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isAlwaysOnVpnLockdownEnabledBlocking(this).getOrNull() == true
+                        if (isLockdown) {
+                            com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAlwaysOnVpnPackageBlocking(
+                                context = this,
+                                vpnPackage = packageName,
+                                lockdown = false
+                            )
+                            Log.i(TAG, "Always-On VPN lockdown successfully reset to false for daytime DNS mode")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not reset Always-On VPN lockdown in daytime", e)
                 }
             }
 
@@ -349,7 +381,7 @@ class CurfewBlackholeVpnService : VpnService() {
                     service.activePolicy = policy
                     service.compiledBlockedDomainsCache = compiled
                     service.dnsForwarder?.setCustomDnsHost(policy.dnsHost)
-                    service.establishTunnel(targetMode)
+                    service.establishTunnel(targetMode, forceRebuild = true)
                 } ?: run {
                     if (targetMode != VpnMode.IDLE) {
                         start(appContext)

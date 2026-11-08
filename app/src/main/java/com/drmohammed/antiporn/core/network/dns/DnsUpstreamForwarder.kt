@@ -133,9 +133,8 @@ class DnsUpstreamForwarder(
             }
         }
 
-        // 3. YouTube Comments Preservation vs Strict Mode:
-        // If isYouTubeRestrictedModeEnabled is true and user configured AdGuard, use AdGuard Family
-        if (policy.isYouTubeRestrictedModeEnabled && host != null && host.contains("adguard", ignoreCase = true)) {
+        // 3. User configured AdGuard Family
+        if (host != null && host.contains("adguard", ignoreCase = true)) {
             val reply = sendUdpQuery(ADGUARD_FAMILY_PRIMARY, rawPayload, timeoutMs = 900)
             if (reply != null) return reply
         }
@@ -203,19 +202,25 @@ class DnsUpstreamForwarder(
     private fun resolvePhysicalNetworkDns(): List<String> {
         val result = mutableListOf<String>()
         try {
-            val cm = vpnService.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            val activeNetwork = cm?.activeNetwork
-            val linkProps = if (activeNetwork != null) cm.getLinkProperties(activeNetwork) else null
-            if (linkProps != null) {
-                for (inetAddress in linkProps.dnsServers) {
-                    val hostAddress = inetAddress.hostAddress
-                    // Exclude empty, excluded/local IPs, and IPv6 addresses (containing ':') since socket is IPv4 UDP
-                    if (!hostAddress.isNullOrBlank() &&
-                        !EXCLUDED_DNS_IPS.contains(hostAddress) &&
-                        !hostAddress.contains(':') &&
-                        parseIpv4ToInetAddress(hostAddress) != null
-                    ) {
-                        result.add(hostAddress)
+            val cm = vpnService.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return result
+            val networks = cm.allNetworks
+            for (net in networks) {
+                val caps = cm.getNetworkCapabilities(net) ?: continue
+                if (!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) &&
+                    caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                ) {
+                    val linkProps = cm.getLinkProperties(net) ?: continue
+                    for (inetAddress in linkProps.dnsServers) {
+                        val hostAddress = inetAddress.hostAddress
+                        // Exclude empty, excluded/local IPs, and IPv6 addresses (containing ':') since socket is IPv4 UDP
+                        if (!hostAddress.isNullOrBlank() &&
+                            !EXCLUDED_DNS_IPS.contains(hostAddress) &&
+                            !hostAddress.contains(':') &&
+                            parseIpv4ToInetAddress(hostAddress) != null &&
+                            !result.contains(hostAddress)
+                        ) {
+                            result.add(hostAddress)
+                        }
                     }
                 }
             }

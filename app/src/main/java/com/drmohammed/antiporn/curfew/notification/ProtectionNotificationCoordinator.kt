@@ -222,9 +222,13 @@ object ProtectionNotificationCoordinator {
                 }
             }
             is ProtectionState.Inactive -> {
-                builder.setContentTitle(context.getString(R.string.curfew_vpn_notification_title))
-                    .setContentText(context.getString(R.string.curfew_vpn_notification_desc))
-                    .setSmallIcon(R.drawable.ic_shield_curfew)
+                val title = context.getString(R.string.dns_vpn_notification_title)
+                val desc = context.getString(R.string.dns_vpn_notification_desc)
+                builder.setContentTitle(title)
+                    .setContentText(desc)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(desc))
+                    .setSmallIcon(R.drawable.ic_shield_dns)
+                    .setCategory(NotificationCompat.CATEGORY_SERVICE)
             }
         }
 
