@@ -787,6 +787,29 @@ class ApprovalRepository(
             if (AppSuspensionShield.isBlacklisted(pkg)) continue
             if (com.drmohammed.antiporn.curfew.CurfewAppResolver.isSystemCriticalOrImmune(appContext, pkg)) continue
 
+            // Auto-Adopt Whitelisted Apps: If the package is in policy's customCurfewWhitelistPackages,
+            // it has been explicitly approved by the supervisor. Auto-adopt it into approved baseline without freezing.
+            if (policy.customCurfewWhitelistPackages.contains(pkg)) {
+                Log.i(TAG, "🌱 [AUTO_ADOPT_WHITELISTED] Package '$pkg' is in customCurfewWhitelistPackages. Auto-adopting into approved baseline.")
+                val appName = try {
+                    if (appInfo != null) pm.getApplicationLabel(appInfo).toString() else pkg
+                } catch (e: Exception) {
+                    pkg
+                }
+                val nowMs = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)
+                val baselineEntity = PendingApprovalEntity(
+                    packageName = pkg,
+                    appName = appName,
+                    requestedAt = pkgInfo.firstInstallTime.takeIf { it > 0 } ?: nowMs,
+                    status = PendingApprovalEntity.STATUS_APPROVED,
+                    decidedBy = "GUARDIAN_POLICY_WHITELIST",
+                    decidedAt = nowMs,
+                    isCloudSynced = true
+                )
+                approvalDao.savePendingApprovalBlocking(baselineEntity)
+                continue
+            }
+
             // Auto-Adopt Pre-existing Apps: If the app was installed prior to or during Device Owner activation,
             // it is part of the user's pre-existing baseline. Auto-adopt it into approved baseline without freezing.
             val firstInstallTime = pkgInfo.firstInstallTime

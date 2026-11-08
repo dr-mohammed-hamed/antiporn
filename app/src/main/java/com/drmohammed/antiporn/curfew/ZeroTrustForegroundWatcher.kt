@@ -90,11 +90,18 @@ object ZeroTrustForegroundWatcher {
 
             // Exclude self and critical system framework / launcher / dialer / keyboard, and filter uninstalled
             val criticalPackages = CurfewAppResolver.resolveCoreSystemCriticalPackages(appContext)
+            val curfewWhitelisted = try {
+                com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(appContext)
+                    .getCurrentPolicy().customCurfewWhitelistPackages
+            } catch (e: Exception) {
+                emptySet()
+            }
             val pm = appContext.packageManager
             val updated = pending.filter { pkg ->
                 pkg.isNotBlank() &&
                     !criticalPackages.contains(pkg) &&
                     !AppPolicyRegistry.isImmune(pkg) &&
+                    !curfewWhitelisted.contains(pkg) &&
                     isPackageInstalled(pm, pkg)
             }.toSet()
 

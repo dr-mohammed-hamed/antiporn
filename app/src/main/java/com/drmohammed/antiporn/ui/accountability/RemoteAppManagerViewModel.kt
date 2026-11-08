@@ -11,6 +11,7 @@ import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.data.model.InstalledAppDto
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.drmohammed.antiporn.data.repository.AppInventoryManager
+import com.drmohammed.antiporn.data.repository.ApprovalRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.telemetry.DpmExecutionResult
@@ -41,7 +42,8 @@ class RemoteAppManagerViewModel(
     application: Application,
     private val policyRepository: PolicyRepository = PolicyRepository.getInstance(application),
     private val accountabilityRepository: AccountabilityRepository = AccountabilityRepository.getInstance(application),
-    private val appInventoryManager: AppInventoryManager = AppInventoryManager.getInstance(application)
+    private val appInventoryManager: AppInventoryManager = AppInventoryManager.getInstance(application),
+    private val approvalRepository: ApprovalRepository = ApprovalRepository.getInstance(application)
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(RemoteAppManagerUiState())
@@ -351,6 +353,14 @@ class RemoteAppManagerViewModel(
                     errorMsg = context.getString(R.string.toast_not_device_owner)
                 }
 
+                // Synchronize Zero-Trust approvals locally so it is never re-frozen
+                try {
+                    approvalRepository.unsuspendAndApprove(pkg, decidedBy = "SELF")
+                    Log.i(TAG, "Quick unsuspend: Auto-approved package $pkg in local Zero-Trust baseline")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Quick unsuspend: Error approving $pkg in local Zero-Trust", e)
+                }
+
                 _uiState.update { current ->
                     current.copy(
                         isLoading = false,
@@ -375,17 +385,28 @@ class RemoteAppManagerViewModel(
                 }
             } else {
                 val updatedBlacklist = state.customBlacklist - pkg
-                val updatedCurfewWhitelist = state.customCurfewWhitelist + pkg
                 val myUid = accountabilityRepository.getCachedUid()
                 val myName = accountabilityRepository.getMyDisplayName()
                     ?: context.getString(R.string.guardian_default_name)
+
+                // 1. Resolve Zero-Trust approval on ward cloud ticket so ZeroTrustWatcher never re-freezes it
+                try {
+                    val approvalSuccess = approvalRepository.resolveWardApproval(
+                        wardUid = state.wardId,
+                        packageName = pkg,
+                        approve = true,
+                        guardianName = myName
+                    )
+                    Log.i(TAG, "Quick unsuspend: Auto-resolved ward approval for $pkg (success=$approvalSuccess)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Quick unsuspend: Error resolving ward approval for $pkg", e)
+                }
 
                 val updatedPolicy = state.currentPolicy.copy(
                     guardianUid = state.currentPolicy.guardianUid?.takeIf { it.isNotBlank() } ?: myUid,
                     guardianName = state.currentPolicy.guardianName?.takeIf { it.isNotBlank() } ?: myName,
                     isSupervised = true,
                     customBlacklistPackages = updatedBlacklist,
-                    customCurfewWhitelistPackages = updatedCurfewWhitelist,
                     updatedAt = TrustedTimeProvider.currentTimeMillis(context)
                 )
 
@@ -395,10 +416,8 @@ class RemoteAppManagerViewModel(
                     current.copy(
                         isLoading = false,
                         customBlacklist = updatedBlacklist,
-                        customCurfewWhitelist = updatedCurfewWhitelist,
                         currentPolicy = updatedPolicy,
                         initialBlacklist = updatedBlacklist,
-                        initialCurfewWhitelist = updatedCurfewWhitelist,
                         allApps = current.allApps.map { if (it.packageName == pkg) it.copy(isSuspended = false) else it },
                         displayedApps = current.displayedApps.map { if (it.packageName == pkg) it.copy(isSuspended = false) else it }
                     )
@@ -476,6 +495,21 @@ class RemoteAppManagerViewModel(
                 version = state.currentPolicy.version + 1,
                 updatedAt = TrustedTimeProvider.currentTimeMillis(context)
             )
+
+            // Auto-resolve Zero-Trust approvals for any packages removed from 24/7 blacklist
+            val unFrozenPackages = state.initialBlacklist - state.customBlacklist
+            for (pkg in unFrozenPackages) {
+                try {
+                    if (state.isLocalMode) {
+                        approvalRepository.unsuspendAndApprove(pkg, decidedBy = "SELF")
+                    } else {
+                        approvalRepository.resolveWardApproval(state.wardId, pkg, approve = true, guardianName = myName ?: "GUARDIAN")
+                    }
+                    Log.i(TAG, "saveChanges: Auto-approved un-frozen package '$pkg'")
+                } catch (e: Exception) {
+                    Log.e(TAG, "saveChanges: Error auto-approving package '$pkg'", e)
+                }
+            }
 
             try {
                 val success = if (state.isLocalMode) {

@@ -123,4 +123,24 @@ class AppInventoryAndZeroTrustTest {
         assertFalse(pendingEntity.isApproved)
         assertFalse(pendingEntity.isRejected)
     }
+
+    @Test
+    fun testDevicePolicyBundle_unfreezeRemovesFromCustomBlacklist() {
+        val initialPolicy = DevicePolicyBundle(
+            customBlacklistPackages = setOf("com.google.android.apps.bard", "com.distracting.app"),
+            customCurfewWhitelistPackages = emptySet()
+        )
+
+        // When supervisor unfreezes "com.google.android.apps.bard"
+        val updatedBlacklist = initialPolicy.customBlacklistPackages - "com.google.android.apps.bard"
+        val updatedPolicy = initialPolicy.copy(
+            customBlacklistPackages = updatedBlacklist
+        )
+
+        assertFalse("Gemini must be removed from custom blacklist", updatedPolicy.customBlacklistPackages.contains("com.google.android.apps.bard"))
+        assertTrue("Other apps must remain in custom blacklist", updatedPolicy.customBlacklistPackages.contains("com.distracting.app"))
+
+        val removedFromBlacklist = initialPolicy.customBlacklistPackages - updatedPolicy.customBlacklistPackages
+        assertTrue("Removed set must contain Gemini", removedFromBlacklist.contains("com.google.android.apps.bard"))
+    }
 }

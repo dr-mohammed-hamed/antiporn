@@ -525,16 +525,51 @@ class PolicyRepository(
                     val removedFromBlacklist = (previousPolicy.customBlacklistPackages - currentBlacklist).filter {
                         it != appContext.packageName && !AppPolicyRegistry.isImmune(it) && !AppSuspensionShield.isBlacklisted(it)
                     }
+
+                    // Self-Healing Zero-Trust Bridge: If the supervisor removed a package from blacklist or added to curfew whitelist,
+                    // auto-promote its pending Zero-Trust ticket to APPROVED so it is not re-frozen by ZeroTrustForegroundWatcher.
+                    val approvalRepo = ApprovalRepository.getInstance(appContext)
+                    val localPendingSet = try {
+                        approvalRepo.getLocalPendingApprovals().filter { it.isPending }.map { it.packageName }.toSet()
+                    } catch (e: Exception) {
+                        emptySet()
+                    }
+
+                    for (pkg in removedFromBlacklist) {
+                        if (localPendingSet.contains(pkg)) {
+                            Log.i(TAG, "Self-healing bridge: auto-approving package '$pkg' removed from custom blacklist by supervisor")
+                            try {
+                                approvalRepo.unsuspendAndApprove(pkg, bundle.guardianName ?: "GUARDIAN_POLICY")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed auto-approving removed blacklist package '$pkg'", e)
+                            }
+                        }
+                    }
+
+                    for (pkg in bundle.customCurfewWhitelistPackages) {
+                        if (localPendingSet.contains(pkg)) {
+                            Log.i(TAG, "Self-healing bridge: auto-approving whitelisted package '$pkg' by supervisor")
+                            try {
+                                approvalRepo.unsuspendAndApprove(pkg, bundle.guardianName ?: "GUARDIAN_POLICY")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed auto-approving whitelisted package '$pkg'", e)
+                            }
+                        }
+                    }
+
                     if (removedFromBlacklist.isNotEmpty()) {
                         val isBlockActive = CurfewEnforcer.isEffectiveBlockActive(appContext)
                         val immunePackages = CurfewAppResolver.resolveImmunePackages(appContext)
-                        val pendingPackages = ApprovalRepository.getInstance(appContext)
-                            .getLocalPendingApprovals()
-                            .filter { it.isPending }
-                            .map { it.packageName }
-                            .toSet()
+                        val remainingPending = try {
+                            approvalRepo.getLocalPendingApprovals()
+                                .filter { it.isPending }
+                                .map { it.packageName }
+                                .toSet()
+                        } catch (e: Exception) {
+                            emptySet()
+                        }
                         val packagesToUnsuspend = removedFromBlacklist.filter { pkg ->
-                            (!isBlockActive || immunePackages.contains(pkg)) && !pendingPackages.contains(pkg)
+                            (!isBlockActive || immunePackages.contains(pkg)) && !remainingPending.contains(pkg)
                         }.toTypedArray()
                         if (packagesToUnsuspend.isNotEmpty()) {
                             try {
