@@ -57,12 +57,366 @@
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:fontFamily="@font/tajawal"
+                        android:text="@string/dns_table_title"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <!-- DNS Comparison Table -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        app:cardBackgroundColor="?attr/colorSurface"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="0dp"
+                        app:strokeColor="?attr/colorOutlineVariant"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <!-- Header Row -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="32dp"
+                                android:background="?attr/colorSurfaceContainerHigh"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="6dp">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="3.4"
+                                    android:fontFamily="@font/tajawal"
+                                    android:text="@string/dns_col_server"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="11sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1.3"
+                                    android:gravity="center"
+                                    android:fontFamily="@font/tajawal"
+                                    android:text="@string/dns_col_porn"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1.3"
+                                    android:gravity="center"
+                                    android:fontFamily="@font/tajawal"
+                                    android:text="@string/dns_col_ads"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1.4"
+                                    android:gravity="center"
+                                    android:fontFamily="@font/tajawal"
+                                    android:text="@string/dns_col_youtube"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="2.6"
+                                    android:gravity="center"
+                                    android:fontFamily="@font/tajawal"
+                                    android:text="@string/dns_col_speed"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <View
+                                android:layout_width="match_parent"
+                                android:layout_height="1dp"
+                                android:background="?attr/colorOutlineVariant" />
+
+                            <!-- Row 1: Cloudflare Family (Default) -->
+                            <LinearLayout
+                                android:id="@+id/rowDnsCloudflare"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="48dp"
+                                android:background="?attr/selectableItemBackground"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="6dp">
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="3.4"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <RadioButton
+                                        android:id="@+id/rbDnsCloudflare"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:clickable="false"
+                                        android:focusable="false"
+                                        android:minWidth="0dp"
+                                        android:minHeight="0dp" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="4dp"
+                                        android:fontFamily="@font/tajawal"
+                                        android:text="@string/dns_preset_cloudflare_title"
+                                        android:textColor="?attr/colorOnSurface"
+                                        android:textSize="11sp"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <ImageView
+                                    android:layout_width="0dp"
+                                    android:layout_height="16dp"
+                                    android:layout_weight="1.3"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_check_small"
+                                    app:tint="@color/status_green"
+                                    android:contentDescription="@null" />
+
+                                <ImageView
+                                    android:layout_width="0dp"
+                                    android:layout_height="16dp"
+                                    android:layout_weight="1.3"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_close"
+                                    app:tint="?attr/colorOutline"
+                                    android:contentDescription="@null" />
+
+                                <ImageView
+                                    android:layout_width="0dp"
+                                    android:layout_height="16dp"
+                                    android:layout_weight="1.4"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_check_small"
+                                    app:tint="@color/status_green"
+                                    android:contentDescription="@null" />
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="2.6"
+                                    android:gravity="center"
+                                    android:fontFamily="@font/tajawal"
+                                    android:text="@string/dns_speed_fast"
+                                    android:textColor="@color/status_green"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <View
+                                android:layout_width="match_parent"
+                                android:layout_height="1dp"
+                                android:background="?attr/colorOutlineVariant" />
+
+                            <!-- Row 2: Control D (Light) -->
+                            <LinearLayout
+                                android:id="@+id/rowDnsControlD"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="48dp"
+                                android:background="?attr/selectableItemBackground"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="6dp">
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="3.4"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <RadioButton
+                                        android:id="@+id/rbDnsControlD"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:clickable="false"
+                                        android:focusable="false"
+                                        android:minWidth="0dp"
+                                        android:minHeight="0dp" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="4dp"
+                                        android:fontFamily="@font/tajawal"
+                                        android:text="@string/dns_preset_controld_title"
+                                        android:textColor="?attr/colorOnSurface"
+                                        android:textSize="11sp"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <ImageView
+                                    android:layout_width="0dp"
+                                    android:layout_height="16dp"
+                                    android:layout_weight="1.3"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_check_small"
+                                    app:tint="@color/status_green"
+                                    android:contentDescription="@null" />
+
+                                <ImageView
+                                    android:layout_width="0dp"
+                                    android:layout_height="16dp"
+                                    android:layout_weight="1.3"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_check_small"
+                                    app:tint="@color/status_green"
+                                    android:contentDescription="@null" />
+
+                                <ImageView
+                                    android:layout_width="0dp"
+                                    android:layout_height="16dp"
+                                    android:layout_weight="1.4"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_check_small"
+                                    app:tint="@color/status_green"
+                                    android:contentDescription="@null" />
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="2.6"
+                                    android:gravity="center"
+                                    android:fontFamily="@font/tajawal"
+                                    android:text="@string/dns_speed_warn"
+                                    android:textColor="@color/status_orange"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <View
+                                android:layout_width="match_parent"
+                                android:layout_height="1dp"
+                                android:background="?attr/colorOutlineVariant" />
+
+                            <!-- Row 3: AdGuard Family -->
+                            <LinearLayout
+                                android:id="@+id/rowDnsAdguard"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="48dp"
+                                android:background="?attr/selectableItemBackground"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="6dp">
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="3.4"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <RadioButton
+                                        android:id="@+id/rbDnsAdguard"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:clickable="false"
+                                        android:focusable="false"
+                                        android:minWidth="0dp"
+                                        android:minHeight="0dp" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="4dp"
+                                        android:fontFamily="@font/tajawal"
+                                        android:text="@string/dns_preset_adguard_title"
+                                        android:textColor="?attr/colorOnSurface"
+                                        android:textSize="11sp"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <ImageView
+                                    android:layout_width="0dp"
+                                    android:layout_height="16dp"
+                                    android:layout_weight="1.3"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_check_small"
+                                    app:tint="@color/status_green"
+                                    android:contentDescription="@null" />
+
+                                <ImageView
+                                    android:layout_width="0dp"
+                                    android:layout_height="16dp"
+                                    android:layout_weight="1.3"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_check_small"
+                                    app:tint="@color/status_green"
+                                    android:contentDescription="@null" />
+
+                                <ImageView
+                                    android:layout_width="0dp"
+                                    android:layout_height="16dp"
+                                    android:layout_weight="1.4"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_close"
+                                    app:tint="?attr/colorOutline"
+                                    android:contentDescription="@null" />
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="2.6"
+                                    android:gravity="center"
+                                    android:fontFamily="@font/tajawal"
+                                    android:text="@string/dns_speed_medium"
+                                    android:textColor="@color/status_orange"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Manual Custom DNS input below table -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:fontFamily="@font/tajawal"
+                        android:text="@string/dns_manual_input_label"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/tilDnsHost"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="6dp"
                         app:boxCornerRadiusBottomEnd="12dp"
                         app:boxCornerRadiusBottomStart="12dp"
                         app:boxCornerRadiusTopEnd="12dp"
@@ -78,73 +432,8 @@
                             android:inputType="textUri"
                             android:maxLines="1"
                             android:singleLine="true"
-                            android:textSize="13sp" />
+                            android:textSize="12sp" />
                     </com.google.android.material.textfield.TextInputLayout>
-
-                    <!-- DNS Quick Presets -->
-                    <HorizontalScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:scrollbars="none">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnPresetControlD"
-                                style="@style/Widget.Material3.Button.TonalButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:paddingVertical="0dp"
-                                android:text="@string/btn_dns_preset_controld"
-                                android:textSize="11sp"
-                                app:cornerRadius="10dp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnPresetAdguard"
-                                style="@style/Widget.Material3.Button.TonalButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:layout_marginStart="6dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:paddingVertical="0dp"
-                                android:text="@string/btn_dns_preset_adguard"
-                                android:textSize="11sp"
-                                app:cornerRadius="10dp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnPresetCloudflare"
-                                style="@style/Widget.Material3.Button.TonalButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:layout_marginStart="6dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:paddingVertical="0dp"
-                                android:text="@string/btn_dns_preset_cloudflare"
-                                android:textSize="11sp"
-                                app:cornerRadius="10dp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnPresetNextDns"
-                                style="@style/Widget.Material3.Button.TonalButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:layout_marginStart="6dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:paddingVertical="0dp"
-                                android:text="@string/btn_dns_preset_nextdns"
-                                android:textSize="11sp"
-                                app:cornerRadius="10dp" />
-                        </LinearLayout>
-                    </HorizontalScrollView>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

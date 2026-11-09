@@ -588,9 +588,23 @@
     <string name="guardian_dns_title">Custom DNS Host</string>
     <string name="guardian_dns_desc">Enforce a specific NextDNS or AdGuard TLS hostname.</string>
     <string name="guardian_dns_hint">e.g. your-id.dns.nextdns.io</string>
-    <string name="btn_dns_preset_controld">Control D (Default)</string>
+    <string name="dns_table_title">Verified DNS Servers Comparison</string>
+    <string name="dns_col_server">Server</string>
+    <string name="dns_col_porn">Adult</string>
+    <string name="dns_col_ads">Ads</string>
+    <string name="dns_col_youtube">YouTube</string>
+    <string name="dns_col_speed">Speed (EG)</string>
+    <string name="dns_speed_fast">Ultra (15ms)</string>
+    <string name="dns_speed_warn">Slow (EU)</string>
+    <string name="dns_speed_medium">Medium</string>
+    <string name="dns_preset_cloudflare_title">Cloudflare Family (Default)</string>
+    <string name="dns_preset_controld_title">Control D (Light)</string>
+    <string name="dns_preset_adguard_title">AdGuard Family</string>
+    <string name="dns_manual_input_label">Or enter custom DoT Hostname:</string>
+
+    <string name="btn_dns_preset_controld">Control D (Comprehensive)</string>
     <string name="btn_dns_preset_adguard">AdGuard Family</string>
-    <string name="btn_dns_preset_cloudflare">Cloudflare Family</string>
+    <string name="btn_dns_preset_cloudflare">Cloudflare Family (Default)</string>
     <string name="btn_dns_preset_nextdns">Default NextDNS</string>
     <string name="toast_partner_deleted">Partner removed successfully.</string>
     <string name="btn_retry">Retry</string>

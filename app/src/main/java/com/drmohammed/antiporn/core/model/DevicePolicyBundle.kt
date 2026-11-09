@@ -28,7 +28,7 @@ data class DevicePolicyBundle(
     val isFullSystemFilteringEnabled: Boolean = false,
     val customBlockedUrls: Set<String> = emptySet(),
     val customAllowedUrls: Set<String> = emptySet(),
-    val dnsHost: String = CONTROLD_FAMILY_DNS_HOST,
+    val dnsHost: String = CLOUDFLARE_FAMILY_DNS_HOST,
     val isYouTubeRestrictedModeEnabled: Boolean = false,
     val isTelegramWebBlocked: Boolean = true,
     val guardianUid: String? = null,
@@ -157,6 +157,7 @@ data class DevicePolicyBundle(
         const val BROWSER_FILTER_WHITELIST_ONLY = 2
 
         const val CONTROLD_FAMILY_DNS_HOST = "no-ads-drugs-malware-porn-gambling-dating-typo.freedns.controld.com"
+        const val CONTROLD_NO_ADS_PORN_DNS_HOST = "no-ads-porn.freedns.controld.com"
         const val ADGUARD_FAMILY_DNS_HOST = "family.adguard-dns.com"
         const val CLOUDFLARE_FAMILY_DNS_HOST = "family.cloudflare-dns.com"
         const val LEGACY_DEFAULT_NEXTDNS_HOST = "family.cloudflare-dns.com"
@@ -173,7 +174,7 @@ data class DevicePolicyBundle(
             customBlockedUrls = emptySet(),
             customAllowedUrls = emptySet(),
             customCurfewWhitelistPackages = com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST,
-            dnsHost = CONTROLD_FAMILY_DNS_HOST,
+            dnsHost = CLOUDFLARE_FAMILY_DNS_HOST,
             isYouTubeRestrictedModeEnabled = false,
             isTelegramWebBlocked = true,
             guardianUid = null,
@@ -225,7 +226,7 @@ data class DevicePolicyBundle(
             val customBlockedUrls = (map["customBlockedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
             val customAllowedUrls = (map["customAllowedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
-            val dns = (map["dnsHost"] as? String)?.takeIf { it.isNotBlank() } ?: CONTROLD_FAMILY_DNS_HOST
+            val dns = (map["dnsHost"] as? String)?.takeIf { it.isNotBlank() } ?: CLOUDFLARE_FAMILY_DNS_HOST
             val ytRestricted = (map["isYouTubeRestrictedModeEnabled"] as? Boolean) ?: false
             val tgBlocked = (map["isTelegramWebBlocked"] as? Boolean) ?: true
 
@@ -307,7 +308,7 @@ data class DevicePolicyBundle(
                 val customBlockedUrls = json.optJSONArray("customBlockedUrls").toStringSet()
                 val customAllowedUrls = json.optJSONArray("customAllowedUrls").toStringSet()
 
-                val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: CONTROLD_FAMILY_DNS_HOST
+                val dns = json.optString("dnsHost", "").takeIf { it.isNotBlank() } ?: CLOUDFLARE_FAMILY_DNS_HOST
                 val ytRestricted = json.optBoolean("isYouTubeRestrictedModeEnabled", false)
                 val tgBlocked = json.optBoolean("isTelegramWebBlocked", true)
                 val gUid = json.optString("guardianUid", "").takeIf { it.isNotBlank() }

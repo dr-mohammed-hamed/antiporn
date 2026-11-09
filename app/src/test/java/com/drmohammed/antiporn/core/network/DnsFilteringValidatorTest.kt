@@ -12,6 +12,7 @@ class DnsFilteringValidatorTest {
     @Test
     fun testIsKnownFamilyPreset() {
         assertTrue(DnsFilteringValidator.isKnownFamilyPreset(DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST))
+        assertTrue(DnsFilteringValidator.isKnownFamilyPreset(DevicePolicyBundle.CONTROLD_NO_ADS_PORN_DNS_HOST))
         assertTrue(DnsFilteringValidator.isKnownFamilyPreset(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST))
         assertTrue(DnsFilteringValidator.isKnownFamilyPreset(DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST))
         assertTrue(DnsFilteringValidator.isKnownFamilyPreset("FAMILY-FILTER-DNS.CLEANBROWSING.ORG"))

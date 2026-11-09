@@ -10,6 +10,7 @@ class ActiveShieldsEvaluatorTest {
     @Test
     fun testIsHostAdultFiltering_knownFamilyPresets_returnTrue() {
         assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering(DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST))
+        assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering(DevicePolicyBundle.CONTROLD_NO_ADS_PORN_DNS_HOST))
         assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST))
         assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering(DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST))
         assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering("family-filter-dns.cleanbrowsing.org"))

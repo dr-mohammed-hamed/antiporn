@@ -11,6 +11,7 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.RadioButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -55,10 +56,13 @@ class WebFilterSettingsActivity : AppCompatActivity() {
     private lateinit var toolbar: MaterialToolbar
     private lateinit var tilDnsHost: TextInputLayout
     private lateinit var etDnsHost: TextInputEditText
-    private lateinit var btnPresetControlD: MaterialButton
-    private lateinit var btnPresetAdguard: MaterialButton
-    private lateinit var btnPresetCloudflare: MaterialButton
-    private lateinit var btnPresetNextDns: MaterialButton
+    private lateinit var rowDnsCloudflare: View
+    private lateinit var rbDnsCloudflare: RadioButton
+    private lateinit var rowDnsControlD: View
+    private lateinit var rbDnsControlD: RadioButton
+    private lateinit var rowDnsAdguard: View
+    private lateinit var rbDnsAdguard: RadioButton
+    private var isProgrammaticDnsChange = false
     private lateinit var switchBlockIncognito: MaterialSwitch
     private lateinit var switchBlockTelegramWeb: MaterialSwitch
     private lateinit var btnAddBlockedUrl: MaterialButton
@@ -138,10 +142,12 @@ class WebFilterSettingsActivity : AppCompatActivity() {
 
         tilDnsHost = findViewById(R.id.tilDnsHost)
         etDnsHost = findViewById(R.id.etDnsHost)
-        btnPresetControlD = findViewById(R.id.btnPresetControlD)
-        btnPresetAdguard = findViewById(R.id.btnPresetAdguard)
-        btnPresetCloudflare = findViewById(R.id.btnPresetCloudflare)
-        btnPresetNextDns = findViewById(R.id.btnPresetNextDns)
+        rowDnsCloudflare = findViewById(R.id.rowDnsCloudflare)
+        rbDnsCloudflare = findViewById(R.id.rbDnsCloudflare)
+        rowDnsControlD = findViewById(R.id.rowDnsControlD)
+        rbDnsControlD = findViewById(R.id.rbDnsControlD)
+        rowDnsAdguard = findViewById(R.id.rowDnsAdguard)
+        rbDnsAdguard = findViewById(R.id.rbDnsAdguard)
         switchBlockIncognito = findViewById(R.id.switchBlockIncognito)
         switchBlockTelegramWeb = findViewById(R.id.switchBlockTelegramWeb)
         btnAddBlockedUrl = findViewById(R.id.btnAddBlockedUrl)
@@ -157,33 +163,63 @@ class WebFilterSettingsActivity : AppCompatActivity() {
         blockedUrls.clear()
         blockedUrls.addAll(initialPolicy.customBlockedUrls)
 
+        isProgrammaticDnsChange = true
         etDnsHost.setText(currentDnsHost)
+        isProgrammaticDnsChange = false
+        updateTableSelection(currentDnsHost)
+
         switchBlockIncognito.isChecked = isIncognitoBlocked
         switchBlockTelegramWeb.isChecked = isTelegramWebBlocked
     }
 
+    private fun updateTableSelection(host: String) {
+        val clean = host.trim().lowercase()
+        val isCloudflare = clean == DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST.lowercase()
+        val isControlD = clean == DevicePolicyBundle.CONTROLD_NO_ADS_PORN_DNS_HOST.lowercase() ||
+                clean == DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST.lowercase()
+        val isAdguard = clean == DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST.lowercase()
+
+        rbDnsCloudflare.isChecked = isCloudflare
+        rbDnsControlD.isChecked = isControlD
+        rbDnsAdguard.isChecked = isAdguard
+
+        rowDnsCloudflare.isActivated = isCloudflare
+        rowDnsControlD.isActivated = isControlD
+        rowDnsAdguard.isActivated = isAdguard
+    }
+
     private fun setupListeners() {
+        val selectPreset = { host: String ->
+            isProgrammaticDnsChange = true
+            etDnsHost.setText(host)
+            etDnsHost.setSelection(host.length)
+            isProgrammaticDnsChange = false
+            updateTableSelection(host)
+            currentDnsHost = host
+            updateSaveButtonState()
+        }
+
+        rowDnsCloudflare.setOnClickListener {
+            selectPreset(DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST)
+        }
+        rowDnsControlD.setOnClickListener {
+            selectPreset(DevicePolicyBundle.CONTROLD_NO_ADS_PORN_DNS_HOST)
+        }
+        rowDnsAdguard.setOnClickListener {
+            selectPreset(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST)
+        }
+
         etDnsHost.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 currentDnsHost = s?.toString()?.trim().orEmpty()
+                if (!isProgrammaticDnsChange) {
+                    updateTableSelection(currentDnsHost)
+                }
                 updateSaveButtonState()
             }
             override fun afterTextChanged(s: Editable?) {}
         })
-
-        btnPresetControlD.setOnClickListener {
-            etDnsHost.setText(DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST)
-        }
-        btnPresetAdguard.setOnClickListener {
-            etDnsHost.setText(DevicePolicyBundle.ADGUARD_FAMILY_DNS_HOST)
-        }
-        btnPresetCloudflare.setOnClickListener {
-            etDnsHost.setText(DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST)
-        }
-        btnPresetNextDns.setOnClickListener {
-            etDnsHost.setText(DevicePolicyBundle.LEGACY_DEFAULT_NEXTDNS_HOST)
-        }
 
         switchBlockIncognito.setOnCheckedChangeListener { _, isChecked ->
             isIncognitoBlocked = isChecked
@@ -282,7 +318,7 @@ class WebFilterSettingsActivity : AppCompatActivity() {
     }
 
     private fun hasUnsavedChanges(): Boolean {
-        val cleanInputDns = currentDnsHost.ifBlank { DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST }
+        val cleanInputDns = currentDnsHost.ifBlank { DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST }
         return cleanInputDns != initialPolicy.dnsHost ||
                 isIncognitoBlocked != initialPolicy.isIncognitoBlocked ||
                 isTelegramWebBlocked != initialPolicy.isTelegramWebBlocked ||
@@ -301,13 +337,14 @@ class WebFilterSettingsActivity : AppCompatActivity() {
         isSaving = true
         updateSaveButtonState()
 
-        val dnsToSave = currentDnsHost.ifBlank { DevicePolicyBundle.CONTROLD_FAMILY_DNS_HOST }
+        val dnsToSave = currentDnsHost.ifBlank { DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST }
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val validationResult = DnsFilteringValidator.validateDnsHost(dnsToSave)
                 if (validationResult is DnsFilteringValidator.ValidationResult.UnfilteredPorn) {
                     withContext(Dispatchers.Main) {
+                        if (isFinishing || isDestroyed) return@withContext
                         isSaving = false
                         updateSaveButtonState()
                         tilDnsHost.error = getString(R.string.dns_probe_error_not_blocking)
@@ -340,13 +377,16 @@ class WebFilterSettingsActivity : AppCompatActivity() {
                     val saved = policyRepo.saveAndEnforceSelfPolicy(updatedPolicy)
                     if (saved) {
                         withContext(Dispatchers.Main) {
-                            ProtectionEngine.applyAllAsync(app)
+                            if (!isFinishing && !isDestroyed) {
+                                ProtectionEngine.applyAllAsync(app)
+                            }
                         }
                     }
                     saved
                 }
 
                 withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
                     isSaving = false
                     if (success) {
                         Toast.makeText(this@WebFilterSettingsActivity, R.string.toast_self_policy_saved, Toast.LENGTH_SHORT).show()
@@ -365,6 +405,7 @@ class WebFilterSettingsActivity : AppCompatActivity() {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.e("WebFilterSettings", "Error saving web filter settings", e)
                 withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
                     isSaving = false
                     updateSaveButtonState()
                     Toast.makeText(this@WebFilterSettingsActivity, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
