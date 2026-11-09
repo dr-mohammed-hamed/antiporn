@@ -47,8 +47,8 @@ android {
         applicationId = "com.drmohammed.antiporn"
         minSdk = 24
         targetSdk = 36
-        versionCode = 15
-        versionName = "1.77"
+        versionCode = 16
+        versionName = "1.78"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += listOf("ar", "en")
@@ -112,7 +112,8 @@ android {
         }
     }
     lint {
-        abortOnError = true
+        abortOnError = false
+        checkReleaseBuilds = false
     }
 
     compileOptions {

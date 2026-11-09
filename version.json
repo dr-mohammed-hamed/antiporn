@@ -1,11 +1,11 @@
 {
-  "versionCode": 15,
-  "versionName": "1.77",
+  "versionCode": 16,
+  "versionName": "1.78",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 33501392,
+  "fileSizeBytes": 35480337,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.77: إصلاح شامل للتبديل بين الوضع النهاري والليلي (Light/Dark Mode)، منع الظهور المفاجئ لنافذة رمز الـ QR، حماية مفاتيح الحظر والسياسات من استعادة الحالة التلقائية، وتعزيز استقرار دروع الحماية.",
-  "releaseDate": "2026-11-07"
+  "releaseNotes": "إصدار 1.78: إتاحة إلغاء تثبيت منظم وآمن لمالك الجهاز (Device Owner) بإذن مسبق، اعتماد خوادم Cloudflare Family المشفرة مع قياس زمن الاستجابة، سد تسريبات الـ VPN أثناء حظر التجوال، تخصيص اسم المحمي في شريط التطبيق، وتقسيم شاشات التحكم لسهولة وسرعة الوصول.",
+  "releaseDate": "2026-11-09"
 }
