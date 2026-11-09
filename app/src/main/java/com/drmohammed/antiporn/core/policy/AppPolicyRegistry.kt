@@ -300,7 +300,9 @@ object AppPolicyRegistry {
      * Determines whether an application is a permanent 24/7 security threat (Telegram, TikTok, Proxy Browsers).
      */
     fun isPermanentlyBlacklisted(packageName: String): Boolean {
-        return isHighRisk(packageName)
+        // Under Unified Zero-Trust architecture, no package is permanently blacklisted or silently uninstalled;
+        // all non-system applications are subject to Zero-Trust freeze until supervisor approval.
+        return false
     }
 
     /**
@@ -362,8 +364,8 @@ object AppPolicyRegistry {
      * Returns all explicit blacklisted packages.
      */
     fun getBlacklistedPackages(): Set<String> {
-        return RULES.filter { it.classification == AppClassification.PERMANENT_BLACKLIST && !it.isWildcard }
-            .map { it.pattern }.toSet()
+        // Under Unified Zero-Trust architecture, blacklist is empty to prevent automatic silent uninstallations or hiding.
+        return emptySet()
     }
 
     /**

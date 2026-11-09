@@ -1,5 +1,6 @@
 package com.drmohammed.antiporn.shields
 
+import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -25,7 +26,8 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in telegramPackages) {
-            assertTrue("Package $pkg must be permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertFalse("Package $pkg must not be blacklisted under Unified Zero-Trust", AppSuspensionShield.isBlacklisted(pkg))
+            assertTrue("Package $pkg must be high risk", AppPolicyRegistry.isHighRisk(pkg))
             assertEquals("Telegram", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -51,7 +53,8 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in socialPackages) {
-            assertTrue("Package $pkg must be permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertFalse("Package $pkg must not be blacklisted under Unified Zero-Trust", AppSuspensionShield.isBlacklisted(pkg))
+            assertTrue("Package $pkg must be high risk", AppPolicyRegistry.isHighRisk(pkg))
             assertEquals("Open Social Network", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -76,7 +79,8 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in browsers) {
-            assertTrue("Package $pkg must be permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertFalse("Package $pkg must not be blacklisted under Unified Zero-Trust", AppSuspensionShield.isBlacklisted(pkg))
+            assertTrue("Package $pkg must be high risk", AppPolicyRegistry.isHighRisk(pkg))
             assertEquals("Proxy Browser", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -95,7 +99,8 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in chatApps) {
-            assertTrue("Package $pkg must be permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertFalse("Package $pkg must not be blacklisted under Unified Zero-Trust", AppSuspensionShield.isBlacklisted(pkg))
+            assertTrue("Package $pkg must be high risk", AppPolicyRegistry.isHighRisk(pkg))
             assertEquals("Random Chat App", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -113,7 +118,8 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in tikTokApps) {
-            assertTrue("Package $pkg must be permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertFalse("Package $pkg must not be blacklisted under Unified Zero-Trust", AppSuspensionShield.isBlacklisted(pkg))
+            assertTrue("Package $pkg must be high risk", AppPolicyRegistry.isHighRisk(pkg))
             assertEquals("TikTok", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -180,6 +186,7 @@ class AppSuspensionShieldTest {
             AppSuspensionShield.TIKTOK_PACKAGES.size
 
         assertEquals(51, totalExpected)
-        assertEquals(51, AppSuspensionShield.BLACKLISTED_PACKAGES.size)
+        assertTrue("BLACKLISTED_PACKAGES must be empty under Unified Zero-Trust", AppSuspensionShield.BLACKLISTED_PACKAGES.isEmpty())
+        assertEquals(0, AppSuspensionShield.BLACKLISTED_PACKAGES.size)
     }
 }

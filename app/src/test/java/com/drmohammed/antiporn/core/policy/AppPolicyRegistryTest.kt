@@ -29,6 +29,7 @@ class AppPolicyRegistryTest {
         val highRiskPackages = listOf(
             "org.telegram.messenger",
             "org.telegram.messenger.web",
+            "com.reddit.frontpage",
             "com.zhiliaoapp.musically",
             "org.torproject.torbrowser",
             "org.mozilla.firefox",
@@ -38,12 +39,15 @@ class AppPolicyRegistryTest {
 
         for (pkg in highRiskPackages) {
             assertTrue("Expected isHighRisk to be true for $pkg", AppPolicyRegistry.isHighRisk(pkg))
-            assertTrue("Expected isPermanentlyBlacklisted to be true for $pkg", AppPolicyRegistry.isPermanentlyBlacklisted(pkg))
+            assertFalse("Expected isPermanentlyBlacklisted to be false for $pkg under Unified Zero-Trust", AppPolicyRegistry.isPermanentlyBlacklisted(pkg))
             assertFalse("Expected isExemptFromCurfew to be false for $pkg", AppPolicyRegistry.isExemptFromCurfew(pkg))
         }
 
-        assertTrue("Blacklisted packages must not be empty", AppPolicyRegistry.getBlacklistedPackages().isNotEmpty())
-        assertTrue("Blacklisted packages must contain Telegram", AppPolicyRegistry.getBlacklistedPackages().contains("org.telegram.messenger"))
+        assertFalse("Self-protection must not be high-risk", AppPolicyRegistry.isHighRisk("com.drmohammed.antiporn"))
+        assertFalse("Calculator must not be high-risk", AppPolicyRegistry.isHighRisk("com.google.android.calculator"))
+        assertFalse("Calculator must not be permanently blacklisted", AppPolicyRegistry.isPermanentlyBlacklisted("com.google.android.calculator"))
+
+        assertTrue("Blacklisted packages must be empty under Unified Zero-Trust", AppPolicyRegistry.getBlacklistedPackages().isEmpty())
     }
 
     @Test
@@ -51,6 +55,7 @@ class AppPolicyRegistryTest {
         val highRiskPackages = listOf(
             "org.telegram.messenger",
             "org.telegram.messenger.web",
+            "com.reddit.frontpage",
             "com.zhiliaoapp.musically",
             "org.torproject.torbrowser",
             "org.mozilla.firefox",

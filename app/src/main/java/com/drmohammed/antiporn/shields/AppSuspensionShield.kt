@@ -25,8 +25,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Pluggable security shield targeting unauthorized and unrestricted applications:
- * Suspends, hides, and silently uninstalls Telegram clients, open social networks,
- * proxy/bypass browsers, and random/anonymous chat applications.
+ * Suspends Telegram clients, open social networks, proxy/bypass browsers,
+ * and random/anonymous chat applications.
  */
 object AppSuspensionShield : ProtectionShield {
 
@@ -228,23 +228,6 @@ object AppSuspensionShield : ProtectionShield {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to suspend package: $packageName", e)
-            }
-
-            // Check-Before-Write: hide application only if not already hidden
-            try {
-                val isHidden = try { dpm.isApplicationHidden(admin, packageName) } catch (e: Exception) { false }
-                if (!isHidden) {
-                    val hidden = dpm.setApplicationHidden(admin, packageName, true)
-                    if (hidden) {
-                        Log.i(TAG, "Hidden package: $packageName")
-                    } else {
-                        Log.w(TAG, "Failed to hide package: $packageName")
-                    }
-                } else {
-                    Log.d(TAG, "Package $packageName is already hidden; skipping setApplicationHidden")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to hide package: $packageName", e)
             }
 
             uninstallSilently(context, packageName)

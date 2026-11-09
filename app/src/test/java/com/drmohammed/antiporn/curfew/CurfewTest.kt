@@ -171,13 +171,11 @@ class CurfewTest {
         val telegramPkg = "org.telegram.messenger"
         val tiktokPkg = "com.zhiliaoapp.musically"
 
-        assertTrue(AppSuspensionShield.isBlacklisted(telegramPkg))
-        assertTrue(AppSuspensionShield.isBlacklisted(tiktokPkg))
+        assertFalse("Under Unified Zero-Trust, no app is permanently blacklisted", AppSuspensionShield.isBlacklisted(telegramPkg))
+        assertFalse("Under Unified Zero-Trust, no app is permanently blacklisted", AppSuspensionShield.isBlacklisted(tiktokPkg))
 
-        val candidates = setOf(telegramPkg, tiktokPkg, "com.google.android.youtube")
-        val safeToUnsuspend = candidates.filterNot { AppSuspensionShield.isBlacklisted(it) }
-
-        assertEquals(listOf("com.google.android.youtube"), safeToUnsuspend)
+        assertTrue("Telegram is classified as high-risk", com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(telegramPkg))
+        assertTrue("TikTok is classified as high-risk", com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(tiktokPkg))
     }
 
     @Test

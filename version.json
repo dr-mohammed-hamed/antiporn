@@ -1,11 +1,11 @@
 {
-  "versionCode": 16,
-  "versionName": "1.78",
+  "versionCode": 17,
+  "versionName": "1.79",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
   "fileSizeBytes": 35480337,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.78: إتاحة إلغاء تثبيت منظم وآمن لمالك الجهاز (Device Owner) بإذن مسبق، اعتماد خوادم Cloudflare Family المشفرة مع قياس زمن الاستجابة، سد تسريبات الـ VPN أثناء حظر التجوال، تخصيص اسم المحمي في شريط التطبيق، وتقسيم شاشات التحكم لسهولة وسرعة الوصول.",
+  "releaseNotes": "إصدار 1.79: اعتماد معمارية الثقة الصفرية الموحدة (Unified Zero-Trust) لمنع الحذف الصامت للتطبيقات أو إخفائها وإبقائها خاضعة للرقابة، تعزيز سياسات تعليق التطبيقات، سد تسريبات الـ DNS أثناء تفعيل حظر التجوال، وتحسين أداء وموثوقية النظام الأمني الشامل.",
   "releaseDate": "2026-11-09"
 }
