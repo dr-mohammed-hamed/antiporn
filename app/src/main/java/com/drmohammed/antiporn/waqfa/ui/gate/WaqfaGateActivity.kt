@@ -30,7 +30,7 @@ class WaqfaGateActivity : AppCompatActivity() {
     private lateinit var binding: ActivityWaqfaGateBinding
     private val viewModel: WaqfaGateViewModel by viewModel()
 
-    private var packageName: String = ""
+    private var targetPackageName: String = ""
     private var appName: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,10 +38,10 @@ class WaqfaGateActivity : AppCompatActivity() {
         binding = ActivityWaqfaGateBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        packageName = intent.getStringExtra(EXTRA_PACKAGE_NAME) ?: ""
-        appName = intent.getStringExtra(EXTRA_APP_NAME) ?: packageName
+        targetPackageName = intent.getStringExtra(EXTRA_PACKAGE_NAME) ?: ""
+        appName = intent.getStringExtra(EXTRA_APP_NAME) ?: targetPackageName
 
-        if (packageName.isBlank()) {
+        if (targetPackageName.isBlank()) {
             WaqfaReactionExecutor.kickToHomeScreen(this)
             finish()
             return
@@ -51,7 +51,7 @@ class WaqfaGateActivity : AppCompatActivity() {
         setupViews()
         observeUiState()
 
-        viewModel.init(packageName, appName)
+        viewModel.init(targetPackageName, appName)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -67,7 +67,7 @@ class WaqfaGateActivity : AppCompatActivity() {
             return
         }
 
-        packageName = newPkg
+        targetPackageName = newPkg
         appName = newApp
         binding.tvTargetApp.text = getString(R.string.waqfa_attempting_open, appName)
         viewModel.init(newPkg, newApp)

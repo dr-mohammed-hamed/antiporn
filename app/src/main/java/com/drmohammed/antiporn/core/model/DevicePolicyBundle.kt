@@ -22,6 +22,7 @@ data class DevicePolicyBundle(
     val lockNewInstallsUntilApproved: Boolean = true,
     val customBlacklistPackages: Set<String> = emptySet(),
     val customCurfewWhitelistPackages: Set<String> = emptySet(),
+    val customAiScanPackages: Set<String> = emptySet(),
     val curfewVpnBypassPackages: Set<String> = emptySet(),
     val protectedAppPackages: Set<String> = emptySet(),
     val browserFilterMode: Int = BROWSER_FILTER_OFF,
@@ -41,6 +42,10 @@ data class DevicePolicyBundle(
     val breakoutStatus: String? = null,
     val breakoutRequestedAt: Long? = null,
     val breakoutUnlockAt: Long? = null,
+    val deactivationStatus: String? = null,
+    val deactivationRequestedAt: Long? = null,
+    val deactivationUnlockAt: Long? = null,
+    val deactivationHasQr: Boolean = false,
     val guardianPolicySnapshot: String? = null,
     val lastSelfModifiedAt: Long? = null,
     val waqfaConfig: WaqfaConfig = WaqfaConfig(),
@@ -66,6 +71,7 @@ data class DevicePolicyBundle(
             "lockNewInstallsUntilApproved" to lockNewInstallsUntilApproved,
             "customBlacklistPackages" to customBlacklistPackages.toList(),
             "customCurfewWhitelistPackages" to customCurfewWhitelistPackages.toList(),
+            "customAiScanPackages" to customAiScanPackages.toList(),
             "curfewVpnBypassPackages" to curfewVpnBypassPackages.toList(),
             "protectedAppPackages" to protectedAppPackages.toList(),
             "browserFilterMode" to browserFilterMode,
@@ -83,6 +89,10 @@ data class DevicePolicyBundle(
             "breakoutStatus" to breakoutStatus,
             "breakoutRequestedAt" to breakoutRequestedAt,
             "breakoutUnlockAt" to breakoutUnlockAt,
+            "deactivationStatus" to deactivationStatus,
+            "deactivationRequestedAt" to deactivationRequestedAt,
+            "deactivationUnlockAt" to deactivationUnlockAt,
+            "deactivationHasQr" to deactivationHasQr,
             "guardianPolicySnapshot" to guardianPolicySnapshot,
             "lastSelfModifiedAt" to lastSelfModifiedAt,
             "waqfaConfig" to waqfaConfig.toMap(),
@@ -113,6 +123,9 @@ data class DevicePolicyBundle(
         val whitelistArr = JSONArray().apply { customCurfewWhitelistPackages.forEach { put(it) } }
         json.put("customCurfewWhitelistPackages", whitelistArr)
 
+        val aiScanArr = JSONArray().apply { customAiScanPackages.forEach { put(it) } }
+        json.put("customAiScanPackages", aiScanArr)
+
         val vpnBypassArr = JSONArray().apply { curfewVpnBypassPackages.forEach { put(it) } }
         json.put("curfewVpnBypassPackages", vpnBypassArr)
 
@@ -141,6 +154,10 @@ data class DevicePolicyBundle(
         if (breakoutStatus != null) json.put("breakoutStatus", breakoutStatus)
         if (breakoutRequestedAt != null) json.put("breakoutRequestedAt", breakoutRequestedAt)
         if (breakoutUnlockAt != null) json.put("breakoutUnlockAt", breakoutUnlockAt)
+        if (deactivationStatus != null) json.put("deactivationStatus", deactivationStatus)
+        if (deactivationRequestedAt != null) json.put("deactivationRequestedAt", deactivationRequestedAt)
+        if (deactivationUnlockAt != null) json.put("deactivationUnlockAt", deactivationUnlockAt)
+        json.put("deactivationHasQr", deactivationHasQr)
         if (guardianPolicySnapshot != null) json.put("guardianPolicySnapshot", guardianPolicySnapshot)
         if (lastSelfModifiedAt != null) json.put("lastSelfModifiedAt", lastSelfModifiedAt)
         json.put("waqfaConfig", waqfaConfig.toJson())
@@ -167,6 +184,13 @@ data class DevicePolicyBundle(
         const val BREAKOUT_STATUS_CANCELLED = "CANCELLED"
         const val BREAKOUT_STATUS_COMPLETED = "COMPLETED"
         const val BREAKOUT_GRACE_PERIOD_MS = 24L * 60L * 60L * 1000L // 24 Hours
+
+        const val DEACTIVATION_STATUS_PENDING = "PENDING"
+        const val DEACTIVATION_STATUS_REJECTED = "REJECTED"
+        const val DEACTIVATION_STATUS_CANCELLED = "CANCELLED"
+        const val DEACTIVATION_STATUS_COMPLETED = "COMPLETED"
+        const val DEACTIVATION_DEFAULT_DELAY_MS = 48L * 60L * 60L * 1000L // 48 Hours
+        const val DEACTIVATION_QR_DELAY_MS = 24L * 60L * 60L * 1000L // 24 Hours
 
         fun defaultPolicy(): DevicePolicyBundle = DevicePolicyBundle(
             browserFilterMode = BROWSER_FILTER_OFF,
@@ -216,6 +240,7 @@ data class DevicePolicyBundle(
             } else {
                 (map["customCurfewWhitelistPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
             }
+            val aiScan = (map["customAiScanPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
             val vpnBypass = (map["curfewVpnBypassPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
             val protectedApps = (map["protectedAppPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
 
@@ -240,6 +265,10 @@ data class DevicePolicyBundle(
             val breakoutStatus = (map["breakoutStatus"] as? String)?.takeIf { it.isNotBlank() }
             val breakoutRequestedAt = (map["breakoutRequestedAt"] as? Number)?.toLong()
             val breakoutUnlockAt = (map["breakoutUnlockAt"] as? Number)?.toLong()
+            val deactivationStatus = (map["deactivationStatus"] as? String)?.takeIf { it.isNotBlank() }
+            val deactivationRequestedAt = (map["deactivationRequestedAt"] as? Number)?.toLong()
+            val deactivationUnlockAt = (map["deactivationUnlockAt"] as? Number)?.toLong()
+            val deactivationHasQr = (map["deactivationHasQr"] as? Boolean) ?: false
             val guardianPolicySnapshot = (map["guardianPolicySnapshot"] as? String)?.takeIf { it.isNotBlank() }
             val lastSelfModifiedAt = (map["lastSelfModifiedAt"] as? Number)?.toLong()
             val waqfa = WaqfaConfig.fromMap(map["waqfaConfig"])
@@ -259,6 +288,7 @@ data class DevicePolicyBundle(
                 lockNewInstallsUntilApproved = lockNew,
                 customBlacklistPackages = blacklist,
                 customCurfewWhitelistPackages = whitelist,
+                customAiScanPackages = aiScan,
                 curfewVpnBypassPackages = vpnBypass,
                 protectedAppPackages = protectedApps,
                 browserFilterMode = browserFilterMode,
@@ -275,6 +305,9 @@ data class DevicePolicyBundle(
                 timeZoneId = timeZoneId, lastHeartbeat = lastHeartbeat,
                 breakoutStatus = breakoutStatus,
                 breakoutRequestedAt = breakoutRequestedAt, breakoutUnlockAt = breakoutUnlockAt,
+                deactivationStatus = deactivationStatus,
+                deactivationRequestedAt = deactivationRequestedAt, deactivationUnlockAt = deactivationUnlockAt,
+                deactivationHasQr = deactivationHasQr,
                 guardianPolicySnapshot = guardianPolicySnapshot,
                 lastSelfModifiedAt = lastSelfModifiedAt,
                 waqfaConfig = waqfa,
@@ -301,6 +334,7 @@ data class DevicePolicyBundle(
                 } else {
                     com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST
                 }
+                val aiScan = json.optJSONArray("customAiScanPackages").toStringSet()
                 val vpnBypass = json.optJSONArray("curfewVpnBypassPackages").toStringSet()
                 val protectedApps = json.optJSONArray("protectedAppPackages").toStringSet()
                 val browserFilterMode = json.optInt("browserFilterMode", BROWSER_FILTER_OFF).coerceIn(0, 2)
@@ -321,6 +355,10 @@ data class DevicePolicyBundle(
                 val breakoutStatus = json.optString("breakoutStatus", "").takeIf { it.isNotBlank() }
                 val breakoutRequestedAt = if (json.has("breakoutRequestedAt") && !json.isNull("breakoutRequestedAt")) json.optLong("breakoutRequestedAt") else null
                 val breakoutUnlockAt = if (json.has("breakoutUnlockAt") && !json.isNull("breakoutUnlockAt")) json.optLong("breakoutUnlockAt") else null
+                val deactivationStatus = json.optString("deactivationStatus", "").takeIf { it.isNotBlank() }
+                val deactivationRequestedAt = if (json.has("deactivationRequestedAt") && !json.isNull("deactivationRequestedAt")) json.optLong("deactivationRequestedAt") else null
+                val deactivationUnlockAt = if (json.has("deactivationUnlockAt") && !json.isNull("deactivationUnlockAt")) json.optLong("deactivationUnlockAt") else null
+                val deactivationHasQr = json.optBoolean("deactivationHasQr", false)
                 val guardianPolicySnapshot = json.optString("guardianPolicySnapshot", "").takeIf { it.isNotBlank() }
                 val lastSelfModifiedAt = if (json.has("lastSelfModifiedAt") && !json.isNull("lastSelfModifiedAt")) json.optLong("lastSelfModifiedAt") else null
                 val waqfa = WaqfaConfig.fromJson(json.optJSONObject("waqfaConfig"))
@@ -342,6 +380,7 @@ data class DevicePolicyBundle(
                     lockNewInstallsUntilApproved = json.optBoolean("lockNewInstallsUntilApproved", true),
                     customBlacklistPackages = blacklist,
                     customCurfewWhitelistPackages = whitelist,
+                    customAiScanPackages = aiScan,
                     curfewVpnBypassPackages = vpnBypass,
                     protectedAppPackages = protectedApps,
                     browserFilterMode = browserFilterMode,
@@ -358,6 +397,9 @@ data class DevicePolicyBundle(
                     timeZoneId = timeZoneId, lastHeartbeat = lastHeartbeat,
                     breakoutStatus = breakoutStatus,
                     breakoutRequestedAt = breakoutRequestedAt, breakoutUnlockAt = breakoutUnlockAt,
+                    deactivationStatus = deactivationStatus,
+                    deactivationRequestedAt = deactivationRequestedAt, deactivationUnlockAt = deactivationUnlockAt,
+                    deactivationHasQr = deactivationHasQr,
                     guardianPolicySnapshot = guardianPolicySnapshot,
                     lastSelfModifiedAt = lastSelfModifiedAt,
                     waqfaConfig = waqfa,

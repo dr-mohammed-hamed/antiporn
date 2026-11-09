@@ -2,6 +2,7 @@ package com.drmohammed.antiporn.waqfa.engine
 
 import android.content.Context
 import android.util.Log
+import timber.log.Timber
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.CurfewAppResolver
 import com.drmohammed.antiporn.data.repository.PolicyRepository
@@ -48,6 +49,11 @@ class WaqfaSessionManager(
     fun updateConfig(config: WaqfaConfig) {
         cachedConfig = config
         Log.i(TAG, "WaqfaConfig updated: isEnabled=${config.isEnabled}, targets=${config.targetPackages.size}")
+        try {
+            WaqfaForegroundWatcher.getInstance(context).notifyConfigChanged()
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Could not notify WaqfaForegroundWatcher of config update")
+        }
     }
 
     fun getConfig(): WaqfaConfig = cachedConfig

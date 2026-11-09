@@ -1,9 +1,9 @@
 package com.drmohammed.antiporn.core.network.dns
 
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import kotlinx.coroutines.*
+import timber.log.Timber
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
@@ -33,7 +33,7 @@ class DnsTunnelWorker(
                 var outStream: FileOutputStream? = null
                 val packetBuffer = ByteArray(PACKET_BUFFER_SIZE)
 
-                Log.i(TAG, "DNS Filtering Loop active on TUN interface (24/7 Defense)")
+                Timber.tag(TAG).i("DNS Filtering Loop active on TUN interface (24/7 Defense)")
 
                 try {
                     inStream = FileInputStream(pfd.fileDescriptor)
@@ -43,20 +43,33 @@ class DnsTunnelWorker(
                         val bytesRead = try {
                             inStream.read(packetBuffer)
                         } catch (e: IOException) {
-                            Log.d(TAG, "TUN read IOException: ${e.message}")
+                            Timber.tag(TAG).d("TUN read IOException: ${e.message}")
                             break // Interface closed or handover initiated
                         }
-                        if (bytesRead <= 0) continue
+                        if (bytesRead < 0) {
+                            Timber.tag(TAG).d("TUN interface EOF reached; breaking read loop")
+                            break
+                        }
+                        if (bytesRead == 0) continue
 
                         val version = (packetBuffer[0].toInt() and 0xFF) ushr 4
-                        Log.d(TAG, "TUN packet read: $bytesRead bytes, ipVersion=$version")
+                        Timber.tag(TAG).d("TUN packet read: $bytesRead bytes, ipVersion=$version")
+
+                        if (version == 6) {
+                            val ipv6Refused = DnsPacketParser.buildIpv6RefusedResponse(packetBuffer, bytesRead)
+                            if (ipv6Refused != null) {
+                                Timber.tag(TAG).i("Instant REFUSED sent for IPv6 DNS query -> forces fast IPv4 fallback")
+                                writeToTun(outStream, ipv6Refused)
+                            }
+                            continue
+                        }
 
                         val parsedQuery = DnsPacketParser.parseDnsQuery(packetBuffer, bytesRead)
                         if (parsedQuery == null) {
-                            Log.d(TAG, "Non-DNS or unparsed packet received on TUN (version=$version, len=$bytesRead)")
+                            Timber.tag(TAG).d("Non-DNS or unparsed packet received on TUN (version=$version, len=$bytesRead)")
                             continue
                         }
-                        Log.i(TAG, "DNS Query: ${parsedQuery.qName} (type=${parsedQuery.qType}) from ${parsedQuery.srcPort}")
+                        Timber.tag(TAG).i("DNS Query: ${parsedQuery.qName} (type=${parsedQuery.qType}) from ${parsedQuery.srcPort}")
                         val policy = policyProvider()
                         val customBlocked = customBlockedProvider()
                         val action = DnsPolicyEvaluator.evaluate(parsedQuery, policy, customBlocked)
@@ -94,14 +107,14 @@ class DnsTunnelWorker(
                                             writeToTun(outStream, clientPacket)
                                         }
                                     } catch (e: Exception) {
-                                        Log.w(TAG, "Upstream DNS query failed for ${parsedQuery.qName}: ${e.message}")
+                                        Timber.tag(TAG).w("Upstream DNS query failed for ${parsedQuery.qName}: ${e.message}")
                                     }
                                 }
                             }
                         }
                     }
                 } catch (e: Exception) {
-                    Log.d(TAG, "DNS Filtering Loop terminated: ${e.message}")
+                    Timber.tag(TAG).d("DNS Filtering Loop terminated: ${e.message}")
                 } finally {
                     try { inStream?.close() } catch (_: Exception) {}
                     try { outStream?.close() } catch (_: Exception) {}
@@ -114,9 +127,9 @@ class DnsTunnelWorker(
         synchronized(outStreamLock) {
             try {
                 outStream.write(packet)
-                Log.d(TAG, "Sent response packet to TUN (${packet.size} bytes)")
+                Timber.tag(TAG).d("Sent response packet to TUN (${packet.size} bytes)")
             } catch (e: IOException) {
-                Log.w(TAG, "Failed writing DNS response packet to TUN", e)
+                Timber.tag(TAG).w(e, "Failed writing DNS response packet to TUN")
             }
         }
     }

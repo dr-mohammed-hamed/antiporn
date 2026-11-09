@@ -12,6 +12,7 @@ data class InstalledAppDto(
     val isCurfewWhitelisted: Boolean = false,
     val isCurfewVpnBypassed: Boolean = false,
     val isProtected: Boolean = false,
+    val isAiScanTarget: Boolean = false,
     val updatedAt: Long = System.currentTimeMillis()
 ) {
 
@@ -27,6 +28,7 @@ data class InstalledAppDto(
             "isCurfewWhitelisted" to isCurfewWhitelisted,
             "isCurfewVpnBypassed" to isCurfewVpnBypassed,
             "isProtected" to isProtected,
+            "isAiScanTarget" to isAiScanTarget,
             "updatedAt" to updatedAt
         )
     }
@@ -44,6 +46,7 @@ data class InstalledAppDto(
                 isCurfewWhitelisted = map["isCurfewWhitelisted"] as? Boolean ?: false,
                 isCurfewVpnBypassed = map["isCurfewVpnBypassed"] as? Boolean ?: false,
                 isProtected = map["isProtected"] as? Boolean ?: false,
+                isAiScanTarget = map["isAiScanTarget"] as? Boolean ?: false,
                 updatedAt = (map["updatedAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
             )
         }

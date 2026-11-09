@@ -383,4 +383,150 @@ object DnsPacketParser {
         }
         return (sum.inv() and 0xFFFF).toShort()
     }
+
+    /**
+     * Inspects an incoming raw IPv6 packet and if it is a DNS query destined for UDP port 53,
+     * immediately constructs an RFC-compliant IPv6 DNS REFUSED (RCODE 5) response packet.
+     * This signals the client resolver to immediately fallback to IPv4 DNS without any timeout.
+     */
+    fun buildIpv6RefusedResponse(packet: ByteArray, length: Int): ByteArray? {
+        if (length < 40 + UDP_HEADER_LEN + DNS_HEADER_LEN) return null
+
+        val buffer = ByteBuffer.wrap(packet, 0, length)
+        val firstByte = buffer.get(0).toInt() and 0xFF
+        val version = firstByte ushr 4
+        if (version != 6) return null
+
+        val nextHeader = buffer.get(6).toInt() and 0xFF
+        if (nextHeader != 17) return null // UDP
+
+        val srcIp = ByteArray(16)
+        val dstIp = ByteArray(16)
+        buffer.position(8)
+        buffer.get(srcIp)
+        buffer.get(dstIp)
+
+        // UDP header at offset 40
+        buffer.position(40)
+        val srcPort = buffer.short.toInt() and 0xFFFF
+        val dstPort = buffer.short.toInt() and 0xFFFF
+        val udpLength = buffer.short.toInt() and 0xFFFF
+
+        if (dstPort != DNS_PORT || udpLength < UDP_HEADER_LEN + DNS_HEADER_LEN) return null
+
+        val dnsOffset = 48
+        val dnsLength = minOf(udpLength - UDP_HEADER_LEN, length - dnsOffset)
+        if (dnsLength < DNS_HEADER_LEN) return null
+
+        val txId = buffer.getShort(dnsOffset)
+        val flags = buffer.getShort(dnsOffset + 2).toInt() and 0xFFFF
+        val isQuery = (flags and 0x8000) == 0
+        if (!isQuery) return null
+
+        val qdCount = buffer.getShort(dnsOffset + 4)
+        if ((qdCount.toInt() and 0xFFFF) != 1) return null
+
+        // Parse exact QNAME to isolate question section without trailing EDNS0 / OPT RRs
+        val questionStart = dnsOffset + DNS_HEADER_LEN
+        val dnsEnd = dnsOffset + dnsLength
+        buffer.position(questionStart)
+        var isTerminated = false
+        while (buffer.hasRemaining() && buffer.position() < dnsEnd) {
+            val labelLen = buffer.get().toInt() and 0xFF
+            if (labelLen == 0) {
+                isTerminated = true
+                break
+            }
+            if (labelLen > 63 || buffer.position() + labelLen > dnsEnd) return null
+            buffer.position(buffer.position() + labelLen)
+        }
+        if (!isTerminated || buffer.position() + 4 > dnsEnd) return null
+        buffer.position(buffer.position() + 4) // QTYPE (2 bytes) + QCLASS (2 bytes)
+        val questionEnd = buffer.position()
+
+        val questionLen = questionEnd - questionStart
+        val questionSection = ByteArray(questionLen)
+        System.arraycopy(packet, questionStart, questionSection, 0, questionLen)
+
+        val dnsResponseLen = DNS_HEADER_LEN + questionLen
+        val udpTotalLen = UDP_HEADER_LEN + dnsResponseLen
+        val ipTotalLen = 40 + udpTotalLen
+
+        val response = ByteArray(ipTotalLen)
+        val respBuf = ByteBuffer.wrap(response)
+
+        // 1. IPv6 Header (40 bytes)
+        respBuf.put(0x60.toByte()) // Version 6, Traffic class 0
+        respBuf.put(0x00.toByte())
+        respBuf.putShort(0x0000.toShort()) // Flow label
+        respBuf.putShort(udpTotalLen.toShort()) // Payload length
+        respBuf.put(17.toByte()) // Next Header = UDP
+        respBuf.put(64.toByte()) // Hop Limit
+        respBuf.put(dstIp) // Swap src/dst
+        respBuf.put(srcIp)
+
+        // 2. UDP Header (8 bytes) at offset 40
+        respBuf.putShort(dstPort.toShort()) // srcPort = 53
+        respBuf.putShort(srcPort.toShort()) // dstPort
+        respBuf.putShort(udpTotalLen.toShort())
+        respBuf.putShort(0.toShort()) // Checksum placeholder
+
+        // 3. DNS Header (12 bytes) + Question section
+        respBuf.putShort(txId)
+        respBuf.putShort(0x8185.toShort()) // QR=1, RD=1, RA=1, RCODE=5 (REFUSED)
+        respBuf.putShort(qdCount)
+        respBuf.putShort(0.toShort()) // ANCOUNT = 0
+        respBuf.putShort(0.toShort()) // NSCOUNT = 0
+        respBuf.putShort(0.toShort()) // ARCOUNT = 0
+        respBuf.put(questionSection)
+
+        // Calculate IPv6 UDP checksum
+        val checksum = calculateIpv6UdpChecksum(dstIp, srcIp, udpTotalLen, response, 40, udpTotalLen)
+        respBuf.putShort(46, checksum)
+
+        return response
+    }
+
+    private fun calculateIpv6UdpChecksum(
+        srcIp: ByteArray,
+        dstIp: ByteArray,
+        udpLen: Int,
+        udpPacket: ByteArray,
+        udpOffset: Int,
+        udpPacketLen: Int
+    ): Short {
+        var sum = 0L
+
+        // Pseudo-header: Src IPv6 (16 bytes)
+        for (i in 0 until 16 step 2) {
+            sum += (((srcIp[i].toInt() and 0xFF) shl 8) or (srcIp[i + 1].toInt() and 0xFF))
+        }
+        // Pseudo-header: Dst IPv6 (16 bytes)
+        for (i in 0 until 16 step 2) {
+            sum += (((dstIp[i].toInt() and 0xFF) shl 8) or (dstIp[i + 1].toInt() and 0xFF))
+        }
+        // UDP length (32-bit in pseudo header)
+        sum += (udpLen and 0xFFFF)
+        // Next header = 17
+        sum += 17
+
+        // UDP packet data
+        var i = udpOffset
+        val end = udpOffset + udpPacketLen
+        while (i < end - 1) {
+            sum += (((udpPacket[i].toInt() and 0xFF) shl 8) or (udpPacket[i + 1].toInt() and 0xFF))
+            i += 2
+        }
+        if (i < end) {
+            sum += ((udpPacket[i].toInt() and 0xFF) shl 8)
+        }
+
+        while ((sum ushr 16) > 0) {
+            sum = (sum and 0xFFFF) + (sum ushr 16)
+        }
+
+        var result = (sum.inv() and 0xFFFF).toInt()
+        if (result == 0) result = 0xFFFF
+        return result.toShort()
+    }
 }

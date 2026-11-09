@@ -457,6 +457,8 @@ class GuardianControlViewModel(
                 isTelegramWebBlocked = state.isTelegramWebBlocked,
                 browserFilterMode = state.currentPolicy.browserFilterMode,
                 isFullSystemFilteringEnabled = state.currentPolicy.isFullSystemFilteringEnabled,
+                waqfaConfig = state.currentPolicy.waqfaConfig,
+                customAiScanPackages = state.currentPolicy.customAiScanPackages,
                 customBlockedUrls = state.currentPolicy.customBlockedUrls,
                 customAllowedUrls = state.currentPolicy.customAllowedUrls,
                 dnsHost = rawDns,

@@ -65,12 +65,22 @@ class ScreenFrameStreamManager(
         frameCounter = 0
         fpsTimerStart = 0L
 
-        val displayMetrics = context.resources.displayMetrics
-        val realWidth = displayMetrics.widthPixels.coerceAtLeast(1)
-        val realHeight = displayMetrics.heightPixels.coerceAtLeast(1)
+        val wm = context.getSystemService(Context.WINDOW_SERVICE) as? android.view.WindowManager
+        val (realWidth, realHeight) = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R && wm != null) {
+            val bounds = wm.currentWindowMetrics.bounds
+            Pair(bounds.width().coerceAtLeast(1), bounds.height().coerceAtLeast(1))
+        } else if (wm != null) {
+            val dm = android.util.DisplayMetrics()
+            @Suppress("DEPRECATION")
+            wm.defaultDisplay?.getRealMetrics(dm)
+            Pair(dm.widthPixels.coerceAtLeast(1), dm.heightPixels.coerceAtLeast(1))
+        } else {
+            val dm = context.resources.displayMetrics
+            Pair(dm.widthPixels.coerceAtLeast(1), dm.heightPixels.coerceAtLeast(1))
+        }
         val width = 416.coerceAtMost(realWidth)
         val height = ((realHeight.toFloat() * width) / realWidth).roundToInt().coerceAtLeast(1)
-        val density = displayMetrics.densityDpi
+        val density = context.resources.displayMetrics.densityDpi
 
         Log.i(TAG, "Creating VirtualDisplay: physical=${realWidth}x${realHeight}, virtual=${width}x${height}, density=$density")
 

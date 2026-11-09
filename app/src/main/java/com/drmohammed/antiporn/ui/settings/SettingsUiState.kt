@@ -20,5 +20,11 @@ data class SettingsUiState(
     val isGoogleLinked: Boolean = false,
     val googleAccountEmail: String? = null,
     val isSharingTelemetry: Boolean = false,
-    val myDisplayName: String = ""
+    val myDisplayName: String = "",
+    val isDeactivationPending: Boolean = false,
+    val isDeactivating: Boolean = false,
+    val deactivationUnlockAt: Long? = null,
+    val isSupervised: Boolean = false,
+    val isSelfControlAllowed: Boolean = true,
+    val remainingDeactivationMs: Long = 0L
 )

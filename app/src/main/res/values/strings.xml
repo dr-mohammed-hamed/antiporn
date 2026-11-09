@@ -31,7 +31,35 @@
     <string name="card_device_owner_active">مفعلة وتتحكم بالنظام بالكامل</string>
 
     <string name="card_device_owner_inactive">غير مفعلة (اضغط للتفعيل الذاتي)</string>
-    <string name="toast_device_owner_already_active">صلاحية المالك نشطة ودرع حِصْن يعمل بأقصى كفاءة 🛡️</string>
+    <string name="toast_device_owner_already_active">صلاحية المالك نشطة ودرع حِصْن يعمل بأقصى كفاءة</string>
+
+    <string name="settings_deactivation_title">إلغاء حماية مالك الجهاز وحذف التطبيق</string>
+    <string name="settings_deactivation_desc">يتيح لك التراجع الآمن عن صلاحيات مالك الجهاز وفك قفل ضبط المصنع وحذف التطبيق بعد مهلة أمان لحمايتك من الانتكاسات.</string>
+    <string name="btn_request_deactivation">بدء طلب إلغاء الصلاحية</string>
+    <string name="btn_cancel_deactivation">تراجع / إلغاء الطلب</string>
+    <string name="btn_execute_deactivation">تأكيد الإلغاء النهائي</string>
+    <string name="deactivation_countdown_format">قيد الانتظار: متبقي %s</string>
+    <string name="dialog_deactivation_title">طلب إلغاء صلاحية مالك الجهاز</string>
+    <string name="dialog_deactivation_message">تبدأ فترة مهلة أمان مدتها 48 ساعة قبل أن تتمكن من إزالة الصلاحية أو حذف التطبيق.\n\nإذا كان لديك كود QR للرقابة الذاتية، يمكنك مسحه لتقليص المهلة إلى 24 ساعة.\n\nسيتم إشعار المشرف فوراً (إن وجد) مع إمكانية التراجع أثناء المهلة.</string>
+    <string name="btn_start_48h">بدء مهلة 48 ساعة</string>
+    <string name="btn_scan_qr_24h">مسح كود QR (24 ساعة)</string>
+    <string name="toast_deactivation_requested">تم بدء طلب إلغاء الصلاحية بنجاح</string>
+    <string name="toast_deactivation_cancelled">تم إلغاء طلب الحذف واستمرار الحماية</string>
+    <string name="toast_deactivation_success">تم فك جميع القيود وإلغاء صلاحية مالك الجهاز بنجاح.</string>
+    <string name="toast_deactivation_not_ready">مهلة الأمان لم تنتهِ بعد، يرجى الانتظار.</string>
+    <string name="toast_guardian_deactivation_alert">تنبيه: الخاضع للرقابة طلب إلغاء صلاحية مالك الجهاز!</string>
+    <string name="guardian_deactivation_alert_msg">طلب %1$s إلغاء صلاحية مالك الجهاز! متبقي: %2$s</string>
+    <string name="dialog_deactivation_cancel_confirm">هل أنت متأكد من إلغاء طلب إزالة الصلاحية والاستمرار في الحماية؟</string>
+    <string name="dialog_deactivation_execute_confirm">انتهت مهلة الأمان المحددة. هل تريد فك جميع القيود وإلغاء صلاحية مالك الجهاز نهائياً الآن؟</string>
+    <string name="btn_confirm_cancel_deactivation">نعم، إلغاء الطلب</string>
+    <string name="btn_confirm_execute_deactivation">تأكيد الفك النهائي</string>
+    <string name="toast_qr_verify_failed">فشل التحقق من كود الـ QR</string>
+    <string name="time_format_hours_minutes">%1$d ساعة و %2$d دقيقة</string>
+    <string name="time_format_minutes">%1$d دقيقة</string>
+    <string name="error_prefix">خطأ: %1$s</string>
+    <string name="error_deactivation_execution">خطأ في التفكيك: %1$s</string>
+    <string name="remote_app_manager_ai_scan_switch">المسح الذكي بالذكاء الاصطناعي</string>
+    <string name="remote_app_manager_ai_scan_disabled_hint">فحص الشاشة بـ AI معطل حالياً في الإعدادات العامة</string>
 
     <string name="card_nextdns_title">درع فلترة الـ DNS وحظر الإباحية والإعلانات</string>
 
@@ -76,7 +104,7 @@
     <string name="card_adb_help_cmd">adb shell dpm set-device-owner com.drmohammed.antiporn/.AdminReceiver</string>
 
     <string name="btn_enforce_now">تطبيق وتأكيد القفل الآن</string>
-    <string name="btn_activate_device_owner_now">بدء التفعيل الذاتي الفوري 🛡️</string>
+    <string name="btn_activate_device_owner_now">بدء التفعيل الذاتي الفوري</string>
 
     <string name="btn_enforcing">جاري تطبيق الإعدادات&#8230;</string>
 
@@ -1087,6 +1115,7 @@
     <string name="label_requested_time">وقت الطلب: %1$s</string>
     <string name="label_decided_time">وقت القرار: %1$s</string>
     <string name="filter_all_wards">جميع المكفولين</string>
+    <string name="badge_high_risk">شديد الخطورة</string>
 
     <!-- Waqfa Mindful Intervention System Tokens -->
     <string name="waqfa_title">وَقْفَة</string>

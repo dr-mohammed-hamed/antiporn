@@ -12,6 +12,7 @@ import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
+import com.drmohammed.antiporn.data.repository.rejectDeviceOwnerDeactivation
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.drmohammed.antiporn.notification.manager.AppNotificationManager
@@ -141,7 +142,13 @@ class GuardianAlertsViewBinder(
             activity.lifecycleScope.launch {
                 try {
                     val wardId = wardIdProvider()
-                    val result = AccountabilityRepository.getInstance(activity.applicationContext).rejectEmergencyBreakout(wardId)
+                    val currentPolicy = policyProvider()
+                    val accountRepo = AccountabilityRepository.getInstance(activity.applicationContext)
+                    val result = if (currentPolicy.deactivationStatus == DevicePolicyBundle.DEACTIVATION_STATUS_PENDING) {
+                        accountRepo.rejectDeviceOwnerDeactivation(wardId)
+                    } else {
+                        accountRepo.rejectEmergencyBreakout(wardId)
+                    }
                     if (activity.isFinishing || activity.isDestroyed) return@launch
                     result.fold(
                         onSuccess = {
@@ -180,23 +187,42 @@ class GuardianAlertsViewBinder(
             cardSelfControlAlertBanner.visibility = View.GONE
         }
 
-        if (policy.breakoutStatus == DevicePolicyBundle.BREAKOUT_STATUS_PENDING && policy.breakoutUnlockAt != null) {
+        val isDeactivationPending = policy.deactivationStatus == DevicePolicyBundle.DEACTIVATION_STATUS_PENDING && policy.deactivationUnlockAt != null
+        val isBreakoutPending = policy.breakoutStatus == DevicePolicyBundle.BREAKOUT_STATUS_PENDING && policy.breakoutUnlockAt != null
+
+        if (isDeactivationPending || isBreakoutPending) {
             cardBreakoutAlertBanner.visibility = View.VISIBLE
             val nowTrusted = TrustedTimeProvider.currentTimeMillis(activity.applicationContext)
-            val remainingMs = (policy.breakoutUnlockAt - nowTrusted).coerceAtLeast(0L)
+            val unlockAt = if (isDeactivationPending) (policy.deactivationUnlockAt ?: 0L) else (policy.breakoutUnlockAt ?: 0L)
+            val remainingMs = (unlockAt - nowTrusted).coerceAtLeast(0L)
             val hours = remainingMs / (1000 * 3600)
             val mins = (remainingMs % (1000 * 3600)) / (1000 * 60)
             val timeStr = String.format(Locale.US, "%02d:%02d", hours, mins)
-            tvBreakoutAlertMsg.text = activity.getString(R.string.guardian_breakout_alert_msg, wardName, timeStr)
+            
+            if (isDeactivationPending) {
+                tvBreakoutAlertMsg.text = activity.getString(R.string.guardian_deactivation_alert_msg, wardName, timeStr)
+            } else {
+                tvBreakoutAlertMsg.text = activity.getString(R.string.guardian_breakout_alert_msg, wardName, timeStr)
+            }
 
             val wardId = wardIdProvider()
             if (wardId.isNotBlank()) {
                 try {
+                    val notifTitle = if (isDeactivationPending) {
+                        activity.getString(R.string.toast_guardian_deactivation_alert)
+                    } else {
+                        activity.getString(R.string.notif_breakout_alert_title)
+                    }
+                    val notifMessage = if (isDeactivationPending) {
+                        activity.getString(R.string.guardian_deactivation_alert_msg, wardName, timeStr)
+                    } else {
+                        activity.getString(R.string.notif_breakout_alert_desc, wardName, timeStr)
+                    }
                     AppNotificationManager.getInstance(activity.applicationContext).postEventNotification(
                         category = NotificationCategory.GUARDIAN,
-                        title = activity.getString(R.string.notif_breakout_alert_title),
-                        message = activity.getString(R.string.notif_breakout_alert_desc, wardName, timeStr),
-                        dedupKey = "breakout_alert_${wardId}_${policy.breakoutUnlockAt}",
+                        title = notifTitle,
+                        message = notifMessage,
+                        dedupKey = "alert_${wardId}_$unlockAt",
                         cooldownMs = 60 * 60 * 1000L,
                         actionType = NotificationActionType.OPEN_GUARDIAN_PANEL,
                         actionPayload = wardId,

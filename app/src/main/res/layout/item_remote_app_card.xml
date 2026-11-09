@@ -168,6 +168,27 @@
             android:textColor="?attr/colorOnSurface"
             android:textSize="13sp" />
 
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchAiScanTarget"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/remote_app_manager_ai_scan_switch"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvAiScanDisabledHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="-4dp"
+            android:layout_marginBottom="4dp"
+            android:text="@string/remote_app_manager_ai_scan_disabled_hint"
+            android:textColor="@color/status_orange"
+            android:textSize="11sp"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

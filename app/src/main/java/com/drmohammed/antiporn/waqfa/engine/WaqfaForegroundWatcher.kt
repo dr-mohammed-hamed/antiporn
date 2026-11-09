@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.PowerManager
 import android.util.Log
+import timber.log.Timber
 
 /**
  * مراقب التطبيق النشط في الواجهة لنظام «وَقْفَة».
@@ -33,7 +34,12 @@ class WaqfaForegroundWatcher(
     private val checkRunnable = object : Runnable {
         override fun run() {
             if (!isRunning || !isScreenOn) return
-            evaluateForegroundPackage()
+            val config = WaqfaSessionManager.getInstance(context).getConfig()
+            if (!config.isEnabled || config.targetPackages.isEmpty()) {
+                Timber.tag(TAG).d("Waqfa is disabled or has no targets; pausing foreground watcher loop")
+                return
+            }
+            evaluateForegroundPackage(config)
             handler.postDelayed(this, checkIntervalMs)
         }
     }
@@ -60,6 +66,16 @@ class WaqfaForegroundWatcher(
         Log.i(TAG, "WaqfaForegroundWatcher stopped")
     }
 
+    fun notifyConfigChanged() {
+        if (isRunning && isScreenOn) {
+            handler.removeCallbacks(checkRunnable)
+            val config = WaqfaSessionManager.getInstance(context).getConfig()
+            if (config.isEnabled && config.targetPackages.isNotEmpty()) {
+                handler.post(checkRunnable)
+            }
+        }
+    }
+
     fun onScreenStateChanged(screenOn: Boolean) {
         isScreenOn = screenOn
         if (screenOn) {
@@ -73,9 +89,8 @@ class WaqfaForegroundWatcher(
         Log.d(TAG, "WaqfaForegroundWatcher screen state: screenOn=$screenOn")
     }
 
-    private fun evaluateForegroundPackage() {
+    private fun evaluateForegroundPackage(config: com.drmohammed.antiporn.waqfa.model.WaqfaConfig) {
         val usm = usageStatsManager ?: return
-        val config = WaqfaSessionManager.getInstance(context).getConfig()
         if (!config.isEnabled || config.targetPackages.isEmpty()) {
             return
         }

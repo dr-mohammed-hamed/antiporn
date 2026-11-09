@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 /**
  * Repository responsible for managing Zero-Trust app installation approvals.
@@ -394,6 +395,28 @@ class ApprovalRepository(
             postApprovalNotification(packageName, approved = false, isCurfewDeferred = false, decidedBy = decidedBy)
         } catch (e: Exception) {
             Log.e(TAG, "Failed recording rejection for package $packageName", e)
+        }
+    }
+
+    /**
+     * Records an approval for an application in local database (e.g. auto-approved when policy is unlocked).
+     */
+    fun recordApproval(packageName: String, appName: String, decidedBy: String = "AUTO_APPROVED_UNLOCKED") {
+        try {
+            val now = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(appContext)
+            val entity = PendingApprovalEntity(
+                packageName = packageName,
+                appName = appName,
+                requestedAt = now,
+                status = PendingApprovalEntity.STATUS_APPROVED,
+                decidedBy = decidedBy,
+                decidedAt = now,
+                isCloudSynced = false
+            )
+            approvalDao.savePendingApprovalBlocking(entity)
+            Timber.tag(TAG).i("Recorded approval for $packageName decidedBy $decidedBy")
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed recording approval for $packageName")
         }
     }
 

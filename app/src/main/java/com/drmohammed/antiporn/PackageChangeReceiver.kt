@@ -1,13 +1,10 @@
 package com.drmohammed.antiporn
 
-import android.app.admin.DevicePolicyManager
 import android.content.BroadcastReceiver
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.SystemClock
-import android.util.Log
 import com.drmohammed.antiporn.core.policy.AppPolicyRegistry
 import com.drmohammed.antiporn.curfew.CurfewAppResolver
 import com.drmohammed.antiporn.curfew.CurfewConfig
@@ -22,9 +19,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.RejectedExecutionException
 
 /**
  * Centralized, debounced engine for processing package installation and removal events.
@@ -58,40 +54,54 @@ object PackageChangeHandler {
         }
         val lastHandled = handledAddEvents[packageName] ?: 0L
         if (now - lastHandled < DEBOUNCE_WINDOW_MS) {
-            Log.d(TAG, "⏩ [DEBOUNCE] Skipping duplicate package added event for $packageName from $source (${now - lastHandled}ms ago)")
+            Timber.tag(TAG).d("[DEBOUNCE] Skipping duplicate package added event for $packageName from $source (${now - lastHandled}ms ago)")
             onComplete?.invoke()
             return
         }
         handledAddEvents[packageName] = now
 
-        Log.w(TAG, "[PACKAGE_ADDED] New package detected: $packageName (source: $source, isReplacing: $isReplacing)")
+        Timber.tag(TAG).w("[PACKAGE_ADDED] New package detected: $packageName (source: $source, isReplacing: $isReplacing)")
 
         val appContext = context.applicationContext
-        handlerScope.launch {
-            try {
+        try {
+            handlerScope.launch {
+                try {
                     val approvalRepo = ApprovalRepository.getInstance(appContext)
                     val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any { it.packageName == packageName && it.isApproved }
                     val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
+                    val isHighRisk = com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(packageName)
+                    val shouldFreeze = (policy.lockNewInstallsUntilApproved || isHighRisk) && !isAlreadyApproved
 
-                    Log.w(TAG, "[ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved")
+                    Timber.tag(TAG).w("[ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isHighRisk=$isHighRisk | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved | shouldFreeze=$shouldFreeze")
 
-                    if (policy.lockNewInstallsUntilApproved && !isAlreadyApproved) {
+                    if (shouldFreeze) {
                         val isImmune = CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)
                         if (isImmune) {
-                            Log.w(TAG, "[IMMUNE_SKIP] Package $packageName is critical system component, launcher, dialer, or keyboard. Skipping freeze.")
+                            Timber.tag(TAG).w("[IMMUNE_SKIP] Package $packageName is critical system component, launcher, dialer, or keyboard. Skipping freeze.")
                         } else {
-                            Log.w(TAG, "[ZERO_TRUST_FREEZE] Strict Zero-Trust active: Freezing unapproved package $packageName (isReplacing=$isReplacing) in 0ms and submitting approval ticket")
+                            Timber.tag(TAG).w("[ZERO_TRUST_FREEZE] Strict Zero-Trust / High-Risk active: Freezing unapproved package $packageName (isReplacing=$isReplacing, isHighRisk=$isHighRisk) in 0ms and submitting approval ticket")
                             val frozen = approvalRepo.freezeAndSubmitApprovalLocal(packageName)
-                            Log.w(TAG, "[FREEZE_STATUS] Result of local freeze for $packageName: $frozen")
+                            Timber.tag(TAG).w("[FREEZE_STATUS] Result of local freeze for $packageName: $frozen")
                         }
                     } else {
-                        Log.w(TAG, "[CURFEW_EVAL] Package $packageName approved or not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")
+                        if (!isAlreadyApproved) {
+                            val appName = try {
+                                val pm = appContext.packageManager
+                                val appInfo = pm.getApplicationInfo(packageName, 0)
+                                pm.getApplicationLabel(appInfo).toString()
+                            } catch (e: Exception) {
+                                packageName
+                            }
+                            Timber.tag(TAG).i("[AUTO_APPROVE] Recording auto-approval for non-high-risk app $packageName ($appName)")
+                            approvalRepo.recordApproval(packageName, appName, "AUTO_APPROVED_UNLOCKED")
+                        }
+                        Timber.tag(TAG).w("[CURFEW_EVAL] Package $packageName approved or not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")
                         CurfewEnforcer.handlePackageAdded(appContext, packageName)
                     }
 
                     // Auto-whitelist Islamic/Quran, productive, or essential applications in curfew policy
                     // Strictly prevent rogue app/browser/store curfew bypasses and respect Zero-Trust locking
-                    val isZeroTrustBlocked = policy.lockNewInstallsUntilApproved && !isAlreadyApproved
+                    val isZeroTrustBlocked = shouldFreeze
                     val isBypassTarget = AppPolicyRegistry.isRestrictedBrowser(packageName) ||
                         CurfewConfig.KNOWN_APP_STORES.contains(packageName) ||
                         CurfewConfig.CURFEW_SEARCH_APPS.contains(packageName) ||
@@ -124,7 +134,7 @@ object PackageChangeHandler {
                                 PolicyRepository.getInstance(appContext).addAppToCurfewWhitelist(packageName)
                             }
                         } catch (e: Exception) {
-                            Log.w(TAG, "Error checking auto-whitelist eligibility for $packageName", e)
+                            Timber.tag(TAG).w(e, "Error checking auto-whitelist eligibility for $packageName")
                         }
                     }
 
@@ -133,9 +143,9 @@ object PackageChangeHandler {
                             val currentPolicy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
                             val restrictionsBundle = BrowserShield.buildBrowserRestrictionsBundle(currentPolicy)
                             com.drmohammed.antiporn.telemetry.SafeDpmGateway.setApplicationRestrictionsBlocking(appContext, packageName, restrictionsBundle)
-                            Log.i(TAG, "Applied browser restrictions to newly added/replaced restricted browser via SafeDpmGateway: $packageName")
+                            Timber.tag(TAG).i("Applied browser restrictions to newly added/replaced restricted browser via SafeDpmGateway: $packageName")
                         } catch (e: Exception) {
-                            Log.e(TAG, "Failed applying browser restrictions to $packageName", e)
+                            Timber.tag(TAG).e(e, "Failed applying browser restrictions to $packageName")
                         }
                     }
 
@@ -147,19 +157,23 @@ object PackageChangeHandler {
                         try {
                             ApprovalRepository.getInstance(appContext).syncPendingApprovalsToCloud()
                         } catch (e: Exception) {
-                            Log.w(TAG, "Async approval cloud sync failed for $packageName: ${e.message}")
+                            Timber.tag(TAG).w("Async approval cloud sync failed for $packageName: ${e.message}")
                         }
                         try {
                             AppInventoryManager.getInstance(appContext).syncInventoryToCloud(force = true)
                         } catch (e: Exception) {
-                            Log.w(TAG, "Async inventory sync failed for $packageName: ${e.message}")
+                            Timber.tag(TAG).w("Async inventory sync failed for $packageName: ${e.message}")
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "[ERROR] Error handling added package $packageName in $source", e)
+                    Timber.tag(TAG).e(e, "[ERROR] Error handling added package $packageName in $source")
                 } finally {
                     onComplete?.invoke()
                 }
+            }
+        } catch (e: Throwable) {
+            Timber.tag(TAG).e(e, "Failed to launch coroutine in handlePackageAdded")
+            onComplete?.invoke()
         }
     }
 
@@ -174,7 +188,7 @@ object PackageChangeHandler {
         onComplete: (() -> Unit)? = null
     ) {
         if (isReplacing) {
-            Log.i(TAG, "[PACKAGE_UPDATING] Package $packageName is being replaced/updated. Preserving approval records & watcher state.")
+            Timber.tag(TAG).i("[PACKAGE_UPDATING] Package $packageName is being replaced/updated. Preserving approval records & watcher state.")
             onComplete?.invoke()
             return
         }
@@ -185,30 +199,35 @@ object PackageChangeHandler {
         }
         val lastHandled = handledRemoveEvents[packageName] ?: 0L
         if (now - lastHandled < DEBOUNCE_WINDOW_MS) {
-            Log.d(TAG, "[DEBOUNCE] Skipping duplicate package removed event for $packageName from $source")
+            Timber.tag(TAG).d("[DEBOUNCE] Skipping duplicate package removed event for $packageName from $source")
             onComplete?.invoke()
             return
         }
         handledRemoveEvents[packageName] = now
 
-        Log.i(TAG, "[PACKAGE_REMOVED] Package removed: $packageName (source: $source)")
+        Timber.tag(TAG).i("[PACKAGE_REMOVED] Package removed: $packageName (source: $source)")
 
         val appContext = context.applicationContext
-        handlerScope.launch {
-            try {
-                ApprovalRepository.getInstance(appContext).removePendingApproval(packageName)
-                ZeroTrustForegroundWatcher.syncWatcherState(appContext)
-
+        try {
+            handlerScope.launch {
                 try {
-                    AppInventoryManager.getInstance(appContext).syncInventoryToCloud(force = true)
+                    ApprovalRepository.getInstance(appContext).removePendingApproval(packageName)
+                    ZeroTrustForegroundWatcher.syncWatcherState(appContext)
+
+                    try {
+                        AppInventoryManager.getInstance(appContext).syncInventoryToCloud(force = true)
+                    } catch (e: Exception) {
+                        Timber.tag(TAG).w("Async inventory sync failed on package removed: $packageName: ${e.message}")
+                    }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Async inventory sync failed on package removed: $packageName: ${e.message}")
+                    Timber.tag(TAG).e(e, "[ERROR] Error handling package removed: $packageName")
+                } finally {
+                    onComplete?.invoke()
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "[ERROR] Error handling package removed: $packageName", e)
-            } finally {
-                onComplete?.invoke()
             }
+        } catch (e: Throwable) {
+            Timber.tag(TAG).e(e, "Failed to launch coroutine in handlePackageRemoved")
+            onComplete?.invoke()
         }
     }
 }
@@ -230,37 +249,63 @@ class PackageChangeReceiver : BroadcastReceiver() {
         val packageName = data?.schemeSpecificPart
 
         val isDeviceOwner = com.drmohammed.antiporn.core.engine.ProtectionEngine.isDeviceOwner(context)
-        Log.w(TAG, "[STATIC_RECEIVER] onReceive: action=$action | package=$packageName | isDeviceOwner=$isDeviceOwner")
+        Timber.tag(TAG).w("[STATIC_RECEIVER] onReceive: action=$action | package=$packageName | isDeviceOwner=$isDeviceOwner")
 
         when (action) {
             Intent.ACTION_PACKAGE_ADDED -> {
                 if (packageName.isNullOrBlank()) return
                 val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
                 val pendingResult = goAsync()
-                PackageChangeHandler.handlePackageAdded(
-                    context = context,
-                    packageName = packageName,
-                    isReplacing = isReplacing,
-                    source = "Static_Manifest",
-                    onComplete = { pendingResult.finish() }
-                )
+                try {
+                    PackageChangeHandler.handlePackageAdded(
+                        context = context,
+                        packageName = packageName,
+                        isReplacing = isReplacing,
+                        source = "Static_Manifest",
+                        onComplete = {
+                            try {
+                                pendingResult.finish()
+                            } catch (e: Exception) {
+                                Timber.tag(TAG).w(e, "Error finishing pendingResult in onComplete")
+                            }
+                        }
+                    )
+                } catch (e: Throwable) {
+                    Timber.tag(TAG).e(e, "Exception invoking handlePackageAdded")
+                    try {
+                        pendingResult.finish()
+                    } catch (_: Exception) {}
+                }
             }
 
             Intent.ACTION_PACKAGE_REMOVED -> {
                 if (packageName.isNullOrBlank()) return
                 val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
                 if (isReplacing) {
-                    Log.i(TAG, "[STATIC_RECEIVER] Package $packageName is being replaced/updated (EXTRA_REPLACING=true). Ignoring temporary removal.")
+                    Timber.tag(TAG).i("[STATIC_RECEIVER] Package $packageName is being replaced/updated (EXTRA_REPLACING=true). Ignoring temporary removal.")
                     return
                 }
                 val pendingResult = goAsync()
-                PackageChangeHandler.handlePackageRemoved(
-                    context = context,
-                    packageName = packageName,
-                    isReplacing = isReplacing,
-                    source = "Static_Manifest",
-                    onComplete = { pendingResult.finish() }
-                )
+                try {
+                    PackageChangeHandler.handlePackageRemoved(
+                        context = context,
+                        packageName = packageName,
+                        isReplacing = isReplacing,
+                        source = "Static_Manifest",
+                        onComplete = {
+                            try {
+                                pendingResult.finish()
+                            } catch (e: Exception) {
+                                Timber.tag(TAG).w(e, "Error finishing pendingResult in onComplete")
+                            }
+                        }
+                    )
+                } catch (e: Throwable) {
+                    Timber.tag(TAG).e(e, "Exception invoking handlePackageRemoved")
+                    try {
+                        pendingResult.finish()
+                    } catch (_: Exception) {}
+                }
             }
 
             AppSuspensionShield.ACTION_UNINSTALL_STATUS -> {
@@ -269,13 +314,13 @@ class PackageChangeReceiver : BroadcastReceiver() {
                 val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: ""
                 when (status) {
                     PackageInstaller.STATUS_SUCCESS -> {
-                        Log.i(TAG, "[UNINSTALL_SUCCESS] Silent uninstall succeeded for $pkgName")
+                        Timber.tag(TAG).i("[UNINSTALL_SUCCESS] Silent uninstall succeeded for $pkgName")
                     }
                     PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                        Log.w(TAG, "[UNINSTALL_PENDING] Silent uninstall requires user action for $pkgName")
+                        Timber.tag(TAG).w("[UNINSTALL_PENDING] Silent uninstall requires user action for $pkgName")
                     }
                     else -> {
-                        Log.w(TAG, "[UNINSTALL_FAILED] Silent uninstall failed for $pkgName (status: $status, msg: $message)")
+                        Timber.tag(TAG).w("[UNINSTALL_FAILED] Silent uninstall failed for $pkgName (status: $status, msg: $message)")
                     }
                 }
             }

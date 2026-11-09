@@ -273,7 +273,7 @@ class PolicyRepository(
                                         cloudPolicy.guardianUid != current.guardianUid ||
                                         cloudPolicy.waqfaConfig != current.waqfaConfig
                                     )
-                                    val statusChanged = cloudPolicy.breakoutStatus != current.breakoutStatus
+                                    val statusChanged = cloudPolicy.breakoutStatus != current.breakoutStatus || cloudPolicy.deactivationStatus != current.deactivationStatus
                                     val isTimeNewer = cloudPolicy.updatedAt > current.updatedAt
                                     val isVersionNewer = cloudPolicy.version > current.version
 
@@ -348,13 +348,25 @@ class PolicyRepository(
     }
 
     /**
+     * Updates policy locally and saves to SQLite and memory flow without triggering
+     * DPM shield re-enforcement. Used during teardown or deactivation completion.
+     */
+    @Synchronized
+    fun updateLocalPolicyWithoutEnforcing(bundle: DevicePolicyBundle) {
+        policyDao.saveDevicePolicyBlocking(DevicePolicyEntity.fromBundle(bundle))
+        _currentPolicyFlow.value = bundle
+        saveFastPolicyCache(bundle)
+        com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry.isSelfControlAllowedWhenSupervised = bundle.isSelfControlAllowed
+    }
+
+    /**
      * Updates policy locally, saves to SQLite, and enforces on the device.
      */
     @Synchronized
     fun updateLocalPolicyAndEnforce(bundle: DevicePolicyBundle) {
         val current = _currentPolicyFlow.value
         Log.i(TAG, "[SelfControlDiag] updateLocalPolicyAndEnforce: v${bundle.version}, isSupervised=${bundle.isSupervised}, isSelfControlAllowed=${bundle.isSelfControlAllowed}")
-        val isBreakoutStatusChange = bundle.breakoutStatus != current.breakoutStatus
+        val isBreakoutStatusChange = bundle.breakoutStatus != current.breakoutStatus || bundle.deactivationStatus != current.deactivationStatus
         if (!isBreakoutStatusChange && (bundle.version < current.version || (bundle.version == current.version && bundle.updatedAt < current.updatedAt))) {
             Log.w(TAG, "Monotonic guard: rejected stale/out-of-order policy v${bundle.version}@${bundle.updatedAt} (current is v${current.version}@${current.updatedAt})")
             com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordCloudSync(
@@ -840,6 +852,18 @@ class PolicyRepository(
             Log.e(TAG, "Failed auto-whitelisting app $packageName in curfew", e)
             false
         }
+    }
+
+    suspend fun requestDeviceOwnerDeactivation(hasQr: Boolean): Result<Long> {
+        return AccountabilityRepository.getInstance(appContext).requestDeviceOwnerDeactivation(hasQr)
+    }
+
+    suspend fun cancelDeviceOwnerDeactivation(): Result<Unit> {
+        return AccountabilityRepository.getInstance(appContext).cancelDeviceOwnerDeactivation()
+    }
+
+    suspend fun executeDeviceOwnerTeardown(): Result<Unit> {
+        return com.drmohammed.antiporn.core.engine.DeviceOwnerTeardownManager.executeTeardown(appContext)
     }
 
     companion object {

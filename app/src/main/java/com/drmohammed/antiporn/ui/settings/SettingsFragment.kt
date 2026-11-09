@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
-import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
@@ -21,6 +20,7 @@ import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.databinding.BottomSheetDiagnosticLogsBinding
 import com.drmohammed.antiporn.databinding.FragmentSettingsBinding
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
+import com.drmohammed.antiporn.ui.control.qr.QrScannerBottomSheet
 import com.drmohammed.antiporn.provisioning.ui.ProvisioningWizardActivity
 import com.drmohammed.antiporn.telemetry.AiTelemetryReporter
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -51,7 +51,7 @@ class SettingsFragment : Fragment() {
     private var actionListener: SettingsActionListener? = null
 
     private var _binding: FragmentSettingsBinding? = null
-    private val binding get() = _binding!!
+    private val binding get() = _binding ?: throw IllegalStateException("Binding is only valid between onCreateView and onDestroyView")
 
     private val settingsViewModel: SettingsViewModel by viewModel()
     private val viewModel get() = settingsViewModel
@@ -120,6 +120,9 @@ class SettingsFragment : Fragment() {
 
         // 4. Device Owner Status
         renderDeviceOwnerSection(state, ctx)
+
+        // 5. Device Owner Deactivation
+        renderDeactivationSection(state, ctx)
     }
 
     private fun renderAiSection(state: SettingsUiState, ctx: Context) {
@@ -286,6 +289,44 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    private fun renderDeactivationSection(state: SettingsUiState, ctx: Context) {
+        if (!state.isDeviceOwner) {
+            binding.cardDeviceOwnerDeactivation.visibility = View.GONE
+            return
+        }
+        binding.cardDeviceOwnerDeactivation.visibility = View.VISIBLE
+
+        if (state.isDeactivationPending) {
+            binding.btnRequestDeactivation.visibility = View.GONE
+            binding.layoutDeactivationPending.visibility = View.VISIBLE
+
+            binding.pbDeactivationProgress.visibility = if (state.isDeactivating) View.VISIBLE else View.GONE
+            binding.btnCancelDeactivation.isEnabled = !state.isDeactivating
+
+            val remaining = state.remainingDeactivationMs
+            if (remaining <= 0L) {
+                binding.tvDeactivationCountdown.text = getString(R.string.toast_deactivation_success)
+                binding.tvDeactivationCountdown.setTextColor(ContextCompat.getColor(ctx, R.color.status_green))
+                binding.btnExecuteDeactivation.isEnabled = !state.isDeactivating
+            } else {
+                val totalMinutes = remaining / (60 * 1000L)
+                val hours = totalMinutes / 60
+                val minutes = totalMinutes % 60
+                val timeStr = if (hours > 0) {
+                    getString(R.string.time_format_hours_minutes, hours, minutes)
+                } else {
+                    getString(R.string.time_format_minutes, minutes)
+                }
+                binding.tvDeactivationCountdown.text = getString(R.string.deactivation_countdown_format, timeStr)
+                binding.tvDeactivationCountdown.setTextColor(ContextCompat.getColor(ctx, R.color.shield_amber_calm))
+                binding.btnExecuteDeactivation.isEnabled = false
+            }
+        } else {
+            binding.btnRequestDeactivation.visibility = View.VISIBLE
+            binding.layoutDeactivationPending.visibility = View.GONE
+        }
+    }
+
     private fun setupListeners() {
         binding.layoutDeviceNamePreference.setOnClickListener {
             val currentTime = SystemClock.elapsedRealtime()
@@ -329,6 +370,88 @@ class SettingsFragment : Fragment() {
             showDiagnosticLogsBottomSheet()
             true
         }
+
+        binding.btnRequestDeactivation.setOnClickListener {
+            val ctx = context ?: return@setOnClickListener
+            MaterialAlertDialogBuilder(ctx)
+                .setTitle(R.string.dialog_deactivation_title)
+                .setMessage(R.string.dialog_deactivation_message)
+                .setPositiveButton(R.string.btn_start_48h) { _, _ ->
+                    viewModel.requestDeactivation(hasQr = false) { result ->
+                        val currentCtx = context ?: return@requestDeactivation
+                        if (!isAdded || viewLifecycleOwner.lifecycle.currentState < androidx.lifecycle.Lifecycle.State.STARTED) return@requestDeactivation
+                        if (result.isSuccess) {
+                            Toast.makeText(currentCtx, R.string.toast_deactivation_requested, Toast.LENGTH_LONG).show()
+                        } else {
+                            val err = result.exceptionOrNull()?.message ?: ""
+                            Toast.makeText(currentCtx, getString(R.string.error_prefix, err), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                .setNeutralButton(R.string.btn_scan_qr_24h) { _, _ ->
+                    val requestKey = "deactivation_qr_request"
+                    parentFragmentManager.setFragmentResultListener(requestKey, viewLifecycleOwner) { _, bundle ->
+                        val verified = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_VERIFIED, false)
+                        if (verified) {
+                            viewModel.requestDeactivation(hasQr = true) { result ->
+                                val currentCtx = context ?: return@requestDeactivation
+                                if (!isAdded || viewLifecycleOwner.lifecycle.currentState < androidx.lifecycle.Lifecycle.State.STARTED) return@requestDeactivation
+                                if (result.isSuccess) {
+                                    Toast.makeText(currentCtx, R.string.toast_deactivation_requested, Toast.LENGTH_LONG).show()
+                                } else {
+                                    val err = result.exceptionOrNull()?.message ?: ""
+                                    Toast.makeText(currentCtx, getString(R.string.error_prefix, err), Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        } else {
+                            val currentCtx = context ?: return@setFragmentResultListener
+                            Toast.makeText(currentCtx, R.string.toast_qr_verify_failed, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    QrScannerBottomSheet.newInstance(requestKey).show(parentFragmentManager, requestKey)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+
+        binding.btnCancelDeactivation.setOnClickListener {
+            val ctx = context ?: return@setOnClickListener
+            MaterialAlertDialogBuilder(ctx)
+                .setTitle(R.string.btn_cancel_deactivation)
+                .setMessage(R.string.dialog_deactivation_cancel_confirm)
+                .setPositiveButton(R.string.btn_confirm_cancel_deactivation) { _, _ ->
+                    viewModel.cancelDeactivation { result ->
+                        val currentCtx = context ?: return@cancelDeactivation
+                        if (!isAdded || viewLifecycleOwner.lifecycle.currentState < androidx.lifecycle.Lifecycle.State.STARTED) return@cancelDeactivation
+                        if (result.isSuccess) {
+                            Toast.makeText(currentCtx, R.string.toast_deactivation_cancelled, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+
+        binding.btnExecuteDeactivation.setOnClickListener {
+            val ctx = context ?: return@setOnClickListener
+            MaterialAlertDialogBuilder(ctx)
+                .setTitle(R.string.btn_execute_deactivation)
+                .setMessage(R.string.dialog_deactivation_execute_confirm)
+                .setPositiveButton(R.string.btn_confirm_execute_deactivation) { _, _ ->
+                    viewModel.executeDeactivation { result ->
+                        val currentCtx = context ?: return@executeDeactivation
+                        if (!isAdded || viewLifecycleOwner.lifecycle.currentState < androidx.lifecycle.Lifecycle.State.STARTED) return@executeDeactivation
+                        if (result.isSuccess) {
+                            Toast.makeText(currentCtx, R.string.toast_deactivation_success, Toast.LENGTH_LONG).show()
+                        } else {
+                            val err = result.exceptionOrNull()?.message ?: ""
+                            Toast.makeText(currentCtx, getString(R.string.error_deactivation_execution, err), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
     }
 
     private fun showDiagnosticLogsBottomSheet() {
@@ -362,11 +485,11 @@ class SettingsFragment : Fragment() {
                         val chooser = AiTelemetryReporter.createShareFileIntent(appContext, reportFile)
                         startActivity(chooser)
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error launching share chooser", e)
+                        Timber.tag(TAG).e(e, "Error launching share chooser")
                         Toast.makeText(appContext, R.string.error_share_report_failed, Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error generating telemetry report file", e)
+                    Timber.tag(TAG).e(e, "Error generating telemetry report file")
                     Toast.makeText(appContext, R.string.error_share_report_failed, Toast.LENGTH_SHORT).show()
                 }
             }

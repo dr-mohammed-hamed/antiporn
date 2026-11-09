@@ -454,7 +454,7 @@
     <string name="card_device_owner_title">Device Owner Authority</string>
     <string name="card_device_owner_active">Device Owner mode is active.</string>
     <string name="card_device_owner_inactive">Not activated. (Tap to activate)</string>
-    <string name="toast_device_owner_already_active">Device Owner is active and your shield is fully operational 🛡️</string>
+    <string name="toast_device_owner_already_active">Device Owner is active and your shield is fully operational</string>
     <string name="card_nextdns_active">%1$s (Enforced &amp; Locked)</string>
     <string name="card_nextdns_pending">Current host: %1$s (Updating to %2$s)</string>
     <string name="card_nextdns_inactive">DNS server is not set.</string>
@@ -476,7 +476,7 @@
     <string name="card_adb_pc_toggle_hint">Or via legacy USB cable ADB command on PC:</string>
     <string name="card_adb_help_cmd">adb shell dpm set-device-owner com.drmohammed.antiporn/.AdminReceiver</string>
     <string name="btn_enforce_now">Enforce Protection Now</string>
-    <string name="btn_activate_device_owner_now">Start Self-Activation Now 🛡️</string>
+    <string name="btn_activate_device_owner_now">Start Self-Activation Now</string>
     <string name="btn_enforcing">Enforcing Shields...</string>
     <string name="toast_enforce_success">Enforced AntiPorn DNS (%1$s), blocked VPN &amp; private browsing successfully!</string>
     <string name="toast_enforce_status_code">DNS shield applied successfully</string>
@@ -905,4 +905,34 @@
     <!-- App Manager Additions -->
     <string name="switch_freeze_new_installs">Auto-Freeze New Installs</string>
     <string name="btn_save_changes">Save Changes</string>
+    <string name="badge_high_risk">High Risk</string>
+    <string name="guardian_deactivation_alert_msg">%1$s requested Device Owner deactivation! Remaining: %2$s</string>
+    <string name="dialog_deactivation_cancel_confirm">Are you sure you want to cancel the deactivation request and keep protection active?</string>
+    <string name="dialog_deactivation_execute_confirm">The safety delay has expired. Do you want to remove all restrictions and permanently deactivate Device Owner now?</string>
+    <string name="btn_confirm_cancel_deactivation">Yes, Cancel Request</string>
+    <string name="btn_confirm_execute_deactivation">Confirm Final Teardown</string>
+    <string name="toast_qr_verify_failed">QR code verification failed</string>
+    <string name="time_format_hours_minutes">%1$d hours and %2$d minutes</string>
+    <string name="time_format_minutes">%1$d minutes</string>
+    <string name="error_prefix">Error: %1$s</string>
+    <string name="error_deactivation_execution">Teardown error: %1$s</string>
+
+    <!-- Device Owner Deactivation & Remote App Manager Additions -->
+    <string name="settings_deactivation_title">Deactivate Device Owner &amp; Uninstall App</string>
+    <string name="settings_deactivation_desc">Allows you to safely revoke Device Owner privileges, restore factory reset capability, and uninstall the app following a cooling-off security delay.</string>
+    <string name="btn_request_deactivation">Request Privilege Deactivation</string>
+    <string name="btn_cancel_deactivation">Cancel Request</string>
+    <string name="btn_execute_deactivation">Confirm Final Deactivation</string>
+    <string name="deactivation_countdown_format">Cooling-off: %s remaining</string>
+    <string name="dialog_deactivation_title">Request Device Owner Deactivation</string>
+    <string name="dialog_deactivation_message">A 48-hour cooling-off safety period will begin before you can remove Device Owner or uninstall the app.\n\nIf you have a self-accountability QR code, you can scan it to reduce the delay to 24 hours.\n\nYour guardian (if configured) will be notified immediately, and you can cancel anytime during the waiting period.</string>
+    <string name="btn_start_48h">Start 48-Hour Delay</string>
+    <string name="btn_scan_qr_24h">Scan QR Code (24-Hour Delay)</string>
+    <string name="toast_deactivation_requested">Deactivation request submitted successfully</string>
+    <string name="toast_deactivation_cancelled">Deactivation request cancelled. Protection continues.</string>
+    <string name="toast_deactivation_success">All restrictions cleared and Device Owner deactivated successfully.</string>
+    <string name="toast_deactivation_not_ready">The cooling-off period has not elapsed yet. Please wait.</string>
+    <string name="toast_guardian_deactivation_alert">Alert: Supervised user requested Device Owner deactivation!</string>
+    <string name="remote_app_manager_ai_scan_switch">AI Smart Scanning</string>
+    <string name="remote_app_manager_ai_scan_disabled_hint">AI screen inspection is currently disabled in general settings</string>
 </resources>

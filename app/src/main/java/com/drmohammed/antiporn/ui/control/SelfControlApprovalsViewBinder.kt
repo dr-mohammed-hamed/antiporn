@@ -72,6 +72,26 @@ class SelfControlApprovalsViewBinder(
                 setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutline))
             }
             container.addView(pkgView)
+
+            if (com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(pkg)) {
+                val riskBadge = TextView(activity).apply {
+                    text = activity.getString(R.string.badge_high_risk)
+                    textSize = 11f
+                    typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(activity.getColor(R.color.status_red))
+                    setBackgroundResource(R.drawable.bg_badge_high_risk)
+                    val hPad = (8 * resources.displayMetrics.density).toInt()
+                    val vPad = (3 * resources.displayMetrics.density).toInt()
+                    setPadding(hPad, vPad, hPad, vPad)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        topMargin = (4 * resources.displayMetrics.density).toInt()
+                    }
+                }
+                container.addView(riskBadge)
+            }
             val btnRow = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(0, (8 * resources.displayMetrics.density).toInt(), 0, 0)

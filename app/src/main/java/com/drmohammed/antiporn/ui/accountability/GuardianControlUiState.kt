@@ -65,7 +65,9 @@ data class GuardianControlUiState(
                     currentPolicy.customBlockedUrls != initial.customBlockedUrls ||
                     currentPolicy.customAllowedUrls != initial.customAllowedUrls ||
                     currentPolicy.browserFilterMode != initial.browserFilterMode ||
-                    currentPolicy.isFullSystemFilteringEnabled != initial.isFullSystemFilteringEnabled
+                    currentPolicy.isFullSystemFilteringEnabled != initial.isFullSystemFilteringEnabled ||
+                    currentPolicy.waqfaConfig != initial.waqfaConfig ||
+                    currentPolicy.customAiScanPackages != initial.customAiScanPackages
         }
 
     val isSaveEnabled: Boolean

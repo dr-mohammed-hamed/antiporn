@@ -143,12 +143,12 @@ class AiInferenceCoordinator(
                 timestampMs = now
             )
             if (trackedBoxes.isNotEmpty()) {
-                val screenMetrics = context.resources.displayMetrics
+                val (screenWidth, screenHeight) = getPhysicalScreenSize()
                 val paddedBoxes = kltTracker.getPaddedBoxes()
                 blurOverlayManager.updateRegionsMapped(
                     rawRegions = paddedBoxes,
-                    targetWidth = screenMetrics.widthPixels,
-                    targetHeight = screenMetrics.heightPixels,
+                    targetWidth = screenWidth,
+                    targetHeight = screenHeight,
                     sourceWidth = 1,
                     sourceHeight = 1
                 )
@@ -187,11 +187,11 @@ class AiInferenceCoordinator(
                             } else {
                                 femaleDetections.map { it.boundingBox }
                             }
-                            val screenMetrics = context.resources.displayMetrics
+                            val (screenWidth, screenHeight) = getPhysicalScreenSize()
                             blurOverlayManager.updateRegionsMapped(
                                 rawRegions = paddedBoxes,
-                                targetWidth = screenMetrics.widthPixels,
-                                targetHeight = screenMetrics.heightPixels,
+                                targetWidth = screenWidth,
+                                targetHeight = screenHeight,
                                 sourceWidth = 1,
                                 sourceHeight = 1
                             )
@@ -447,6 +447,22 @@ class AiInferenceCoordinator(
             inferenceBitmap = null
             scratchPixels = null
             scratchRowBytes = null
+        }
+    }
+
+    private fun getPhysicalScreenSize(): Pair<Int, Int> {
+        val wm = context.getSystemService(Context.WINDOW_SERVICE) as? android.view.WindowManager
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R && wm != null) {
+            val bounds = wm.currentWindowMetrics.bounds
+            Pair(bounds.width().coerceAtLeast(1), bounds.height().coerceAtLeast(1))
+        } else if (wm != null) {
+            val dm = android.util.DisplayMetrics()
+            @Suppress("DEPRECATION")
+            wm.defaultDisplay?.getRealMetrics(dm)
+            Pair(dm.widthPixels.coerceAtLeast(1), dm.heightPixels.coerceAtLeast(1))
+        } else {
+            val dm = context.resources.displayMetrics
+            Pair(dm.widthPixels.coerceAtLeast(1), dm.heightPixels.coerceAtLeast(1))
         }
     }
 

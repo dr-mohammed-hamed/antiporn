@@ -25,7 +25,7 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in telegramPackages) {
-            assertFalse("Under Unified Zero-Trust, package is not permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertTrue("Package $pkg must be permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
             assertEquals("Telegram", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -51,7 +51,7 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in socialPackages) {
-            assertFalse("Under Unified Zero-Trust, package is not permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertTrue("Package $pkg must be permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
             assertEquals("Open Social Network", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -76,7 +76,7 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in browsers) {
-            assertFalse("Under Unified Zero-Trust, package is not permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertTrue("Package $pkg must be permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
             assertEquals("Proxy Browser", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -95,7 +95,7 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in chatApps) {
-            assertFalse("Under Unified Zero-Trust, package is not permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertTrue("Package $pkg must be permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
             assertEquals("Random Chat App", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
@@ -113,33 +113,31 @@ class AppSuspensionShieldTest {
         )
 
         for (pkg in tikTokApps) {
-            assertFalse("Under Unified Zero-Trust, package is not permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
+            assertTrue("Package $pkg must be permanently blacklisted", AppSuspensionShield.isBlacklisted(pkg))
             assertEquals("TikTok", AppSuspensionShield.getCategoryForPackage(pkg))
         }
     }
 
     @Test
     fun testExplicitImmunitySafeguard() {
-        val immuneApps = listOf(
-            "org.puregram.messenger",
-            "com.drmohammed.antiporn"
+        val immuneApp = "com.drmohammed.antiporn"
+
+        assertTrue("Package $immuneApp must be marked as immune", AppSuspensionShield.isImmune(immuneApp))
+        assertFalse(
+            "Immune package $immuneApp must NEVER be reported as blacklisted",
+            AppSuspensionShield.isBlacklisted(immuneApp)
+        )
+        assertFalse(
+            "Immune package $immuneApp must NOT exist in BLACKLISTED_PACKAGES set",
+            AppSuspensionShield.BLACKLISTED_PACKAGES.contains(immuneApp)
+        )
+        assertNull(
+            "Immune package $immuneApp must return null category",
+            AppSuspensionShield.getCategoryForPackage(immuneApp)
         )
 
-        for (pkg in immuneApps) {
-            assertTrue("Package $pkg must be marked as immune", AppSuspensionShield.isImmune(pkg))
-            assertFalse(
-                "Immune package $pkg must NEVER be reported as blacklisted",
-                AppSuspensionShield.isBlacklisted(pkg)
-            )
-            assertFalse(
-                "Immune package $pkg must NOT exist in BLACKLISTED_PACKAGES set",
-                AppSuspensionShield.BLACKLISTED_PACKAGES.contains(pkg)
-            )
-            assertNull(
-                "Immune package $pkg must return null category",
-                AppSuspensionShield.getCategoryForPackage(pkg)
-            )
-        }
+        // Puregram must NOT be immune (closed security loophole)
+        assertFalse("Puregram must not be immune", AppSuspensionShield.isImmune("org.puregram.messenger"))
 
         val overlap = AppSuspensionShield.BLACKLISTED_PACKAGES.intersect(AppSuspensionShield.IMMUNE_PACKAGES)
         assertTrue("BLACKLISTED_PACKAGES and IMMUNE_PACKAGES must have zero overlap", overlap.isEmpty())
@@ -182,7 +180,6 @@ class AppSuspensionShieldTest {
             AppSuspensionShield.TIKTOK_PACKAGES.size
 
         assertEquals(51, totalExpected)
-        // Under Unified Zero-Trust, BLACKLISTED_PACKAGES is empty to prevent silent uninstalls
-        assertEquals(0, AppSuspensionShield.BLACKLISTED_PACKAGES.size)
+        assertEquals(51, AppSuspensionShield.BLACKLISTED_PACKAGES.size)
     }
 }

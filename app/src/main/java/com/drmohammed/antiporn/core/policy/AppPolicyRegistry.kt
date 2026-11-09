@@ -22,7 +22,6 @@ object AppPolicyRegistry {
         // 1. ABSOLUTE IMMUNITY (NEVER SUSPEND, NEVER UNINSTALL)
         // =========================================================================
         AppRule("com.drmohammed.antiporn", AppClassification.ALWAYS_IMMUNE, "AntiPorn Self-Protection"),
-        AppRule("org.puregram.messenger", AppClassification.ALWAYS_IMMUNE, "Puregram Custom Messenger"),
 
         // =========================================================================
         // 2. SYSTEM CRITICAL FRAMEWORKS
@@ -148,16 +147,8 @@ object AppPolicyRegistry {
         AppRule("com.google.android.apps.searchlite", AppClassification.SEARCH_LOOPHOLE, "Google Go Search Lite"),
 
         // =========================================================================
-        // 12. CURFEW EXEMPT: USER CUSTOM BUSINESS & PRODUCTIVITY (com.dr.tech.*)
-        // =========================================================================
-        AppRule("com.dr.tech.*", AppClassification.CURFEW_EXEMPT_PRODUCTIVITY, "User Business Suite Wildcard"),
-        AppRule("com.dr.tech.daftar_albahr", AppClassification.CURFEW_EXEMPT_PRODUCTIVITY, "Daftar Al-Bahr Micro-ERP"),
-        AppRule("com.dr.tech.hafeez_pos_micro_erp", AppClassification.CURFEW_EXEMPT_PRODUCTIVITY, "Hafeez POS Micro-ERP"),
-
-        // =========================================================================
         // 13. CURFEW EXEMPT: CLEAN MEDIA PLAYERS & ALTERNATIVE YOUTUBE (NewPipe & Forks)
         // =========================================================================
-        AppRule("com.dr.tech.puretube", AppClassification.CURFEW_EXEMPT_MEDIA, "PureTube YouTube Player"),
         AppRule("org.schabi.newpipe.*", AppClassification.CURFEW_EXEMPT_MEDIA, "NewPipe Official, Debug & Forks Wildcard"),
         AppRule("org.schabi.newpipe", AppClassification.CURFEW_EXEMPT_MEDIA, "NewPipe Official Client"),
         AppRule("org.schabi.newpipe.debug", AppClassification.CURFEW_EXEMPT_MEDIA, "NewPipe Debug / Custom Variant"),
@@ -227,23 +218,7 @@ object AppPolicyRegistry {
         AppRule("com.whatsapp", AppClassification.CURFEW_EXEMPT_COMMUNICATION, "WhatsApp Messenger"),
 
         // =========================================================================
-        // 17. CURFEW EXEMPT: PERMITTED GAMES & EMULATORS
-        // =========================================================================
-        AppRule("com.axlebolt.standoff2", AppClassification.CURFEW_EXEMPT_GAME, "Standoff 2 FPS"),
-        AppRule("com.AlfaBravo.CombatMaster", AppClassification.CURFEW_EXEMPT_GAME, "Combat Master FPS"),
-        AppRule("com.nekki.shadowfightarena", AppClassification.CURFEW_EXEMPT_GAME, "Shadow Fight 4 Arena"),
-        AppRule("com.zeptolab.bulletecho.google", AppClassification.CURFEW_EXEMPT_GAME, "Bullet Echo PvP"),
-        AppRule("com.smokingguninc.phobies", AppClassification.CURFEW_EXEMPT_GAME, "Phobies Strategy"),
-        AppRule("yio.tro.antiyoy.android", AppClassification.CURFEW_EXEMPT_GAME, "Antiyoy Strategy"),
-        AppRule("air.com.RustyLake.CubeEscapeCollection", AppClassification.CURFEW_EXEMPT_GAME, "Cube Escape Collection"),
-        AppRule("org.ppsspp.ppsspp", AppClassification.CURFEW_EXEMPT_GAME, "PPSSPP PSP Emulator"),
-        AppRule("xyz.aethersx2.android", AppClassification.CURFEW_EXEMPT_GAME, "AetherSX2 PS2 Emulator"),
-        AppRule("com.frogmind.badland", AppClassification.CURFEW_EXEMPT_GAME, "BADLAND Adventure"),
-        AppRule("com.nvsgames.snap", AppClassification.CURFEW_EXEMPT_GAME, "MARVEL SNAP Card Strategy"),
-        AppRule("com.coloros.gamespaceui", AppClassification.CURFEW_EXEMPT_GAME, "Realme/OPPO Game Space UI"),
-
-        // =========================================================================
-        // 18. SYSTEM CALCULATORS, CLOCKS, AND SOUND RECORDERS
+        // 17. SYSTEM CALCULATORS, CLOCKS, AND SOUND RECORDERS
         // =========================================================================
         AppRule("com.google.android.calculator", AppClassification.CURFEW_EXEMPT_PRODUCTIVITY, "Google Calculator"),
         AppRule("com.coloros.calculator", AppClassification.CURFEW_EXEMPT_PRODUCTIVITY, "ColorOS Calculator"),
@@ -284,7 +259,7 @@ object AppPolicyRegistry {
         val lowerPkg = packageName.lowercase()
         return classificationCache.computeIfAbsent(lowerPkg) { pkg ->
             // Priority 0: Always Immune
-            if (pkg == "com.drmohammed.antiporn" || pkg == "org.puregram.messenger") {
+            if (pkg == "com.drmohammed.antiporn") {
                 return@computeIfAbsent AppClassification.ALWAYS_IMMUNE
             }
 
@@ -313,19 +288,25 @@ object AppPolicyRegistry {
     }
 
     /**
+     * Determines whether an application is high-risk (Telegram, TikTok, Proxy Browsers, Random Chat apps, Open Social Networks)
+     * that requires explicit guardian or self-control gate approval before running, even if general Zero-Trust is disabled.
+     */
+    fun isHighRisk(packageName: String): Boolean {
+        if (isImmune(packageName)) return false
+        return classify(packageName) == AppClassification.PERMANENT_BLACKLIST
+    }
+
+    /**
      * Determines whether an application is a permanent 24/7 security threat (Telegram, TikTok, Proxy Browsers).
      */
     fun isPermanentlyBlacklisted(packageName: String): Boolean {
-        // Under Unified Zero-Trust architecture, no package is permanently blacklisted or silently uninstalled;
-        // all non-system applications are subject to Zero-Trust freeze until supervisor approval.
-        return false
+        return isHighRisk(packageName)
     }
 
     /**
      * Determines whether an application is exempt from night curfew suspensions.
      */
     fun isExemptFromCurfew(packageName: String): Boolean {
-        if (packageName.equals("org.puregram.messenger", ignoreCase = true)) return false
         if (isPermanentlyBlacklisted(packageName)) return false
         val cls = classify(packageName)
         return when (cls) {
@@ -381,8 +362,8 @@ object AppPolicyRegistry {
      * Returns all explicit blacklisted packages.
      */
     fun getBlacklistedPackages(): Set<String> {
-        // Under Unified Zero-Trust architecture, blacklist is empty to prevent automatic silent uninstallations.
-        return emptySet()
+        return RULES.filter { it.classification == AppClassification.PERMANENT_BLACKLIST && !it.isWildcard }
+            .map { it.pattern }.toSet()
     }
 
     /**

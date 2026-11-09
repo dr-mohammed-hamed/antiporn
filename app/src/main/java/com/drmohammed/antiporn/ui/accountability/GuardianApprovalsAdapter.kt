@@ -52,6 +52,7 @@ class GuardianApprovalsAdapter(
         private val tvAppName: TextView = itemView.findViewById(R.id.tvAppName)
         private val tvPackageName: TextView = itemView.findViewById(R.id.tvPackageName)
         private val tvWardName: TextView = itemView.findViewById(R.id.tvWardName)
+        private val tvRiskBadge: TextView = itemView.findViewById(R.id.tvRiskBadge)
         private val tvStatusBadge: TextView = itemView.findViewById(R.id.tvStatusBadge)
         private val tvTimestamp: TextView = itemView.findViewById(R.id.tvTimestamp)
 
@@ -70,6 +71,9 @@ class GuardianApprovalsAdapter(
             tvAppName.text = item.appName
             tvPackageName.text = item.packageName
             tvWardName.text = ctx.getString(R.string.label_ward_prefix, item.wardName)
+
+            val isHighRisk = com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(item.packageName)
+            tvRiskBadge.visibility = if (isHighRisk) View.VISIBLE else View.GONE
 
             // Highlighting if directed from notification
             val primaryColor = com.google.android.material.color.MaterialColors.getColor(

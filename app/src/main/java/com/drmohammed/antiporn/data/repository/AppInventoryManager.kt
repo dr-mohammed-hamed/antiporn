@@ -49,6 +49,7 @@ class AppInventoryManager internal constructor(context: Context) {
         val curfewVpnBypass = policy?.curfewVpnBypassPackages ?: emptySet()
         val customBlacklist = policy?.customBlacklistPackages ?: emptySet()
         val protectedPackages = policy?.protectedAppPackages ?: emptySet()
+        val customAiScan = policy?.customAiScanPackages ?: emptySet()
 
         val installedApplications = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -89,7 +90,8 @@ class AppInventoryManager internal constructor(context: Context) {
                 val isUpdatedSystem = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
                 // Include user-installed apps, updated system apps, launchable apps (e.g. Chrome, YouTube), or currently managed apps
                 !isSystem || isUpdatedSystem || launchablePackages.contains(pkg) ||
-                        customBlacklist.contains(pkg) || customCurfewWhitelist.contains(pkg) || protectedPackages.contains(pkg)
+                        customBlacklist.contains(pkg) || customCurfewWhitelist.contains(pkg) || protectedPackages.contains(pkg) ||
+                        customAiScan.contains(pkg)
             }
             .map { appInfo ->
                 val pkg = appInfo.packageName
@@ -113,6 +115,7 @@ class AppInventoryManager internal constructor(context: Context) {
                 val isCurfewWhitelisted = customCurfewWhitelist.contains(pkg)
                 val isCurfewVpnBypassed = curfewVpnBypass.contains(pkg)
                 val isProtected = protectedPackages.contains(pkg)
+                val isAiScanTarget = customAiScan.contains(pkg)
 
                 InstalledAppDto(
                     packageName = pkg,
@@ -122,6 +125,7 @@ class AppInventoryManager internal constructor(context: Context) {
                     isCurfewWhitelisted = isCurfewWhitelisted,
                     isCurfewVpnBypassed = isCurfewVpnBypassed,
                     isProtected = isProtected,
+                    isAiScanTarget = isAiScanTarget,
                     updatedAt = System.currentTimeMillis()
                 )
             }

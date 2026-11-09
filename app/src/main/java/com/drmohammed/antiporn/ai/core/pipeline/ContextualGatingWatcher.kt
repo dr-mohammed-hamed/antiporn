@@ -4,9 +4,10 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Handler
-import android.os.Looper
-import android.util.Log
+import android.os.HandlerThread
+import android.os.Process
 import com.drmohammed.antiporn.ai.core.policy.AiExemptionRegistry
+import timber.log.Timber
 
 /**
  * مراقب السياق وصمام الأمان القائم على UsageStatsManager
@@ -22,7 +23,9 @@ class ContextualGatingWatcher(
         // MINOR: non-positive interval makes a zero/negative query window.
         require(checkIntervalMs >= 500L) { "checkIntervalMs must be >= 500ms" }
     }
-    private val handler = Handler(Looper.getMainLooper())
+
+    private var watcherThread: HandlerThread? = null
+    private var handler: Handler? = null
     private val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
 
     @Volatile
@@ -49,7 +52,7 @@ class ContextualGatingWatcher(
         override fun run() {
             if (!isRunning) return
             evaluateForegroundPackage()
-            handler.postDelayed(this, checkIntervalMs)
+            handler?.postDelayed(this, checkIntervalMs)
         }
     }
 
@@ -57,19 +60,28 @@ class ContextualGatingWatcher(
         private const val TAG = "ContextualGatingWatcher"
     }
 
+    @Synchronized
     fun start() {
         if (isRunning) return
         isRunning = true
-        handler.post(checkRunnable)
-        Log.d(TAG, "Contextual gating watcher started")
+        val thread = HandlerThread("AiGatingWatcher", Process.THREAD_PRIORITY_BACKGROUND).apply { start() }
+        watcherThread = thread
+        val h = Handler(thread.looper)
+        handler = h
+        h.post(checkRunnable)
+        Timber.tag(TAG).d("Contextual gating watcher started on background HandlerThread")
     }
 
+    @Synchronized
     fun stop() {
         isRunning = false
-        handler.removeCallbacks(checkRunnable)
+        handler?.removeCallbacks(checkRunnable)
+        handler = null
+        watcherThread?.quitSafely()
+        watcherThread = null
         isTargetAppForeground = false
         currentForegroundPackage = ""
-        Log.d(TAG, "Contextual gating watcher stopped")
+        Timber.tag(TAG).d("Contextual gating watcher stopped")
     }
 
     private fun evaluateForegroundPackage() {
@@ -81,11 +93,11 @@ class ContextualGatingWatcher(
         val events = try {
             usm.queryEvents(now - (checkIntervalMs * 3), now)
         } catch (e: SecurityException) {
-            // Fail-closed security policy: permission revoked → keep scanning, never silent fail-open.
+            // Fail-closed security policy: permission revoked -> keep scanning, never silent fail-open.
             failClosed("usage permission revoked: ${e.message}")
             return
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to query usage events", e)
+            Timber.tag(TAG).e(e, "Failed to query usage events")
             lastQueryFailed = true
             null
         } ?: run {
@@ -119,17 +131,17 @@ class ContextualGatingWatcher(
 
         if (latestEventPackage != currentForegroundPackage) {
             currentForegroundPackage = latestEventPackage
-            // Defensive resilience: AppPolicyRegistry delegates run on main looper — never let one throw kill watcher.
+            // Defensive resilience: AppPolicyRegistry delegates run on background thread — never let one throw kill watcher.
             val isTarget = try {
                 isTargetPackage(latestEventPackage)
             } catch (e: Exception) {
-                Log.e(TAG, "Policy check failed, fail-closed", e)
+                Timber.tag(TAG).e(e, "Policy check failed, fail-closed")
                 true
             }
 
             if (isTarget != isTargetAppForeground) {
                 isTargetAppForeground = isTarget
-                Log.d(TAG, "Foreground changed -> Target: $isTarget (pkg: $latestEventPackage)")
+                Timber.tag(TAG).d("Foreground changed -> Target: $isTarget (pkg: $latestEventPackage)")
                 onStateChanged?.invoke(isTarget, latestEventPackage)
             }
         }
@@ -137,7 +149,7 @@ class ContextualGatingWatcher(
 
     /** Fail CLOSED (keep scanning) — safe direction for a protection feature. */
     private fun failClosed(reason: String) {
-        Log.w(TAG, "Gating fail-closed: $reason")
+        Timber.tag(TAG).w("Gating fail-closed: $reason")
         lastQueryFailed = true
         if (!isTargetAppForeground) {
             isTargetAppForeground = true
@@ -152,7 +164,19 @@ class ContextualGatingWatcher(
         // تطبيقات النظام النظيفة المعفاة حصراً (لانشر، إعدادات، هاتف، ساعة، آلة حاسبة)
         if (AiExemptionRegistry.isExempt(pkg)) return false
 
-        // كافة التطبيقات الأخرى (المعرض، المتصفحات، السوشيال، وتطبيقات الطرف الثالث) هدف للفحص
-        return true
+        val policy = try {
+            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy()
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Failed to load policy for AI gating target check")
+            null
+        }
+
+        // إذا كان التطبيق مخصصاً يدوياً من المستخدم/الوصي للمسح بالذكاء الاصطناعي
+        if (policy != null && policy.customAiScanPackages.contains(pkg)) {
+            return true
+        }
+
+        // الاستهداف القياسي: المتصفحات المقيدة وشبكات التواصل والمتاجر
+        return AiExemptionRegistry.isTarget(pkg)
     }
 }

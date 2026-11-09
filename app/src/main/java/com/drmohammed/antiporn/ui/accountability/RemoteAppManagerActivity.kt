@@ -160,6 +160,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             onCurfewWhitelistToggled = { pkg, isAllowed -> viewModel.setCurfewWhitelist(pkg, isAllowed) },
             onCurfewVpnBypassToggled = { pkg, isBypassed -> viewModel.setCurfewVpnBypass(pkg, isBypassed) },
             onProtectToggled = { pkg, isProtected -> viewModel.setProtectedApp(pkg, isProtected) },
+            onAiScanToggled = { pkg, isTarget -> viewModel.setAiScanTarget(pkg, isTarget) },
             onQuickUnsuspendClicked = { app -> confirmAndExecuteQuickUnsuspend(app) }
         )
         rvAppsList.adapter = adapter
@@ -227,10 +228,12 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             apps = state.displayedApps,
             customBlacklist = state.customBlacklist,
             customCurfewWhitelist = state.customCurfewWhitelist,
+            customAiScanPackages = state.customAiScanPackages,
             curfewVpnBypass = state.curfewVpnBypass,
             protectedApps = state.protectedApps,
             initialCurfewWhitelist = state.initialCurfewWhitelist,
-            initialCurfewVpnBypass = state.initialCurfewVpnBypass
+            initialCurfewVpnBypass = state.initialCurfewVpnBypass,
+            isScreenAiEnabledGlobally = state.isScreenAiEnabledGlobally
         )
     }
 
@@ -315,33 +318,40 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         private val onCurfewWhitelistToggled: (String, Boolean) -> Unit,
         private val onCurfewVpnBypassToggled: (String, Boolean) -> Unit,
         private val onProtectToggled: (String, Boolean) -> Unit,
+        private val onAiScanToggled: (String, Boolean) -> Unit,
         private val onQuickUnsuspendClicked: (InstalledAppDto) -> Unit
     ) : RecyclerView.Adapter<RemoteAppsAdapter.AppViewHolder>() {
 
         private var apps: List<InstalledAppDto> = emptyList()
         private var customBlacklist: Set<String> = emptySet()
         private var customCurfewWhitelist: Set<String> = emptySet()
+        private var customAiScanPackages: Set<String> = emptySet()
         private var curfewVpnBypass: Set<String> = emptySet()
         private var protectedApps: Set<String> = emptySet()
         private var initialCurfewWhitelist: Set<String> = emptySet()
         private var initialCurfewVpnBypass: Set<String> = emptySet()
+        private var isScreenAiEnabledGlobally: Boolean = false
 
         fun submitData(
             apps: List<InstalledAppDto>,
             customBlacklist: Set<String>,
             customCurfewWhitelist: Set<String>,
+            customAiScanPackages: Set<String>,
             curfewVpnBypass: Set<String>,
             protectedApps: Set<String>,
             initialCurfewWhitelist: Set<String>,
-            initialCurfewVpnBypass: Set<String>
+            initialCurfewVpnBypass: Set<String>,
+            isScreenAiEnabledGlobally: Boolean
         ) {
             this.apps = apps
             this.customBlacklist = customBlacklist
             this.customCurfewWhitelist = customCurfewWhitelist
+            this.customAiScanPackages = customAiScanPackages
             this.curfewVpnBypass = curfewVpnBypass
             this.protectedApps = protectedApps
             this.initialCurfewWhitelist = initialCurfewWhitelist
             this.initialCurfewVpnBypass = initialCurfewVpnBypass
+            this.isScreenAiEnabledGlobally = isScreenAiEnabledGlobally
             notifyDataSetChanged()
         }
 
@@ -358,6 +368,8 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             val switchAllowCurfewInternet: MaterialSwitch = view.findViewById(R.id.switchAllowCurfewInternet)
             val tvCurfewInternetDisabledHint: TextView = view.findViewById(R.id.tvCurfewInternetDisabledHint)
             val switchProtect: MaterialSwitch = view.findViewById(R.id.switchProtect)
+            val switchAiScanTarget: MaterialSwitch = view.findViewById(R.id.switchAiScanTarget)
+            val tvAiScanDisabledHint: TextView = view.findViewById(R.id.tvAiScanDisabledHint)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AppViewHolder {
@@ -395,6 +407,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             holder.switchAllowInCurfew.setOnCheckedChangeListener(null)
             holder.switchAllowCurfewInternet.setOnCheckedChangeListener(null)
             holder.switchProtect.setOnCheckedChangeListener(null)
+            holder.switchAiScanTarget.setOnCheckedChangeListener(null)
 
             val isFrozen = customBlacklist.contains(pkg)
             holder.switchFreeze247.isChecked = isFrozen
@@ -443,6 +456,18 @@ class RemoteAppManagerActivity : AppCompatActivity() {
 
             holder.switchProtect.isChecked = protectedApps.contains(pkg)
 
+            if (!isScreenAiEnabledGlobally) {
+                holder.switchAiScanTarget.isChecked = false
+                holder.switchAiScanTarget.isEnabled = false
+                holder.switchAiScanTarget.alpha = 0.4f
+                holder.tvAiScanDisabledHint.visibility = View.VISIBLE
+            } else {
+                holder.switchAiScanTarget.isEnabled = true
+                holder.switchAiScanTarget.alpha = 1.0f
+                holder.tvAiScanDisabledHint.visibility = View.GONE
+                holder.switchAiScanTarget.isChecked = customAiScanPackages.contains(pkg)
+            }
+
             holder.switchFreeze247.setOnCheckedChangeListener { _, isChecked ->
                 onFreezeToggled(pkg, isChecked)
             }
@@ -457,6 +482,10 @@ class RemoteAppManagerActivity : AppCompatActivity() {
 
             holder.switchProtect.setOnCheckedChangeListener { _, isChecked ->
                 onProtectToggled(pkg, isChecked)
+            }
+
+            holder.switchAiScanTarget.setOnCheckedChangeListener { _, isChecked ->
+                onAiScanToggled(pkg, isChecked)
             }
         }
     }

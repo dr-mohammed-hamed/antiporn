@@ -32,7 +32,8 @@ service cloud.firestore {
 
     // 1. Pairings: Exchange and resolve 6-character alphanumeric pairing codes
     match /pairings/{code} {
-      allow read: if request.auth != null;
+      allow get: if request.auth != null;
+      allow list: if false;
       allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
       allow update: if request.auth != null && (
         resource.data.ownerUid == request.auth.uid ||
@@ -84,6 +85,28 @@ service cloud.firestore {
              request.resource.data.get('breakoutUnlockAt', null) == null)
           )
         ) ||
+        // Case 5c: Ward initiates or cancels Device Owner Deactivation (48h default, 24h with QR)
+        (resource.data.get('guardianUid', null) != null && isOwner(wardUid) &&
+          request.resource.data.get('guardianUid', null) == resource.data.get('guardianUid', null) &&
+          request.resource.data.get('isSupervised', null) == resource.data.get('isSupervised', null) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deactivationStatus', 'deactivationRequestedAt', 'deactivationUnlockAt', 'deactivationHasQr', 'updatedAt']) &&
+          (
+            (request.resource.data.get('deactivationStatus', null) == 'PENDING' &&
+             request.resource.data.get('deactivationRequestedAt', 0) <= request.time.toMillis() + 900000 &&
+             ((request.resource.data.get('deactivationHasQr', false) == true && request.resource.data.get('deactivationUnlockAt', 0) >= request.time.toMillis() + 85500000) ||
+              (request.resource.data.get('deactivationHasQr', false) == false && request.resource.data.get('deactivationUnlockAt', 0) >= request.time.toMillis() + 171900000))) ||
+            (request.resource.data.get('deactivationStatus', null) == 'CANCELLED' &&
+             request.resource.data.get('deactivationUnlockAt', null) == null)
+          )
+        ) ||
+        // Case 5d: Ward executes Device Owner Deactivation AFTER 48h (or 24h with QR) grace period has passed
+        (resource.data.get('guardianUid', null) != null && isOwner(wardUid) &&
+          resource.data.get('deactivationStatus', null) == 'PENDING' &&
+          resource.data.get('deactivationUnlockAt', 0) > 0 &&
+          request.time.toMillis() >= resource.data.get('deactivationUnlockAt', 0) &&
+          request.resource.data.get('guardianUid', null) == null &&
+          request.resource.data.get('isSupervised', false) == false &&
+          request.resource.data.get('deactivationStatus', null) == 'COMPLETED') ||
         // Case 6: Ward executes emergency breakout AFTER 24h grace period has legitimately passed on server clock
         (resource.data.get('guardianUid', null) != null && isOwner(wardUid) &&
           resource.data.get('breakoutStatus', null) == 'PENDING' &&
@@ -131,10 +154,7 @@ service cloud.firestore {
     // UID Mappings: Forwarding aliases for accounts that upgraded from device fallback or changed UID
     match /uid_mappings/{oldUid} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && (
-        request.auth.uid == oldUid ||
-        request.resource.data.get('activeUid', '') == request.auth.uid
-      );
+      allow write: if request.auth != null && request.auth.uid == oldUid;
     }
   }
 }

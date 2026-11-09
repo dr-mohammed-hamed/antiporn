@@ -43,6 +43,8 @@ import com.drmohammed.antiporn.data.repository.AppInventoryManager
 import com.drmohammed.antiporn.databinding.ActivityMainBinding
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
 import com.drmohammed.antiporn.ota.model.OtaVersionInfo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.drmohammed.antiporn.ota.repository.OtaRepository
 import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
@@ -258,8 +260,14 @@ class MainActivity : AppCompatActivity(),
             DnsWatchdogService.startService(this)
             CurfewScheduler.scheduleNextAlarms(this)
             CurfewEnforcer.syncBlockStateAsync(this)
-            if (!ProtectionEngine.isSystemFullyProtected(this)) {
-                triggerEnforcement(showToast = false)
+            lifecycleScope.launch(Dispatchers.IO) {
+                if (!ProtectionEngine.isSystemFullyProtected(this@MainActivity)) {
+                    withContext(Dispatchers.Main) {
+                        if (!isFinishing && !isDestroyed) {
+                            triggerEnforcement(showToast = false)
+                        }
+                    }
+                }
             }
             com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(this).syncZeroTrustBaselineAndReconcileAsync()
         }

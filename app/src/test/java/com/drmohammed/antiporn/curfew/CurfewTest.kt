@@ -45,14 +45,12 @@ class CurfewTest {
 
     @Test
     fun testStaticWhitelist_containsRequiredUserApps() {
-        // Business & productivity apps
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.dr.tech.daftar_albahr"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.dr.tech.hafeez_pos_micro_erp"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.dr.tech.puretube"))
+        // Media & productivity apps
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("org.schabi.newpipe"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("org.schabi.newpipe.debug"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("org.polymorphicshade.tubular"))
         assertFalse("Puregram should NOT be exempt during curfew", CurfewConfig.STATIC_WHITELIST.contains("org.puregram.messenger"))
+        assertFalse("Daftar Al-Bahr should NOT have hardcoded exemption", CurfewConfig.STATIC_WHITELIST.contains("com.dr.tech.daftar_albahr"))
 
         // Islamic apps & Athan
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.athanotify"))
@@ -74,20 +72,6 @@ class CurfewTest {
         // Audiobooks & Podcasts
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("de.ph1b.audiobook"))
         assertTrue(CurfewConfig.STATIC_WHITELIST.contains("de.danoeh.antennapod"))
-
-        // Exempted Games & Emulators
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.axlebolt.standoff2"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.AlfaBravo.CombatMaster"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.nekki.shadowfightarena"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.zeptolab.bulletecho.google"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.smokingguninc.phobies"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("yio.tro.antiyoy.android"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("air.com.RustyLake.CubeEscapeCollection"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("org.ppsspp.ppsspp"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("xyz.aethersx2.android"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.frogmind.badland"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.nvsgames.snap"))
-        assertTrue(CurfewConfig.STATIC_WHITELIST.contains("com.coloros.gamespaceui"))
     }
 
     @Test
@@ -187,14 +171,13 @@ class CurfewTest {
         val telegramPkg = "org.telegram.messenger"
         val tiktokPkg = "com.zhiliaoapp.musically"
 
-        // Under Unified Zero-Trust architecture, blacklist is disabled so apps are governed by approval
-        assertFalse(AppSuspensionShield.isBlacklisted(telegramPkg))
-        assertFalse(AppSuspensionShield.isBlacklisted(tiktokPkg))
+        assertTrue(AppSuspensionShield.isBlacklisted(telegramPkg))
+        assertTrue(AppSuspensionShield.isBlacklisted(tiktokPkg))
 
         val candidates = setOf(telegramPkg, tiktokPkg, "com.google.android.youtube")
         val safeToUnsuspend = candidates.filterNot { AppSuspensionShield.isBlacklisted(it) }
 
-        assertEquals(listOf(telegramPkg, tiktokPkg, "com.google.android.youtube"), safeToUnsuspend)
+        assertEquals(listOf("com.google.android.youtube"), safeToUnsuspend)
     }
 
     @Test
@@ -278,7 +261,7 @@ class CurfewTest {
 
     @Test
     fun testPhobiesGame_isInStaticWhitelist() {
-        assertTrue("Phobies game must be whitelisted", CurfewConfig.STATIC_WHITELIST.contains("com.smokingguninc.phobies"))
+        assertFalse("Phobies game must NOT have hardcoded whitelist", CurfewConfig.STATIC_WHITELIST.contains("com.smokingguninc.phobies"))
     }
 
     @Test
@@ -362,8 +345,6 @@ class CurfewTest {
         val bundle = com.drmohammed.antiporn.core.model.DevicePolicyBundle.defaultPolicy()
         assertTrue("WhatsApp must be seeded in customCurfewWhitelistPackages by default",
             bundle.customCurfewWhitelistPackages.contains("com.whatsapp"))
-        assertTrue("Daftar Al-Bahr must be seeded in customCurfewWhitelistPackages by default",
-            bundle.customCurfewWhitelistPackages.contains("com.dr.tech.daftar_albahr"))
         assertTrue("Moshafy Quran must be seeded in customCurfewWhitelistPackages by default",
             bundle.customCurfewWhitelistPackages.contains("com.islamicapp.moshafy"))
         assertTrue("NewPipe must be seeded in customCurfewWhitelistPackages by default",
@@ -425,8 +406,7 @@ class CurfewTest {
 
     @Test
     fun testAppPolicyRegistry_wildcardCurfewExemptions() {
-        // Test wildcard matching com.dr.tech.*, org.schabi.newpipe.*, com.mxtech.videoplayer.*
-        assertTrue(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("com.dr.tech.pos_scanner"))
+        // Test wildcard matching org.schabi.newpipe.*, com.mxtech.videoplayer.*
         assertTrue(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("org.schabi.newpipe.nightly"))
         assertTrue(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("com.mxtech.videoplayer.custom"))
 
@@ -434,5 +414,6 @@ class CurfewTest {
         assertFalse(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("org.telegram.messenger"))
         assertFalse(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("com.android.chrome"))
         assertFalse(com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("com.heytap.market"))
+        assertFalse("dr.tech apps should not have hardcoded curfew exemptions", com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isExemptFromCurfew("com.dr.tech.pos_scanner"))
     }
 }

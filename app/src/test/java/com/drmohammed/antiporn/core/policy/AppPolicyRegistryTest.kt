@@ -14,37 +14,60 @@ class AppPolicyRegistryTest {
     }
 
     @Test
-    fun testSelfProtectionAndPuregram_areAlwaysImmune() {
+    fun testSelfProtectionAndPuregram_immunityCheck() {
         assertTrue(AppPolicyRegistry.isImmune("com.drmohammed.antiporn"))
-        assertTrue(AppPolicyRegistry.isImmune("org.puregram.messenger"))
+        assertTrue(AppPolicyRegistry.isExemptFromCurfew("com.drmohammed.antiporn"))
+
+        // Puregram must NOT be immune or permanently exempt (closed loophole)
+        assertFalse(AppPolicyRegistry.isImmune("org.puregram.messenger"))
         assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("org.puregram.messenger"))
         assertFalse("Puregram is not exempt from curfew", AppPolicyRegistry.isExemptFromCurfew("org.puregram.messenger"))
-        assertTrue(AppPolicyRegistry.isExemptFromCurfew("com.drmohammed.antiporn"))
     }
 
     @Test
     fun testPermanentBlacklist_strictHierarchy() {
-        // Under Unified Zero-Trust architecture, no package is permanently blacklisted or silently uninstalled.
-        // Instead, all applications are subject to the supervisor Zero-Trust approval workflow.
-        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("org.telegram.messenger"))
-        assertFalse(AppPolicyRegistry.isExemptFromCurfew("org.telegram.messenger"))
-        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("org.telegram.messenger.web"))
-        assertFalse(AppPolicyRegistry.isExemptFromCurfew("org.telegram.messenger.web"))
+        val highRiskPackages = listOf(
+            "org.telegram.messenger",
+            "org.telegram.messenger.web",
+            "com.zhiliaoapp.musically",
+            "org.torproject.torbrowser",
+            "org.mozilla.firefox",
+            "com.duckduckgo.mobile.android",
+            "chat.ometv"
+        )
 
-        // TikTok
-        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("com.zhiliaoapp.musically"))
-        assertFalse(AppPolicyRegistry.isExemptFromCurfew("com.zhiliaoapp.musically"))
+        for (pkg in highRiskPackages) {
+            assertTrue("Expected isHighRisk to be true for $pkg", AppPolicyRegistry.isHighRisk(pkg))
+            assertTrue("Expected isPermanentlyBlacklisted to be true for $pkg", AppPolicyRegistry.isPermanentlyBlacklisted(pkg))
+            assertFalse("Expected isExemptFromCurfew to be false for $pkg", AppPolicyRegistry.isExemptFromCurfew(pkg))
+        }
 
-        // Proxy Browsers
-        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("org.torproject.torbrowser"))
-        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("org.mozilla.firefox"))
-        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("com.duckduckgo.mobile.android"))
+        assertTrue("Blacklisted packages must not be empty", AppPolicyRegistry.getBlacklistedPackages().isNotEmpty())
+        assertTrue("Blacklisted packages must contain Telegram", AppPolicyRegistry.getBlacklistedPackages().contains("org.telegram.messenger"))
+    }
 
-        // Random Chat
-        assertFalse(AppPolicyRegistry.isPermanentlyBlacklisted("chat.ometv"))
+    @Test
+    fun testHighRiskAppClassification() {
+        val highRiskPackages = listOf(
+            "org.telegram.messenger",
+            "org.telegram.messenger.web",
+            "com.zhiliaoapp.musically",
+            "org.torproject.torbrowser",
+            "org.mozilla.firefox",
+            "com.duckduckgo.mobile.android",
+            "chat.ometv"
+        )
 
-        // Blacklist set must be empty
-        assertTrue(AppPolicyRegistry.getBlacklistedPackages().isEmpty())
+        for (pkg in highRiskPackages) {
+            assertTrue("Expected isHighRisk to be true for $pkg", AppPolicyRegistry.isHighRisk(pkg))
+        }
+
+        // Immune apps must not be high-risk
+        assertFalse("Self-protection must not be high-risk", AppPolicyRegistry.isHighRisk("com.drmohammed.antiporn"))
+        assertFalse("Puregram must not be high-risk", AppPolicyRegistry.isHighRisk("org.puregram.messenger"))
+
+        // Regular non-blacklisted apps must not be high-risk
+        assertFalse("Regular calculator app must not be high-risk", AppPolicyRegistry.isHighRisk("com.google.android.calculator"))
     }
 
     @Test
@@ -64,14 +87,14 @@ class AppPolicyRegistryTest {
     }
 
     @Test
-    fun testBusinessWildcard_matchesAllDrTechApps() {
+    fun testBusinessWildcard_drTechAppsNotHardcodedExempt() {
         val daftar = "com.dr.tech.daftar_albahr"
         val hafeez = "com.dr.tech.hafeez_pos_micro_erp"
         val newApp = "com.dr.tech.future_micro_pos"
 
-        assertTrue(AppPolicyRegistry.isExemptFromCurfew(daftar))
-        assertTrue(AppPolicyRegistry.isExemptFromCurfew(hafeez))
-        assertTrue("Any future com.dr.tech.* app must be auto-exempted via wildcard", AppPolicyRegistry.isExemptFromCurfew(newApp))
+        assertFalse("dr.tech apps must not have hardcoded curfew exemptions", AppPolicyRegistry.isExemptFromCurfew(daftar))
+        assertFalse("dr.tech apps must not have hardcoded curfew exemptions", AppPolicyRegistry.isExemptFromCurfew(hafeez))
+        assertFalse("dr.tech apps must not have hardcoded curfew exemptions", AppPolicyRegistry.isExemptFromCurfew(newApp))
     }
 
     @Test

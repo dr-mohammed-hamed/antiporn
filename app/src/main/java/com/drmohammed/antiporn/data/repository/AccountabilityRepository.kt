@@ -35,12 +35,12 @@ import java.util.Locale
 class AccountabilityRepository(
     context: Context,
     private val partnerDao: PartnerDao = HisnRoomDatabase.getInstance(context).partnerDao(),
-    private val policyDao: DevicePolicyDao = HisnRoomDatabase.getInstance(context).devicePolicyDao()
+    internal val policyDao: DevicePolicyDao = HisnRoomDatabase.getInstance(context).devicePolicyDao()
 ) {
 
-    private val appContext = context.applicationContext
+    internal val appContext = context.applicationContext
     private val auth = FirebaseAuth.getInstance()
-    private val firestore = FirebaseFirestore.getInstance()
+    internal val firestore = FirebaseFirestore.getInstance()
 
     val partnersFlow: Flow<List<PartnerEntity>> = partnerDao.getAllPartnersFlow()
     val guardiansFlow: Flow<List<PartnerEntity>> = partnerDao.getPartnersByRoleFlow(PartnerEntity.ROLE_GUARDIAN)

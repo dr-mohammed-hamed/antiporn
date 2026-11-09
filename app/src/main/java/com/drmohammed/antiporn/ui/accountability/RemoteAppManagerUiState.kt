@@ -19,19 +19,23 @@ data class RemoteAppManagerUiState(
     val currentPolicy: DevicePolicyBundle = DevicePolicyBundle.defaultPolicy(),
     val customBlacklist: Set<String> = emptySet(),
     val customCurfewWhitelist: Set<String> = emptySet(),
+    val customAiScanPackages: Set<String> = emptySet(),
     val curfewVpnBypass: Set<String> = emptySet(),
     val protectedApps: Set<String> = emptySet(),
     val lockNewInstallsUntilApproved: Boolean = true,
     val initialBlacklist: Set<String> = emptySet(),
     val initialCurfewWhitelist: Set<String> = emptySet(),
+    val initialAiScanPackages: Set<String> = emptySet(),
     val initialCurfewVpnBypass: Set<String> = emptySet(),
     val initialProtectedApps: Set<String> = emptySet(),
     val initialLockNewInstalls: Boolean = true,
+    val isScreenAiEnabledGlobally: Boolean = false,
     val errorMessage: String? = null
 ) {
     val hasUnsavedChanges: Boolean
         get() = customBlacklist != initialBlacklist ||
                 customCurfewWhitelist != initialCurfewWhitelist ||
+                customAiScanPackages != initialAiScanPackages ||
                 curfewVpnBypass != initialCurfewVpnBypass ||
                 protectedApps != initialProtectedApps ||
                 lockNewInstallsUntilApproved != initialLockNewInstalls
