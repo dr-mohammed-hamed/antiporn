@@ -286,7 +286,7 @@
     <string name="ai_permission_denied">تم رفض إذن التقاط الشاشة</string>
 
     <!-- Accountability Hub Strings -->
-    <string name="title_accountability_hub">مركز شريك المساءلة</string>
+    <string name="title_accountability_hub">مركز التحكم والإشراف</string>
 
     <string name="subtitle_accountability_hub">إدارة الحماية المشتركة والتحكم التبادلي بين الأصدقاء</string>
 
@@ -300,9 +300,9 @@
 
     <string name="btn_add_partner">إضافة صديق / شريك جديد</string>
 
-    <string name="section_my_wards">من أحميهم (مكفولون تحت إشرافي)</string>
+    <string name="section_my_wards">من أحميهم</string>
 
-    <string name="section_my_guardians">من يحمونني (أولياء وأصدقاء يتحكمون بحمايتي)</string>
+    <string name="section_my_guardians">من يحمونني</string>
 
     <string name="empty_wards_msg">لا يوجد أشخاص تحت إشرافك حالياً. أضف صديقك عبر رمزه لحمايته.</string>
 
@@ -867,7 +867,6 @@
     <string name="btn_hero_nap_extend">+60 دقيقة تمديد</string>
 
     <!-- Settings Tab Strings -->
-    <string name="settings_category_general">الإعدادات العامة</string>
     <string name="settings_ai_title">فحص الشاشة بالذكاء الاصطناعي</string>
     <string name="settings_ai_desc">كشف وتعتيم المحتوى الحساس فوراً على شاشة الجهاز دون إرسال أي بيانات للخارج</string>
     <string name="settings_ota_title">تحديثات التطبيق</string>
@@ -901,9 +900,9 @@
     <string name="qr_emergency_time_minutes">%1$d دقيقة</string>
     <string name="qr_export_dialog_title">رمز حماية لوحة التحكم الذاتي</string>
     <string name="qr_export_dialog_subtitle">احفظ هذا الرمز في مكان بعيد عن متناولك (اطبعه أو أرسله لهاتف آخر) ثم احذفه من هذا الهاتف لتأخير الاندفاعية.</string>
-    <string name="qr_export_warning">تنبيه: الاحتفاظ بالصورة على هذا الهاتف يُلغي فائدة تأخير الاندفاعية!</string>
-    <string name="qr_export_share">مشاركة</string>
-    <string name="qr_export_print">طباعة</string>
+    <string name="qr_export_warning">احتفظ به الآن فلن يظهر مرة أخرى</string>
+    <string name="qr_export_share">مشاركة الرمز</string>
+    <string name="qr_export_print">طباعة الرمز</string>
     <string name="qr_export_save">حفظ كصورة</string>
     <string name="qr_export_close">إغلاق</string>
     <string name="qr_export_save_success">تم حفظ الصورة في معرض الصور بنجاح</string>
@@ -920,7 +919,7 @@
     <string name="self_control_qr_card_subtitle">منع التعديل اللحظي للدروع</string>
     <string name="self_control_qr_switch_title">تفعيل قفل الـ QR لتأكيد الحفظ</string>
     <string name="self_control_qr_switch_desc">عند التفعيل، لن يُسمح بحفظ أو تطبيق أي تعديلات في هذه اللوحة إلا بعد مسح رمز الـ QR الفعلي بكاميرا الهاتف لتأخير الاندفاعية.</string>
-    <string name="self_control_qr_btn_show">عرض ومشاركة رمز الـ QR</string>
+    <string name="self_control_qr_btn_show">عرض ومشاركة الرمز</string>
     <string name="self_control_qr_btn_regenerate">إعادة إنشاء رمز جديد</string>
     <string name="self_control_qr_disabled_toast">تم إيقاف قفل الـ QR</string>
     <string name="self_control_qr_regenerate_confirm_title">إعادة إنشاء رمز QR جديد</string>

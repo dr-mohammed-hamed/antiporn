@@ -59,9 +59,10 @@ object CurfewShield : ProtectionShield {
         return try {
             val isActive = CurfewEnforcer.isEffectiveBlockActive(context)
             if (isActive) {
-                // Ground-truth verification: Ensure OEM stores, Google Play, and search loophole apps are suspended (Zero Hiding policy)
-                val packagesToVerify = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS +
-                        setOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, CurfewConfig.GOOGLE_SEARCH_PACKAGE)
+                // Ground-truth verification: Ensure OEM stores and search loophole apps are suspended (Zero Hiding policy).
+                // Note: Google Play Store and Google Search are intentionally kept unsuspended for licensing and IPC background services,
+                // while their external traffic is halted via the Always-On VPN Blackhole during active night curfew.
+                val packagesToVerify = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
                 val allStoresSuspended = packagesToVerify.all { pkg ->
                     try {
                         val isInstalled = try {

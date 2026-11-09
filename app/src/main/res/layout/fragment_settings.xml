@@ -26,14 +26,6 @@
             android:textSize="24sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="@string/settings_category_general"
-            android:textColor="?attr/colorOutline"
-            android:textSize="13sp" />
-
         <!-- Card: Classic List Preference Container -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"

@@ -510,21 +510,30 @@ class DnsWatchdogService : Service() {
             )
 
             ProtectionEngine.applyAllAsync(applicationContext)
-            try {
-                AppNotificationManager.getInstance(applicationContext).postEventNotification(
-                    category = NotificationCategory.SHIELDS,
-                    title = getString(R.string.notif_tamper_alert_title),
-                    message = getString(R.string.notif_tamper_alert_msg),
-                    dedupKey = "tamper_alert_enforce",
-                    cooldownMs = 15 * 60 * 1000L,
-                    actionType = NotificationActionType.NONE,
-                    systemNotificationId = NotificationRegistry.EVENT_SYSTEM_TAMPER_ID,
-                    channelId = NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
-                    postSystemNotification = true,
-                    importance = 3
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Error posting tamper alert notification", e)
+
+            // Only post user-facing tamper alert notification if actual DNS or Time tampering is detected
+            val isDirectTamper = desyncReasons.any {
+                it.startsWith("[DNS_GLOBAL:") || it.startsWith("[TIMEZONE:") ||
+                        it.startsWith("[AUTO_TIME:") || it.startsWith("[dns:") ||
+                        it.startsWith("[system_tamper:")
+            }
+            if (isDirectTamper) {
+                try {
+                    AppNotificationManager.getInstance(applicationContext).postEventNotification(
+                        category = NotificationCategory.SHIELDS,
+                        title = getString(R.string.notif_tamper_alert_title),
+                        message = getString(R.string.notif_tamper_alert_msg),
+                        dedupKey = "tamper_alert_enforce",
+                        cooldownMs = 15 * 60 * 1000L,
+                        actionType = NotificationActionType.NONE,
+                        systemNotificationId = NotificationRegistry.EVENT_SYSTEM_TAMPER_ID,
+                        channelId = NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
+                        postSystemNotification = true,
+                        importance = 3
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error posting tamper alert notification", e)
+                }
             }
         }
         com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncZeroTrustBaselineAndReconcileAsync()

@@ -117,6 +117,19 @@ class CurfewTest {
     }
 
     @Test
+    fun testCurfewSuspensionTargetStores_excludesGoogleSearchAndPlayStoreForIpc() {
+        val storesToSuspend = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
+        assertFalse(
+            "Google Search must NOT be in storesToSuspend as DPM suspension fails on system assist apps",
+            storesToSuspend.contains(CurfewConfig.GOOGLE_SEARCH_PACKAGE)
+        )
+        assertFalse(
+            "Google Play Store must NOT be in storesToSuspend as it is kept for background licensing IPC",
+            storesToSuspend.contains(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE)
+        )
+    }
+
+    @Test
     fun testCurfewForegroundWatcher_isGeminiActivity() {
         // Gemini surfaces
         assertTrue(

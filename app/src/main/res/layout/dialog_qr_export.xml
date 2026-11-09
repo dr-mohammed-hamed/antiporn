@@ -4,168 +4,173 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:overScrollMode="never">
 
-    <com.google.android.material.card.MaterialCardView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        app:cardBackgroundColor="?attr/colorSurface"
-        app:cardCornerRadius="24dp"
-        app:cardElevation="6dp"
-        app:strokeColor="?attr/colorOutlineVariant"
-        app:strokeWidth="1dp">
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="24dp">
 
+        <!-- Top Drag Handle -->
+        <View
+            android:layout_width="44dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_bottom_sheet_handle" />
+
+        <!-- Sheet Title -->
+        <TextView
+            android:id="@+id/tvExportTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/tajawal"
+            android:gravity="center"
+            android:text="@string/qr_export_dialog_title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <!-- Sheet Subtitle -->
+        <TextView
+            android:id="@+id/tvExportSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="16dp"
+            android:fontFamily="@font/tajawal"
+            android:gravity="center"
+            android:paddingHorizontal="8dp"
+            android:text="@string/qr_export_dialog_subtitle"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="13sp" />
+
+        <!-- QR Code Container (Pure White background to ensure QR readability in dark mode) -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="220dp"
+            android:layout_height="220dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#FFFFFFFF"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <ImageView
+                android:id="@+id/ivExportQrCode"
+                android:layout_width="200dp"
+                android:layout_height="200dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/qr_export_dialog_title"
+                android:scaleType="fitCenter"
+                tools:src="@drawable/ic_hisn_shield_emblem" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Warning Callout Card -->
+        <LinearLayout
+            android:id="@+id/cardExportWarning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="18dp"
+            android:background="@drawable/bg_qr_card_warning"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_warning_amber"
+                app:tint="@color/shield_amber_calm" />
+
+            <TextView
+                android:id="@+id/tvExportWarning"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:fontFamily="@font/tajawal"
+                android:text="@string/qr_export_warning"
+                android:textColor="@color/shield_amber_calm"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Primary Action: Full Width Share Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnShareQr"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginBottom="8dp"
+            android:fontFamily="@font/tajawal"
+            android:text="@string/qr_export_share"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:backgroundTint="?attr/colorPrimary"
+            app:cornerRadius="14dp"
+            app:icon="@drawable/ic_share"
+            app:iconGravity="textStart"
+            app:iconSize="20dp"
+            app:iconTint="?attr/colorOnPrimary" />
+
+        <!-- Secondary Actions Row: Print & Save to Gallery -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingHorizontal="20dp"
-            android:paddingTop="20dp"
-            android:paddingBottom="20dp">
+            android:layout_marginBottom="6dp"
+            android:orientation="horizontal">
 
-            <!-- Title & Subtitle -->
-            <TextView
-                android:id="@+id/tvExportTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/tajawal"
-                android:gravity="center"
-                android:text="@string/qr_export_dialog_title"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvExportSubtitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="16dp"
-                android:fontFamily="@font/tajawal"
-                android:gravity="center"
-                android:text="@string/qr_export_dialog_subtitle"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="13sp" />
-
-            <!-- QR Code Container (Pure White background to ensure QR readability in dark mode) -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="260dp"
-                android:layout_height="260dp"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="#FFFFFFFF"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="2dp"
-                app:strokeColor="#FFE2E8F0"
-                app:strokeWidth="1dp">
-
-                <ImageView
-                    android:id="@+id/ivExportQrCode"
-                    android:layout_width="240dp"
-                    android:layout_height="240dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/qr_export_dialog_title"
-                    android:scaleType="fitCenter"
-                    tools:src="@drawable/ic_hisn_shield_emblem" />
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Warning Callout Card -->
-            <LinearLayout
-                android:id="@+id/cardExportWarning"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:background="@drawable/bg_qr_card_warning"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:padding="12dp">
-
-                <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_warning_amber" />
-
-                <TextView
-                    android:id="@+id/tvExportWarning"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:layout_weight="1"
-                    android:fontFamily="@font/tajawal"
-                    android:text="@string/qr_export_warning"
-                    android:textColor="@color/shield_amber_calm"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- Action Buttons Grid / Row -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
-
-                <!-- Share Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnShareQr"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
-                    android:fontFamily="@font/tajawal"
-                    android:text="@string/qr_export_share"
-                    android:textSize="12sp"
-                    app:icon="@drawable/ic_share"
-                    app:iconGravity="textStart"
-                    app:iconSize="18dp" />
-
-                <!-- Print Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnPrintQr"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginEnd="4dp"
-                    android:fontFamily="@font/tajawal"
-                    android:text="@string/qr_export_print"
-                    android:textSize="12sp"
-                    app:icon="@drawable/ic_print"
-                    app:iconGravity="textStart"
-                    app:iconSize="18dp" />
-
-                <!-- Save to Gallery Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnSaveQrImage"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:fontFamily="@font/tajawal"
-                    android:text="@string/qr_export_save"
-                    android:textSize="12sp"
-                    app:icon="@drawable/ic_save"
-                    app:iconGravity="textStart"
-                    app:iconSize="18dp" />
-            </LinearLayout>
-
-            <!-- Close Button -->
+            <!-- Print Button -->
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCloseExportDialog"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:id="@+id/btnPrintQr"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
                 android:fontFamily="@font/tajawal"
-                android:text="@string/qr_export_close"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="13sp" />
+                android:text="@string/qr_export_print"
+                android:textSize="13sp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_print"
+                app:iconGravity="textStart"
+                app:iconSize="18dp" />
 
+            <!-- Save to Gallery Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSaveQrImage"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:fontFamily="@font/tajawal"
+                android:text="@string/qr_export_save"
+                android:textSize="13sp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_save"
+                app:iconGravity="textStart"
+                app:iconSize="18dp" />
         </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
+
+        <!-- Close Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCloseExportDialog"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/tajawal"
+            android:text="@string/qr_export_close"
+            android:textColor="?attr/colorOutline"
+            android:textSize="13sp" />
+
+    </LinearLayout>
 </androidx.core.widget.NestedScrollView>

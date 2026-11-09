@@ -383,7 +383,6 @@
     <string name="btn_hero_nap_extend">+60m Extend</string>
 
     <!-- Settings Tab Strings -->
-    <string name="settings_category_general">General Settings</string>
     <string name="settings_ai_title">Screen AI Inspection</string>
     <string name="settings_ai_desc">Detect and blur sensitive content in real-time on device</string>
     <string name="settings_ota_title">App Updates</string>
@@ -417,9 +416,9 @@
     <string name="qr_emergency_time_minutes">%1$d min</string>
     <string name="qr_export_dialog_title">Self-Control Lock Code</string>
     <string name="qr_export_dialog_subtitle">Store this code away from reach (print it or send to another device) then delete it from this device to delay impulses.</string>
-    <string name="qr_export_warning">Warning: Keeping this image on this device defeats impulse delay!</string>
-    <string name="qr_export_share">Share</string>
-    <string name="qr_export_print">Print</string>
+    <string name="qr_export_warning">Keep it safe now; it will not be shown again!</string>
+    <string name="qr_export_share">Share Code</string>
+    <string name="qr_export_print">Print Code</string>
     <string name="qr_export_save">Save Image</string>
     <string name="qr_export_close">Close</string>
     <string name="qr_export_save_success">Image saved to gallery successfully</string>

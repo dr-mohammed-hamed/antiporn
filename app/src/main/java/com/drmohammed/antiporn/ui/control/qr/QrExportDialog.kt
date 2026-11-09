@@ -12,32 +12,35 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import androidx.fragment.app.DialogFragment
+import androidx.lifecycle.lifecycleScope
 import androidx.print.PrintHelper
 import com.drmohammed.antiporn.R
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
 
 /**
- * Modern Material Design 3 Dialog displaying the generated Self-Control QR lock code.
+ * Modern Material Design 3 BottomSheet dialog displaying the generated Self-Control QR lock code.
  * Provides user actions to share (via FileProvider Intent), print (via PrintHelper),
  * and save as PNG to the device photo gallery (via MediaStore).
  */
-class QrExportDialog : DialogFragment() {
+class QrExportDialog : BottomSheetDialogFragment() {
 
     private lateinit var ivExportQrCode: ImageView
     private lateinit var btnShareQr: MaterialButton
     private lateinit var btnPrintQr: MaterialButton
     private lateinit var btnSaveQrImage: MaterialButton
     private lateinit var btnCloseExportDialog: MaterialButton
-
-    private var currentBitmap: Bitmap? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,12 +60,9 @@ class QrExportDialog : DialogFragment() {
 
     override fun onStart() {
         super.onStart()
-        dialog?.window?.apply {
-            setBackgroundDrawableResource(android.R.color.transparent)
-            setLayout(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.WRAP_CONTENT
-            )
+        (dialog as? BottomSheetDialog)?.behavior?.apply {
+            state = BottomSheetBehavior.STATE_EXPANDED
+            skipCollapsed = true
         }
     }
 
@@ -79,19 +79,18 @@ class QrExportDialog : DialogFragment() {
         val qrManager = SelfControlQrManager.getInstance(requireContext())
         val token = qrManager.getSavedToken() ?: qrManager.generateAndSaveNewToken()
         val resolvedBitmap = qrManager.generateQrBitmap(token, 512)
-        currentBitmap = resolvedBitmap
         ivExportQrCode.setImageBitmap(resolvedBitmap)
 
         btnShareQr.setOnClickListener {
-            resolvedBitmap.let { bmp -> shareQrCode(bmp) }
+            shareQrCode(resolvedBitmap)
         }
 
         btnPrintQr.setOnClickListener {
-            resolvedBitmap.let { bmp -> printQrCode(bmp) }
+            printQrCode(resolvedBitmap)
         }
 
         btnSaveQrImage.setOnClickListener {
-            resolvedBitmap.let { bmp -> saveBitmapToGallery(bmp) }
+            saveBitmapToGallery(resolvedBitmap)
         }
 
         btnCloseExportDialog.setOnClickListener {
@@ -101,28 +100,45 @@ class QrExportDialog : DialogFragment() {
 
     private fun shareQrCode(bitmap: Bitmap) {
         val context = context ?: return
-        try {
-            val cachePath = File(context.cacheDir, "qr_exports").apply { mkdirs() }
-            val imageFile = File(cachePath, "AntiPorn_SelfControl_QR.png")
-            FileOutputStream(imageFile).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        btnShareQr.isEnabled = false
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val cachePath = File(context.cacheDir, "qr_exports").apply { mkdirs() }
+                val imageFile = File(cachePath, "AntiPorn_SelfControl_QR.png")
+                FileOutputStream(imageFile).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+
+                val authority = "${context.packageName}.fileprovider"
+                val contentUri: Uri = FileProvider.getUriForFile(context, authority, imageFile)
+
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                    putExtra(Intent.EXTRA_TEXT, getString(R.string.qr_export_share_text))
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                val chooser = Intent.createChooser(shareIntent, getString(R.string.qr_export_share_chooser))
+                withContext(Dispatchers.Main) {
+                    if (isAdded) {
+                        startActivity(chooser)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to share QR image", e)
+                withContext(Dispatchers.Main) {
+                    if (isAdded) {
+                        Toast.makeText(context, getString(R.string.qr_export_share_error, e.localizedMessage ?: ""), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } finally {
+                withContext(Dispatchers.Main) {
+                    if (isAdded) {
+                        btnShareQr.isEnabled = true
+                    }
+                }
             }
-
-            val authority = "${context.packageName}.fileprovider"
-            val contentUri: Uri = FileProvider.getUriForFile(context, authority, imageFile)
-
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
-                putExtra(Intent.EXTRA_STREAM, contentUri)
-                putExtra(Intent.EXTRA_TEXT, getString(R.string.qr_export_share_text))
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-
-            val chooser = Intent.createChooser(shareIntent, getString(R.string.qr_export_share_chooser))
-            startActivity(chooser)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to share QR image", e)
-            Toast.makeText(context, getString(R.string.qr_export_share_error, e.localizedMessage ?: ""), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -145,59 +161,75 @@ class QrExportDialog : DialogFragment() {
     private fun saveBitmapToGallery(bitmap: Bitmap) {
         val context = context ?: return
         btnSaveQrImage.isEnabled = false
-        val filename = "AntiPorn_SelfControl_QR_${System.currentTimeMillis()}.png"
-        var outputStream: OutputStream? = null
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val filename = "AntiPorn_SelfControl_QR_${System.currentTimeMillis()}.png"
+            var outputStream: OutputStream? = null
 
-        try {
-            val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/AntiPorn")
-                    put(MediaStore.MediaColumns.IS_PENDING, 1)
-                }
-            }
-
-            val uri = context.contentResolver.insert(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues
-            )
-
-            if (uri != null) {
-                outputStream = context.contentResolver.openOutputStream(uri)
-                if (outputStream != null) {
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-                    outputStream.flush()
-                }
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    contentValues.clear()
-                    contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
-                    context.contentResolver.update(uri, contentValues, null, null)
-                }
-
-                Toast.makeText(context, R.string.qr_export_save_success, Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(context, R.string.qr_export_save_error_gallery, Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to save QR to gallery", e)
-            Toast.makeText(context, getString(R.string.qr_export_save_error, e.localizedMessage ?: ""), Toast.LENGTH_SHORT).show()
-        } finally {
             try {
-                outputStream?.close()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                        put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/AntiPorn")
+                        put(MediaStore.MediaColumns.IS_PENDING, 1)
+                    }
+
+                    val uri = context.contentResolver.insert(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        contentValues
+                    )
+
+                    if (uri != null) {
+                        outputStream = context.contentResolver.openOutputStream(uri)
+                        if (outputStream != null) {
+                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                            outputStream.flush()
+                        }
+
+                        contentValues.clear()
+                        contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                        context.contentResolver.update(uri, contentValues, null, null)
+
+                        withContext(Dispatchers.Main) {
+                            if (isAdded) {
+                                Toast.makeText(context, R.string.qr_export_save_success, Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            if (isAdded) {
+                                Toast.makeText(context, R.string.qr_export_save_error_gallery, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                } else {
+                    // Pre-Android 10: avoid SecurityException due to missing WRITE_EXTERNAL_STORAGE
+                    withContext(Dispatchers.Main) {
+                        if (isAdded) {
+                            Toast.makeText(context, R.string.qr_export_save_error_gallery, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
             } catch (e: Exception) {
-                Log.w(TAG, "Error closing stream", e)
-            }
-            if (isAdded) {
-                btnSaveQrImage.isEnabled = true
+                Log.e(TAG, "Failed to save QR to gallery", e)
+                withContext(Dispatchers.Main) {
+                    if (isAdded) {
+                        Toast.makeText(context, getString(R.string.qr_export_save_error, e.localizedMessage ?: ""), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } finally {
+                try {
+                    outputStream?.close()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error closing stream", e)
+                }
+                withContext(Dispatchers.Main) {
+                    if (isAdded) {
+                        btnSaveQrImage.isEnabled = true
+                    }
+                }
             }
         }
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        currentBitmap = null
     }
 
     companion object {

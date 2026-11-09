@@ -244,6 +244,16 @@ object CurfewEnforcer {
                         com.drmohammed.antiporn.telemetry.SafeDpmGateway.setAlwaysOnVpnPackageBlocking(context, null, false)
                         Log.i(TAG, "Always-on Blackhole VPN released via SafeDpmGateway")
                     }
+                    // Immediately re-enforce DoT Private DNS after VPN release to eliminate opportunistic race condition
+                    if (com.drmohammed.antiporn.telemetry.SafeDpmGateway.isDeviceOwner(context)) {
+                        com.drmohammed.antiporn.telemetry.SafeDpmGateway.executeRawBlocking(
+                            context = context,
+                            tag = com.drmohammed.antiporn.telemetry.BlackBoxRecorder.TAG_SHIELD,
+                            actionName = "restoreDnsShieldOnCurfewRelease"
+                        ) { dpm, admin ->
+                            com.drmohammed.antiporn.shields.DnsShield.apply(context, dpm, admin)
+                        }
+                    }
                 }
                 Log.i(TAG, "VPN Blackhole is disabled and network is released.")
             } catch (e: Exception) {
@@ -268,9 +278,9 @@ object CurfewEnforcer {
                 details = "targets=${targets.size}, vpnEnabled=$vpnEnabled, instantKill=$instantKill, nap=${NapController.isNapActive(context)}"
             )
 
-            // 1. Suspend all OEM App Stores, Google Play, and search loophole apps natively (Zero Hiding policy)
-            val curfewStoresToSuspend = (CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS +
-                    setOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, CurfewConfig.GOOGLE_SEARCH_PACKAGE))
+            // 1. Suspend all OEM App Stores and search loophole apps natively (Zero Hiding policy).
+            // Note: Google Play Store and Google Search are kept unsuspended for licensing and IPC background services.
+            val curfewStoresToSuspend = (CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS)
             val pm = context.packageManager
             val storesBatchToSuspend = curfewStoresToSuspend.filter { pkg ->
                 try {
@@ -412,8 +422,7 @@ object CurfewEnforcer {
             }
             val customBlacklist = currentPolicy?.customBlacklistPackages ?: emptySet()
 
-            val curfewStoresToUnsuspend = (CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS +
-                    setOf(CurfewConfig.GOOGLE_PLAY_STORE_PACKAGE, CurfewConfig.GOOGLE_SEARCH_PACKAGE))
+            val curfewStoresToUnsuspend = (CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS)
             val storesBatchToUnsuspend = curfewStoresToUnsuspend.filter { pkg ->
                 if (AppSuspensionShield.isBlacklisted(pkg) || customBlacklist.contains(pkg)) {
                     Log.i(TAG, "Preserving suspension of $pkg on curfew release as it is in blacklist/customBlacklist")
