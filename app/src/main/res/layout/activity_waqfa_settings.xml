@@ -70,6 +70,16 @@
                             android:text="@string/waqfa_switch_master_desc"
                             android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/tvEngineStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            tools:text="محرك الوصول اللحظي (0ms) نشط" />
                     </LinearLayout>
 
                     <com.google.android.material.materialswitch.MaterialSwitch

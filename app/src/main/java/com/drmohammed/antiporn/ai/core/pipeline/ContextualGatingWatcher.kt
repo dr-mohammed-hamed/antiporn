@@ -6,27 +6,39 @@ import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Process
+import com.drmohammed.antiporn.accessibility.bus.ForegroundAppEventBus
 import com.drmohammed.antiporn.ai.core.policy.AiExemptionRegistry
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
- * مراقب السياق وصمام الأمان القائم على UsageStatsManager
- * يفحص التطبيق النشط في الواجهة بشكل دوري خفيف ويحدث راية [isTargetAppForeground]
- * لإبقاء خط المعالجة في سبات تام في التطبيقات الآمنة
+ * مراقب السياق وصمام الأمان الهجين لحماية شاشة الذكاء الاصطناعي.
+ * - عند اتصال [HisnAccessibilityService]: يستقبل التغيرات لحظياً في 0ms عبر [ForegroundAppEventBus]
+ *   مع إيقاف حلقة الفحص الدوري تماماً (Zero-Polling).
+ * - عند انقطاع خدمة الوصول: ينشط كـ Fallback احتياطي عبر [UsageStatsManager] كل 1000ms.
  */
 class ContextualGatingWatcher(
-    private val context: Context,
+    context: Context,
     private val checkIntervalMs: Long = 1000L,
     private val onStateChanged: ((Boolean, String) -> Unit)? = null
 ) {
     init {
-        // MINOR: non-positive interval makes a zero/negative query window.
         require(checkIntervalMs >= 500L) { "checkIntervalMs must be >= 500ms" }
     }
 
+    private val context = context.applicationContext
     private var watcherThread: HandlerThread? = null
     private var handler: Handler? = null
-    private val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+    private val usageStatsManager = this.context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+    private val eventBus = ForegroundAppEventBus.getInstance(this.context)
+
+    private var watcherScope: CoroutineScope? = null
+    private var busCollectorJob: Job? = null
+    private var stateCollectorJob: Job? = null
 
     @Volatile
     var isTargetAppForeground: Boolean = false
@@ -36,7 +48,6 @@ class ContextualGatingWatcher(
     var currentForegroundPackage: String = ""
         private set
 
-    /** True when the last UsageStats query failed / was denied — lets UI distinguish dead vs idle. */
     @Volatile
     var lastQueryFailed: Boolean = false
         private set
@@ -51,6 +62,12 @@ class ContextualGatingWatcher(
     private val checkRunnable = object : Runnable {
         override fun run() {
             if (!isRunning) return
+
+            // قانون الصفر بولينج: إذا كانت خدمة الوصول نشطة، يتوقف الفحص الدوري تماماً
+            if (eventBus.isAccessibilityActive.value) {
+                return
+            }
+
             evaluateForegroundPackage()
             handler?.postDelayed(this, checkIntervalMs)
         }
@@ -64,12 +81,48 @@ class ContextualGatingWatcher(
     fun start() {
         if (isRunning) return
         isRunning = true
+
+        val scope = CoroutineScope(Dispatchers.Default)
+        watcherScope = scope
+
+        // مراقبة تفاعلية لحالة خدمة الوصول المركزية
+        stateCollectorJob = scope.launch {
+            eventBus.isAccessibilityActive.collect { active ->
+                if (active) {
+                    handler?.removeCallbacks(checkRunnable)
+                    Timber.tag(TAG).d("HisnAccessibilityService connected: AI Gating loop stopped (Zero-Polling Active)")
+                    val currentPkg = eventBus.activePackage.value
+                    if (!currentPkg.isNullOrBlank() && isRunning) {
+                        evaluatePackageDirectly(currentPkg)
+                    }
+                } else if (isRunning) {
+                    Timber.tag(TAG).d("HisnAccessibilityService disconnected: Starting AI Gating fallback loop")
+                    handler?.removeCallbacks(checkRunnable)
+                    handler?.post(checkRunnable)
+                }
+            }
+        }
+
+        // استقبال أحداث التطبيق النشط اللحظية من الناقل المركزي في 0ms
+        busCollectorJob = scope.launch {
+            eventBus.activePackage.collect { pkg ->
+                if (!pkg.isNullOrBlank() && eventBus.isAccessibilityActive.value && isRunning) {
+                    evaluatePackageDirectly(pkg)
+                }
+            }
+        }
+
         val thread = HandlerThread("AiGatingWatcher", Process.THREAD_PRIORITY_BACKGROUND).apply { start() }
         watcherThread = thread
         val h = Handler(thread.looper)
         handler = h
-        h.post(checkRunnable)
-        Timber.tag(TAG).d("Contextual gating watcher started on background HandlerThread")
+
+        if (!eventBus.isAccessibilityActive.value) {
+            h.post(checkRunnable)
+            Timber.tag(TAG).d("Contextual gating watcher started in fallback mode on background HandlerThread")
+        } else {
+            Timber.tag(TAG).d("Contextual gating watcher started in dormant event-driven mode (0ms Active)")
+        }
     }
 
     @Synchronized
@@ -79,9 +132,39 @@ class ContextualGatingWatcher(
         handler = null
         watcherThread?.quitSafely()
         watcherThread = null
+
+        busCollectorJob?.cancel()
+        busCollectorJob = null
+        stateCollectorJob?.cancel()
+        stateCollectorJob = null
+        watcherScope?.cancel()
+        watcherScope = null
+
         isTargetAppForeground = false
         currentForegroundPackage = ""
         Timber.tag(TAG).d("Contextual gating watcher stopped")
+    }
+
+    @Synchronized
+    private fun evaluatePackageDirectly(pkg: String) {
+        lastQueryFailed = false
+        lastQueryTimeMs = System.currentTimeMillis()
+
+        if (pkg != currentForegroundPackage) {
+            currentForegroundPackage = pkg
+            val isTarget = try {
+                isTargetPackage(pkg)
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Policy check failed, fail-closed")
+                true
+            }
+
+            if (isTarget != isTargetAppForeground) {
+                isTargetAppForeground = isTarget
+                Timber.tag(TAG).d("Foreground changed (0ms A11y) -> Target: $isTarget (pkg: $pkg)")
+                onStateChanged?.invoke(isTarget, pkg)
+            }
+        }
     }
 
     private fun evaluateForegroundPackage() {
@@ -93,7 +176,6 @@ class ContextualGatingWatcher(
         val events = try {
             usm.queryEvents(now - (checkIntervalMs * 3), now)
         } catch (e: SecurityException) {
-            // Fail-closed security policy: permission revoked -> keep scanning, never silent fail-open.
             failClosed("usage permission revoked: ${e.message}")
             return
         } catch (e: Exception) {
@@ -120,7 +202,6 @@ class ContextualGatingWatcher(
             }
         }
 
-        // إذا لم توجد أحداث تنقل جديدة ولكن لدينا تطبيق نشط مسجل مسبقاً، نحافظ على حالته لتفادي إغراق السجل
         if (latestEventPackage.isEmpty()) {
             if (currentForegroundPackage.isNotEmpty()) {
                 return
@@ -129,22 +210,7 @@ class ContextualGatingWatcher(
             return
         }
 
-        if (latestEventPackage != currentForegroundPackage) {
-            currentForegroundPackage = latestEventPackage
-            // Defensive resilience: AppPolicyRegistry delegates run on background thread — never let one throw kill watcher.
-            val isTarget = try {
-                isTargetPackage(latestEventPackage)
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Policy check failed, fail-closed")
-                true
-            }
-
-            if (isTarget != isTargetAppForeground) {
-                isTargetAppForeground = isTarget
-                Timber.tag(TAG).d("Foreground changed -> Target: $isTarget (pkg: $latestEventPackage)")
-                onStateChanged?.invoke(isTarget, latestEventPackage)
-            }
-        }
+        evaluatePackageDirectly(latestEventPackage)
     }
 
     /** Fail CLOSED (keep scanning) — safe direction for a protection feature. */
@@ -158,10 +224,7 @@ class ContextualGatingWatcher(
     }
 
     private fun isTargetPackage(pkg: String): Boolean {
-        // إذا كان تطبيقنا نفسه فهو آمن (شاشة التجربة)
         if (pkg == context.packageName) return false
-
-        // تطبيقات النظام النظيفة المعفاة حصراً (لانشر، إعدادات، هاتف، ساعة، آلة حاسبة)
         if (AiExemptionRegistry.isExempt(pkg)) return false
 
         val policy = try {
@@ -171,12 +234,10 @@ class ContextualGatingWatcher(
             null
         }
 
-        // إذا كان التطبيق مخصصاً يدوياً من المستخدم/الوصي للمسح بالذكاء الاصطناعي
         if (policy != null && policy.customAiScanPackages.contains(pkg)) {
             return true
         }
 
-        // الاستهداف القياسي: المتصفحات المقيدة وشبكات التواصل والمتاجر
         return AiExemptionRegistry.isTarget(pkg)
     }
 }

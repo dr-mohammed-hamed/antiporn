@@ -1216,4 +1216,17 @@
     <!-- App Manager Additions -->
     <string name="switch_freeze_new_installs">تجميد التطبيقات الجديدة تلقائياً</string>
     <string name="btn_save_changes">حفظ التعديلات</string>
+
+    <!-- Accessibility Service & Waqfa Engine Strings -->
+    <string name="accessibility_service_name">محرك حماية الوصول (الحصن)</string>
+    <string name="accessibility_service_description">تُستخدم هذه الخدمة لرصد فتح التطبيقات المقيدة في منظومة «وَقْفَة» وحماية التركيز على الجهاز محلياً دون جمع أو مشاركة أي بيانات شخصية.</string>
+    <string name="waqfa_engine_status_instant">محرك الوصول اللحظي (0ms) نشط</string>
+    <string name="waqfa_engine_status_fallback">مراقب الاستخدام الدوري (احتياطي)</string>
+    <string name="waqfa_engine_status_dormant">المحرك غير نشط</string>
+    <string name="waqfa_permission_dialog_title">تفعيل صلاحية الوصول لمنظومة «وَقْفَة»</string>
+    <string name="waqfa_permission_dialog_desc">تتطلب ميزة «وَقْفَة» صلاحية الوصول لرصد التطبيقات المستهدفة واعتراضها فوراً في 0ms دون وميض. يرجى تفعيل الخدمة أو منح إذن الوصول لبيانات الاستخدام كبديل.</string>
+    <string name="waqfa_permission_dialog_enable_btn">تفعيل الخدمة</string>
+    <string name="waqfa_permission_dialog_fallback_btn">استخدام البديل (بيانات الاستخدام)</string>
+    <string name="waqfa_permission_dialog_skip_btn">لاحقاً</string>
+    <string name="waqfa_could_not_open_settings">تعذر فتح شاشة الإعدادات</string>
 </resources>

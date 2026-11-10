@@ -3,9 +3,11 @@ package com.drmohammed.antiporn.waqfa.ui.settings
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -13,6 +15,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.databinding.ActivityWaqfaSettingsBinding
 import com.drmohammed.antiporn.waqfa.model.WaqfaTimeoutReactionType
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
@@ -24,6 +28,7 @@ class WaqfaSettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityWaqfaSettingsBinding
     private val viewModel: WaqfaSettingsViewModel by viewModel()
+    private var isBindingUi = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +46,11 @@ class WaqfaSettingsActivity : AppCompatActivity() {
         viewModel.initialize(isRemote, wardId, policyJson)
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshEngineStatus()
+    }
+
     private fun setupToolbar(isRemote: Boolean) {
         if (isRemote) {
             binding.toolbar.title = getString(R.string.waqfa_guardian_card_title)
@@ -52,6 +62,7 @@ class WaqfaSettingsActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         binding.swWaqfaMaster.setOnCheckedChangeListener { _, isChecked ->
+            if (isBindingUi) return@setOnCheckedChangeListener
             viewModel.setWaqfaEnabled(isChecked)
         }
 
@@ -65,10 +76,12 @@ class WaqfaSettingsActivity : AppCompatActivity() {
         }
 
         binding.swReasonRequired.setOnCheckedChangeListener { _, isChecked ->
+            if (isBindingUi) return@setOnCheckedChangeListener
             viewModel.setReasonRequired(isChecked)
         }
 
         binding.rgTimeoutReaction.setOnCheckedChangeListener { _, checkedId ->
+            if (isBindingUi) return@setOnCheckedChangeListener
             when (checkedId) {
                 R.id.rbExitOnly -> {
                     viewModel.setTimeoutReactionType(WaqfaTimeoutReactionType.EXIT_ONLY)
@@ -86,11 +99,13 @@ class WaqfaSettingsActivity : AppCompatActivity() {
         }
 
         binding.etCooldownMinutes.doAfterTextChanged {
+            if (isBindingUi) return@doAfterTextChanged
             val mins = it?.toString()?.toIntOrNull() ?: 3
             viewModel.setCooldownMinutes(mins)
         }
 
         binding.btnSaveWaqfaSettings.setOnClickListener {
+            binding.btnSaveWaqfaSettings.isEnabled = false
             viewModel.saveSettings { success, updatedPolicy ->
                 if (isFinishing || isDestroyed) return@saveSettings
                 if (success) {
@@ -103,6 +118,7 @@ class WaqfaSettingsActivity : AppCompatActivity() {
                     Toast.makeText(this, getString(R.string.waqfa_settings_saved_toast), Toast.LENGTH_SHORT).show()
                     finish()
                 } else {
+                    binding.btnSaveWaqfaSettings.isEnabled = true
                     Toast.makeText(this, getString(R.string.waqfa_settings_save_failed_toast), Toast.LENGTH_SHORT).show()
                 }
             }
@@ -120,40 +136,97 @@ class WaqfaSettingsActivity : AppCompatActivity() {
     }
 
     private fun renderUi(state: WaqfaSettingsUiState) {
-        val config = state.config
+        isBindingUi = true
+        try {
+            val config = state.config
 
-        if (binding.swWaqfaMaster.isChecked != config.isEnabled) {
-            binding.swWaqfaMaster.isChecked = config.isEnabled
-        }
-
-        val count = config.targetPackages.size
-        binding.tvTargetAppsCount.text = getString(R.string.waqfa_target_apps_desc, count)
-
-        if (binding.swReasonRequired.isChecked != config.isReasonRequired) {
-            binding.swReasonRequired.isChecked = config.isReasonRequired
-        }
-
-        when (config.timeoutReactionType) {
-            WaqfaTimeoutReactionType.EXIT_ONLY -> {
-                binding.rbExitOnly.isChecked = true
-                binding.layoutCooldownDuration.visibility = View.GONE
+            if (binding.swWaqfaMaster.isChecked != config.isEnabled) {
+                binding.swWaqfaMaster.isChecked = config.isEnabled
             }
-            WaqfaTimeoutReactionType.EXIT_AND_FREEZE -> {
-                binding.rbExitAndFreeze.isChecked = true
-                binding.layoutCooldownDuration.visibility = View.VISIBLE
-            }
-            WaqfaTimeoutReactionType.NOTIFY_ONLY -> {
-                binding.rbNotifyOnly.isChecked = true
-                binding.layoutCooldownDuration.visibility = View.GONE
-            }
-        }
 
-        val cooldownStr = config.cooldownMinutes.toString()
-        if (binding.etCooldownMinutes.text?.toString() != cooldownStr) {
-            binding.etCooldownMinutes.setText(cooldownStr)
-        }
+            val count = config.targetPackages.size
+            binding.tvTargetAppsCount.text = getString(R.string.waqfa_target_apps_desc, count)
 
-        binding.btnSaveWaqfaSettings.isEnabled = !state.isLoading
+            // عرض شارة حالة محرك الرصد اللحظي (0ms) / الاحتياطي
+            when (state.engineType) {
+                WaqfaEngineType.INSTANT_0MS -> {
+                    binding.tvEngineStatus.text = getString(R.string.waqfa_engine_status_instant)
+                    binding.tvEngineStatus.setTextColor(ContextCompat.getColor(this, R.color.status_green))
+                    binding.tvEngineStatus.visibility = View.VISIBLE
+                }
+                WaqfaEngineType.USAGE_STATS_FALLBACK -> {
+                    binding.tvEngineStatus.text = getString(R.string.waqfa_engine_status_fallback)
+                    binding.tvEngineStatus.setTextColor(ContextCompat.getColor(this, R.color.status_orange))
+                    binding.tvEngineStatus.visibility = View.VISIBLE
+                }
+                WaqfaEngineType.DORMANT -> {
+                    binding.tvEngineStatus.text = getString(R.string.waqfa_engine_status_dormant)
+                    val dormantColor = MaterialColors.getColor(
+                        binding.tvEngineStatus,
+                        com.google.android.material.R.attr.colorOnSurfaceVariant
+                    )
+                    binding.tvEngineStatus.setTextColor(dormantColor)
+                    binding.tvEngineStatus.visibility = View.VISIBLE
+                }
+            }
+
+            if (binding.swReasonRequired.isChecked != config.isReasonRequired) {
+                binding.swReasonRequired.isChecked = config.isReasonRequired
+            }
+
+            when (config.timeoutReactionType) {
+                WaqfaTimeoutReactionType.EXIT_ONLY -> {
+                    binding.rbExitOnly.isChecked = true
+                    binding.layoutCooldownDuration.visibility = View.GONE
+                }
+                WaqfaTimeoutReactionType.EXIT_AND_FREEZE -> {
+                    binding.rbExitAndFreeze.isChecked = true
+                    binding.layoutCooldownDuration.visibility = View.VISIBLE
+                }
+                WaqfaTimeoutReactionType.NOTIFY_ONLY -> {
+                    binding.rbNotifyOnly.isChecked = true
+                    binding.layoutCooldownDuration.visibility = View.GONE
+                }
+            }
+
+            val cooldownStr = config.cooldownMinutes.toString()
+            if (binding.etCooldownMinutes.text?.toString() != cooldownStr) {
+                binding.etCooldownMinutes.setText(cooldownStr)
+            }
+
+            binding.btnSaveWaqfaSettings.isEnabled = !state.isLoading
+
+            if (state.showPermissionDialog) {
+                showPermissionGuidanceDialog()
+                viewModel.dismissPermissionDialog()
+            }
+        } finally {
+            isBindingUi = false
+        }
+    }
+
+    private fun showPermissionGuidanceDialog() {
+        if (isFinishing || isDestroyed) return
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.waqfa_permission_dialog_title)
+            .setMessage(R.string.waqfa_permission_dialog_desc)
+            .setPositiveButton(R.string.waqfa_permission_dialog_enable_btn) { _, _ ->
+                try {
+                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                } catch (e: Exception) {
+                    Toast.makeText(this, getString(R.string.waqfa_could_not_open_settings), Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(R.string.waqfa_permission_dialog_fallback_btn) { _, _ ->
+                try {
+                    startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                } catch (e: Exception) {
+                    Toast.makeText(this, getString(R.string.waqfa_could_not_open_settings), Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNeutralButton(R.string.waqfa_permission_dialog_skip_btn, null)
+            .show()
     }
 
     companion object {

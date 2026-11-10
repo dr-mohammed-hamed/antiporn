@@ -1,10 +1,12 @@
 package com.drmohammed.antiporn.waqfa.ui.settings
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.drmohammed.antiporn.accessibility.bus.ForegroundAppEventBus
+import com.drmohammed.antiporn.accessibility.control.AccessibilitySelfActivator
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
+import com.drmohammed.antiporn.curfew.CurfewForegroundWatcher
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.waqfa.engine.WaqfaSessionManager
 import com.drmohammed.antiporn.waqfa.model.WaqfaConfig
@@ -14,6 +16,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
+
+enum class WaqfaEngineType {
+    INSTANT_0MS,
+    USAGE_STATS_FALLBACK,
+    DORMANT
+}
 
 data class WaqfaSettingsUiState(
     val config: WaqfaConfig = WaqfaConfig(),
@@ -21,7 +30,9 @@ data class WaqfaSettingsUiState(
     val wardId: String? = null,
     val isLoading: Boolean = false,
     val isSaved: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val engineType: WaqfaEngineType = WaqfaEngineType.DORMANT,
+    val showPermissionDialog: Boolean = false
 )
 
 class WaqfaSettingsViewModel(
@@ -40,7 +51,7 @@ class WaqfaSettingsViewModel(
             try {
                 DevicePolicyBundle.fromJson(policyJson)
             } catch (e: Exception) {
-                Log.w(TAG, "Failed parsing remote policyJson for Waqfa, falling back to local policy", e)
+                Timber.tag(TAG).w(e, "Failed parsing remote policyJson for Waqfa, falling back to local policy")
                 policyRepository.getCurrentPolicy()
             }
         } else {
@@ -55,10 +66,49 @@ class WaqfaSettingsViewModel(
                 wardId = wardId
             )
         }
+
+        if (!isRemote) {
+            viewModelScope.launch {
+                AccessibilitySelfActivator.enableSilently(getApplication())
+                refreshEngineStatus()
+            }
+        }
+    }
+
+    fun refreshEngineStatus() {
+        val app = getApplication<Application>()
+        val a11yActive = ForegroundAppEventBus.getInstance(app).isAccessibilityActive.value ||
+            AccessibilitySelfActivator.isServiceEnabledInSettings(app)
+
+        val hasUsage = CurfewForegroundWatcher.hasUsageStatsPermission(app)
+
+        val engine = when {
+            a11yActive -> WaqfaEngineType.INSTANT_0MS
+            hasUsage -> WaqfaEngineType.USAGE_STATS_FALLBACK
+            else -> WaqfaEngineType.DORMANT
+        }
+
+        _uiState.update { it.copy(engineType = engine) }
     }
 
     fun setWaqfaEnabled(enabled: Boolean) {
+        val state = _uiState.value
         _uiState.update { it.copy(config = it.config.copy(isEnabled = enabled)) }
+
+        if (enabled && !state.isRemote) {
+            val app = getApplication<Application>()
+            val healed = AccessibilitySelfActivator.enableSilently(app)
+            val hasUsage = CurfewForegroundWatcher.hasUsageStatsPermission(app)
+
+            if (!healed && !AccessibilitySelfActivator.isServiceEnabledInSettings(app) && !hasUsage) {
+                _uiState.update { it.copy(showPermissionDialog = true) }
+            }
+            refreshEngineStatus()
+        }
+    }
+
+    fun dismissPermissionDialog() {
+        _uiState.update { it.copy(showPermissionDialog = false) }
     }
 
     fun setTargetPackages(packages: Set<String>) {
@@ -112,7 +162,7 @@ class WaqfaSettingsViewModel(
                     onComplete(success, updatedPolicy)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error saving waqfa settings", e)
+                Timber.tag(TAG).e(e, "Error saving waqfa settings")
                 _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
                 onComplete(false, null)
             }

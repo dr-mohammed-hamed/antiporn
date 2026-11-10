@@ -30,6 +30,7 @@ app/keystore/*
 # Antigravity & Agent tools
 .agents/
 .specify/
+graphify-out/
 
 # Temporary provisioning & audit artifacts
 *.zip

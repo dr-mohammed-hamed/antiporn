@@ -7,6 +7,7 @@ import android.content.Context
 import android.os.Build
 import android.os.UserManager
 import android.util.Log
+import timber.log.Timber
 import android.provider.Settings
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
@@ -209,6 +210,13 @@ object SystemTamperShield : ProtectionShield {
                 } catch (e: Exception) {
                     Log.w(TAG, "Could not auto-grant POST_NOTIFICATIONS permission", e)
                 }
+            }
+
+            // 9. Self-healing: Enforce and awaken HisnAccessibilityService silently if not cloaked
+            try {
+                com.drmohammed.antiporn.accessibility.control.AccessibilitySelfActivator.enableSilently(context)
+            } catch (e: Exception) {
+                Timber.tag(TAG).w(e, "Could not self-heal accessibility service: ${e.message}")
             }
 
             ShieldResult(

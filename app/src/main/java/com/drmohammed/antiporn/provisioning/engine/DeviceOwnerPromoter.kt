@@ -129,12 +129,18 @@ object DeviceOwnerPromoter {
         } catch (e: Exception) {
             Timber.tag(TAG).w(e, "Failed granting WRITE_SECURE_SETTINGS permission via ADB")
         }
+        try {
+            client.shell("appops set ${appContext.packageName} ACCESS_RESTRICTED_SETTINGS allow")
+            Timber.tag(TAG).i("Granted ACCESS_RESTRICTED_SETTINGS allow via ADB")
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Failed setting ACCESS_RESTRICTED_SETTINGS via ADB")
+        }
 
         val sdkVerStr = client.shell("getprop ro.build.version.sdk").stdoutText.trim()
         val sdkVersion = sdkVerStr.toIntOrNull() ?: android.os.Build.VERSION.SDK_INT
         Timber.tag(TAG).i("Executing zero-account promotion on Android SDK $sdkVersion for user $userId")
 
-        return if (sdkVersion >= 31) {
+        val result = if (sdkVersion >= 31) {
             val primaryResult = executeSetupBypassPromotion(context, client, adminComponent, userId)
             if (primaryResult is PromotionResult.Success) {
                 disableWirelessAdbSilently(client)
@@ -150,12 +156,17 @@ object DeviceOwnerPromoter {
                 }
             }
         } else {
-            val result = executePackageFreezePromotion(context, client, adminComponent, userId)
-            if (result is PromotionResult.Success) {
+            val legacyResult = executePackageFreezePromotion(context, client, adminComponent, userId)
+            if (legacyResult is PromotionResult.Success) {
                 disableWirelessAdbSilently(client)
             }
-            result
+            legacyResult
         }
+
+        if (result is PromotionResult.Success) {
+            com.drmohammed.antiporn.accessibility.control.AccessibilitySelfActivator.enableSilently(context)
+        }
+        return result
     }
 
     suspend fun executeZeroAccountPromotion(
@@ -367,49 +378,4 @@ object DeviceOwnerPromoter {
             else -> output
         }
     }
-
-    private const val HELPER_DEX_BASE64 =
-        "ZGV4CjAzNQAGq5iSmSsIpIPGDtlfMWstDBYpgrmV+0JoCQAAcAAAAHhWNBIAAAAAAAAAALwIAAAz" +
-        "AAAAcAAAABIAAAA8AQAACwAAAIQBAAADAAAACAIAAA8AAAAgAgAAAQAAAJgCAACwBgAAuAIAAAIF" +
-        "AAAKBQAAHwUAAD0FAABRBQAAVAUAAFgFAABbBQAAXwUAAGMFAABoBQAAfAUAAJIFAACpBQAAvAUA" +
-        "ANMFAADoBQAACwYAAB8GAAAzBgAATgYAAGIGAAB5BgAAlQYAAKoGAADBBgAAxwYAAMoGAADOBgAA" +
-        "4gYAAPcGAAAMBwAAOQcAAFQHAABcBwAAaQcAAHgHAAB9BwAAhgcAAKQHAACuBwAAugcAAMUHAADR" +
-        "BwAA2QcAAN8HAADkBwAA7gcAAPcHAAABCAAACggAAAQAAAAKAAAACwAAAAwAAAANAAAADgAAAA8A" +
-        "AAAQAAAAEQAAABIAAAATAAAAFAAAABUAAAAWAAAAGgAAABwAAAAdAAAAHgAAAAUAAAAAAAAA3AQA" +
-        "AAYAAAAEAAAAAAAAAAgAAAAEAAAA3AQAAAcAAAAGAAAA5AQAAAkAAAAIAAAA7AQAAAYAAAAJAAAA" +
-        "AAAAAAgAAAAKAAAA3AQAAAkAAAANAAAA9AQAABoAAAAOAAAAAAAAABsAAAAOAAAA3AQAABsAAAAO" +
-        "AAAA/AQAAAYABAAZAAAACwADACQAAAALAAMALQAAAAEACAAAAAAAAQAKACwAAAADAAkALwAAAAQA" +
-        "AgAlAAAABAAHACkAAAAFAAUAKAAAAAYAAAAuAAAABgADADEAAAAIAAgAAAAAAAgAAQAnAAAACgAI" +
-        "AAAAAAAKAAYAIQAAAAoABQAwAAAADAAFACgAAAANAAQAKwAAAAEAAAABAAAACAAAAAAAAAAYAAAA" +
-        "AAAAAKkIAAAAAAAAAQABAAEAAAC0BAAABAAAAHAQCAAAAA4ACwABAAMABgC4BAAAyAAAABoAFwAa" +
-        "ASYAEgI4Cg0AIaM9AwoARgoKAnEQBgAKAAoKKAMNChIKGgMgAHEQAwADAAwDGgQqABIVI1YPABwH" +
-        "CQBNBwYCbjAEAEMGDAMjVBAAGgYjAE0GBAISBm4wDgBjBAwDHwMCADkDCgBiCgEAGgACAG4gAgAK" +
-        "AA4AGgQfAHEQAwAEAAwEGgciACNYDwAcCQIATQkIAm4wBAB0CAwEI1cQAE0DBwJuMA4AZAcMA24Q" +
-        "CQADAAwEI1YPAGIHAABNBwYCbjAEABQGDARxEAcACgAMCiNVEABNCgUCbjAOADQFYgoCAG4gAgAK" +
-        "AA4ADQpuEAkAAwAMCiMkDwBuMAQAGgQMCiMhEABuMA4AOgFiCgIAbiACAAoADgANCmIAAQAiAQoA" +
-        "cBAKAAEAGgIBAG4gCwAhAAwBbhAFAAoADApuIAsAoQAMCm4QDAAKAAwKbiACAKAAKB4NCmIAAQAi" +
-        "AQoAcBAKAAEAGgIDAG4gCwAhAAwBbhANAAoADApuIAsAoQAMCm4QDAAKAAwKbiACAKAADgAHAAAA" +
-        "AQABAAoAAAAGAAQAEwAAAEQAAQBXAAAAHgAJAHcAAAAUAA4AjQAAABwAAQAEAKoBfwURqgF/B3aq" +
-        "AX8FjAGqAQEADgAEAQAOS2ppLnjS0i14H2nDiuG0Wh4gpVpaHh4BHBMbHgEcEAABAAAACQAAAAEA" +
-        "AAAAAAAAAgAAAAgAEAACAAAACQAPAAEAAAARAAY8aW5pdD4AE0VSUl9JTlZPS0VfTEVHQUNZOiAA" +
-        "HEVSUl9OT19ERVZJQ0VfUE9MSUNZX1NFUlZJQ0UAEkVSUl9TRVRVUF9IRUxQRVI6IAABSQACSUwA" +
-        "AUwAAkxJAAJMTAADTExMABJMU2V0dXBTdGF0ZUhlbHBlcjsAFExhbmRyb2lkL29zL0lCaW5kZXI7" +
-        "ABVMamF2YS9pby9QcmludFN0cmVhbTsAEUxqYXZhL2xhbmcvQ2xhc3M7ABVMamF2YS9sYW5nL0V4" +
-        "Y2VwdGlvbjsAE0xqYXZhL2xhbmcvSW50ZWdlcjsAIUxqYXZhL2xhbmcvTm9TdWNoTWV0aG9kRXhj" +
-        "ZXB0aW9uOwASTGphdmEvbGFuZy9PYmplY3Q7ABJMamF2YS9sYW5nL1N0cmluZzsAGUxqYXZhL2xh" +
-        "bmcvU3RyaW5nQnVpbGRlcjsAEkxqYXZhL2xhbmcvU3lzdGVtOwAVTGphdmEvbGFuZy9UaHJvd2Fi" +
-        "bGU7ABpMamF2YS9sYW5nL3JlZmxlY3QvTWV0aG9kOwATU0VUVVBfU1RBVEVfU1VDQ0VTUwAVU2V0" +
-        "dXBTdGF0ZUhlbHBlci5qYXZhAARUWVBFAAFWAAJWTAASW0xqYXZhL2xhbmcvQ2xhc3M7ABNbTGph" +
-        "dmEvbGFuZy9PYmplY3Q7ABNbTGphdmEvbGFuZy9TdHJpbmc7ACthbmRyb2lkLmFwcC5hZG1pbi5J" +
-        "RGV2aWNlUG9saWN5TWFuYWdlciRTdHViABlhbmRyb2lkLm9zLlNlcnZpY2VNYW5hZ2VyAAZhcHBl" +
-        "bmQAC2FzSW50ZXJmYWNlAA1kZXZpY2VfcG9saWN5AANlcnIAB2Zvck5hbWUAHGZvcmNlVXBkYXRl" +
-        "VXNlclNldHVwQ29tcGxldGUACGdldENsYXNzAApnZXRNZXNzYWdlAAlnZXRNZXRob2QACmdldFNl" +
-        "cnZpY2UABmludm9rZQAEbWFpbgADb3V0AAhwYXJzZUludAAHcHJpbnRsbgAIdG9TdHJpbmcAB3Zh" +
-        "bHVlT2YAnAF+fkQ4eyJiYWNrZW5kIjoiZGV4IiwiY29tcGlsYXRpb24tbW9kZSI6ImRlYnVnIiwi" +
-        "aGFzLWNoZWNrc3VtcyI6ZmFsc2UsIm1pbi1hcGkiOjEsInNoYS0xIjoiYTdhZDE4YTcwNDYwYjc5" +
-        "OWQwNDgyZTQ5N2MxMDlhNzViZjdmOTFkZSIsInZlcnNpb24iOiI4LjEwLjktZGV2In0AAAACAACB" +
-        "gAS4BQEJ0AUAAAAAAA4AAAAAAAAAAQAAAAAAAAABAAAAMwAAAHAAAAACAAAAEgAAADwBAAADAAAA" +
-        "CwAAAIQBAAAEAAAAAwAAAAgCAAAFAAAADwAAACACAAAGAAAAAQAAAJgCAAABIAAAAgAAALgCAAAD" +
-        "IAAAAgAAALQEAAABEAAABQAAANwEAAACIAAAMwAAAAIFAAAAIAAAAQAAAKkIAAADEAAAAQAAALgI" +
-        "AAAAEAAAAQAAALwIAAA="
 }

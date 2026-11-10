@@ -935,4 +935,17 @@
     <string name="toast_guardian_deactivation_alert">Alert: Supervised user requested Device Owner deactivation!</string>
     <string name="remote_app_manager_ai_scan_switch">AI Smart Scanning</string>
     <string name="remote_app_manager_ai_scan_disabled_hint">AI screen inspection is currently disabled in general settings</string>
+
+    <!-- Accessibility Service & Waqfa Engine Strings -->
+    <string name="accessibility_service_name">Hisn Accessibility Shield</string>
+    <string name="accessibility_service_description">Used exclusively to detect restricted applications under the Waqfa focus protection system instantly without collecting or sharing any personal data.</string>
+    <string name="waqfa_engine_status_instant">Instant Accessibility Engine (0ms) Active</string>
+    <string name="waqfa_engine_status_fallback">Usage Stats Polling (Fallback)</string>
+    <string name="waqfa_engine_status_dormant">Engine Inactive</string>
+    <string name="waqfa_permission_dialog_title">Enable Accessibility for Waqfa</string>
+    <string name="waqfa_permission_dialog_desc">Waqfa requires Accessibility permission to detect target applications instantly (0ms) without flicker. Please enable the service or grant Usage Access as a fallback.</string>
+    <string name="waqfa_permission_dialog_enable_btn">Enable Service</string>
+    <string name="waqfa_permission_dialog_fallback_btn">Use Fallback (Usage Access)</string>
+    <string name="waqfa_permission_dialog_skip_btn">Later</string>
+    <string name="waqfa_could_not_open_settings">Could not open settings</string>
 </resources>

@@ -213,6 +213,14 @@ object DeviceOwnerTeardownManager {
                 Timber.tag(TAG).w("Error clearing AlwaysOnVpnPackage: ${e.message}")
             }
 
+            // 7b. إلغاء خدمة الوصول وتعطيلها بنظافة
+            try {
+                com.drmohammed.antiporn.accessibility.control.AccessibilitySelfActivator.disableAndCloakSilently(appContext, isTemporaryCloak = false)
+                Timber.tag(TAG).i("HisnAccessibilityService disabled cleanly during teardown")
+            } catch (e: Exception) {
+                Timber.tag(TAG).w("Error disabling accessibility service during teardown: ${e.message}")
+            }
+
             // 8. دفع حالة اكتمال الإلغاء للسحابة وتحديث السياسة المحلية دون إعادة تفعيل القيود
             try {
                 if (currentPolicy.isSupervised && !currentPolicy.guardianUid.isNullOrBlank()) {
