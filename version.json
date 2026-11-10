@@ -1,11 +1,11 @@
 {
-  "versionCode": 17,
+  "versionCode": 18,
   "versionName": "1.79",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 35480337,
+  "fileSizeBytes": 35488585,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.79: اعتماد معمارية الثقة الصفرية الموحدة (Unified Zero-Trust) لمنع الحذف الصامت للتطبيقات أو إخفائها وإبقائها خاضعة للرقابة، تعزيز سياسات تعليق التطبيقات، سد تسريبات الـ DNS أثناء تفعيل حظر التجوال، وتحسين أداء وموثوقية النظام الأمني الشامل.",
-  "releaseDate": "2026-11-09"
+  "releaseNotes": "إصدار 1.79 (تحديث داخلي 18): دمج خدمة الوصول المركزية لاعتراض التطبيقات المقيدة لحظياً في 0ms لمنظومة «وَقْفَة»، وتطبيق قانون الصفر استطلاع (Zero-Polling) لتوفير البطارية، مع تحسينات شاملة على استقرار النظام وإعدادات التركيز.",
+  "releaseDate": "2026-11-10"
 }
