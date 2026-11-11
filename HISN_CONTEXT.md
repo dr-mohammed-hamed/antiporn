@@ -399,7 +399,7 @@ com.drmohammed.antiporn
 - يفرض تشفير Private DNS (DNS-over-TLS) باستخدام خادم **Cloudflare Family الافتراضي** (`family.cloudflare-dns.com` - الأسرع استجابة والأكثر استقراراً عالمياً) مع دعم خيارات موثقة:
   - Control D Family (`no-ads-drugs-malware-porn-gambling-dating-typo.freedns.controld.com`)
   - AdGuard Family (`family.adguard-dns.com`)
-  - NextDNS (`family.cloudflare-dns.com`)
+  - Cloudflare Family (`family.cloudflare-dns.com`)
 - **الفحص الاستباقي للـ DoT (`DnsFilteringValidator.kt`):** فحص الخادم المخصص عبر المنفذ 853 قبل تطبيقه بإرسال استعلامات تجريبية (`google.com` للمرور و `pornhub.com` للتأكد من الحجب والـ Sinkhole) لتفادي قطع الإنترنت عن هاتف المستخدم.
 - **Fallback ذكي:** في حال فشل استدعاء DPM في بعض واجهات الشركات (مثل واجهة Realme/ColorOS)، يتم تفعيله فورياً عبر صلاحية كتابة إعدادات النظام `Settings.Global.putString(..., "private_dns_specifier", host)`.
 

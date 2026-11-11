@@ -17,7 +17,7 @@ class AdminReceiver : DeviceAdminReceiver() {
 
     override fun onEnabled(context: Context, intent: Intent) {
         super.onEnabled(context, intent)
-        Log.i(TAG, "Device Admin / Owner enabled. Enforcing NextDNS and security policies...")
+        Log.i(TAG, "Device Admin / Owner enabled. Enforcing DNS and security policies...")
         val appContext = context.applicationContext
         try {
             com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(appContext).recordDeviceOwnerEnabledTimestamp()
@@ -29,7 +29,7 @@ class AdminReceiver : DeviceAdminReceiver() {
 
     override fun onProfileProvisioningComplete(context: Context, intent: Intent) {
         super.onProfileProvisioningComplete(context, intent)
-        Log.i(TAG, "Profile provisioning complete. Enforcing NextDNS and security policies...")
+        Log.i(TAG, "Profile provisioning complete. Enforcing DNS and security policies...")
         val appContext = context.applicationContext
         try {
             com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(appContext).recordDeviceOwnerEnabledTimestamp()
@@ -61,7 +61,7 @@ class AdminReceiver : DeviceAdminReceiver() {
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED,
             ACTION_ENFORCE_POLICIES -> {
-                Log.i(TAG, "Broadcast received (${intent?.action}). Enforcing NextDNS policies...")
+                Log.i(TAG, "Broadcast received (${intent?.action}). Enforcing DNS policies...")
                 enforcePoliciesAsync(context)
             }
         }

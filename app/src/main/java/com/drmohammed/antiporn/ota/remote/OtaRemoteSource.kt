@@ -25,8 +25,10 @@ object OtaRemoteSource {
 
     /**
      * Default Cloudflare R2 public distribution endpoint for version.json.
+     * Evaluated dynamically from BuildConfig.OTA_BASE_URL.
      */
-    const val DEFAULT_VERSION_URL = "https://example-releases.r2.dev/version.json"
+    val DEFAULT_VERSION_URL: String
+        get() = "${com.drmohammed.antiporn.BuildConfig.OTA_BASE_URL.trimEnd('/')}/version.json"
 
     private const val CONNECT_TIMEOUT_MS = 15_000 // 15 seconds
     private const val READ_TIMEOUT_MS = 15_000    // 15 seconds

@@ -30,8 +30,8 @@
   - `CurfewShield`: جدولة فترات حظر صارمة (أوقات النوم/حظر ليلي/قيلولة) لمنع استخدام الهاتف خارج الأوقات المحددة.
 * **مراقبة مستمرة (DnsWatchdogService):** خدمة خلفية دائمة تراقب أي تغيير في إعدادات الاتصال أو الـ DNS وتعيد فرض السياسات فوراً.
 
-### 2. فرض NextDNS إجبارياً عبر DoT المشفر (Enforced DoT NextDNS)
-* **التشفير الشامل:** فرض خادم `family.cloudflare-dns.com` عبر بروتوكول DNS over TLS (DoT) باستخدام واجهة `DevicePolicyManager.setGlobalPrivateDnsModeSpecifiedHost`.
+### 2. فرض خادم Cloudflare Family إجبارياً عبر DoT المشفر (Enforced DoT Cloudflare Family)
+* **التشفير الشامل:** فرض خادم `family.cloudflare-dns.com` (1.1.1.3 لحجب المحتوى الإباحي والبرمجيات الخبيثة بدون تعطيل تعليقات يوتيوب) عبر بروتوكول DNS over TLS (DoT) باستخدام واجهة `DevicePolicyManager.setGlobalPrivateDnsModeSpecifiedHost` مع إمكانية التخصيص من الإعدادات.
 * **منع التعديل والالتفاف:** تطبيق قيد `UserManager.DISALLOW_CONFIG_PRIVATE_DNS` لتظليل إعدادات الـ DNS في لوحة تحكم أندرويد ومنع أي تغيير يدوي.
 * **إغلاق منافذ الـ VPN:** تطبيق قيد `UserManager.DISALLOW_CONFIG_VPN` لإبطال عمل أي تطبيق VPN خارجي قد يحاول تحويل المسارات.
 
@@ -51,7 +51,7 @@
   - سجل استثناءات ذكي ومحمي (`AiExemptionRegistry`) للتطبيقات الموثوقة لتجنب الإنذارات الكاذبة أثناء العمل البرمجي.
 
 ### 5. التحديثات الهوائية المستقلة (Independent OTA Updates)
-* **توزيع مستقل وآمن:** الاتصال المباشر بخدمة Cloudflare R2 (`app-updates`) للتحقق من الإصدارات وتحميل التحديثات دون الاعتماد على متجر Google Play.
+* **توزيع مستقل وآمن:** التحقق من الإصدارات وتحميل التحديثات الموقعة هوائياً دون الاعتماد على متجر Google Play عبر خدمة Cloudflare R2 (طالع [دليل إعداد وتخصيص التحديثات الهوائية](file:///d:/b/antiporn/doc/OTA_DISTRIBUTION.md) للتفاصيل وكيفية ربط حاويتك الخاصة).
 * **دوران مفاتيح التوقيع (Lineage Key Rotation):** دعم معايير التوقيع APK Signature Scheme v2 و v3 مع إثباتات شجرة المفاتيح (Signing Certificate Lineage Proofs) لضمان أمان التحديثات وقابليتها للترقية المستقبلية بأمان تام.
 * **تثبيت صامت وسلس:** استغلال صلاحيات مسؤول الجهاز المالك لتثبيت التحديثات دون مقاطعة المستخدم.
 

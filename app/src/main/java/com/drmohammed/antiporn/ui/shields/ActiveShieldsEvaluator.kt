@@ -167,7 +167,7 @@ object ActiveShieldsEvaluator {
     fun isHostAdultFiltering(host: String): Boolean {
         val clean = host.trim().lowercase()
         return DnsFilteringValidator.isKnownFamilyPreset(clean) ||
-                clean.contains("nextdns") ||
+                clean.contains("cloudflare") ||
                 clean.contains("family") ||
                 clean.contains("cleanbrowsing")
     }

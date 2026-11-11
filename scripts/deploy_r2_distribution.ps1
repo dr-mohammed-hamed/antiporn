@@ -17,6 +17,26 @@ param(
     [string]$VersionFile = "version.json"
 )
 
+$localPropsFile = Join-Path $PSScriptRoot "..\local.properties"
+$localProps = @{}
+if (Test-Path $localPropsFile) {
+    Get-Content $localPropsFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $parts = $line.Split("=", 2)
+            $localProps[$parts[0].Trim()] = $parts[1].Trim()
+        }
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($BucketName) -or $BucketName -eq "antiporn-releases") {
+    if ($env:CLOUDFLARE_R2_BUCKET) {
+        $BucketName = $env:CLOUDFLARE_R2_BUCKET
+    } elseif ($localProps.ContainsKey("r2.bucket.name")) {
+        $BucketName = $localProps["r2.bucket.name"]
+    }
+}
+
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "  AntiPorn - Cloudflare R2 Deployment Hub                 " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -54,9 +74,22 @@ Write-Host "   -> $uploadApk" -ForegroundColor Gray
 
 # 4. Upload version.json (OTA metadata)
 if (Test-Path $VersionFile) {
+    $r2BaseUrl = $env:CLOUDFLARE_R2_PUBLIC_URL
+    if ([string]::IsNullOrWhiteSpace($r2BaseUrl) -and $localProps.ContainsKey("ota.base.url")) {
+        $r2BaseUrl = $localProps["ota.base.url"]
+    }
+    
+    $tempVersionFile = Join-Path $env:TEMP "version_upload.json"
+    $vObj = Get-Content $VersionFile -Raw | ConvertFrom-Json
+    if (-not [string]::IsNullOrWhiteSpace($r2BaseUrl)) {
+        $vObj.downloadUrl = "$($r2BaseUrl.TrimEnd('/'))/antiporn-release.apk"
+    }
+    $vObj | ConvertTo-Json -Depth 4 | Set-Content -Path $tempVersionFile -Encoding utf8
+
     Write-Host "[4/4] Uploading $VersionFile to $BucketName/version.json..." -ForegroundColor Green
-    $uploadVer = wrangler r2 object put "$BucketName/version.json" --file="$VersionFile" --content-type="application/json" --remote --force 2>&1
+    $uploadVer = wrangler r2 object put "$BucketName/version.json" --file="$tempVersionFile" --content-type="application/json" --remote --force 2>&1
     Write-Host "   -> $uploadVer" -ForegroundColor Gray
+    Remove-Item $tempVersionFile -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Cyan

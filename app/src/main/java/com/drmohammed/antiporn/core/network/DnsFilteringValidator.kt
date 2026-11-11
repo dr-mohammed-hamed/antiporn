@@ -82,7 +82,7 @@ object DnsFilteringValidator {
             socket = rawSocket
             rawSocket.soTimeout = READ_TIMEOUT_MS
 
-            // Attach TLS Server Name Indication (SNI) for NextDNS and strict DoT resolvers
+            // Attach TLS Server Name Indication (SNI) for strict DoT resolvers
             try {
                 val sslParams = rawSocket.sslParameters
                 sslParams.serverNames = listOf(SNIHostName(cleanHost))

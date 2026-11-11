@@ -24,6 +24,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$localPropsFile = Join-Path $PSScriptRoot "..\local.properties"
+$localProps = @{}
+if (Test-Path $localPropsFile) {
+    Get-Content $localPropsFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $parts = $line.Split("=", 2)
+            $localProps[$parts[0].Trim()] = $parts[1].Trim()
+        }
+    }
+}
+
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "  AntiPorn - All-in-One Automated Release & Deployer      " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -57,7 +69,15 @@ if ($LASTEXITCODE -ne 0) {
 # 3. Sign APK with v2/v3 Lineage Rotation
 Write-Host "[3/5] Signing APK with official v2/v3 Lineage Rotation..." -ForegroundColor Green
 if ([string]::IsNullOrWhiteSpace($env:RELEASE_KEYSTORE_PASSWORD)) {
-    $env:RELEASE_KEYSTORE_PASSWORD = "REDACTED_KEYSTORE_PASSWORD"
+    if ($localProps.ContainsKey("release.keystore.password")) {
+        $env:RELEASE_KEYSTORE_PASSWORD = $localProps["release.keystore.password"]
+    }
+}
+if ([string]::IsNullOrWhiteSpace($env:RELEASE_KEYSTORE_PASSWORD)) {
+    $secPass = Read-Host -Prompt "Enter password for antiporn-release.jks" -AsSecureString
+    $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPass)
+    $env:RELEASE_KEYSTORE_PASSWORD = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
 }
 & powershell -ExecutionPolicy Bypass -File scripts\sign_rotated_release.ps1
 if ($LASTEXITCODE -ne 0) {
@@ -89,10 +109,18 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+$r2BaseUrl = $env:CLOUDFLARE_R2_PUBLIC_URL
+if ([string]::IsNullOrWhiteSpace($r2BaseUrl) -and $localProps.ContainsKey("ota.base.url")) {
+    $r2BaseUrl = $localProps["ota.base.url"]
+}
+if ([string]::IsNullOrWhiteSpace($r2BaseUrl)) {
+    $r2BaseUrl = "https://your-r2-bucket.r2.dev"
+}
+
 Write-Host "`n==========================================================" -ForegroundColor Green
 Write-Host "  SUCCESS! NEW RELEASE PUBLISHED & DEPLOYED TO R2!        " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
 Write-Host "APK Size:    $apkSizeMb MB" -ForegroundColor White
-Write-Host "Public Link: https://example-releases.r2.dev/antiporn-release.apk" -ForegroundColor Cyan
-Write-Host "OTA Meta:    https://example-releases.r2.dev/version.json" -ForegroundColor Cyan
+Write-Host "Public Link: $r2BaseUrl/antiporn-release.apk" -ForegroundColor Cyan
+Write-Host "OTA Meta:    $r2BaseUrl/version.json" -ForegroundColor Cyan
 Write-Host "Note: Existing users will download this update, and the QR code points to it automatically!" -ForegroundColor Yellow

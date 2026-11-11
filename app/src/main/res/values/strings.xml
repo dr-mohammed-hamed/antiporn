@@ -61,19 +61,19 @@
     <string name="remote_app_manager_ai_scan_switch">المسح الذكي بالذكاء الاصطناعي</string>
     <string name="remote_app_manager_ai_scan_disabled_hint">فحص الشاشة بـ AI معطل حالياً في الإعدادات العامة</string>
 
-    <string name="card_nextdns_title">درع فلترة الـ DNS وحظر الإباحية والإعلانات</string>
+    <string name="card_dns_title">درع فلترة الـ DNS وحظر الإباحية والإعلانات</string>
 
-    <string name="card_nextdns_default">family.adguard-dns.com (مفروض ومقفل)</string>
+    <string name="card_dns_default">family.cloudflare-dns.com (مفروض ومقفل)</string>
 
-    <string name="card_nextdns_active">%1$s (مفروض ومقفل)</string>
+    <string name="card_dns_active">%1$s (مفروض ومقفل)</string>
 
-    <string name="card_nextdns_pending">المضيف الحالي: %1$s (سيتم التحديث إلى %2$s)</string>
+    <string name="card_dns_pending">المضيف الحالي: %1$s (سيتم التحديث إلى %2$s)</string>
 
-    <string name="card_nextdns_inactive">غير مفروض</string>
+    <string name="card_dns_inactive">غير مفروض</string>
 
-    <string name="card_nextdns_locked">إعدادات الـ DNS في الهاتف مقفولة وممنوع تعديلها نهائياً.</string>
+    <string name="card_dns_locked">إعدادات الـ DNS في الهاتف مقفولة وممنوع تعديلها نهائياً.</string>
 
-    <string name="card_nextdns_unlocked">مفعل على النظام.</string>
+    <string name="card_dns_unlocked">مفعل على النظام.</string>
 
     <string name="card_vpn_title">إغلاق ثغرة الـ VPN وتطبيقات التجاوز</string>
 
@@ -135,7 +135,7 @@
 
     <string name="card_system_tamper_subtext">حظر الوضع الآمن، وإعادة ضبط المصنع، ومنع إلغاء التثبيت (وقفل الوقت في حال تفعيله من المشرف)</string>
 
-    <string name="shield_dns_success">تم فرض خادم NextDNS وحظر تغيير الإعدادات بنجاح</string>
+    <string name="shield_dns_success">تم فرض خادم DNS المشفر وحظر تغيير الإعدادات بنجاح</string>
 
     <string name="shield_vpn_success">تم حظر تطبيقات الـ VPN ومنع التجاوز بنجاح</string>
 
@@ -460,7 +460,7 @@
 
     <string name="btn_dns_preset_cloudflare">Cloudflare Family (سريع - افتراضي)</string>
 
-    <string name="btn_dns_preset_nextdns">NextDNS الخاص</string>
+    <string name="btn_dns_preset_custom_family">DNS عائلي مخصص</string>
 
     <string name="error_invalid_dns_host">يرجى إدخال عنوان خادم DNS صحيح (مثال: family.adguard-dns.com)</string>
 

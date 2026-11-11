@@ -1,0 +1,14 @@
+## AntiPorn (Hisn) - Local Properties Template
+# Copy this file to `local.properties` and customize for your development environment.
+# `local.properties` is strictly ignored by Git and should never contain production secrets in public repos.
+
+# 1. Android SDK Location (Auto-configured by Android Studio)
+sdk.dir=/path/to/Android/Sdk
+
+# 2. Independent OTA Update Distribution (Optional)
+# Configure your own Cloudflare R2 public distribution endpoint or S3 bucket URL.
+ota.base.url=https://your-r2-bucket.r2.dev
+r2.bucket.name=your-releases-bucket
+
+# 3. Release Signing Keystore Password (Optional - only needed for running scripts/publish_new_release.ps1)
+# release.keystore.password=YourSecurePassword

@@ -2,7 +2,7 @@
 # سكريبت النسخ الاحتياطي الذكي والشامل لمشروع "حصن" (Hisn / AntiPorn)
 # ==============================================================================
 param(
-    [string]$OutputDir = "D:\b\backups",
+    [string]$OutputDir = (Join-Path (Split-Path -Parent $PSScriptRoot) "backups"),
     [string]$ZipPassword = ""
 )
 

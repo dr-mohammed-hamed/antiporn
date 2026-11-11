@@ -27,7 +27,7 @@ class OtaModelsAndVerifierTest {
               "versionName": "2.4.0",
               "minSupportedVersion": 10,
               "apkFileName": "antiporn-v2.4.0.apk",
-              "downloadUrl": "https://example-releases.r2.dev/antiporn-v2.4.0.apk",
+              "downloadUrl": "https://releases.example.com/antiporn-v2.4.0.apk",
               "fileSizeBytes": 28901750,
               "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
               "sha256ApkHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -41,7 +41,7 @@ class OtaModelsAndVerifierTest {
         assertEquals("2.4.0", info.versionName)
         assertEquals(10L, info.minSupportedVersion)
         assertEquals("antiporn-v2.4.0.apk", info.apkFileName)
-        assertEquals("https://example-releases.r2.dev/antiporn-v2.4.0.apk", info.downloadUrl)
+        assertEquals("https://releases.example.com/antiporn-v2.4.0.apk", info.downloadUrl)
         assertEquals(28901750L, info.fileSizeBytes)
         assertEquals("Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk", info.sha256CertificateChecksum)
         assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", info.sha256ApkHash)

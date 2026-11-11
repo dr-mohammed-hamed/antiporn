@@ -11,7 +11,22 @@ $lineageFile = Join-Path $projectRoot "app\keystore\signing_lineage.bin"
 $inputApk    = Join-Path $projectRoot "app\build\outputs\apk\release\app-release.apk"
 $outputApk   = Join-Path $projectRoot "app\build\outputs\apk\release\app-release-rotated.apk"
 
+$localPropsFile = Join-Path $PSScriptRoot "..\local.properties"
+$localProps = @{}
+if (Test-Path $localPropsFile) {
+    Get-Content $localPropsFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $parts = $line.Split("=", 2)
+            $localProps[$parts[0].Trim()] = $parts[1].Trim()
+        }
+    }
+}
+
 $newKeyPass = $env:RELEASE_KEYSTORE_PASSWORD
+if ([string]::IsNullOrWhiteSpace($newKeyPass) -and $localProps.ContainsKey("release.keystore.password")) {
+    $newKeyPass = $localProps["release.keystore.password"]
+}
 if ([string]::IsNullOrWhiteSpace($newKeyPass)) {
     $secPass = Read-Host -Prompt "Enter password for antiporn-release.jks" -AsSecureString
     $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPass)

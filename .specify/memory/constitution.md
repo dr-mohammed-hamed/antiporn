@@ -23,7 +23,7 @@
 ### 🔴 المادة 2: الحماية على مستوى نواة الشبكة (System & Network Stack Level)
 * لا يجوز الاعتماد على حلول واجهات المستخدم السطحية (مثل مراقبة العناوين في المتصفحات عبر Accessibility Service) كبديل لدرع الشبكة.
 * الحماية الأساسية تكون دائماً مشفرة وعميقة عبر:
-  1. فرض **NextDNS over TLS** على مستوى النظام (`DevicePolicyManager.setGlobalPrivateDnsModeSpecifiedHost`).
+  1. فرض **DoT المشفر (Cloudflare Family)** على مستوى النظام (`DevicePolicyManager.setGlobalPrivateDnsModeSpecifiedHost`).
   2. قفل واجهة الـ DNS في الإعدادات (`DISALLOW_CONFIG_PRIVATE_DNS`).
   3. حظر بروتوكولات الـ VPN بالكامل (`DISALLOW_CONFIG_VPN`).
 
@@ -97,8 +97,8 @@
   // ✅ فحص الحالة الحالية قبل الكتابة لمنع الحلقة اللانهائية:
   val currentMode = dpm.getGlobalPrivateDnsMode(admin)
   val currentHost = dpm.getGlobalPrivateDnsHost(admin)
-  if (currentMode != DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME || currentHost != NEXTDNS_HOST) {
-      dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, NEXTDNS_HOST)
+  if (currentMode != DevicePolicyManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME || currentHost != targetHost) {
+      dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, targetHost)
   } else {
       // تخطي الكتابة لعدم إثارة الـ Observer
   }

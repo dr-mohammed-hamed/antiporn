@@ -177,7 +177,6 @@ data class DevicePolicyBundle(
         const val CONTROLD_NO_ADS_PORN_DNS_HOST = "no-ads-porn.freedns.controld.com"
         const val ADGUARD_FAMILY_DNS_HOST = "family.adguard-dns.com"
         const val CLOUDFLARE_FAMILY_DNS_HOST = "family.cloudflare-dns.com"
-        const val LEGACY_DEFAULT_NEXTDNS_HOST = "family.cloudflare-dns.com"
 
         const val BREAKOUT_STATUS_PENDING = "PENDING"
         const val BREAKOUT_STATUS_REJECTED = "REJECTED"

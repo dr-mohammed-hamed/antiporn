@@ -6,6 +6,16 @@ plugins {
 import java.util.Properties
 import java.io.FileInputStream
 
+val localProps = Properties().apply {
+    val localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) {
+        FileInputStream(localPropsFile).use { load(it) }
+    }
+}
+val otaBaseUrl = localProps.getProperty("ota.base.url")
+    ?: System.getenv("OTA_BASE_URL")
+    ?: "https://example-releases.r2.dev"
+
 val googleServicesFile = file("google-services.json")
 if (!googleServicesFile.exists()) {
     googleServicesFile.writeText("""
@@ -52,6 +62,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += listOf("ar", "en")
+        buildConfigField("String", "OTA_BASE_URL", "\"$otaBaseUrl\"")
         ndk {
             abiFilters.clear()
             abiFilters.add("arm64-v8a")
@@ -59,7 +70,7 @@ android {
     }
 
     signingConfigs {
-        // Local/dev key: load rotated key from keystore/key.properties if present, fallback to AOSP testkey.
+        // Local/dev key: load rotated key from keystore/key.properties if present, fallback to AOSP testkey or debug key.
         val keyPropsFile = file("keystore/key.properties")
         if (keyPropsFile.exists()) {
             val keyProps = Properties().apply {
@@ -72,11 +83,14 @@ android {
                 keyPassword = keyProps.getProperty("keyPassword")
             }
         }
-        create("aospTestKey") {
-            storeFile = file("keystore/testkey.p12")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        val devTestKeyFile = file("keystore/testkey.p12")
+        if (devTestKeyFile.exists()) {
+            create("aospTestKey") {
+                storeFile = devTestKeyFile
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
         // Production key comes exclusively from CI secrets (never committed).
         // Set KEYSTORE_PATH/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD to sign releases.
@@ -93,13 +107,17 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.findByName("rotatedDevKey") ?: signingConfigs.getByName("aospTestKey")
+            signingConfig = signingConfigs.findByName("rotatedDevKey")
+                ?: signingConfigs.findByName("aospTestKey")
+                ?: signingConfigs.getByName("debug")
         }
         release {
             // Uses "prod" when KEYSTORE_PATH is set (CI); otherwise falls back to
             // active dev signing so local assembleRelease still works but is NOT shippable.
             signingConfig = if (System.getenv("KEYSTORE_PATH").isNullOrBlank()) {
-                signingConfigs.findByName("rotatedDevKey") ?: signingConfigs.getByName("aospTestKey")
+                signingConfigs.findByName("rotatedDevKey")
+                    ?: signingConfigs.findByName("aospTestKey")
+                    ?: signingConfigs.getByName("debug")
             } else {
                 signingConfigs.getByName("prod")
             }

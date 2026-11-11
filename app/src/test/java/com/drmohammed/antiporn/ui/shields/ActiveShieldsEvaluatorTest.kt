@@ -17,8 +17,7 @@ class ActiveShieldsEvaluatorTest {
         assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering("dns-family.adguard.com"))
         assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering("family.adguard-dns.com"))
         assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering("family.cloudflare-dns.com"))
-        assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering("family.cloudflare-dns.com"))
-        assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering("my-custom-nextdns-id.dns.nextdns.io"))
+        assertTrue(ActiveShieldsEvaluator.isHostAdultFiltering("security.cloudflare-dns.com"))
     }
 
     @Test

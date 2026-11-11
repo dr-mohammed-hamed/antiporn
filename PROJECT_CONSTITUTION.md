@@ -118,4 +118,4 @@
 1. اكتمال التجميع بنجاح: `.\gradlew.bat compileDebugSources` بدون أي أخطاء.
 2. نجاح فحص الجودة المعياري: `.\gradlew.bat lintDebug` بصفر أخطاء (`0 errors`).
 3. نجاح كافة الاختبارات الوحدوية: `.\gradlew.bat testDebugUnitTest` بنسبة 100%.
-4. خلو التغييرات من أي تراجع وظيفي (Regression) في الميزات الحيوية (NextDNS, VPN, Curfew, Zero-Trust).
+4. خلو التغييرات من أي تراجع وظيفي (Regression) في الميزات الحيوية (DNS, VPN, Curfew, Zero-Trust).

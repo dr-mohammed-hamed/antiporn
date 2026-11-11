@@ -8,9 +8,9 @@
     <string name="header_subtitle_slogan">The Muslim\'s Digital Fortress</string>
     <string name="header_ayah_ref"></string>
     <string name="header_subtitle">Encrypted Shield with Device Owner Authority</string>
-    <string name="card_nextdns_title">AntiPorn &amp; AdBlock DNS Shield</string>
-    <string name="card_nextdns_default">Family Filter Server (Enforced &amp; Locked)</string>
-    <string name="card_nextdns_locked">Device DNS settings are locked and tamper-proof.</string>
+    <string name="card_dns_title">AntiPorn &amp; AdBlock DNS Shield</string>
+    <string name="card_dns_default">Family Filter Server (Enforced &amp; Locked)</string>
+    <string name="card_dns_locked">Device DNS settings are locked and tamper-proof.</string>
     <string name="watchdog_notification_title">Hisn app is active.</string>
     <string name="watchdog_notification_desc">Hisn app is active.</string>
     <string name="admin_disable_warning">Security Warning: Hisn protection cannot be disabled to prevent bypass!</string>
@@ -455,10 +455,10 @@
     <string name="card_device_owner_active">Device Owner mode is active.</string>
     <string name="card_device_owner_inactive">Not activated. (Tap to activate)</string>
     <string name="toast_device_owner_already_active">Device Owner is active and your shield is fully operational</string>
-    <string name="card_nextdns_active">%1$s (Enforced &amp; Locked)</string>
-    <string name="card_nextdns_pending">Current host: %1$s (Updating to %2$s)</string>
-    <string name="card_nextdns_inactive">DNS server is not set.</string>
-    <string name="card_nextdns_unlocked">DNS settings are unlocked.</string>
+    <string name="card_dns_active">%1$s (Enforced &amp; Locked)</string>
+    <string name="card_dns_pending">Current host: %1$s (Updating to %2$s)</string>
+    <string name="card_dns_inactive">DNS server is not set.</string>
+    <string name="card_dns_unlocked">DNS settings are unlocked.</string>
     <string name="card_vpn_title">VPN Blocking Shield</string>
     <string name="card_vpn_blocked">External VPN connections are strictly blocked.</string>
     <string name="card_vpn_unblocked">VPN connections are not blocked.</string>
@@ -586,8 +586,8 @@
     <string name="dialog_cannot_delete_guardian_title">Cannot Remove Guardian</string>
     <string name="dialog_cannot_delete_guardian_msg">Guardians cannot be removed while supervision is active.</string>
     <string name="guardian_dns_title">Custom DNS Host</string>
-    <string name="guardian_dns_desc">Enforce a specific NextDNS or AdGuard TLS hostname.</string>
-    <string name="guardian_dns_hint">e.g. your-id.dns.nextdns.io</string>
+    <string name="guardian_dns_desc">Enforce a specific Cloudflare Family or AdGuard TLS hostname.</string>
+    <string name="guardian_dns_hint">e.g. family.cloudflare-dns.com</string>
     <string name="dns_table_title">Verified DNS Servers Comparison</string>
     <string name="dns_col_server">Server</string>
     <string name="dns_col_porn">Adult</string>
@@ -605,7 +605,7 @@
     <string name="btn_dns_preset_controld">Control D (Comprehensive)</string>
     <string name="btn_dns_preset_adguard">AdGuard Family</string>
     <string name="btn_dns_preset_cloudflare">Cloudflare Family (Default)</string>
-    <string name="btn_dns_preset_nextdns">Default NextDNS</string>
+    <string name="btn_dns_preset_custom_family">Custom Family DNS</string>
     <string name="toast_partner_deleted">Partner removed successfully.</string>
     <string name="btn_retry">Retry</string>
     <string name="guardian_offline_banner_desc">Device is offline. Changes will sync when reconnected.</string>

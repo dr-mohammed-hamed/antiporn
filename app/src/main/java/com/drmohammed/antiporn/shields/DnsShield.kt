@@ -24,10 +24,9 @@ object DnsShield : ProtectionShield {
 
     private const val TAG = "AntiPorn_DnsShield"
     const val DEFAULT_DNS_HOST = com.drmohammed.antiporn.core.model.DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST
-    const val NEXTDNS_HOST = "family.cloudflare-dns.com"
 
     override val id: String = "dns"
-    override val titleResId: Int = R.string.card_nextdns_title
+    override val titleResId: Int = R.string.card_dns_title
 
     fun getEffectiveDnsHost(context: Context): String {
         return try {
@@ -171,7 +170,7 @@ object DnsShield : ProtectionShield {
                 isVpnActive -> context.getString(R.string.shield_dns_local_filter_active)
                 success && !usedFallback -> context.getString(R.string.shield_dns_success)
                 success && usedFallback -> context.getString(R.string.shield_dns_fallback_active)
-                else -> context.getString(R.string.card_nextdns_inactive)
+                else -> context.getString(R.string.card_dns_inactive)
             }
 
             return ShieldResult(
@@ -238,15 +237,15 @@ object DnsShield : ProtectionShield {
                 val isFilteringAdult = ActiveShieldsEvaluator.isHostAdultFiltering(activeHost ?: "")
 
                 if (isConfigured && (isHostMatching || isFilteringAdult) && !activeHost.isNullOrBlank() && isDnsLocked) {
-                    ShieldStatus.Active(context.getString(R.string.card_nextdns_active, activeHost))
+                    ShieldStatus.Active(context.getString(R.string.card_dns_active, activeHost))
                 } else {
                     val currentHostDisplay = activeHost ?: context.getString(R.string.default_dns_text)
-                    ShieldStatus.NeedsEnforcement(context.getString(R.string.card_nextdns_pending, currentHostDisplay, targetHost))
+                    ShieldStatus.NeedsEnforcement(context.getString(R.string.card_dns_pending, currentHostDisplay, targetHost))
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking DNS status", e)
-            ShieldStatus.NeedsEnforcement(context.getString(R.string.card_nextdns_inactive))
+            ShieldStatus.NeedsEnforcement(context.getString(R.string.card_dns_inactive))
         }
     }
 }
