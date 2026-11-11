@@ -253,8 +253,6 @@ com.drmohammed.antiporn
 │   │   ├── RemoteAppManagerActivity.kt    # إدارة تطبيقات المكفول وحظرها/السماح بها عن بعد
 │   │   ├── RemoteAppManagerUiState.kt
 │   │   └── RemoteAppManagerViewModel.kt
-│   ├── browser/
-│   │   └── BrowserUrlFilterActivity.kt    # إدارة قوائم المواقع المسموحة والمحظورة
 │   ├── control/                           # تبويب مراكز التحكم والأنشطة اللامركزية وبوابة الـ QR
 │   │   ├── SelfControlApprovalsViewBinder.kt # عرض قائمة التطبيقات المعلقة مباشرة في شاشة التحكم
 │   │   ├── SelfControlFragment.kt         # تبويب التحكم الذاتي ومنطلق الشاشات الفرعية المتخصصة
@@ -651,7 +649,7 @@ erDiagram
 14. `VIBRATE`: اهتزاز تنبيهي لحظي عند رصد عورة على الشاشة.
 
 ### 9.2 المكونات المسجلة (14 Activities, 8 Receivers, 5 Services, 2 Providers)
-- **الأنشطة (14):** `MainActivity`, `EnterpriseProvisioningActivity`, `WaqfaGateActivity`, `WaqfaSettingsActivity`, `GuardianControlActivity`, `GuardianApprovalsHubActivity`, `RemoteAppManagerActivity`, `CurfewSettingsActivity`, `WebFilterSettingsActivity`, `OtherSettingsActivity`, `BrowserUrlFilterActivity`, `DiagnosticLogViewerActivity`, `ProvisioningWizardActivity`, `NotificationCenterActivity`.
+- **الأنشطة (13):** `MainActivity`, `EnterpriseProvisioningActivity`, `WaqfaGateActivity`, `WaqfaSettingsActivity`, `GuardianControlActivity`, `GuardianApprovalsHubActivity`, `RemoteAppManagerActivity`, `CurfewSettingsActivity`, `WebFilterSettingsActivity`, `OtherSettingsActivity`, `DiagnosticLogViewerActivity`, `ProvisioningWizardActivity`, `NotificationCenterActivity`.
 - **المستقبلات (8):** `AdminReceiver`, `PackageChangeReceiver`, `CurfewAlarmReceiver`, `WaqfaAlarmReceiver`, `CurfewBootReceiver`, `NapNotificationReceiver`, `PairingCodeReceiver`, `OtaInstallReceiver`.
 - **الخدمات (5):** `DnsWatchdogService` (specialUse), `CurfewBlackholeVpnService` (specialUse VPN), `ScreenAiProjectionService` (mediaProjection), `AntiPornFirebaseMessagingService`, `AdbPairingNotificationService` (specialUse).
 - **المزودات (2):** `FileProvider` (مشاركة التقارير والملفات داخلياً بأمان)، و `InitializationProvider` (معدل بتعطيل WorkManager الافتراضي لتهيئته عند الطلب عبر Koin).

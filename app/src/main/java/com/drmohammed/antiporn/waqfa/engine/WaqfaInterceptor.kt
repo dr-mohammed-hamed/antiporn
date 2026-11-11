@@ -21,27 +21,37 @@ object WaqfaInterceptor {
 
     private const val INTERCEPTION_DEBOUNCE_MS = 600L
 
+    private val appLabelCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     fun resolveAppLabel(context: Context, packageName: String): String {
-        return try {
-            val pm = context.packageManager
-            val appInfo = pm.getApplicationInfo(packageName, 0)
-            pm.getApplicationLabel(appInfo).toString()
-        } catch (_: PackageManager.NameNotFoundException) {
-            packageName
-        } catch (e: Exception) {
-            Log.w(TAG, "Error resolving app label for $packageName", e)
-            packageName
+        return appLabelCache.getOrPut(packageName) {
+            try {
+                val pm = context.packageManager
+                val appInfo = pm.getApplicationInfo(packageName, 0)
+                pm.getApplicationLabel(appInfo).toString()
+            } catch (_: PackageManager.NameNotFoundException) {
+                packageName
+            } catch (e: Exception) {
+                Log.w(TAG, "Error resolving app label for $packageName", e)
+                packageName
+            }
         }
     }
 
     /**
      * يُفحص التطبيق النشط في الواجهة. إذا كان خاضعاً لوقفة ولا يملك جلسة نشطة، تُطلق نافذة الاعتراض فوراً.
      */
-    fun evaluateForegroundPackage(context: Context, foregroundPackage: String, isPackageChanged: Boolean = true) {
+    fun evaluateForegroundPackage(
+        context: Context,
+        foregroundPackage: String,
+        isPackageChanged: Boolean = true,
+        isFromAccessibility: Boolean = true
+    ) {
         if (foregroundPackage.isBlank() || foregroundPackage == context.packageName) {
             return
         }
 
+        val startTime = android.os.SystemClock.elapsedRealtime()
         val sessionMgr = WaqfaSessionManager.getInstance(context)
 
         // 1. إخطار مدير الجلسات بتغير التطبيق فقط إذا تغير التطبيق فعلياً لمنع حجز الـ Mutex غير المبرر
@@ -57,7 +67,16 @@ object WaqfaInterceptor {
         // 2. التحقق مما إذا كان التطبيق في فترة تهدئة وتجميد مؤقت
         if (WaqfaCooldownStore.isPackageInCooldown(context, foregroundPackage)) {
             Log.i(TAG, "Target $foregroundPackage is currently in cooldown. Forcing exit.")
+            val appName = resolveAppLabel(context, foregroundPackage)
             WaqfaReactionExecutor.kickToHomeScreen(context)
+            val latency = android.os.SystemClock.elapsedRealtime() - startTime
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordWaqfa(
+                context = context,
+                action = "COOLDOWN_FORCED",
+                isSuccess = true,
+                executionTimeMs = latency,
+                details = "pkg=$foregroundPackage, app=$appName, engine=${if (isFromAccessibility) "0ms_A11y" else "UsageStats"}"
+            )
             return
         }
 
@@ -78,7 +97,16 @@ object WaqfaInterceptor {
 
         // 5. إطلاق شاشة الاعتراض الكاملة فوراً وبأعلى أولوية
         val appName = resolveAppLabel(context, foregroundPackage)
+        val latency = android.os.SystemClock.elapsedRealtime() - startTime
         launchGate(context, foregroundPackage, appName)
+
+        com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordWaqfa(
+            context = context,
+            action = "GATE_LAUNCHED",
+            isSuccess = true,
+            executionTimeMs = latency,
+            details = "pkg=$foregroundPackage, app=$appName, engine=${if (isFromAccessibility) "0ms_A11y" else "UsageStats"}"
+        )
     }
 
     fun launchGate(context: Context, packageName: String, appName: String) {

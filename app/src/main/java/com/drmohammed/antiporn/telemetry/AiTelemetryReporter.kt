@@ -96,6 +96,13 @@ object AiTelemetryReporter {
             emptyList()
         }
 
+        val waqfaEvents = try {
+            (diagDao.getDiagnosticEventsBlocking(30, BlackBoxRecorder.TAG_WAQFA) +
+                diagDao.getDiagnosticEventsBlocking(15, BlackBoxRecorder.TAG_A11Y)).map { it.toDto() }
+        } catch (e: Exception) {
+            emptyList()
+        }.sortedByDescending { it.timestamp }
+
         val liveShields = try {
             com.drmohammed.antiporn.core.engine.ProtectionEngine.evaluateSystemStatus(appContext)
         } catch (e: Exception) {
@@ -245,16 +252,33 @@ object AiTelemetryReporter {
         }
         sb.appendLine()
 
-        // 8. AI Prompt & Diagnosis Guidance
+        // 8. Waqfa & Accessibility Telemetry
+        sb.appendLine("## ⏱️ 8. Waqfa & Accessibility Interceptions (سجل اعتراضات وقفة ومحرك الوصول اللحظي)")
+        if (waqfaEvents.isNotEmpty()) {
+            sb.appendLine("| Timestamp | Action | Latency | Status | Details / Engine |")
+            sb.appendLine("| :--- | :--- | :---: | :---: | :--- |")
+            for (event in waqfaEvents.take(30)) {
+                val statusEmoji = if (event.isSuccess) "✅ OK" else "❌ FAIL"
+                val latencyStr = if (event.executionTimeMs > 0L) "${event.executionTimeMs}ms" else "0ms"
+                val meta = event.contextMetadata?.replace("|", "/") ?: (event.errorDetails?.replace("|", "/") ?: "-")
+                sb.appendLine("| `${event.formattedTime()}` | `${event.actionName}` | `$latencyStr` | $statusEmoji | $meta |")
+            }
+        } else {
+            sb.appendLine("ℹ️ *No Waqfa or Accessibility interception events recorded yet.*")
+        }
+        sb.appendLine()
+
+        // 9. AI Prompt & Diagnosis Guidance
         sb.appendLine("---")
-        sb.appendLine("## 🤖 8. AI Diagnosis Instructions (تعليمات التحليل للذكاء الاصطناعي)")
+        sb.appendLine("## 🤖 9. AI Diagnosis Instructions (تعليمات التحليل للذكاء الاصطناعي)")
         sb.appendLine("""
 Please analyze the telemetry and black-box log above and provide an actionable diagnosis:
 1. **Curfew & Alarm Timing:** Verify if the scheduled curfew start/end matches the observed behavior and identify any alarm skips or drift.
 2. **Security Shields Audit:** Verify if any shield (DNS, VPN, Browser, Curfew, Tamper, AppSuspension) reported NEEDS ENFORCEMENT or DISABLED and check its ground truth reason.
 3. **Cloud Sync & Monotonic Guards:** Check for rejected stale policies, UID mismatches, or missing acknowledgments.
 4. **Permissions & Security:** Identify any DPM failures, SecurityExceptions, or unexpected state transitions.
-5. **Actionable Recommendations:** Provide a surgical diagnosis and concrete code/configuration recommendations.
+5. **Waqfa & Accessibility Interceptions:** Check for interception latency spikes, engine transitions, or abnormal debounce rejections.
+6. **Actionable Recommendations:** Provide a surgical diagnosis and concrete code/configuration recommendations.
 """.trimIndent())
 
         return sb.toString()

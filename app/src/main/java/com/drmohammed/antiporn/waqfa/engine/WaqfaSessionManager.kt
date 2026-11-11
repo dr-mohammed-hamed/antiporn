@@ -44,6 +44,16 @@ class WaqfaSessionManager(
         } catch (e: Exception) {
             Log.w(TAG, "Failed reading initial policy for Waqfa, using defaults", e)
         }
+        // استعادة أي جلسة سارية غير منتهية من قاعدة البيانات عند إعادة إقلاع العملية
+        try {
+            val now = TrustedTimeProvider.currentTimeMillis(context)
+            repository.getAllActiveSessionsBlocking().firstOrNull { !it.isExpired(now) }?.let { restored ->
+                activeSession = restored
+                Log.i(TAG, "Restored active Waqfa session from DB for ${restored.packageName}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed restoring initial active Waqfa session from DB", e)
+        }
     }
 
     fun updateConfig(config: WaqfaConfig) {
@@ -70,13 +80,7 @@ class WaqfaSessionManager(
     }
 
     fun hasActiveValidSessionBlocking(packageName: String): Boolean {
-        var session = activeSession
-        if (session == null || session.packageName != packageName) {
-            session = repository.getActiveSessionBlocking(packageName)?.also { restored ->
-                activeSession = restored
-            }
-        }
-        val currentSession = session ?: return false
+        val currentSession = activeSession ?: return false
         if (currentSession.packageName != packageName) return false
         val now = TrustedTimeProvider.currentTimeMillis(context)
         val valid = !currentSession.isExpired(now)

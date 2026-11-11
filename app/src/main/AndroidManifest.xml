@@ -227,12 +227,6 @@
             android:name=".ui.control.other.OtherSettingsActivity"
             android:exported="false"
             android:launchMode="singleTop" />
-        <activity
-            android:name=".ui.browser.BrowserUrlFilterActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:windowSoftInputMode="adjustResize"
-            android:label="@string/title_browser_url_filter" />
 
         <activity
             android:name=".ui.settings.DiagnosticLogViewerActivity"

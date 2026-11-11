@@ -29,6 +29,12 @@ class HisnAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         eventBus.setAccessibilityActive(true)
         Timber.tag(TAG).i("HisnAccessibilityService connected to Android Framework (Instant 0ms Engine Active)")
+        com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordA11y(
+            context = applicationContext,
+            action = "SERVICE_CONNECTED",
+            isSuccess = true,
+            details = "Instant 0ms Engine Active"
+        )
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -73,6 +79,11 @@ class HisnAccessibilityService : AccessibilityService() {
         if (::eventBus.isInitialized) {
             eventBus.setAccessibilityActive(false)
         }
+        com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordA11y(
+            context = applicationContext,
+            action = "SERVICE_UNBIND",
+            isSuccess = true
+        )
         return super.onUnbind(intent)
     }
 
@@ -82,6 +93,11 @@ class HisnAccessibilityService : AccessibilityService() {
         if (::eventBus.isInitialized) {
             eventBus.setAccessibilityActive(false)
         }
+        com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordA11y(
+            context = applicationContext,
+            action = "SERVICE_DESTROYED",
+            isSuccess = true
+        )
     }
 
     companion object {

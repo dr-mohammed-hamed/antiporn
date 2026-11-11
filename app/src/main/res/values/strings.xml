@@ -1200,7 +1200,17 @@
     <string name="switch_block_incognito">منع التصفح الخفي</string>
     <string name="switch_block_vpn">منع تطبيقات الـ VPN</string>
     <string name="switch_block_telegram_web">حظر تيليجرام ويب</string>
-    <string name="blocked_urls_section_title">المواقع المحظورة</string>
+    <string name="switch_youtube_restricted">وضع يوتيوب المقيد</string>
+    <string name="switch_full_system_filter">تطبيق الفلترة على كامل النظام (VPN)</string>
+    <string name="tab_blocked_websites">المحظورة (%1$d)</string>
+    <string name="tab_allowed_websites">المسموحة (%1$d)</string>
+    <string name="switch_whitelist_only">حصر التصفح على المواقع المسموحة فقط</string>
+    <string name="empty_allowed_urls">لا توجد مواقع مسموحة مضافة حالياً</string>
+    <string name="empty_blocked_urls">لا توجد مواقع محظورة مضافة حالياً</string>
+    <string name="dialog_empty_whitelist_title">قائمة المواقع المسموحة فارغة</string>
+    <string name="dialog_empty_whitelist_desc">لا يمكن تفعيل حظر التصفح الشامل وحصر التصفح على المواقع المسموحة دون إضافة موقع واحد على الأقل، لتجنب قطع الاتصال بالإنترنت تماماً.</string>
+    <string name="dialog_add_allowed_title">السماح بموقع</string>
+    <string name="blocked_urls_section_title">إدارة المواقع</string>
     <string name="btn_add_blocked_url">إضافة موقع</string>
     <string name="dialog_add_url_title">حظر موقع</string>
     <string name="dialog_add_url_hint">example.com</string>
@@ -1229,4 +1239,8 @@
     <string name="waqfa_permission_dialog_fallback_btn">استخدام البديل (بيانات الاستخدام)</string>
     <string name="waqfa_permission_dialog_skip_btn">لاحقاً</string>
     <string name="waqfa_could_not_open_settings">تعذر فتح شاشة الإعدادات</string>
+    <string name="waqfa_engine_status_fallback_clickable">مراقب الاستخدام الدوري (احتياطي) • اضغط للترقية إلى 0ms</string>
+    <string name="waqfa_engine_status_dormant_clickable">المحرك غير نشط • اضغط للتفعيل</string>
+    <string name="waqfa_engine_status_instant_toast">محرك الوصول اللحظي (0ms) نشط ويعمل بأعلى كفاءة</string>
+    <string name="waqfa_engine_status_remote_toast">حالة محرك وقفة تعتمد على صلاحيات جهاز الابن الخاضع للإشراف</string>
 </resources>

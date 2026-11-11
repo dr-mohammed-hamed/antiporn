@@ -7,7 +7,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.EditText
+import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -29,6 +29,7 @@ import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -40,9 +41,12 @@ import kotlinx.coroutines.withContext
 
 /**
  * Dedicated Sub-Screen for Web Filter, DNS, and Browsing Restrictions.
- * Replaces the cluttered radio-button browser filter and integrates Telegram web block & DNS presets.
+ * Features ultra-minimalist Material 3 UI with Segmented Buttons for Blocked/Allowed lists,
+ * zero visual clutter, strict Whitelist Only mode, and full-system VPN filtering scope.
  */
 class WebFilterSettingsActivity : AppCompatActivity() {
+
+    private enum class UrlTab { BLOCKED, ALLOWED }
 
     private var isRemote = false
     private var wardId: String = ""
@@ -51,7 +55,12 @@ class WebFilterSettingsActivity : AppCompatActivity() {
     private var currentDnsHost = ""
     private var isIncognitoBlocked = true
     private var isTelegramWebBlocked = true
+    private var isYouTubeRestricted = false
+    private var isFullSystemFiltering = false
+    private var isWhitelistOnlyMode = false
     private val blockedUrls = mutableSetOf<String>()
+    private val allowedUrls = mutableSetOf<String>()
+    private var currentTab = UrlTab.BLOCKED
 
     private lateinit var toolbar: MaterialToolbar
     private lateinit var tilDnsHost: TextInputLayout
@@ -63,8 +72,18 @@ class WebFilterSettingsActivity : AppCompatActivity() {
     private lateinit var rowDnsAdguard: View
     private lateinit var rbDnsAdguard: RadioButton
     private var isProgrammaticDnsChange = false
+
     private lateinit var switchBlockIncognito: MaterialSwitch
     private lateinit var switchBlockTelegramWeb: MaterialSwitch
+    private lateinit var switchYouTubeRestricted: MaterialSwitch
+    private lateinit var switchFullSystemFilter: MaterialSwitch
+
+    private lateinit var toggleGroupUrlType: MaterialButtonToggleGroup
+    private lateinit var btnTabBlocked: MaterialButton
+    private lateinit var btnTabAllowed: MaterialButton
+    private lateinit var layoutWhitelistOnlyMaster: View
+    private lateinit var switchWhitelistOnly: MaterialSwitch
+
     private lateinit var btnAddBlockedUrl: MaterialButton
     private lateinit var tvEmptyBlockedUrls: TextView
     private lateinit var layoutBlockedUrlsList: LinearLayout
@@ -110,7 +129,7 @@ class WebFilterSettingsActivity : AppCompatActivity() {
         initViews()
         bindInitialPolicy()
         setupListeners()
-        renderBlockedUrls()
+        updateTabUi()
         updateSaveButtonState()
     }
 
@@ -148,8 +167,18 @@ class WebFilterSettingsActivity : AppCompatActivity() {
         rbDnsControlD = findViewById(R.id.rbDnsControlD)
         rowDnsAdguard = findViewById(R.id.rowDnsAdguard)
         rbDnsAdguard = findViewById(R.id.rbDnsAdguard)
+
         switchBlockIncognito = findViewById(R.id.switchBlockIncognito)
         switchBlockTelegramWeb = findViewById(R.id.switchBlockTelegramWeb)
+        switchYouTubeRestricted = findViewById(R.id.switchYouTubeRestricted)
+        switchFullSystemFilter = findViewById(R.id.switchFullSystemFilter)
+
+        toggleGroupUrlType = findViewById(R.id.toggleGroupUrlType)
+        btnTabBlocked = findViewById(R.id.btnTabBlocked)
+        btnTabAllowed = findViewById(R.id.btnTabAllowed)
+        layoutWhitelistOnlyMaster = findViewById(R.id.layoutWhitelistOnlyMaster)
+        switchWhitelistOnly = findViewById(R.id.switchWhitelistOnly)
+
         btnAddBlockedUrl = findViewById(R.id.btnAddBlockedUrl)
         tvEmptyBlockedUrls = findViewById(R.id.tvEmptyBlockedUrls)
         layoutBlockedUrlsList = findViewById(R.id.layoutBlockedUrlsList)
@@ -160,8 +189,14 @@ class WebFilterSettingsActivity : AppCompatActivity() {
         currentDnsHost = initialPolicy.dnsHost
         isIncognitoBlocked = initialPolicy.isIncognitoBlocked
         isTelegramWebBlocked = initialPolicy.isTelegramWebBlocked
+        isYouTubeRestricted = initialPolicy.isYouTubeRestrictedModeEnabled
+        isFullSystemFiltering = initialPolicy.isFullSystemFilteringEnabled
+        isWhitelistOnlyMode = initialPolicy.browserFilterMode == DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY
+
         blockedUrls.clear()
         blockedUrls.addAll(initialPolicy.customBlockedUrls)
+        allowedUrls.clear()
+        allowedUrls.addAll(initialPolicy.customAllowedUrls)
 
         isProgrammaticDnsChange = true
         etDnsHost.setText(currentDnsHost)
@@ -170,6 +205,17 @@ class WebFilterSettingsActivity : AppCompatActivity() {
 
         switchBlockIncognito.isChecked = isIncognitoBlocked
         switchBlockTelegramWeb.isChecked = isTelegramWebBlocked
+        switchYouTubeRestricted.isChecked = isYouTubeRestricted
+        switchFullSystemFilter.isChecked = isFullSystemFiltering
+        switchWhitelistOnly.isChecked = isWhitelistOnlyMode
+
+        if (isWhitelistOnlyMode && blockedUrls.isEmpty() && allowedUrls.isNotEmpty()) {
+            currentTab = UrlTab.ALLOWED
+            toggleGroupUrlType.check(R.id.btnTabAllowed)
+        } else {
+            currentTab = UrlTab.BLOCKED
+            toggleGroupUrlType.check(R.id.btnTabBlocked)
+        }
     }
 
     private fun updateTableSelection(host: String) {
@@ -231,6 +277,27 @@ class WebFilterSettingsActivity : AppCompatActivity() {
             updateSaveButtonState()
         }
 
+        switchYouTubeRestricted.setOnCheckedChangeListener { _, isChecked ->
+            isYouTubeRestricted = isChecked
+            updateSaveButtonState()
+        }
+
+        switchFullSystemFilter.setOnCheckedChangeListener { _, isChecked ->
+            isFullSystemFiltering = isChecked
+            updateSaveButtonState()
+        }
+
+        switchWhitelistOnly.setOnCheckedChangeListener { _, isChecked ->
+            isWhitelistOnlyMode = isChecked
+            updateSaveButtonState()
+        }
+
+        toggleGroupUrlType.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            currentTab = if (checkedId == R.id.btnTabAllowed) UrlTab.ALLOWED else UrlTab.BLOCKED
+            updateTabUi()
+        }
+
         btnAddBlockedUrl.setOnClickListener {
             showAddUrlDialog()
         }
@@ -240,28 +307,59 @@ class WebFilterSettingsActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateTabUi() {
+        btnTabBlocked.text = getString(R.string.tab_blocked_websites, blockedUrls.size)
+        btnTabAllowed.text = getString(R.string.tab_allowed_websites, allowedUrls.size)
+
+        if (currentTab == UrlTab.ALLOWED) {
+            layoutWhitelistOnlyMaster.visibility = View.VISIBLE
+        } else {
+            layoutWhitelistOnlyMaster.visibility = View.GONE
+        }
+        renderUrlsList()
+    }
+
     private fun showAddUrlDialog() {
-        val input = EditText(this).apply {
+        val density = resources.displayMetrics.density
+        val til = TextInputLayout(this).apply {
             hint = getString(R.string.dialog_add_url_hint)
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            setBoxCornerRadii(12f * density, 12f * density, 12f * density, 12f * density)
+        }
+        val input = TextInputEditText(til.context).apply {
             inputType = android.text.InputType.TYPE_TEXT_VARIATION_URI
             setSingleLine(true)
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.tajawal)
         }
+        til.addView(input)
+
         val frame = FrameLayout(this).apply {
-            val pad = (20 * resources.displayMetrics.density).toInt()
-            setPadding(pad, (8 * resources.displayMetrics.density).toInt(), pad, 0)
-            addView(input)
+            val padHorizontal = (20 * density).toInt()
+            val padTop = (8 * density).toInt()
+            setPadding(padHorizontal, padTop, padHorizontal, 0)
+            addView(til)
         }
 
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.dialog_add_url_title)
+        val titleRes = if (currentTab == UrlTab.ALLOWED) R.string.dialog_add_allowed_title else R.string.dialog_add_url_title
+        val targetSet = if (currentTab == UrlTab.ALLOWED) allowedUrls else blockedUrls
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(titleRes)
             .setView(frame)
             .setPositiveButton(R.string.browser_filter_btn_add) { dialog, _ ->
                 val raw = input.text?.toString()?.trim().orEmpty()
                 val sanitized = BrowserUrlSanitizer.sanitize(raw)
                 if (sanitized != null) {
-                    if (!blockedUrls.contains(sanitized)) {
-                        blockedUrls.add(sanitized)
-                        renderBlockedUrls()
+                    if (!targetSet.contains(sanitized)) {
+                        targetSet.add(sanitized)
+                        // Ensure mutual exclusivity between blocked and allowed sets to prevent DNS vs Browser rule conflicts
+                        if (targetSet === allowedUrls) {
+                            blockedUrls.remove(sanitized)
+                        } else {
+                            allowedUrls.remove(sanitized)
+                        }
+                        updateTabUi()
                         updateSaveButtonState()
                     } else {
                         Toast.makeText(this, R.string.browser_filter_error_duplicate_url, Toast.LENGTH_SHORT).show()
@@ -272,42 +370,67 @@ class WebFilterSettingsActivity : AppCompatActivity() {
                 dialog.dismiss()
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+
+        input.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)?.performClick()
+                true
+            } else {
+                false
+            }
+        }
+
+        dialog.show()
     }
 
-    private fun renderBlockedUrls() {
+    private fun renderUrlsList() {
         layoutBlockedUrlsList.removeAllViews()
-        if (blockedUrls.isEmpty()) {
+        val currentList = if (currentTab == UrlTab.ALLOWED) allowedUrls else blockedUrls
+
+        if (currentList.isEmpty()) {
+            tvEmptyBlockedUrls.text = if (currentTab == UrlTab.ALLOWED) {
+                getString(R.string.empty_allowed_urls)
+            } else {
+                getString(R.string.empty_blocked_urls)
+            }
             tvEmptyBlockedUrls.visibility = View.VISIBLE
             return
         }
         tvEmptyBlockedUrls.visibility = View.GONE
 
         val density = resources.displayMetrics.density
-        for (url in blockedUrls) {
+        val tajawalTypeface = androidx.core.content.res.ResourcesCompat.getFont(this, R.font.tajawal)
+
+        for (url in currentList.sorted()) {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding((8 * density).toInt(), (8 * density).toInt(), (8 * density).toInt(), (8 * density).toInt())
+                setPadding((8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt())
             }
 
             val tvUrl = TextView(this).apply {
                 text = url
                 textSize = 13f
+                typeface = tajawalTypeface
                 setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurface))
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             row.addView(tvUrl)
 
+            // Touch target size 48x48dp with ripple to strictly satisfy mobile accessibility standards
             val ivDelete = ImageView(this).apply {
                 setImageResource(R.drawable.ic_close)
-                val iconSize = (20 * density).toInt()
-                layoutParams = LinearLayout.LayoutParams(iconSize, iconSize)
+                val targetSize = (48 * density).toInt()
+                val pad = (14 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams(targetSize, targetSize)
+                setPadding(pad, pad, pad, pad)
+                setBackgroundResource(android.R.drawable.list_selector_background)
                 setColorFilter(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutline))
                 contentDescription = getString(R.string.browser_filter_item_delete_cd)
                 setOnClickListener {
-                    blockedUrls.remove(url)
-                    renderBlockedUrls()
+                    currentList.remove(url)
+                    updateTabUi()
                     updateSaveButtonState()
                 }
             }
@@ -319,10 +442,15 @@ class WebFilterSettingsActivity : AppCompatActivity() {
 
     private fun hasUnsavedChanges(): Boolean {
         val cleanInputDns = currentDnsHost.ifBlank { DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST }
+        val initialWasWhitelist = initialPolicy.browserFilterMode == DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY
         return cleanInputDns != initialPolicy.dnsHost ||
                 isIncognitoBlocked != initialPolicy.isIncognitoBlocked ||
                 isTelegramWebBlocked != initialPolicy.isTelegramWebBlocked ||
-                blockedUrls != initialPolicy.customBlockedUrls
+                isYouTubeRestricted != initialPolicy.isYouTubeRestrictedModeEnabled ||
+                isFullSystemFiltering != initialPolicy.isFullSystemFilteringEnabled ||
+                isWhitelistOnlyMode != initialWasWhitelist ||
+                blockedUrls != initialPolicy.customBlockedUrls ||
+                allowedUrls != initialPolicy.customAllowedUrls
     }
 
     private fun updateSaveButtonState() {
@@ -334,6 +462,17 @@ class WebFilterSettingsActivity : AppCompatActivity() {
 
     private fun saveChanges() {
         if (isSaving || !hasUnsavedChanges()) return
+
+        // Guard against locking out connectivity when Whitelist Only is selected without allowed domains
+        if (isWhitelistOnlyMode && allowedUrls.isEmpty()) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.dialog_empty_whitelist_title)
+                .setMessage(R.string.dialog_empty_whitelist_desc)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            return
+        }
+
         isSaving = true
         updateSaveButtonState()
 
@@ -358,13 +497,21 @@ class WebFilterSettingsActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                val filterMode = if (blockedUrls.isNotEmpty()) DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST else DevicePolicyBundle.BROWSER_FILTER_OFF
+                // If full system filtering or custom blocked/allowed lists are active, ensure filterMode enables the filtering pipeline
+                val filterMode = when {
+                    isWhitelistOnlyMode -> DevicePolicyBundle.BROWSER_FILTER_WHITELIST_ONLY
+                    isFullSystemFiltering || blockedUrls.isNotEmpty() || allowedUrls.isNotEmpty() -> DevicePolicyBundle.BROWSER_FILTER_BLOCKLIST
+                    else -> DevicePolicyBundle.BROWSER_FILTER_OFF
+                }
 
                 val updatedPolicy = initialPolicy.copy(
                     dnsHost = dnsToSave,
                     isIncognitoBlocked = isIncognitoBlocked,
                     isTelegramWebBlocked = isTelegramWebBlocked,
+                    isYouTubeRestrictedModeEnabled = isYouTubeRestricted,
+                    isFullSystemFilteringEnabled = isFullSystemFiltering,
                     customBlockedUrls = blockedUrls,
+                    customAllowedUrls = allowedUrls,
                     browserFilterMode = filterMode
                 )
 

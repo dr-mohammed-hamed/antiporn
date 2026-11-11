@@ -36,6 +36,8 @@ object BlackBoxRecorder {
     const val TAG_GATE = "GATE"
     const val TAG_PAIRING = "PAIRING"
     const val TAG_CRASH = "CRASH"
+    const val TAG_WAQFA = "WAQFA"
+    const val TAG_A11Y = "A11Y"
 
     /**
      * Core generic recording dispatch. Executes asynchronously off the main thread.
@@ -164,5 +166,27 @@ object BlackBoxRecorder {
         executionTimeMs: Long = 0L
     ) {
         record(context, TAG_PAIRING, action, isSuccess, executionTimeMs, error, details)
+    }
+
+    fun recordWaqfa(
+        context: Context,
+        action: String,
+        isSuccess: Boolean = true,
+        executionTimeMs: Long = 0L,
+        details: String? = null,
+        error: String? = null
+    ) {
+        record(context, TAG_WAQFA, action, isSuccess, executionTimeMs, error, details)
+    }
+
+    fun recordA11y(
+        context: Context,
+        action: String,
+        isSuccess: Boolean = true,
+        executionTimeMs: Long = 0L,
+        details: String? = null,
+        error: String? = null
+    ) {
+        record(context, TAG_A11Y, action, isSuccess, executionTimeMs, error, details)
     }
 }

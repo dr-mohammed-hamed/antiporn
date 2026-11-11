@@ -66,6 +66,27 @@ class WaqfaSettingsActivity : AppCompatActivity() {
             viewModel.setWaqfaEnabled(isChecked)
         }
 
+        binding.tvEngineStatus.setOnClickListener {
+            val state = viewModel.uiState.value
+            if (state.isRemote) {
+                Toast.makeText(this, getString(R.string.waqfa_engine_status_remote_toast), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            when (state.engineType) {
+                WaqfaEngineType.INSTANT_0MS -> {
+                    Toast.makeText(this, getString(R.string.waqfa_engine_status_instant_toast), Toast.LENGTH_SHORT).show()
+                }
+                WaqfaEngineType.USAGE_STATS_FALLBACK,
+                WaqfaEngineType.DORMANT -> {
+                    if (!state.config.isEnabled) {
+                        viewModel.setWaqfaEnabled(true)
+                    }
+                    navigateToAccessibilitySettings()
+                }
+            }
+        }
+
         binding.btnSelectApps.setOnClickListener {
             if (supportFragmentManager.findFragmentByTag("WaqfaAppPicker") != null) return@setOnClickListener
             val currentTargets = viewModel.uiState.value.config.targetPackages
@@ -155,12 +176,22 @@ class WaqfaSettingsActivity : AppCompatActivity() {
                     binding.tvEngineStatus.visibility = View.VISIBLE
                 }
                 WaqfaEngineType.USAGE_STATS_FALLBACK -> {
-                    binding.tvEngineStatus.text = getString(R.string.waqfa_engine_status_fallback)
+                    val statusText = if (state.isRemote) {
+                        getString(R.string.waqfa_engine_status_fallback)
+                    } else {
+                        getString(R.string.waqfa_engine_status_fallback_clickable)
+                    }
+                    binding.tvEngineStatus.text = statusText
                     binding.tvEngineStatus.setTextColor(ContextCompat.getColor(this, R.color.status_orange))
                     binding.tvEngineStatus.visibility = View.VISIBLE
                 }
                 WaqfaEngineType.DORMANT -> {
-                    binding.tvEngineStatus.text = getString(R.string.waqfa_engine_status_dormant)
+                    val statusText = if (state.isRemote) {
+                        getString(R.string.waqfa_engine_status_dormant)
+                    } else {
+                        getString(R.string.waqfa_engine_status_dormant_clickable)
+                    }
+                    binding.tvEngineStatus.text = statusText
                     val dormantColor = MaterialColors.getColor(
                         binding.tvEngineStatus,
                         com.google.android.material.R.attr.colorOnSurfaceVariant
@@ -212,11 +243,7 @@ class WaqfaSettingsActivity : AppCompatActivity() {
             .setTitle(R.string.waqfa_permission_dialog_title)
             .setMessage(R.string.waqfa_permission_dialog_desc)
             .setPositiveButton(R.string.waqfa_permission_dialog_enable_btn) { _, _ ->
-                try {
-                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                } catch (e: Exception) {
-                    Toast.makeText(this, getString(R.string.waqfa_could_not_open_settings), Toast.LENGTH_SHORT).show()
-                }
+                navigateToAccessibilitySettings()
             }
             .setNegativeButton(R.string.waqfa_permission_dialog_fallback_btn) { _, _ ->
                 try {
@@ -227,6 +254,20 @@ class WaqfaSettingsActivity : AppCompatActivity() {
             }
             .setNeutralButton(R.string.waqfa_permission_dialog_skip_btn, null)
             .show()
+    }
+
+    private fun navigateToAccessibilitySettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        } catch (ignored: Exception) {
+            android.util.Log.w("WaqfaSettingsActivity", "Direct accessibility settings intent failed, falling back to general settings", ignored)
+            try {
+                startActivity(Intent(Settings.ACTION_SETTINGS))
+            } catch (e: Exception) {
+                android.util.Log.e("WaqfaSettingsActivity", "Could not open system settings", e)
+                Toast.makeText(this, getString(R.string.waqfa_could_not_open_settings), Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     companion object {

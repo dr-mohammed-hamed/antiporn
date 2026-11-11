@@ -98,9 +98,8 @@ class WaqfaSettingsViewModel(
         if (enabled && !state.isRemote) {
             val app = getApplication<Application>()
             val healed = AccessibilitySelfActivator.enableSilently(app)
-            val hasUsage = CurfewForegroundWatcher.hasUsageStatsPermission(app)
 
-            if (!healed && !AccessibilitySelfActivator.isServiceEnabledInSettings(app) && !hasUsage) {
+            if (!healed && !AccessibilitySelfActivator.isServiceEnabledInSettings(app)) {
                 _uiState.update { it.copy(showPermissionDialog = true) }
             }
             refreshEngineStatus()

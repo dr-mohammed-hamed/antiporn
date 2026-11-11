@@ -84,6 +84,10 @@ class WaqfaRepository(
         waqfaDao.getAllActiveSessions().map { it.toDomain() }
     }
 
+    fun getAllActiveSessionsBlocking(): List<WaqfaSession> {
+        return waqfaDao.getAllActiveSessionsBlocking().map { it.toDomain() }
+    }
+
     suspend fun endAllActiveSessions(endAction: String): Unit = withContext(Dispatchers.IO) {
         val nowTrusted = TrustedTimeProvider.currentTimeMillis(context)
         waqfaDao.markAllActiveSessionsCompleted(nowTrusted, endAction)

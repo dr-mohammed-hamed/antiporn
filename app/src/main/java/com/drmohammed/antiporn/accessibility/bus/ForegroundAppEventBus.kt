@@ -70,7 +70,8 @@ class ForegroundAppEventBus(context: Context) {
             WaqfaInterceptor.evaluateForegroundPackage(
                 context = appContext,
                 foregroundPackage = packageName,
-                isPackageChanged = isChanged
+                isPackageChanged = isChanged,
+                isFromAccessibility = isFromAccessibility
             )
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error evaluating foreground package in WaqfaInterceptor")

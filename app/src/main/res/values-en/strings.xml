@@ -889,8 +889,18 @@
     <string name="switch_block_incognito">Block Incognito Browsing</string>
     <string name="switch_block_vpn">Block VPN Applications</string>
     <string name="switch_block_telegram_web">Block Telegram Web</string>
-    <string name="blocked_urls_section_title">Blocked Websites</string>
-    <string name="btn_add_blocked_url">Add Website</string>
+    <string name="switch_youtube_restricted">YouTube Restricted Mode</string>
+    <string name="switch_full_system_filter">Filter Entire System (VPN)</string>
+    <string name="tab_blocked_websites">Blocked (%1$d)</string>
+    <string name="tab_allowed_websites">Allowed (%1$d)</string>
+    <string name="switch_whitelist_only">Only Allow Whitelisted Sites</string>
+    <string name="empty_allowed_urls">No allowed sites added yet</string>
+    <string name="empty_blocked_urls">No blocked sites added yet</string>
+    <string name="dialog_empty_whitelist_title">Allowed list is empty</string>
+    <string name="dialog_empty_whitelist_desc">Cannot enable whitelist-only mode without adding at least one website to the allowed list, to avoid completely cutting off internet access.</string>
+    <string name="dialog_add_allowed_title">Allow Website</string>
+    <string name="blocked_urls_section_title">Manage Sites</string>
+    <string name="btn_add_blocked_url">Add Site</string>
     <string name="dialog_add_url_title">Block Website</string>
     <string name="dialog_add_url_hint">example.com</string>
 
@@ -948,4 +958,8 @@
     <string name="waqfa_permission_dialog_fallback_btn">Use Fallback (Usage Access)</string>
     <string name="waqfa_permission_dialog_skip_btn">Later</string>
     <string name="waqfa_could_not_open_settings">Could not open settings</string>
+    <string name="waqfa_engine_status_fallback_clickable">Usage Stats Polling (Fallback) • Tap to upgrade to 0ms</string>
+    <string name="waqfa_engine_status_dormant_clickable">Engine Inactive • Tap to activate</string>
+    <string name="waqfa_engine_status_instant_toast">Instant Accessibility Engine (0ms) is active at maximum performance</string>
+    <string name="waqfa_engine_status_remote_toast">Waqfa engine status depends on permissions of the supervised ward device</string>
 </resources>
