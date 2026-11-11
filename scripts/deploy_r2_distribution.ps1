@@ -80,11 +80,12 @@ if (Test-Path $VersionFile) {
     }
     
     $tempVersionFile = Join-Path $env:TEMP "version_upload.json"
-    $vObj = Get-Content $VersionFile -Raw | ConvertFrom-Json
+    $vObj = Get-Content $VersionFile -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not [string]::IsNullOrWhiteSpace($r2BaseUrl)) {
         $vObj.downloadUrl = "$($r2BaseUrl.TrimEnd('/'))/antiporn-release.apk"
     }
-    $vObj | ConvertTo-Json -Depth 4 | Set-Content -Path $tempVersionFile -Encoding utf8
+    $jsonContent = $vObj | ConvertTo-Json -Depth 4
+    [System.IO.File]::WriteAllText($tempVersionFile, $jsonContent, [System.Text.UTF8Encoding]::new($false))
 
     Write-Host "[4/4] Uploading $VersionFile to $BucketName/version.json..." -ForegroundColor Green
     $uploadVer = wrangler r2 object put "$BucketName/version.json" --file="$tempVersionFile" --content-type="application/json" --remote --force 2>&1
