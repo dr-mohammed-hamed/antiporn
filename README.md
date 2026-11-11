@@ -1,13 +1,17 @@
-# «حِصْن» (Hisn) - Enterprise Zero-Trust AntiPorn Device Owner 🛡️
+# «Hisn» (حِصْن) - Enterprise Zero-Trust AntiPorn Device Owner 🛡️
+
+<p align="center">
+  <a href="README.ar.md"><strong>🇸🇦 اقرأ التوثيق الكامل باللغة العربية (Read in Arabic)</strong></a>
+</p>
 
 <p align="center">
   <img src="art/hisn_brand_logo.jpg" alt="Hisn Brand Logo" width="160" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.18);" />
 </p>
 
 <p align="center">
-  <strong>نظام حماية ذاتية متقدم وسياسات أمان رقمية صارمة بصلاحية مسؤول الجهاز المالك (Device Owner) ونماذج الذكاء الاصطناعي على الجهاز لنظام أندرويد</strong>
+  <strong>Advanced Self-Control & Zero-Trust Digital Defense Stack for Android</strong>
   <br />
-  <em>Advanced Self-Control & Zero-Trust Digital Defense Stack for Android (On-Device Edge AI + Kernel-Level Policy Enforcement)</em>
+  <em>On-Device Edge AI Vision + Kernel-Level Device Owner Enforcement + Zero-Account-Loss Provisioning</em>
 </p>
 
 <p align="center">
@@ -22,100 +26,102 @@
 
 ---
 
-## 📑 فهرس المحتويات (Table of Contents)
+## 📑 Table of Contents
 
-1. [نظرة عامة والرؤية الطبية والهندسية (Executive Vision)](#-نظرة-عامة-والرؤية-الطبية-والهندسية-executive-vision)
-2. [معرض الواجهات والتجربة الحية (Visual Product Showcase)](#-معرض-الواجهات-والتجربة-الحية-visual-product-showcase)
-3. [المحدد الهندسي الصارم لحماية بيئة المطور (Core Developer Invariant)](#-المحدد-الهندسي-الصارم-لحماية-بيئة-المطور-core-developer-invariant)
-4. [المعمارية الهندسية الشاملة للنظام (High-Level System Topology)](#-المعمارية-الهندسية-الشاملة-للنظام-high-level-system-topology)
-5. [مصفوفة دروع الحماية السبعة (The 7 Modular Zero-Trust Shields)](#-مصفوفة-دروع-الحماية-السبعة-the-7-modular-zero-trust-shields)
-6. [خط أنابيب الرؤية العصبية المحلية (On-Device Edge AI Pipeline)](#-خط-أنابيب-الرؤية-العصبية-المحلية-on-device-edge-ai-pipeline)
-7. [محرك «وقفة» السلوكي لكسر تدفق الدوبامين (The Waqfa Behavioral Circuit Breaker)](#-محرك-وقفة-السلوكي-لكسر-تدفق-الدوبامين-the-waqfa-behavioral-circuit-breaker)
-8. [طرق التفعيل والتهيئة المؤسسية (Provisioning & Activation Guide)](#-طرق-التفعيل-والتهيئة-المؤسسية-provisioning--activation-guide)
-9. [المقاييس الهندسية وأجنحة الاختبار المؤتمتة (Verified Engineering Metrics)](#-المقاييس-الهندسية-وأجنحة-الاختبار-المؤتمتة-verified-engineering-metrics)
-10. [بوابة التوثيق المعماري الموسع (Documentation Portal)](#-بوابة-التوثيق-المعماري-الموسع-documentation-portal)
-11. [البناء والتطوير المحلي وبوابة الأمان (Local Build, CI/CD & Security)](#-البناء-والتطوير-المحلي-وبوابة-الأمان-local-build-cicd--security)
-12. [الترخيص والملكية الفكرية (License & Attribution)](#-الترخيص-والملكية-الفكرية-license--attribution)
-
----
-
-## 📖 نظرة عامة والرؤية الطبية والهندسية (Executive Vision)
-
-تم تصميم وهندسة مشروع **«حِصْن» (AntiPorn Device Owner)** كمنظومة دفاعية وسيادية متكاملة على مستوى نواة نظام أندرويد (AOSP)، تجمع بين **الرؤية الطبية والفسيولوجية للإدمان الرقمي** و**الهندسة البرمجية فائقة الأمان (Defense-in-Depth & Zero-Trust)**.
-
-### الركائز الفلسفية والتقنية:
-* **كسر النشوة الدوبامينية (Dopamine Circuit Breaker):** بدلاً من الاعتماد الهش على "الإرادة اللحظية" التي تنهار أمام الاندفاع، يفرض النظام احتكاكاً إجبارياً وتأخيراً زمنياً مدروساً (Frictional Barriers) لتمكين العقل الواعي من استعادة السيطرة (Urge Surfing).
-* **معمارية انعدام الثقة بنظام التشغيل (Zero-Trust Enforcement):** استغلال صلاحيات **مسؤول الجهاز المالك (Device Owner)** لتطبيق سياسات غير قابلة للالتفاف، أو الإيقاف الإجباري، أو الحذف، مع إغلاق الوضع الآمن وحسابات الضيوف.
-* **الخصوصية المطلقة وحماية البيانات (100% Zero-Cloud AI):** كافة عمليات معالجة وتحليل إطارات الشاشة تتم محلياً بالكامل عبر معالجات الجهاز العصبية (NPU/CPU) دون إرسال أي بايت أو لقطة شاشة خارج الهاتف.
-* **استدامة التطوير لمهندسي النظم:** صُمم النظام ليوفر أقصى درجات الحماية السلوكية دون إعاقة عمل المهندسين والمطورين عبر ضمان بقاء أدوات ADB وتصحيح الأخطاء نشطة دائماً.
+1. [Executive Vision & Medical-Engineering Paradigm](#-executive-vision--medical-engineering-paradigm)
+2. [Visual Product Showcase](#-visual-product-showcase)
+3. [Core Developer Invariant: Permanent ADB Preservation](#-core-developer-invariant-permanent-adb-preservation)
+4. [High-Level System Topology & Architecture](#-high-level-system-topology--architecture)
+5. [The 7 Modular Zero-Trust Shields Matrix](#-the-7-modular-zero-trust-shields-matrix)
+6. [On-Device Cascaded Edge AI & Neural Vision Pipeline](#-on-device-cascaded-edge-ai--neural-vision-pipeline)
+7. [The "Waqfa" Behavioral Circuit Breaker](#-the-waqfa-behavioral-circuit-breaker)
+8. [Zero-Account-Loss Activation & Provisioning Guide](#-zero-account-loss-activation--provisioning-guide)
+9. [Verified Engineering Metrics & Test Suites](#-verified-engineering-metrics--test-suites)
+10. [Architectural Documentation Portal](#-architectural-documentation-portal)
+11. [Local Build, CI/CD Pipeline & Zero-Leak Gate](#-local-build-cicd-pipeline--zero-leak-gate)
+12. [Contributing, Responsible Disclosure & License](#-contributing-responsible-disclosure--license)
 
 ---
 
-## 📸 معرض الواجهات والتجربة الحية (Visual Product Showcase)
+## 📖 Executive Vision & Medical-Engineering Paradigm
+
+**«Hisn» (AntiPorn DO)** is an enterprise-grade digital defense system engineered at the intersection of **clinical neurobiology** and **AOSP kernel-level zero-trust systems engineering**.
+
+Developed by **Dr. Mohammed Hamed** (physician and systems engineer), this project dismantles the traditional, flawed paradigm of relying on ephemeral human willpower during impulsive dopamine rushes. Instead, it deploys **friction-enforced behavioral circuit breakers** and **immutable OS-level barriers**.
+
+### Core Architectural Pillars:
+* **The Dopamine Circuit Breaker:** Neuroscience proves that impulsive cravings follow a temporal wave (*Urge Surfing*) peaking within the first 90 seconds. Hisn enforces intentional physiological friction (mindful breathing gates, delayed QR unlocks, non-skippable reflection prompts) allowing the prefrontal cortex to regain control.
+* **Kernel & OS-Level Zero-Trust Enforcement:** Leveraging Android Enterprise **Device Owner (DPM)** privileges, the system applies tamper-proof restrictions immune to bypass, force-stops, safe-mode reboots, guest user creation, or impulsive uninstallation.
+* **100% On-Device Neural Vision (Zero-Cloud Privacy):** All visual stream inferences run entirely locally on the phone's NPU/CPU. Zero frames, zero telemetry, and zero screenshots ever leave the hardware boundary.
+* **Mobile Engineer Invariant:** Full digital discipline is maintained without compromising software engineering workflows. USB debugging and ADB connectivity are permanently preserved by design.
+
+---
+
+## 📸 Visual Product Showcase
 
 <div align="center">
 
-### 1. منظومة الحماية والدروع الأساسية
-| الشاشة الرئيسية ومستوى الالتزام | دروع الحماية السبعة النشطة | بوابة التحكم الذاتي وأقفال الإرادة |
+### 1. Core Protection Ecosystem & Active Shields
+| Home Dashboard & Commitment Status | 7 Active Protection Shields | Self-Control & Willpower Portal |
 |:---:|:---:|:---:|
-| <img src="art/screenshots/01_home_screen.jpg" width="240" alt="الشاشة الرئيسية" style="border-radius: 14px;" /> | <img src="art/screenshots/02_active_shields.jpg" width="240" alt="دروع الحماية النشطة" style="border-radius: 14px;" /> | <img src="art/screenshots/03_self_control_panel.jpg" width="240" alt="بوابة التحكم الذاتي" style="border-radius: 14px;" /> |
-| **لوحة قياس الثبات والدرع الفعال** | **مراقبة وحالة الدروع اللحظية** | **مهلات التأخير وأقفال الطوارئ** |
+| <img src="art/screenshots/01_home_screen.jpg" width="240" alt="Home Dashboard" style="border-radius: 14px;" /> | <img src="art/screenshots/02_active_shields.jpg" width="240" alt="Active Shields" style="border-radius: 14px;" /> | <img src="art/screenshots/03_self_control_panel.jpg" width="240" alt="Self-Control Panel" style="border-radius: 14px;" /> |
+| **Real-time defense state & score** | **Granular OS-level shield status** | **Friction delays & emergency locks** |
 
-### 2. الانضباط الزمني وشبكة الـ DNS المشفرة
-| فك القفل بالـ QR المؤقت | حظر التجوال الليلي والنوم والقيلولة | إعدادات الـ DNS المشفر (DoT) |
+### 2. Temporal Discipline & Encrypted Network Infrastructure
+| Time-Locked QR Unlock Delay | Night Curfew & Smart Nap Control | Encrypted DNS over TLS (DoT) |
 |:---:|:---:|:---:|
-| <img src="art/screenshots/04_qr_scanner_delay.jpg" width="240" alt="فك القفل بالـ QR" style="border-radius: 14px;" /> | <img src="art/screenshots/05_night_curfew.jpg" width="240" alt="حظر التجوال الليلي" style="border-radius: 14px;" /> | <img src="art/screenshots/06_network_and_dns_settings.jpg" width="240" alt="إعدادات الـ DNS" style="border-radius: 14px;" /> |
-| **مسح رمز فعلي مع تأخير مدروس** | **جدولة ساعات النوم وعزل التطبيقات** | **فرض خوادم DoT العائلية المشفرة** |
+| <img src="art/screenshots/04_qr_scanner_delay.jpg" width="240" alt="QR Scanner Delay" style="border-radius: 14px;" /> | <img src="art/screenshots/05_night_curfew.jpg" width="240" alt="Night Curfew" style="border-radius: 14px;" /> | <img src="art/screenshots/06_network_and_dns_settings.jpg" width="240" alt="Network & DNS Settings" style="border-radius: 14px;" /> |
+| **Physical paper QR + intentional timer** | **Scheduled app suspension & curfew** | **Enforced Cloudflare Family DoT** |
 
-### 3. إدارة التطبيقات وبوابة التدبر والمساءلة
-| إدارة سياسات التطبيقات (SSOT) | بوابة «وقفة» للتدبر النفسي | لوحة متابعة المكفول عن بُعد |
+### 3. Application Governance & Mindful Reflection Gate
+| App Policy Manager (SSOT) | «Waqfa» Mindful Gate | Remote Ward Supervision Portal |
 |:---:|:---:|:---:|
-| <img src="art/screenshots/07_app_policy_manager.jpg" width="240" alt="إدارة سياسات التطبيقات" style="border-radius: 14px;" /> | <img src="art/screenshots/08_waqfa_mindful_gate.jpg" width="240" alt="بوابة وقفة" style="border-radius: 14px;" /> | <img src="art/screenshots/09_remote_ward_control.jpg" width="240" alt="لوحة المشرف عن بعد" style="border-radius: 14px;" /> |
-| **تجميد وحظر التطبيقات ديناميكياً** | **تمارين تنفس وتريث قبل الفتح** | **مراقبة التزام المكفول وتحديث السياسات** |
+| <img src="art/screenshots/07_app_policy_manager.jpg" width="240" alt="App Policy Manager" style="border-radius: 14px;" /> | <img src="art/screenshots/08_waqfa_mindful_gate.jpg" width="240" alt="Waqfa Gate" style="border-radius: 14px;" /> | <img src="art/screenshots/09_remote_ward_control.jpg" width="240" alt="Remote Ward Control" style="border-radius: 14px;" /> |
+| **Dynamic app suspension & policy rules** | **Paced breathing & cognitive friction** | **Encrypted guardian policy monitoring** |
 
-### 4. مركز رفيق المساءلة والتحكم المشترك
-| مركز رفيق المساءلة والتحقق المشترك المشفر |
+### 4. Accountability Center & Mutual Verification
+| Cryptographically Paired Accountability Center |
 |:---:|
-| <img src="art/screenshots/10_accountability_supervision.jpg" width="260" alt="مركز رفيق المساءلة" style="border-radius: 14px;" /> |
-| **المشرفون المعتمدون، وقوائم المكفولين، ومزامنة السحابة المشفرة** |
+| <img src="art/screenshots/10_accountability_supervision.jpg" width="260" alt="Accountability Center" style="border-radius: 14px;" /> |
+| **Trusted guardians, supervised wards, and end-to-end synced policies** |
 
 </div>
 
 ---
 
-## 📌 المحدد الهندسي الصارم لحماية بيئة المطور (Core Developer Invariant)
+## 📌 Core Developer Invariant: Permanent ADB Preservation
 
 > [!IMPORTANT]
-> ### 🛡️ إبقاء تصحيح أخطاء USB (USB Debugging / ADB) متاحاً بشكل دائم للمطور:
-> * صاحب ومطور هذا المشروع وجمهور مستهدف واسع منه يعملون في **مجال هندسة وتطوير برمجيات الهواتف الذكية (Mobile Software Engineering)**.
-> * ولذلك، فإن المعمارية تفرض **قيداً صارماً وغير قابل للتفاوض (Strict Invariant)** يمنع منعاً باتاً استدعاء أو فرض أي من القيود التالية برمجياً:
->   - ❌ `UserManager.DISALLOW_DEBUGGING_FEATURES`
->   - ❌ `UserManager.DISALLOW_CONFIG_DEVELOPER_OPTIONS`
-> * **الهدف المعماري:** إحكام غلق كافة الثغرات السلوكية والمباشرة أثناء الاستخدام الفردي للجهاز (الـ DNS، قفل الـ VPN، حظر متصفحات التصفح الخفي، التعتيم البصري الفوري للشاشة، وتجميد التطبيقات المشتتة) مع الاحتفاظ بالهاتف كبيئة عمل واختبار وتطوير برمجية متكاملة عبر الحاسوب دون أي تعارض.
+> ### 🛡️ Permanent USB Debugging & ADB Guarantee:
+> * The author of this project and a substantial segment of its target developer community work professionally in **Mobile Software Engineering**.
+> * Therefore, the architecture enforces an immutable, non-negotiable **Contractual Invariant**:
+>   - ❌ `UserManager.DISALLOW_DEBUGGING_FEATURES` is **NEVER** applied.
+>   - ❌ `UserManager.DISALLOW_CONFIG_DEVELOPER_OPTIONS` is **NEVER** applied.
+> * **Design Objective:** Close all impulsive on-screen bypass vectors during individual phone usage (enforcing Private DNS, locking down third-party VPNs, disabling incognito browsers, instant AI screen blurring, and freezing distracting apps) while preserving the device as a complete, fully operable development and test workstation via computer-tethered ADB.
 
 ---
 
-## 🏗️ المعمارية الهندسية الشاملة للنظام (High-Level System Topology)
+## 🏗️ High-Level System Topology & Architecture
 
-يعتمد «حِصْن» على تصميم معماري متعدد الطبقات (Clean Architecture) يفصل بصرامة بين العرض، المنطق، الدروع الدفاعية، وواجهات النظام الخام:
+Hisn follows Clean Architecture with strict modular boundaries between Presentation, Domain/State, Defense Shields, Local AI, and Android OS Kernel APIs:
 
 ```mermaid
 graph TD
-    subgraph UI_Layer ["1. طبقة واجهة المستخدم (Presentation & UX Layer)"]
+    subgraph UI_Layer ["1. Presentation & UX Layer"]
         UI1["Material 3 & Edge-to-Edge Activities"]
         UI2["Waqfa Mindful Gate Overlay (وقفة)"]
         UI3["Self-Control & Accountability UI"]
-        UI4["ScreenBlurOverlayManager (Floating Blur Window)"]
+        UI4["ScreenBlurOverlayManager (Floating System Window)"]
     end
 
-    subgraph Domain_State ["2. طبقة المنطق وإدارة الحالة (Domain & State - MVVM/Koin)"]
+    subgraph Domain_State ["2. Domain & State Layer (MVVM & Koin DI)"]
         VM["ViewModels & StateFlow Observables"]
         DI["Koin Dependency Injection Engine"]
         AP_REG["AppPolicyRegistry (Single Source of Truth)"]
         TT["TrustedTime (Monotonic SNTP Engine)"]
     end
 
-    subgraph Defense_Shields ["3. منظومة الدروع السبعة (7 Modular Defense Shields)"]
+    subgraph Defense_Shields ["3. Seven Modular Zero-Trust Shields"]
         S1["SystemTamperShield (Anti-SafeMode & MultiUser)"]
         S2["AppSuspensionShield (Silent Freeze/Purge)"]
         S3["DnsShield (DoT Enforced 1.1.1.3)"]
@@ -125,7 +131,7 @@ graph TD
         S7["BrowserShield (SafeSearch & Anti-Incognito)"]
     end
 
-    subgraph Local_Edge_AI ["4. خط أنابيب الرؤية العصبية المحلية (Zero-Cloud Edge AI)"]
+    subgraph Local_Edge_AI ["4. On-Device Edge AI & Neural Vision Pipeline"]
         MP["MediaProjection Virtual Display"]
         FD["FrameDifferencer (0% CPU Idle Skip)"]
         MNET["MobileNetV4 Modesty (TFLite INT8)"]
@@ -134,9 +140,9 @@ graph TD
         KLT["Lucas-Kanade KLT Optical Flow Tracker"]
     end
 
-    subgraph OS_Kernel ["5. طبقة سيادة النظام (AOSP Device Owner & Linux Kernel)"]
+    subgraph OS_Kernel ["5. AOSP Device Owner & Linux Kernel Layer"]
         DPM["DevicePolicyManager & SafeDpmGateway"]
-        ADB_G["USB Debugging Preservation Invariant"]
+        ADB_G["Permanent USB Debugging Preservation Invariant"]
         ROOM["Room SQLite 2.7.0 (Local Persistence)"]
         OTA["Cloudflare R2 OTA + v2/v3 Lineage Rotation"]
     end
@@ -159,145 +165,191 @@ graph TD
 
 ---
 
-## 🛡️ مصفوفة دروع الحماية السبعة (The 7 Modular Zero-Trust Shields)
+## 🛡️ The 7 Modular Zero-Trust Shields Matrix
 
-تتكامل منظومة الحماية عبر 7 دروع معيارية مستقلة يتم حقنها وإدارتها عبر [`AppPolicyRegistry`](docs/APP_POLICY_REGISTRY.md) وفق مبدأ المصدر الموحد للحقيقة:
+System policies are governed centrally by [`AppPolicyRegistry`](docs/APP_POLICY_REGISTRY.md) (Single Source of Truth - SSOT) and executed across 7 modular shields:
 
-| الدرع الدفاعي | ناقل الحماية (Target Vector) | واجهات النظام الخام (AOSP Enforcement APIs) | آلية الصمود والتعافي (Resilience & Fail-safe) |
+| Defense Shield | Target Vector | AOSP Enforcement APIs | Resilience & Recovery Mechanism |
 | :--- | :--- | :--- | :--- |
-| **1. `SystemTamperShield`** | منع الالتفاف وتعطيل الحماية | `setSafeBootBlocked`, `DISALLOW_SAFE_BOOT`, `DISALLOW_ADD_USER`, `DISALLOW_FACTORY_RESET` | رصد محاولات العبث بالساعة والنظام وإعادة قفل الإعدادات فوراً. |
-| **2. `AppSuspensionShield`** | عزل وتجميد التطبيقات المحظورة | `setPackagesSuspended`, `PackageManager.setApplicationEnabledSetting` | مسح فوري وصامت للتطبيقات المحظورة قطعياً (تيك توك، برامج التعارف، متصفحات التصفح الخفي). |
-| **3. `DnsShield`** | تشفير وحجب النطاقات والمواقع | `setGlobalPrivateDnsModeSpecifiedHost`, `DISALLOW_CONFIG_PRIVATE_DNS` | فرض DoT بخوادم Cloudflare Family (`family.cloudflare-dns.com`) ومراقبة خلفية عبر `DnsWatchdogService`. |
-| **4. `VpnShield`** | منع كسر التصفية عبر تطبيقات VPN | `UserManager.DISALLOW_CONFIG_VPN` | إبطال عمل بروتوكولات وتطبيقات الـ VPN الخارجية على مستوى نواة أندرويد. |
-| **5. `CurfewShield`** | حظر التجوال الليلي وإدارة النوم | `CurfewBlackholeVpnService`, `CurfewEnforcer`, `NapController` | توجيه حركة المرور إلى ثقب أسود محلي مجدول من 20:30 إلى 07:00 (توقيت مكة) مع مؤقت قيلولة صارم. |
-| **6. `AccessibilityShield`** | استدامة صلاحيات إمكانية الوصول | `AccessibilitySelfActivator`, `TransientWindowEventFilter` | إعادة تفعيل خدمة إمكانية الوصول ذاتياً ومنع المستخدم من إيقافها برمجياً. |
-| **7. `BrowserShield`** | إلغاء التصفح الخفي وإجبار البحث الآمن | `AppPolicyRegistry`, `BrowserUrlSanitizer`, Chromium Managed Policies | فرض قيود المتصفحات عبر ملفات السياسات المؤسسية وحجب الروابط المشبوهة لحظياً. |
+| **1. `SystemTamperShield`** | OS tampering, settings manipulation | `setSafeBootBlocked`, `DISALLOW_SAFE_BOOT`, `DISALLOW_ADD_USER`, `DISALLOW_FACTORY_RESET` | Detects attempts to alter system clock or users and immediately reapplies restrictions. |
+| **2. `AppSuspensionShield`** | Impulsive distraction & forbidden apps | `setPackagesSuspended`, `PackageManager.setApplicationEnabledSetting` | Immediate, silent suspension and removal of blacklisted packages (TikTok, dating apps, incognito browsers). |
+| **3. `DnsShield`** | Unfiltered DNS and malicious domains | `setGlobalPrivateDnsModeSpecifiedHost`, `DISALLOW_CONFIG_PRIVATE_DNS` | Enforces DoT with Cloudflare Family (`family.cloudflare-dns.com` 1.1.1.3), continuously audited by `DnsWatchdogService`. |
+| **4. `VpnShield`** | Filter evasion via third-party VPNs | `UserManager.DISALLOW_CONFIG_VPN` | System-wide kernel restriction preventing third-party VPN tunnels from establishing. |
+| **5. `CurfewShield`** | Late-night usage & sleep disruption | `CurfewBlackholeVpnService`, `CurfewEnforcer`, `NapController` | Routes unauthorized traffic into a local scheduled blackhole between 20:30 and 07:00 (Makkah time) with nap timer support. |
+| **6. `AccessibilityShield`** | Service termination by user | `AccessibilitySelfActivator`, `TransientWindowEventFilter` | Automatically reactivates accessibility services via Device Owner privileges upon disconnection. |
+| **7. `BrowserShield`** | Incognito browsing & NSFW search | `AppPolicyRegistry`, `BrowserUrlSanitizer`, Chromium Managed Policies | Enforces managed policies across Chromium browsers (disables incognito, enforces SafeSearch, sanitizes URLs). |
 
 ---
 
-## 🧠 خط أنابيب الرؤية العصبية المحلية (On-Device Edge AI Pipeline)
+## 🧠 On-Device Cascaded Edge AI & Neural Vision Pipeline
 
-يعتمد «حِصْن» على خط استدلال بصري متسلسل فائق الخفة والسرعة (Cascaded Inference Pipeline)، يعمل محلياً 100% لحماية خصوصية المستخدم المطلقة وتوفير طاقة البطارية:
+To protect user privacy with **zero cloud dependencies** and prevent battery drain, Hisn uses a multi-tier cascaded inference pipeline:
 
 ```
-[MediaProjection Stream]
-         ↓
-[FrameDifferencer] ──(لا يوجد تغيير في الشاشة)──> تخطي المعالجة تماماً (0% CPU)
-         ↓ (رصد حركة جديدة)
-[Tier 1: MobileNetV4 Modesty (TFLite)] ──(محتوى آمن)──> الاستمرار الطبيعي
-         ↓ (رصد احتمال عدم احتشام > 0.40)
-[Tier 2: NudeNet Anatomical (ONNX Runtime)] ──(تحديد دقيق للأعضاء والأجزاء المكشوفة)
-         ↓
+[MediaProjection Virtual Frame Stream]
+                 ↓
+[FrameDifferencer] ──(Screen is Static)──> Skip Processing (0% CPU / Zero Battery Waste)
+                 ↓ (Motion or Content Change Detected)
+[Tier 1: MobileNetV4 Modesty (TFLite INT8)] ──(Safe Content)──> Continue Normal Rendering
+                 ↓ (Immodesty Probability > 0.40)
+[Tier 2: NudeNet Anatomical (ONNX Runtime)] ──(Granular Anatomical Bounding Boxes)
+                 ↓
 [Tier 3: Halalify Context & Gender Verification]
-         ↓
-[Lucas-Kanade KLT Optical Flow Tracker] ──> تتبع مسار العناصر بمعدل 60fps واستهلاك < 2ms
-         ↓
-[ScreenBlurOverlayManager] ──> طبقة تعتيم فورية عائمة تغطي الشاشة بالكامل
+                 ↓
+[Lucas-Kanade KLT Optical Flow Tracker] ──> Sub-millisecond tracking at 60fps (< 2ms CPU)
+                 ↓
+[ScreenBlurOverlayManager] ──> Instant system-level floating blur overlay
 ```
 
-* **التتبع البصري فائق الخفة (`KltOpticalFlowTracker`):** بدلاً من استدعاء نماذج الذكاء الاصطناعي الثقيلة في كل إطار، يتم تشغيل النموذج مرة واحدة ثم تسليم الإحداثيات لخوارزمية الهرم البصري (Pyramidal Lucas-Kanade) لتتبع الحركة باستهلاك شبه معدوم للطاقة.
-* **سجل الاستثناءات الذكي (`AiExemptionRegistry`):** استثناء محمي للتطبيقات الموثوقة وبيئات التطوير البرمجي لتفادي الإنذارات الكاذبة أثناء العمل اليومي.
+* **Lucas-Kanade Optical Flow (`KltOpticalFlowTracker`):** Instead of executing heavy neural network inference on every frame (which would overheat the device), the deep model runs once upon detection, and coordinates are handed to pyramidal Lucas-Kanade optical flow tracking.
+* **Exemption Engine (`AiExemptionRegistry`):** Trusted developer tools, IDEs, and secure productivity apps are exempt to prevent false positives during technical work.
 
 ---
 
-## ⏳ محرك «وقفة» السلوكي لكسر تدفق الدوبامين (The Waqfa Behavioral Circuit Breaker)
+## ⏳ The "Waqfa" Behavioral Circuit Breaker
 
-استناداً إلى الأبحاث الطبية في علم الأعصاب وعلاج الإدمان السلوكي، فإن الرغبة الملحة تتبع منحنى موجي (Urge Curve) يبلغ ذروته في أول 90 ثانية.  
-صُممت **بوابة «وقفة» (Waqfa Gate)** كقاطع دائرة سلوكي (Behavioral Circuit Breaker):
+Impulsive urges follow a neurobiological surge curve. The **«Waqfa» (وقفة) Gate** acts as an intentional circuit breaker:
 
-* **الاحتكاك الإيجابي الموجه:** عند محاولة فتح تطبيق خاضع للتدبر (مثل منصات التسوق أو المحتوى المشتت)، تُفتح واجهة ملء الشاشة تجبر المستخدم على التوقف والتريث.
-* **تمارين التنفس والتدبر:** عد تنازلي غير قابل للتخطي مصحوب بتمارين تنفس منظمة وإرشادات نفسية لكسر دائرة الاندفاع واستعادة السيطرة الواعية.
-* **منع التكرار الاندفاعي:** تتبع الجلسات عبر `WaqfaSessionManager` لفرض قيود متزايدة في حال تكرار الفتح خلال فترات زمنية قصيرة.
+* **Paced Breathing & Reflection:** Opening borderline or shopping applications triggers a full-screen mindful overlay requiring controlled breathing and reflection before access is granted.
+* **Non-Skippable Delay Countdown:** A timed cooling-off window interrupts autonomic dopamine spikes, returning executive control to the user's prefrontal cortex.
+* **Session Rate Limiting:** Managed by `WaqfaSessionManager`, successive attempts to reopen restricted apps incur progressively longer cooling periods.
 
 ---
 
-## ⚡ طرق التفعيل والتهيئة المؤسسية (Provisioning & Activation Guide)
+## ⚡ Zero-Account-Loss Activation & Provisioning Guide
 
-يمتلك تطبيق «حِصْن» خيارات مرنة متعددة للتفعيل بصلاحية **Device Owner** بما يتناسب مع المستخدم العام والمطور المحترف:
+> [!TIP]
+> ### 🔓 The AOSP Zero-Account Bypass Breakthrough:
+> In pure Android (AOSP), `DevicePolicyManagerService.enforceCanSetDeviceOwnerLocked()` rejects Device Owner setup if any user accounts (Google, WhatsApp, banking) exist.  
+> However, an architectural exception exists: **when `user_setup_complete = 0`, AOSP skips all account and multi-user checks entirely!**  
+> Hisn leverages this mechanism natively, allowing users to activate full Device Owner rights **WITHOUT wiping their phone or removing a single account**. Read the complete deep-dive in **[The Complete Device Owner Guide](docs/device-owner-guide.md)**.
 
-### الطريقة 1: الإعداد الذاتي بنقرة واحدة عبر Shizuku / Wireless ADB (دون كمبيوتر ودون حذف حسابات)
-1. قم بتفعيل تصحيح الأخطاء اللاسلكي (Wireless Debugging) على هاتفك.
-2. شغّل بيئة [Shizuku](https://shizuku.rikka.app/).
-3. افتح تطبيق «حِصْن» وانقر على زر **"تفعيل الصلاحية ذاتياً عبر Shizuku"** في شاشة الترحيب.
-4. لمزيد من الشرح التشريحي المعمق، راجع **[دليل تفعيل Device Owner دون حذف الحسابات](docs/device-owner-guide.md)**.
+```mermaid
+graph TD
+    Start["Install Hisn APK on Device"] --> Choice{"Preferred Activation Vector"}
+    
+    Choice -->|Zero PC Required| ShizukuWay["Method 1: In-App Self-Activation<br/>Local Wireless ADB / Shizuku Engine"]
+    Choice -->|Connected to PC via USB| PCWay["Method 2: One-Click Desktop ADB Script<br/>Zero user_setup_complete + Cache Refresh"]
+    Choice -->|Brand New Device / Factory Reset| QRWay["Method 3: Android Enterprise QR Code<br/>Zero-Touch Optical Camera Setup"]
+    
+    ShizukuWay --> Success["Full Device Owner Activated with All Accounts Preserved!"]
+    PCWay --> Success
+    QRWay --> Success
+```
 
-### الطريقة 2: التهيئة المؤسسية للأجهزة الجديدة عبر رمز الـ QR (Android Enterprise Zero-Touch)
-1. عند تشغيل جهاز جديد أو بعد إعادة ضبط المصنع، انقر 6 مرات متتالية على شاشة الترحيب الأولى (Welcome Screen) لتشغيل قارئ الـ QR.
-2. امسح رمز الـ QR المولد عبر سكربت المشروع:
+### Method 1: On-Device Self-Activation (Zero PC, Zero Account Deletion)
+1. Install the APK: `adb install -r app-release.apk` (or download and install directly on device).
+2. Enable **Wireless Debugging** in Android Developer Options.
+3. Open Hisn and navigate to the **Provisioning Wizard**:
+   - The app natively supports pairing over local loopback TLS/SPAKE2 (`DeviceOwnerPromoter.kt`) or via **[Shizuku](https://shizuku.rikka.app/)**.
+4. Tap **"Self-Promote to Device Owner"**; the app automatically zeroes `user_setup_complete`, flushes the DPM cache, and promotes itself in seconds without touching your accounts.
+
+---
+
+### Method 2: Fast PC Command-Line Activation (ADB Without Account Loss)
+With the phone connected to your PC via USB:
+
+#### For Android 12 to 16 (API 31 to 36):
+```cmd
+:: 1. Temporarily toggle user_setup_complete to bypass account checks
+adb shell settings put secure user_setup_complete 0
+
+:: 2. Grant Device Owner privileges
+adb shell dpm set-device-owner com.drmohammed.antiporn/.AdminReceiver
+
+:: 3. Restore setup state immediately
+adb shell settings put secure user_setup_complete 1
+```
+
+> [!NOTE]
+> On certain OEM skins (OneUI, HyperOS) where DPM caches state in memory, update the cache using the project helper payload:
+> ```cmd
+> adb push scripts/setup-state-helper.jar /data/local/tmp/
+> adb shell CLASSPATH=/data/local/tmp/setup-state-helper.jar app_process /system/bin SetupStateHelper 0
+> adb shell dpm set-device-owner com.drmohammed.antiporn/.AdminReceiver
+> adb shell settings put secure user_setup_complete 1
+> adb shell rm /data/local/tmp/setup-state-helper.jar
+> ```
+
+#### For Legacy Devices (Android 7 to 11):
+Temporarily disable Google account services, assign owner, and re-enable:
+```cmd
+adb shell pm disable-user com.google.android.gms
+adb shell dpm set-device-owner com.drmohammed.antiporn/.AdminReceiver
+adb shell pm enable com.google.android.gms
+```
+
+---
+
+### Method 3: Android Enterprise QR Code Provisioning (Fresh Setup)
+1. On a new or factory-reset device, tap the welcome screen 6 times to open the QR camera.
+2. Scan the enterprise payload generated by:
    ```powershell
    .\scripts\generate_qr_payload.ps1
    ```
-3. سيتولى نظام أندرويد تنزيل التطبيق وتعيينه كمسؤول مالك للجهاز تلقائياً وبأعلى درجات الحصانة.
+3. Android OS automatically downloads, installs, and provisions Hisn as the immutable Device Owner.
 
-### الطريقة 3: التفعيل الكلاسيكي عبر موجه أوامر ADB
-إذا كان هاتفك متصلاً بالحاسوب:
+---
+
+### 🛠️ Developer De-provisioning & Uninstallation
+Because USB debugging remains permanently active, you can remove Device Owner and uninstall at any time via ADB:
 ```bash
-# تثبيت حزمة التطبيق
-adb install -r app-release.apk
-
-# تعيين التطبيق كمسؤول الجهاز المالك
-adb shell dpm set-device-owner com.drmohammed.antiporn/.AdminReceiver
-```
-
-### 🛠️ إلغاء الصلاحية للمطور (Developer De-provisioning)
-نظراً لأننا أبقينا تصحيح أخطاء USB متاحاً بشكل دائم، يمكن إلغاء الصلاحية وحذف التطبيق في أي وقت عبر الحاسوب:
-```bash
-# 1. إزالة صفة مسؤول الجهاز المالك
+# 1. Remove Device Owner privileges
 adb shell dpm remove-active-admin --user 0 com.drmohammed.antiporn/.AdminReceiver
 
-# 2. إزالة التطبيق بالكامل
+# 2. Uninstall the package
 adb uninstall com.drmohammed.antiporn
 ```
 
 ---
 
-## 📊 المقاييس الهندسية وأجنحة الاختبار المؤتمتة (Verified Engineering Metrics)
+## 📊 Verified Engineering Metrics & Test Suites
 
-تم إخضاع المشروع لفحص دقيق وشامل لكافة أجنحة الاختبار ومكونات البناء عبر Gradle:
+The codebase is continuously audited and verified against rigorous static and dynamic analysis gates:
 
-| المقياس الهندسي (Engineering Metric) | القيمة الحالية المؤكدة | التفاصيل البرمجية والملاحظات |
+| Engineering Metric | Current Verified Value | Architecture Notes |
 | :--- | :---: | :--- |
-| **إجمالي أجنحة الاختبار (Test Suites)** | **42 حزمة اختبار مستقلة** | تغطي كافة الطبقات: الدروع، الذكاء الاصطناعي، الشبكة، الترحيل، والـ UI. |
-| **إجمالي الاختبارات المؤتمتة (Unit Tests)** | **319 اختباراً فردياً** | **نجاح بنسبة 100% (0 failures, 0 errors, 0 skipped)**. |
-| **أسطر كود Kotlin الفعلي (Main)** | **38,281 سطر برمجي** | كود إنتاجي نقي موزع على 196 ملفاً برمجياً. |
-| **أسطر كود أجنحة الاختبار (Tests)** | **5,929 سطر برمجي** | اختبارات سلوكية وحسابية جدارية لضمان ثبات النظام وعدم الانهيار. |
-| **إجمالي أسطر كوتلن في المشروع** | **44,210 سطر برمجي** | تلتزم بقواعد Clean Code ومبادئ SOLID و DRY. |
-| **إصدار بيئة أندرويد المستهدفة** | **Android 16 (API 36)** | متوافق تراجعياً حتى Android 7.0 (API 24 - Nougat). |
-| **محرك قاعدة البيانات المحلية** | **Jetpack Room 2.7.0** | مع 11 اختبار ترحيل آلي للمخططات (`RoomMigrationTest`). |
-| **محقن التبعيات (Dependency Injection)** | **Koin 3.5.6** | هيكلية معيارية تفصل مجالات النظام بالكامل. |
+| **Automated Test Suites** | **42 Independent Suites** | Covering shields, AI inference, networking, DB migrations, and UI. |
+| **Total Automated Tests** | **319 Unit Tests** | **100% Pass Rate (0 failures, 0 errors, 0 skipped)**. |
+| **Main Kotlin Source Code** | **38,281 Lines of Code** | Production code organized across 196 source files. |
+| **Test Kotlin Source Code** | **5,929 Lines of Code** | Comprehensive behavior-driven regression suites. |
+| **Total Codebase Footprint** | **44,210 Lines of Kotlin** | Strictly adheres to Clean Code, SOLID, DRY, and KISS principles. |
+| **Target Android Environment** | **Android 16 (API 36 - Baklava)** | Fully backward compatible down to Android 7.0 (API 24 - Nougat). |
+| **Embedded Database Engine** | **Jetpack Room 2.7.0** | Includes 11 automated SQLite schema migration tests (`RoomMigrationTest`). |
+| **Dependency Injection** | **Koin 3.5.6** | Modular dependency graph separating UI, AI, networking, and data layers. |
 
 ---
 
-## 📚 بوابة التوثيق المعماري الموسع (Documentation Portal)
+## 📚 Architectural Documentation Portal
 
-يحتوي مجلد [`docs/`](docs/README.md) و [`scripts/`](scripts/README.md) على أدلة فنية تفصيلية متخصصة:
+Comprehensive documentation is indexed across [`docs/`](docs/README.md) and [`scripts/`](scripts/README.md):
 
-* 📘 **[دليل المعمارية الموحدة لسياسات التطبيقات (APP_POLICY_REGISTRY.md)](docs/APP_POLICY_REGISTRY.md):**  
-  شرح معمارية المصدر الموحد للحقيقة (SSOT)، ودليل إضافة أو استثناء التطبيقات بسطر برمجي واحد.
-* 🛡️ **[خارطة الطريق الجيلية ورؤية المشروع (GENERATIONAL_ANTIPORN_ROADMAP.md)](docs/GENERATIONAL_ANTIPORN_ROADMAP.md):**  
-  الوثيقة الفلسفية والاستراتيجية الكبرى: فسيولوجيا الإدمان، نمط قاطع الدائرة، والذكاء الاصطناعي على الجهاز.
-* 📱 **[المرجع الهندسي لتفعيل Device Owner دون حذف الحسابات (device-owner-guide.md)](docs/device-owner-guide.md):**  
-  تشريح عميق في كود أندرويد الخام (AOSP) لطرق التجاوز الخمس وتفعيل الصلاحية دون مسح بيانات الجهاز.
-* 📡 **[دليل التحديثات الهوائية وتدوير المفاتيح (OTA_DISTRIBUTION.md)](docs/OTA_DISTRIBUTION.md):**  
-  شرح منظومة التوزيع المستقلة عبر Cloudflare R2 وتدوير مفاتيح APK Signature Scheme v2/v3 Lineage Rotation.
-* 🛠️ **[أدوات وأدلة الأتمتة المساعدة والنشر (scripts/README.md)](scripts/README.md):**  
-  دليل سكربتات PowerShell للبناء التلقائي، النسخ الاحتياطي، توليد حمولات الـ QR، والنشر الفوري.
-* 📸 **[معرض لقطات الشاشة وفهرس الواجهات (art/screenshots/README.md)](art/screenshots/README.md):**  
-  الفهرس الكامل لكافة الواجهات والشاشات وتجربة المستخدم.
+* 📱 **[AOSP Device Owner Bypass Guide (device-owner-guide.md)](docs/device-owner-guide.md):**  
+  Deep analysis of AOSP source code detailing all 5 methods to activate Device Owner without deleting accounts.
+* 📘 **[App Policy Registry Architecture (APP_POLICY_REGISTRY.md)](docs/APP_POLICY_REGISTRY.md):**  
+  Complete Single Source of Truth (SSOT) specification and guide for modifying app rules with a single line of code.
+* 🛡️ **[The Generational Anti-Porn Stack (GENERATIONAL_ANTIPORN_ROADMAP.md)](docs/GENERATIONAL_ANTIPORN_ROADMAP.md):**  
+  Foundational architectural blueprint covering dopamine physiology, circuit breaker patterns, and edge AI.
+* 📡 **[Independent OTA Distribution & Key Rotation (OTA_DISTRIBUTION.md)](docs/OTA_DISTRIBUTION.md):**  
+  Guide to hosting releases on Cloudflare R2 and rotating keys via APK Signature Scheme v2/v3 Lineage Rotation.
+* 🛠️ **[Automation & Deployment Scripts Hub (scripts/README.md)](scripts/README.md):**  
+  PowerShell toolset for one-click release publishing, Lineage key signing, backup creation, and QR payload generation.
+* 📸 **[Visual Screenshots Gallery (art/screenshots/README.md)](art/screenshots/README.md):**  
+  Complete indexed catalog of high-resolution UI screen captures and feature walkthroughs.
 
 ---
 
-## 💻 البناء والتطوير المحلي وبوابة الأمان (Local Build, CI/CD & Security)
+## 💻 Local Build, CI/CD Pipeline & Zero-Leak Gate
 
-### استنساخ المستودع والبناء الفوري (Zero-Setup Clone)
-1. استنسخ المستودع:
+### Clean Clone Setup (Zero Configuration)
+1. Clone the repository:
    ```bash
    git clone https://github.com/drmohammed/antiporn.git
    cd antiporn
    ```
-2. **ملف Firebase التجريبي التلقائي:**  
-   تم تجهيز بيئة البناء بحيث تقوم تلقائياً بإنشاء ملف `app/google-services.json` تجريبي وهمي صالح فور تشغيل مهام Gradle إذا لم يكن الملف موجوداً، مما يتيح تجميع وبناء المشروع وتشغيل كافة الاختبارات بنقرة واحدة دون الحاجة لأي إعدادات يدوية مسبقة.
-3. **تشغيل الاختبارات الأحادية:**
+2. **Automatic Mock Firebase Setup:**  
+   The Gradle build configuration automatically generates a mock `app/google-services.json` if none exists, allowing immediate compilation and unit test execution out of the box without manual setup.
+3. **Execute Unit Tests:**
    ```bash
    # Windows (PowerShell)
    .\gradlew.bat testDebugUnitTest
@@ -306,27 +358,20 @@ adb uninstall com.drmohammed.antiporn
    ./gradlew testDebugUnitTest
    ```
 
-### بوابة التحقق من الأمان في الـ CI (Zero Leaks Gate)
-يتضمن مسار التكامل المستمر ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) فحصاً دستورياً صارماً يمنع دمج أي كود يحتوي على ملفات المفاتيح الإنتاجية (`antiporn-release.jks`) أو ملفات التكوين الحساسة (`local.properties`).
+### CI Zero-Leak Gate
+Our GitHub Actions pipeline ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) enforces strict constitutional checks preventing any pull request from merging if release keystores (`antiporn-release.jks`) or environment properties (`local.properties`) are tracked.
 
 ---
 
-## 🤝 المساهمة والمسؤولية الأمنية (Contributing & Security)
+## 🤝 Contributing, Responsible Disclosure & License
 
-نرحب بكافة المساهمات والمقترحات البرمجية لتعزيز قوة وثبات المنظومة:
-* 🔒 **الإبلاغ عن الثغرات الأمنية:** يرجى مراجعة [سياسة الأمان (SECURITY.md)](SECURITY.md) للإبلاغ المسؤول والسري.
-* 🛠️ **إرشادات التطوير والكود النظيف:** يرجى قراءة [دليل المساهمة (CONTRIBUTING.md)](CONTRIBUTING.md) وقواعد الفحص الصارم.
-* 📜 **الملكية الفكرية والتبعيات:** تفاصيل التبعيات والمشاريع الحرة الشقيقة مسجلة في ملف [NOTICE](NOTICE).
-
----
-
-## 📜 الترخيص والملكية الفكرية (License & Attribution)
-
-مشروع **«حِصْن» (AntiPorn DO)** برمجية حرة ومفتوحة المصدر مرخصة بموجب **[رخصة جنو العمومية الإصدار 3.0 (GNU General Public License v3.0 - GPL-3.0)](LICENSE)**.  
-هذا المشروع وقف لله تعالى لحماية عقول وأعراض وأوقات الأمة والشباب من الإدمان الرقمي والمحتوى المشتت.
+* 🔒 **Security Disclosures:** Please review our [Security Policy (SECURITY.md)](SECURITY.md) for responsible disclosure guidelines.
+* 🛠️ **Contributing Code:** Read our [Contribution Guide (CONTRIBUTING.md)](CONTRIBUTING.md) to adhere to clean code standards.
+* 📜 **Open Source Attributions:** Third-party licenses and acknowledgments are cataloged in [NOTICE](NOTICE).
 
 ---
 
-<p align="center">
-  صُنع بفضل الله بعناية طبية وهندسية فائقة لحماية الأمة 🛡️
-</p>
+## 📜 License
+
+**«Hisn» (AntiPorn DO)** is free and open-source software licensed under the **[GNU General Public License v3.0 (GPL-3.0)](LICENSE)**.  
+*Dedicated as an ongoing charitable endowment (Waqf) for the protection of youth and families from digital addiction.* 🛡️
