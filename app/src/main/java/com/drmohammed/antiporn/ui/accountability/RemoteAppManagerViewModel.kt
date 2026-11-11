@@ -67,6 +67,47 @@ class RemoteAppManagerViewModel(
             )
         }
         loadData()
+        if (isLocalMode) {
+            observeLocalPolicyChanges()
+        }
+    }
+
+    private fun observeLocalPolicyChanges() {
+        viewModelScope.launch {
+            policyRepository.currentPolicyFlow.collect { policy ->
+                if (!_uiState.value.isLocalMode) return@collect
+                val state = _uiState.value
+                if (state.hasUnsavedChanges || state.isSaving) return@collect
+                val newCurfewWhitelist = policy.customCurfewWhitelistPackages.toSet()
+                val newCurfewVpnBypass = policy.curfewVpnBypassPackages.toSet()
+                val newBlacklist = policy.customBlacklistPackages.toSet()
+                val newProtected = policy.protectedAppPackages.toSet()
+                val newAiScan = policy.customAiScanPackages.toSet()
+
+                if (state.customCurfewWhitelist != newCurfewWhitelist ||
+                    state.curfewVpnBypass != newCurfewVpnBypass ||
+                    state.customBlacklist != newBlacklist ||
+                    state.protectedApps != newProtected ||
+                    state.customAiScanPackages != newAiScan
+                ) {
+                    _uiState.update { current ->
+                        current.copy(
+                            currentPolicy = policy,
+                            customBlacklist = newBlacklist,
+                            customCurfewWhitelist = newCurfewWhitelist,
+                            customAiScanPackages = newAiScan,
+                            curfewVpnBypass = newCurfewVpnBypass,
+                            protectedApps = newProtected,
+                            initialBlacklist = newBlacklist,
+                            initialCurfewWhitelist = newCurfewWhitelist,
+                            initialAiScanPackages = newAiScan,
+                            initialCurfewVpnBypass = newCurfewVpnBypass,
+                            initialProtectedApps = newProtected
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun loadData() {

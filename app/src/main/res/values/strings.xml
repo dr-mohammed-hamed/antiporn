@@ -1193,6 +1193,18 @@
     <string name="curfew_weekend_switch">حظر عطلة نهاية الأسبوع</string>
     <string name="curfew_weekend_label">عطلة نهاية الأسبوع</string>
     <string name="curfew_internet_kill_switch">قطع الإنترنت أثناء الحظر</string>
+    <string name="curfew_allowed_apps_title">التطبيقات المسموحة</string>
+    <string name="curfew_allowed_apps_none">جميع التطبيقات معلقة أثناء الحظر</string>
+    <string name="curfew_allowed_apps_count_format">%1$d تطبيق مسموح</string>
+    <string name="curfew_allowed_apps_count_with_net_format">%1$d مسموح (%2$d بالنت)</string>
+    <string name="curfew_btn_edit_allowed_apps">تعديل</string>
+    <string name="curfew_picker_title">التطبيقات المسموحة في الحظر</string>
+    <string name="curfew_picker_desc">حدد التطبيقات التي يسمح بفتحها أو اتصالها بالإنترنت أثناء الحظر</string>
+    <string name="curfew_picker_search_hint">بحث عن تطبيق...</string>
+    <string name="curfew_picker_opt_run">تشغيل</string>
+    <string name="curfew_picker_opt_net">نت</string>
+    <string name="curfew_picker_btn_confirm">تأكيد الاختيار</string>
+    <string name="curfew_picker_btn_confirm_count">تأكيد الاختيار (%1$d)</string>
 
     <!-- Web & Network Sub-Screen -->
     <string name="web_filter_title">المواقع والشبكة</string>

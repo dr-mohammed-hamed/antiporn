@@ -882,6 +882,18 @@
     <string name="curfew_weekend_switch">Weekend Curfew</string>
     <string name="curfew_weekend_label">Weekend</string>
     <string name="curfew_internet_kill_switch">Cut Internet During Curfew</string>
+    <string name="curfew_allowed_apps_title">Allowed Apps</string>
+    <string name="curfew_allowed_apps_none">All apps suspended during curfew</string>
+    <string name="curfew_allowed_apps_count_format">%1$d apps allowed</string>
+    <string name="curfew_allowed_apps_count_with_net_format">%1$d allowed (%2$d with net)</string>
+    <string name="curfew_btn_edit_allowed_apps">Edit</string>
+    <string name="curfew_picker_title">Curfew Allowed Apps</string>
+    <string name="curfew_picker_desc">Select apps allowed to open or access internet during curfew</string>
+    <string name="curfew_picker_search_hint">Search apps...</string>
+    <string name="curfew_picker_opt_run">Run</string>
+    <string name="curfew_picker_opt_net">Net</string>
+    <string name="curfew_picker_btn_confirm">Confirm Selection</string>
+    <string name="curfew_picker_btn_confirm_count">Confirm Selection (%1$d)</string>
 
     <!-- Web & Network Sub-Screen -->
     <string name="web_filter_title">Sites &amp; Network</string>

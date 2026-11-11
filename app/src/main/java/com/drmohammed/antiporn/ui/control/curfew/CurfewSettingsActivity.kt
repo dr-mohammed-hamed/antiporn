@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
@@ -50,6 +51,8 @@ class CurfewSettingsActivity : AppCompatActivity() {
     private var selectedWeekendStartMinute = 30
     private var selectedWeekendEndHour = 7
     private var selectedWeekendEndMinute = 0
+    private var selectedCurfewWhitelist = emptySet<String>()
+    private var selectedCurfewVpnBypass = emptySet<String>()
 
     private var isCurfewEnabled = true
     private var isWeekendCurfewEnabled = false
@@ -64,6 +67,8 @@ class CurfewSettingsActivity : AppCompatActivity() {
     private lateinit var btnChangeWeekendStartTime: MaterialButton
     private lateinit var btnChangeWeekendEndTime: MaterialButton
     private lateinit var switchCurfewInternetKill: MaterialSwitch
+    private lateinit var tvCurfewAllowedAppsCount: TextView
+    private lateinit var btnSelectCurfewApps: MaterialButton
     private lateinit var btnSaveCurfewChanges: MaterialButton
 
     private var isSaving = false
@@ -103,10 +108,23 @@ class CurfewSettingsActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
+        supportFragmentManager.setFragmentResultListener(
+            CurfewAppPickerBottomSheet.REQUEST_KEY,
+            this
+        ) { _, bundle ->
+            val whitelist = bundle.getStringArrayList(CurfewAppPickerBottomSheet.RESULT_WHITELIST)?.toSet() ?: emptySet()
+            val vpnBypass = bundle.getStringArrayList(CurfewAppPickerBottomSheet.RESULT_VPN_BYPASS)?.toSet() ?: emptySet()
+            selectedCurfewWhitelist = whitelist
+            selectedCurfewVpnBypass = vpnBypass
+            updateAllowedAppsLabel()
+            updateSaveButtonState()
+        }
+
         initViews()
         bindInitialPolicy()
         setupListeners()
         updateTimingLabels()
+        updateAllowedAppsLabel()
         updateSaveButtonState()
     }
 
@@ -144,6 +162,8 @@ class CurfewSettingsActivity : AppCompatActivity() {
         btnChangeWeekendStartTime = findViewById(R.id.btnChangeWeekendStartTime)
         btnChangeWeekendEndTime = findViewById(R.id.btnChangeWeekendEndTime)
         switchCurfewInternetKill = findViewById(R.id.switchCurfewInternetKill)
+        tvCurfewAllowedAppsCount = findViewById(R.id.tvCurfewAllowedAppsCount)
+        btnSelectCurfewApps = findViewById(R.id.btnSelectCurfewApps)
         btnSaveCurfewChanges = findViewById(R.id.btnSaveCurfewChanges)
     }
 
@@ -161,6 +181,8 @@ class CurfewSettingsActivity : AppCompatActivity() {
         isCurfewEnabled = initialPolicy.isCurfewEnabled
         isWeekendCurfewEnabled = initialPolicy.isWeekendCurfewEnabled
         isCurfewInternetKillEnabled = initialPolicy.isVpnBlackholeEnabled
+        selectedCurfewWhitelist = initialPolicy.customCurfewWhitelistPackages
+        selectedCurfewVpnBypass = initialPolicy.curfewVpnBypassPackages
 
         switchCurfewMaster.isChecked = isCurfewEnabled
         switchWeekendCurfew.isChecked = isWeekendCurfewEnabled
@@ -221,8 +243,36 @@ class CurfewSettingsActivity : AppCompatActivity() {
             }
         }
 
+        btnSelectCurfewApps.setOnClickListener {
+            if (supportFragmentManager.findFragmentByTag(CurfewAppPickerBottomSheet.TAG) != null) return@setOnClickListener
+            val sheet = CurfewAppPickerBottomSheet.newInstance(
+                isRemote = isRemote,
+                wardId = wardId,
+                initialWhitelist = selectedCurfewWhitelist,
+                initialVpnBypass = selectedCurfewVpnBypass,
+                blacklist = initialPolicy.customBlacklistPackages
+            )
+            sheet.setOnConfirmedListener { newWhitelist, newVpnBypass ->
+                selectedCurfewWhitelist = newWhitelist
+                selectedCurfewVpnBypass = newVpnBypass
+                updateAllowedAppsLabel()
+                updateSaveButtonState()
+            }
+            sheet.show(supportFragmentManager, CurfewAppPickerBottomSheet.TAG)
+        }
+
         btnSaveCurfewChanges.setOnClickListener {
             saveChanges()
+        }
+    }
+
+    private fun updateAllowedAppsLabel() {
+        val allowedCount = selectedCurfewWhitelist.size
+        val netCount = selectedCurfewVpnBypass.count { selectedCurfewWhitelist.contains(it) }
+        tvCurfewAllowedAppsCount.text = when {
+            allowedCount == 0 -> getString(R.string.curfew_allowed_apps_none)
+            netCount > 0 -> getString(R.string.curfew_allowed_apps_count_with_net_format, allowedCount, netCount)
+            else -> getString(R.string.curfew_allowed_apps_count_format, allowedCount)
         }
     }
 
@@ -272,7 +322,9 @@ class CurfewSettingsActivity : AppCompatActivity() {
                 selectedWeekendStartMinute != initialPolicy.weekendCurfewStartMinute ||
                 selectedWeekendEndHour != initialPolicy.weekendCurfewEndHour ||
                 selectedWeekendEndMinute != initialPolicy.weekendCurfewEndMinute ||
-                isCurfewInternetKillEnabled != initialPolicy.isVpnBlackholeEnabled
+                isCurfewInternetKillEnabled != initialPolicy.isVpnBlackholeEnabled ||
+                selectedCurfewWhitelist != initialPolicy.customCurfewWhitelistPackages ||
+                selectedCurfewVpnBypass != initialPolicy.curfewVpnBypassPackages
     }
 
     private fun updateSaveButtonState() {
@@ -298,7 +350,9 @@ class CurfewSettingsActivity : AppCompatActivity() {
             weekendCurfewStartMinute = selectedWeekendStartMinute,
             weekendCurfewEndHour = selectedWeekendEndHour,
             weekendCurfewEndMinute = selectedWeekendEndMinute,
-            isVpnBlackholeEnabled = isCurfewInternetKillEnabled
+            isVpnBlackholeEnabled = isCurfewInternetKillEnabled,
+            customCurfewWhitelistPackages = selectedCurfewWhitelist,
+            curfewVpnBypassPackages = selectedCurfewVpnBypass
         )
 
         val app = applicationContext
