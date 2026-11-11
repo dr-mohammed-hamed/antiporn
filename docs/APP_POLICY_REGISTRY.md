@@ -129,15 +129,15 @@ flowchart TD
 
 تتمركز المنظومة في حزمة `com.drmohammed.antiporn.core.policy`:
 
-### 1. [`AppClassification.kt`](file:///d:/b/antiporn/app/src/main/java/com/drmohammed/antiporn/core/policy/AppClassification.kt)
+### 1. [`AppClassification.kt`](../app/src/main/java/com/drmohammed/antiporn/core/policy/AppClassification.kt)
 تعداد يحدد الحالات الأمنية والوظيفية (System, Immune, Blacklist, Restricted, Curfew Exempt, Store).
 
-### 2. [`AppRule.kt`](file:///d:/b/antiporn/app/src/main/java/com/drmohammed/antiporn/core/policy/AppRule.kt)
+### 2. [`AppRule.kt`](../app/src/main/java/com/drmohammed/antiporn/core/policy/AppRule.kt)
 كائن بيانات ذكي يدعم:
 - المطابقة الصريحة (`Exact Match`).
 - مطابقة الأنماط الموسعة (`Wildcards`) مثل `*` و `?` عبر تحويلها تلقائياً إلى تعابير نمطية مجمعة مسبقاً (`Precompiled Regex`) غير حساسة لحالة الأحرف (`IgnoreCase`).
 
-### 3. [`AppPolicyRegistry.kt`](file:///d:/b/antiporn/app/src/main/java/com/drmohammed/antiporn/core/policy/AppPolicyRegistry.kt)
+### 3. [`AppPolicyRegistry.kt`](../app/src/main/java/com/drmohammed/antiporn/core/policy/AppPolicyRegistry.kt)
 السجل المركزي الذي يضم:
 - مصفوفة القواعد الموحدة `RULES: List<AppRule>`.
 - كاش ثنائي للبحث الفوري O(1) عبر `HashSet` و `ConcurrentHashMap`.
@@ -148,7 +148,7 @@ flowchart TD
 ## 7. دليل المطور لإضافة وتعديل التطبيقات (Developer How-To Guide)
 
 لإضافة أو تعديل أي تطبيق في المشروع، **يتم فتح ملف واحد فقط**:  
-[`app/src/main/java/com/drmohammed/antiporn/core/policy/AppPolicyRegistry.kt`](file:///d:/b/antiporn/app/src/main/java/com/drmohammed/antiporn/core/policy/AppPolicyRegistry.kt)
+[`app/src/main/java/com/drmohammed/antiporn/core/policy/AppPolicyRegistry.kt`](../app/src/main/java/com/drmohammed/antiporn/core/policy/AppPolicyRegistry.kt)
 
 ### أمثلة عملية شائعة:
 
@@ -203,7 +203,7 @@ AppRule("com.newchromium.browser", AppClassification.RESTRICTED_BROWSER, "Chromi
 ## 10. دليل الفحص والتحقق وضمان الجودة (Testing & Verification)
 
 ### أ. اختبارات الوحدة الآلية (Automated Unit Testing)
-تم تزويد المنظومة باختبارات شاملة في [`AppPolicyRegistryTest.kt`](file:///d:/b/antiporn/app/src/test/java/com/drmohammed/antiporn/core/policy/AppPolicyRegistryTest.kt) تختبر:
+تم تزويد المنظومة باختبارات شاملة في [`AppPolicyRegistryTest.kt`](../app/src/test/java/com/drmohammed/antiporn/core/policy/AppPolicyRegistryTest.kt) تختبر:
 - مطابقة النجوم مع النسخ الرسمية والتجريبية لـ NewPipe.
 - استثناء نطاق `com.dr.tech.*` بالكامل.
 - الحظر القاطع للتيليجرام وتيك توك ومتصفحات البروكسي.

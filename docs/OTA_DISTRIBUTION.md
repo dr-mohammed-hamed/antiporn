@@ -54,7 +54,7 @@ release.keystore.password=YourSecurePassword
 إذا كنت ترغب في التخلي عن Cloudflare R2 واستخدام مسار آخر:
 
 ### أ. التحويل إلى GitHub Releases:
-1. في ملف [`app/src/main/java/com/drmohammed/antiporn/ota/remote/OtaRemoteSource.kt`](file:///d:/b/antiporn/app/src/main/java/com/drmohammed/antiporn/ota/remote/OtaRemoteSource.kt):
+1. في ملف [`app/src/main/java/com/drmohammed/antiporn/ota/remote/OtaRemoteSource.kt`](../app/src/main/java/com/drmohammed/antiporn/ota/remote/OtaRemoteSource.kt):
    - يمكنك تعديل `fetchLatestVersion()` لتقرأ من واجهة GitHub API:
      `https://api.github.com/repos/YOUR_USER/YOUR_REPO/releases/latest`
 2. في الـ Assets المرفوعة على Release في GitHub، قم بتضمين ملف الـ APK وملف `version.json`.

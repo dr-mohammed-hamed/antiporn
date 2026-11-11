@@ -1,6 +1,63 @@
 # «حِصْن» (Hisn) - AntiPorn Device Owner 🛡️
 
-نظام حماية ذاتية متقدم وتطبيق سياسات رقمية صارمة يعمل بصلاحية **مسؤول الجهاز المالك (Device Owner)** على نظام أندرويد. تم تصميم وهندسة مشروع «حِصْن» لغلق كافة الثغرات والمسالك النفسية والتقنية المؤدية إلى المحتوى الإباحي والمثير (الصريح وشبه الصريح وشبكات التواصل المشتتة)، مع توفير حماية عميقة على مستوى نواة النظام ونظام تشغيل أندرويد الحديث.
+<p align="center">
+  <img src="art/hisn_brand_logo.jpg" alt="Hisn Logo" width="140" style="border-radius: 24px;" />
+</p>
+
+<p align="center">
+  <strong>نظام حماية ذاتية متقدم وسياسات رقمية صارمة بصلاحية مسؤول الجهاز المالك (Device Owner) لنظام أندرويد</strong>
+  <br />
+  <em>Advanced Self-Control & Zero-Trust Digital Defense System for Android</em>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License: GPL-3.0" /></a>
+  <a href="https://developer.android.com"><img src="https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg" alt="Platform: Android" /></a>
+  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-1.9%2B-purple.svg" alt="Kotlin" /></a>
+  <a href=".github/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-Passing-brightgreen.svg" alt="CI Status" /></a>
+  <a href="docs/APP_POLICY_REGISTRY.md"><img src="https://img.shields.io/badge/Security-Zero--Trust%20DO-red.svg" alt="Security: Zero-Trust DO" /></a>
+  <a href="NOTICE"><img src="https://img.shields.io/badge/Attribution-Halalify%20%7C%20NudeNet-orange.svg" alt="Attributions" /></a>
+</p>
+
+---
+
+## 📖 نظرة عامة (Overview)
+
+تم تصميم وهندسة مشروع **«حِصْن» (AntiPorn DO)** لغلق كافة المسالك والثغرات النفسية والتقنية المؤدية إلى الإدمان الرقمي والمحتوى الإباحي وشبكات التواصل المشتتة، مع توفير حماية عميقة على مستوى نواة النظام ونظام تشغيل أندرويد الحديث.  
+
+يعتمد التطبيق على صلاحية **مسؤول الجهاز المالك (Device Owner)** ليجعل من الصعب على النفس الالتفاف على القيود في لحظات الضعف أو الاندفاع، مع دعم نظام رفيق المساءلة (Accountability Partner) والتحكم الذاتي الصارم بالوقت والتطبيقات والشبكة.
+
+---
+
+## 📸 معرض لقطات الشاشة (App Visual Showcase)
+
+<div align="center">
+
+### 1. منظومة الحماية والدروع الأساسية
+| الشاشة الرئيسية وحالة الحماية | دروع الحماية الستة النشطة | بوابة التحكم الذاتي |
+|:---:|:---:|:---:|
+| <img src="art/screenshots/01_home_screen.jpg" width="250" alt="الشاشة الرئيسية" /> | <img src="art/screenshots/02_active_shields.jpg" width="250" alt="دروع الحماية النشطة" /> | <img src="art/screenshots/03_self_control_panel.jpg" width="250" alt="بوابة التحكم الذاتي" /> |
+| **لوحة القياس ومستوى الالتزام** | **درع DNS، حظر VPN، والتعتيم** | **أقفال الإرادة ومهلات التأخير** |
+
+### 2. الانضباط الزمني وشبكة الـ DNS
+| فك القفل بالـ QR المؤقت | حظر التجوال الليلي والنوم | إعدادات الـ DNS المشفر (DoT) |
+|:---:|:---:|:---:|
+| <img src="art/screenshots/04_qr_scanner_delay.jpg" width="250" alt="فك القفل بالـ QR" /> | <img src="art/screenshots/05_night_curfew.jpg" width="250" alt="حظر التجوال الليلي" /> | <img src="art/screenshots/06_network_and_dns_settings.jpg" width="250" alt="إعدادات الـ DNS" /> |
+| **مسح رمز فعلي مع تأخير زمني** | **جدولة ساعات النوم والقيلولة** | **DoT مشفر مع خوادم عائلية** |
+
+### 3. إدارة التطبيقات وبوابة التدبر والمساءلة
+| إدارة سياسات التطبيقات | بوابة «وقفة» للتدبر النفسي | لوحة متابعة المكفول عن بُعد |
+|:---:|:---:|:---:|
+| <img src="art/screenshots/07_app_policy_manager.jpg" width="250" alt="إدارة سياسات التطبيقات" /> | <img src="art/screenshots/08_waqfa_mindful_gate.jpg" width="250" alt="بوابة وقفة" /> | <img src="art/screenshots/09_remote_ward_control.jpg" width="250" alt="لوحة المشرف عن بعد" /> |
+| **تجميد وحظر التطبيقات ديناميكياً** | **تمارين تنفس وتريث قبل الفتح** | **مراقبة التزام المكفول وتحديث السياسات** |
+
+### 4. مركز رفيق المساءلة والتحكم الصارم
+| مركز رفيق المساءلة والتحقق المشترك |
+|:---:|
+| <img src="art/screenshots/10_accountability_supervision.jpg" width="280" alt="مركز رفيق المساءلة" /> |
+| **المشرفون المعتمدون، وقوائم المكفولين، وأكواد الربط المشفرة** |
+
+</div>
 
 ---
 
@@ -8,8 +65,8 @@
 
 > [!IMPORTANT]
 > **إبقاء تصحيح أخطاء USB (USB Debugging / ADB) متاحاً بشكل دائم للمطور:**
-> * صاحب الجهاز يعمل في **مجال هندسة وتطوير تطبيقات الهواتف الذكية (Mobile Engineering)**.
-> * ولذلك **يُمنع منعاً باتاً** تفعيل أو فرض القيود التالية:
+> * صاحب ومطور هذا الجهاز يعمل في **مجال هندسة وتطوير تطبيقات الهواتف الذكية (Mobile Engineering)**.
+> * ولذلك **يُمنع منعاً باتاً** تفعيل أو فرض القيود التالية برمجياً:
 >   - `UserManager.DISALLOW_DEBUGGING_FEATURES`
 >   - `UserManager.DISALLOW_CONFIG_DEVELOPER_OPTIONS`
 > * الهدف هو إحكام غلق الثغرات السلوكية والمباشرة على شاشة الهاتف أثناء الاستخدام الفردي (الـ DNS، قفل الـ VPN، حظر المتصفحات والتصفح الخفي، التعتيم الذكي للمشاهد، وتجميد التطبيقات المشتتة) مع الاحتفاظ بالهاتف كبيئة عمل واختبار وتطوير برمجية متكاملة عبر الحاسوب.
@@ -31,7 +88,7 @@
 * **مراقبة مستمرة (DnsWatchdogService):** خدمة خلفية دائمة تراقب أي تغيير في إعدادات الاتصال أو الـ DNS وتعيد فرض السياسات فوراً.
 
 ### 2. فرض خادم Cloudflare Family إجبارياً عبر DoT المشفر (Enforced DoT Cloudflare Family)
-* **التشفير الشامل:** فرض خادم `family.cloudflare-dns.com` (1.1.1.3 لحجب المحتوى الإباحي والبرمجيات الخبيثة بدون تعطيل تعليقات يوتيوب) عبر بروتوكول DNS over TLS (DoT) باستخدام واجهة `DevicePolicyManager.setGlobalPrivateDnsModeSpecifiedHost` مع إمكانية التخصيص من الإعدادات.
+* **التشفير الشامل:** فرض خادم `family.cloudflare-dns.com` (1.1.1.3 لحجب المحتوى الإباحي والبرمجيات الخبيثة بدون تعطيل تعليقات يوتيوب) عبر بروتوكول DNS over TLS (DoT) باستخدام واجهة `DevicePolicyManager.setGlobalPrivateDnsModeSpecifiedHost` مع إمكانية التخصيص من الإعدادات وخوادم NextDNS / AdGuard.
 * **منع التعديل والالتفاف:** تطبيق قيد `UserManager.DISALLOW_CONFIG_PRIVATE_DNS` لتظليل إعدادات الـ DNS في لوحة تحكم أندرويد ومنع أي تغيير يدوي.
 * **إغلاق منافذ الـ VPN:** تطبيق قيد `UserManager.DISALLOW_CONFIG_VPN` لإبطال عمل أي تطبيق VPN خارجي قد يحاول تحويل المسارات.
 
@@ -44,14 +101,14 @@
 * **خط أنابيب الاستدلال البصري (Inference Pipeline):**
   - `MobileNetV4ModestyDetector`: تصنيف واكتشاف المشاهد غير اللائقة بسرعة فائقة واستهلاك منخفض للبطارية.
   - `NudeNetDetector`: فحص دقيق وشامل لأجزاء الجسم والمشاهد المكشوفة.
-  - `HalalifyGenderDetector`: التعرف الدقيق على السياق البصري.
+  - `HalalifyGenderDetector`: التعرف الدقيق على السياق البصري (مستوحى من مشروع [Halalify-kotlin](https://github.com/Halalify-Team/Halalify-kotlin)).
 * **التتبع البصري فائق السرعة وتعتيم الشاشة (KLT Tracker & Screen Blur):**
   - استخدام خوارزمية هرم لوكاس-كانادي (`KltOpticalFlowTracker`) لتتبع العناصر الحساسة عبر الإطارات بمعدل تحديث سلس واستهلاك شبه معدوم للمعالج.
   - تعتيم وتغطية فورية للشاشة عند رصد المحتوى المخالف عبر طبقة نظام عائمة (`ScreenBlurOverlayManager`).
   - سجل استثناءات ذكي ومحمي (`AiExemptionRegistry`) للتطبيقات الموثوقة لتجنب الإنذارات الكاذبة أثناء العمل البرمجي.
 
 ### 5. التحديثات الهوائية المستقلة (Independent OTA Updates)
-* **توزيع مستقل وآمن:** التحقق من الإصدارات وتحميل التحديثات الموقعة هوائياً دون الاعتماد على متجر Google Play عبر خدمة Cloudflare R2 (طالع [دليل إعداد وتخصيص التحديثات الهوائية](file:///d:/b/antiporn/doc/OTA_DISTRIBUTION.md) للتفاصيل وكيفية ربط حاويتك الخاصة).
+* **توزيع مستقل وآمن:** التحقق من الإصدارات وتحميل التحديثات الموقعة هوائياً دون الاعتماد على متجر Google Play عبر خدمة Cloudflare R2 (طالع [دليل إعداد وتخصيص التحديثات الهوائية](docs/OTA_DISTRIBUTION.md)).
 * **دوران مفاتيح التوقيع (Lineage Key Rotation):** دعم معايير التوقيع APK Signature Scheme v2 و v3 مع إثباتات شجرة المفاتيح (Signing Certificate Lineage Proofs) لضمان أمان التحديثات وقابليتها للترقية المستقبلية بأمان تام.
 * **تثبيت صامت وسلس:** استغلال صلاحيات مسؤول الجهاز المالك لتثبيت التحديثات دون مقاطعة المستخدم.
 
@@ -67,7 +124,7 @@
 لتفعيل صلاحية مسؤول الجهاز المالك (Device Owner)، يجب تجهيز الجهاز وتمرير الأمر عبر بيئة ADB:
 
 > [!NOTE]
-> يتطلب أندرويد عدم وجود أي حسابات مسجلة (مثل حسابات Google أو البريد) في الجهاز أثناء إعداد الـ Device Owner لأول مرة. إذا كانت هناك حسابات، قم بإزالتها مؤقتاً من إعدادات الحسابات قبل تنفيذ الأمر، ثم أعد إضافتها بعد نجاح العملية.
+> يتطلب أندرويد عدم وجود أي حسابات مسجلة (مثل حسابات Google أو البريد) في الجهاز أثناء إعداد الـ Device Owner لأول مرة. إذا كانت هناك حسابات، قم بإزالتها مؤقتاً من إعدادات الحسابات قبل تنفيذ الأمر، ثم أعد إضافتها بعد نجاح العملية. (طالع [دليل تفعيل صلاحية المالك](docs/device-owner-guide.md) للشرح المفصل).
 
 ### 1. تثبيت التطبيق على الجهاز
 ```bash
@@ -109,15 +166,41 @@ adb uninstall com.drmohammed.antiporn
    git clone https://github.com/drmohammed/antiporn.git
    cd antiporn
    ```
-2. **ملف Firebase:** تم تجهيز بيئة البناء بحيث تقوم تلقائياً بإنشاء ملف `app/google-services.json` تجريبي (Mock) صالح فور تشغيل مهام Gradle إذا لم يكن الملف موجوداً، مما يتيح تجميع المشروع وتشغيل الاختبارات دون أي خطوات يدوية إضافية.
+2. **ملف Firebase التجريبي:** تم تجهيز بيئة البناء بحيث تقوم تلقائياً بإنشاء ملف `app/google-services.json` تجريبي (Mock) صالح فور تشغيل مهام Gradle إذا لم يكن الملف موجوداً، مما يتيح تجميع المشروع وتشغيل الاختبارات دون أي خطوات يدوية إضافية.
 3. ولإعداد مشروع Firebase الحقيقي للإنتاج:
    - راجع النموذج المرفق في `app/google-services.json.example`.
    - ضع ملف `google-services.json` الأصلي في مجلد `app/` (الملف مستثنى تلقائياً في `.gitignore`).
 
 ### تشغيل الاختبارات الأحادية (Running Unit Tests)
 ```bash
+# Windows
 .\gradlew.bat testDebugUnitTest
+
+# Linux / macOS
+./gradlew testDebugUnitTest
 ```
+
+---
+
+## 📚 الوثائق والأدلة (Documentation Portal)
+
+كافة وثائق المشروع الفنية والتنظيمية موجودة ومفهرسة بالكامل في مجلد [`docs/`](docs/README.md):
+
+* 📘 [بوابة التوثيق الرئيسية (Documentation Index)](docs/README.md)
+* 🛡️ [دليل تفعيل صلاحية المالك وحل مشاكل الإعداد (Device Owner Guide)](docs/device-owner-guide.md)
+* 📋 [سجل سياسات التطبيقات وقواعد الحظر (App Policy Registry)](docs/APP_POLICY_REGISTRY.md)
+* 🗺️ [خريطة الطريق المعمارية للأجيال القادمة (Generational Roadmap)](docs/GENERATIONAL_ANTIPORN_ROADMAP.md)
+* 🚀 [دليل التوزيع والتحديثات الهوائية السحابية (OTA Distribution)](docs/OTA_DISTRIBUTION.md)
+* 📸 [معرض لقطات الشاشة وفهرس الصور (Screenshots Gallery)](art/screenshots/README.md)
+
+---
+
+## 🤝 المساهمة والأمان (Contributing & Security)
+
+نرحب بكافة المساهمات والمقترحات البرمجية والأفكار لتطوير المشروع:
+* 🔒 **الإبلاغ عن الثغرات الأمنية:** يرجى مراجعة [سياسة الأمان (SECURITY.md)](SECURITY.md) للإبلاغ المسؤول.
+* 🛠️ **إرشادات المساهمة والتطوير:** يرجى الاطلاع على [دليل المساهمة (CONTRIBUTING.md)](CONTRIBUTING.md) وقواعد الكود النظيف.
+* 📜 **الملكية الفكرية والتبعيات:** تجد تفاصيل المشاريع المفتوحة التي اعتمد عليها المشروع في ملف [NOTICE](NOTICE).
 
 ---
 

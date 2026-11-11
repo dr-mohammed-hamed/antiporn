@@ -47,7 +47,7 @@
 * **يُحظر منعاً باتاً** على أي كلاس في طبقة الواجهة (UI) أو مستودعات البيانات (Repositories) مناداة `DevicePolicyManager` مباشرة.
 * جميع تفاعلات إدارة الأجهزة المؤسسية يجب أن تمر حصرياً عبر:
   1. كلاسات الحماية المعزولة المستقلة (`ProtectionShield`).
-  2. بوابة الإدارة الآمنة [`SafeDpmGateway`](file:///d:/b/antiporn/app/src/main/java/com/drmohammed/antiporn/telemetry/SafeDpmGateway.kt).
+  2. بوابة الإدارة الآمنة [`SafeDpmGateway`](app/src/main/java/com/drmohammed/antiporn/telemetry/SafeDpmGateway.kt).
 
 ---
 
@@ -107,7 +107,7 @@
 
 ### المادة 11: عزل النصوص وتعدد اللغات
 * **يُحظر وضع نصوص المستخدمين بشكل مباشر (Hardcoded Strings)** في الواجهات أو كود كوتلين.
-* كافة النصوص والرسائل والتنبيهات يجب أن تكون معزولة في [`res/values/strings.xml`](file:///d:/b/antiporn/app/src/main/res/values/strings.xml) مع توفير الترجمة الإنجليزية المقابلة في [`res/values-en/strings.xml`](file:///d:/b/antiporn/app/src/main/res/values-en/strings.xml).
+* كافة النصوص والرسائل والتنبيهات يجب أن تكون معزولة في [`res/values/strings.xml`](app/src/main/res/values/strings.xml) مع توفير الترجمة الإنجليزية المقابلة في [`res/values-en/strings.xml`](app/src/main/res/values-en/strings.xml).
 
 ---
 

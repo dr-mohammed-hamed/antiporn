@@ -9,9 +9,12 @@ import numpy as np
 from PIL import Image, ImageFilter, ImageDraw
 from collections import deque
 
+from pathlib import Path
+
 def generate_assets():
-    source_path = r"D:\b\antiporn\لوجو حصن 2.jpg"
-    res_dir = r"D:\b\antiporn\app\src\main\res"
+    project_root = Path(__file__).resolve().parent.parent
+    source_path = str(project_root / "art" / "hisn_brand_logo.jpg")
+    res_dir = str(project_root / "app" / "src" / "main" / "res")
 
     if not os.path.exists(source_path):
         print(f"Error: Source image not found at {source_path}")

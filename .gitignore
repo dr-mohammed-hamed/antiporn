@@ -3,7 +3,7 @@
 /local.properties
 .idea/
 .DS_Store
-/build
+build/
 /Halalify-kotlin/
 /devolopment
 /development/
@@ -19,6 +19,7 @@ implementation_plan*.md
 app/google-services.json
 google-services.json
 *.jpg
+!art/**
 
 # Keystores & Credentials
 *.p12
@@ -31,6 +32,7 @@ app/keystore/*
 .agents/
 .specify/
 graphify-out/
+HISN_CONTEXT.md
 
 # Temporary provisioning & audit artifacts
 *.zip

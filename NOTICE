@@ -1,0 +1,33 @@
+==============================================================================
+«حِصْن» (Hisn / AntiPorn DO) - Open Source Notice & Attributions
+Copyright (c) 2026 Dr. Mohammed Hamed and Project Contributors.
+Licensed under the GNU General Public License v3.0 (GPLv3).
+==============================================================================
+
+This software and its distributed packages include artificial intelligence
+models, datasets, and algorithms developed by the open-source community:
+
+1. Halalify (Gaze-Lowering & Modesty Vision)
+   - Origin & Repository: https://github.com/Halalify-Team/Halalify-kotlin
+   - Community: The Halalify Team
+   - License: Open Source / Apache License 2.0
+   - Description: Core inference models and weights used for on-device
+     visual context classification and Islamic modesty protection
+     (`halalify_v2.tflite`).
+
+2. NudeNet (Neural Object Decency Detector)
+   - Origin & Repository: https://github.com/notAI-tech/NudeNet
+   - Authors: notAI Technologies Pvt Ltd & Bedapudi Praneeth
+   - License: MIT License
+   - Copyright: Copyright (c) 2019-2023 notAI Technologies Pvt Ltd
+   - Description: YOLOv8-Nano on-device ONNX runtime object detector used for
+     fine-grained nudity segmentation and instantaneous screen blur
+     (`nudenet_320.onnx`).
+
+3. KLT Tracker & Computer Vision Foundation
+   - Lucas-Kanade pyramidal optical flow tracker (`KltOpticalFlowTracker`)
+     implemented as lightweight on-device native image processing routines.
+
+We express our sincere gratitude and prayers of blessing to all original
+authors and open-source contributors whose foundational work made this
+community protection system possible.
