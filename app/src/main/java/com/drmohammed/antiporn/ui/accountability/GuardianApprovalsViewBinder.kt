@@ -3,6 +3,7 @@ package com.drmohammed.antiporn.ui.accountability
 import android.graphics.Color
 import android.graphics.Typeface
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -28,25 +29,47 @@ import kotlinx.coroutines.tasks.await
  */
 class GuardianApprovalsViewBinder(
     private val activity: AppCompatActivity,
+    private val layoutApprovalsContainer: View? = null,
     private val layoutPendingApps: LinearLayout,
     private val tvNoPendingApps: TextView,
     private val wardIdProvider: () -> String,
     private val onReloadRequested: () -> Unit
 ) {
+    /** Secondary constructor maintaining full backward-compatibility for legacy 5-parameter calls */
+    constructor(
+        activity: AppCompatActivity,
+        layoutPendingApps: LinearLayout,
+        tvNoPendingApps: TextView,
+        wardIdProvider: () -> String,
+        onReloadRequested: () -> Unit
+    ) : this(
+        activity = activity,
+        layoutApprovalsContainer = null,
+        layoutPendingApps = layoutPendingApps,
+        tvNoPendingApps = tvNoPendingApps,
+        wardIdProvider = wardIdProvider,
+        onReloadRequested = onReloadRequested
+    )
+
+    private val targetSectionContainer: View?
+        get() = layoutApprovalsContainer
+            ?: activity.findViewById<View>(R.id.layoutWardApprovalsSection)
+            ?: activity.findViewById<View>(R.id.cardPendingApps)
+            ?: (layoutPendingApps.parent as? View)
+
     private val processingPackages = mutableSetOf<String>()
 
     fun renderPendingApprovals(items: List<Pair<String, String>>) {
         if (activity.isFinishing || activity.isDestroyed) return
         layoutPendingApps.removeAllViews()
-        val cardParent = activity.findViewById<android.view.View>(R.id.cardPendingApps)
-            ?: (layoutPendingApps.parent?.parent as? android.view.View)
+        val container = targetSectionContainer
         if (items.isEmpty()) {
             (tvNoPendingApps.parent as? ViewGroup)?.removeView(tvNoPendingApps)
             layoutPendingApps.addView(tvNoPendingApps)
-            cardParent?.visibility = android.view.View.GONE
+            container?.visibility = View.GONE
             return
         }
-        cardParent?.visibility = android.view.View.VISIBLE
+        container?.visibility = View.VISIBLE
 
         val context = activity
         val wardId = wardIdProvider()
@@ -166,9 +189,7 @@ class GuardianApprovalsViewBinder(
 
     fun renderError() {
         if (activity.isFinishing || activity.isDestroyed) return
-        val cardParent = activity.findViewById<android.view.View>(R.id.cardPendingApps)
-            ?: (layoutPendingApps.parent?.parent as? android.view.View)
-        cardParent?.visibility = android.view.View.VISIBLE
+        targetSectionContainer?.visibility = View.VISIBLE
         layoutPendingApps.removeAllViews()
         val errorView = TextView(activity).apply {
             text = activity.getString(R.string.error_loading_pending_apps)
@@ -214,9 +235,7 @@ class GuardianApprovalsViewBinder(
                     card?.let {
                         layoutPendingApps.removeView(it)
                         if (layoutPendingApps.isEmpty()) {
-                            val cardParent = activity.findViewById<android.view.View>(R.id.cardPendingApps)
-                                ?: (layoutPendingApps.parent?.parent as? android.view.View)
-                            cardParent?.visibility = android.view.View.GONE
+                            targetSectionContainer?.visibility = View.GONE
                         }
                     }
                     onReloadRequested()

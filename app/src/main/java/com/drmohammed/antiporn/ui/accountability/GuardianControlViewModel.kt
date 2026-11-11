@@ -14,6 +14,7 @@ import com.drmohammed.antiporn.data.local.db.dao.PartnerDao
 import com.drmohammed.antiporn.data.repository.AccountabilityRepository
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,9 @@ class GuardianControlViewModel(
     private val _uiState = MutableStateFlow(GuardianControlUiState())
     val uiState: StateFlow<GuardianControlUiState> = _uiState.asStateFlow()
     private var loadWardJob: Job? = null
+    private val listenerLock = Any()
+    @Volatile
+    private var policyListenerRegistration: ListenerRegistration? = null
 
     private val _events = MutableSharedFlow<GuardianControlEvent>()
     val events: SharedFlow<GuardianControlEvent> = _events.asSharedFlow()
@@ -185,6 +189,7 @@ class GuardianControlViewModel(
                     lastHeartbeat = lastHeartbeat
                 )
             }
+            startPolicyListener()
         }
     }
 
@@ -514,6 +519,59 @@ class GuardianControlViewModel(
                 }
             }
         }
+    }
+
+    fun startPolicyListener() {
+        val state = _uiState.value
+        val targetWardId = state.wardId.trim()
+        if (targetWardId.isBlank()) return
+        synchronized(listenerLock) {
+            stopPolicyListener()
+            try {
+                val firestore = FirebaseFirestore.getInstance()
+                policyListenerRegistration = firestore.collection("policies").document(targetWardId)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            Log.w(TAG, "Error in real-time policy listener for ward $targetWardId", error)
+                            return@addSnapshotListener
+                        }
+                        if (snapshot == null || !snapshot.exists()) return@addSnapshotListener
+                        val snapshotData = snapshot.data ?: return@addSnapshotListener
+                        val policy = DevicePolicyBundle.fromMap(snapshotData)
+                        val version = snapshot.getLong("version") ?: policy.version
+                        val acknowledgedVersion = snapshot.getLong("acknowledgedVersion") ?: 0L
+                        val lastAcknowledgedAt = snapshot.getLong("lastAcknowledgedAt") ?: 0L
+                        val lastHeartbeat = snapshot.getLong("lastHeartbeat") ?: 0L
+
+                        _uiState.update { current ->
+                            current.copy(
+                                currentPolicy = policy,
+                                isSelfControlAllowed = policy.isSelfControlAllowed,
+                                version = version,
+                                acknowledgedVersion = acknowledgedVersion,
+                                lastAcknowledgedAt = lastAcknowledgedAt,
+                                lastHeartbeat = lastHeartbeat,
+                                isOffline = false
+                            )
+                        }
+                    }
+                Log.i(TAG, "Attached real-time policy listener for ward $targetWardId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to attach real-time policy listener for ward $targetWardId", e)
+            }
+        }
+    }
+
+    fun stopPolicyListener() {
+        synchronized(listenerLock) {
+            policyListenerRegistration?.remove()
+            policyListenerRegistration = null
+        }
+    }
+
+    override fun onCleared() {
+        stopPolicyListener()
+        super.onCleared()
     }
 
     companion object {

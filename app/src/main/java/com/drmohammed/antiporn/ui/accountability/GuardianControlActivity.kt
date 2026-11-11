@@ -158,6 +158,7 @@ class GuardianControlActivity : AppCompatActivity() {
 
         approvalsViewBinder = GuardianApprovalsViewBinder(
             activity = this,
+            layoutApprovalsContainer = layoutWardApprovalsSection,
             layoutPendingApps = layoutPendingApps,
             tvNoPendingApps = tvNoPendingApps,
             wardIdProvider = { viewModel.uiState.value.wardId },
@@ -352,14 +353,19 @@ class GuardianControlActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (isFinishing || isDestroyed) return
+        viewModel.startPolicyListener()
         approvalsViewBinder.listenForPendingApprovals()
-        approvalsViewBinder.loadPendingApprovals()
-        liveSyncViewBinder.listenForPolicyUpdates()
+    }
+
+    override fun onPause() {
+        viewModel.stopPolicyListener()
+        approvalsViewBinder.stopListening()
+        super.onPause()
     }
 
     override fun onDestroy() {
+        viewModel.stopPolicyListener()
         approvalsViewBinder.stopListening()
-        liveSyncViewBinder.stopListening()
         super.onDestroy()
     }
 
