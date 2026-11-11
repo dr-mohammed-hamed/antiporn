@@ -1,11 +1,11 @@
 {
-  "versionCode": 18,
-  "versionName": "1.79",
+  "versionCode": 19,
+  "versionName": "1.80",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
-  "downloadUrl": "https://example-releases.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 35488585,
+  "downloadUrl": "https://pub-e568dc85c0ec4f2fb3d1b90e310b4310.r2.dev/antiporn-release.apk",
+  "fileSizeBytes": 35480056,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.79 (تحديث داخلي 18): دمج خدمة الوصول المركزية لاعتراض التطبيقات المقيدة لحظياً في 0ms لمنظومة «وَقْفَة»، وتطبيق قانون الصفر استطلاع (Zero-Polling) لتوفير البطارية، مع تحسينات شاملة على استقرار النظام وإعدادات التركيز.",
-  "releaseDate": "2026-11-10"
+  "releaseNotes": "إصدار 1.80 (كود البناء 19): الإصدار الرسمي الأول كبرنامج مفتوح المصدر بالكامل. يتضمن تطبيق معيار Zero-Trust الصارم وإصلاح تعليق DPM، وتوفير منتقي التطبيقات المسموحة في حظر التجوال (Curfew) بحفظ ذرّي فوري، واستقرار فائق لمنظومة «وَقْفَة» لاعتراض التطبيقات المقيدة في 0ms دون استنزاف للبطارية.",
+  "releaseDate": "2026-11-11"
 }
