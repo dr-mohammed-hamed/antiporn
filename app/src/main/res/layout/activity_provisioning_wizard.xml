@@ -420,54 +420,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Optional Shizuku Fast Track Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardShizuku"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:visibility="gone"
-            app:cardBackgroundColor="?attr/colorSurfaceContainer"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="@color/status_green"
-            app:strokeWidth="1.5dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/provisioning_shizuku_title"
-                    android:textColor="@color/status_green"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:lineSpacingExtra="2dp"
-                    android:text="@string/provisioning_shizuku_desc"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="13sp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnShizukuActivate"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/provisioning_btn_shizuku_activate"
-                    android:textColor="@android:color/white"
-                    app:backgroundTint="@color/status_green"
-                    app:cornerRadius="12dp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
         <!-- Step 1: Accounts Pre-flight Guard (Archived / Replaced by Zero-Account Engine) -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardStep1"

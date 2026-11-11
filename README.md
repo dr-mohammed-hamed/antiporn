@@ -228,11 +228,11 @@ Impulsive urges follow a neurobiological surge curve. The **«Waqfa» (وقفة)
 graph TD
     Start["Install Hisn APK on Device"] --> Choice{"Preferred Activation Vector"}
     
-    Choice -->|Zero PC Required| ShizukuWay["Method 1: In-App Self-Activation<br/>Local Wireless ADB / Shizuku Engine"]
+    Choice -->|Zero PC Required| AdbWay["Method 1: In-App Self-Activation<br/>Native Local Wireless ADB Engine (TLS 1.3 / SPAKE2)"]
     Choice -->|Connected to PC via USB| PCWay["Method 2: One-Click Desktop ADB Script<br/>Zero user_setup_complete + Cache Refresh"]
     Choice -->|Brand New Device / Factory Reset| QRWay["Method 3: Android Enterprise QR Code<br/>Zero-Touch Optical Camera Setup"]
     
-    ShizukuWay --> Success["Full Device Owner Activated with All Accounts Preserved!"]
+    AdbWay --> Success["Full Device Owner Activated with All Accounts Preserved!"]
     PCWay --> Success
     QRWay --> Success
 ```
@@ -241,8 +241,8 @@ graph TD
 1. Install the APK: `adb install -r app-release.apk` (or download and install directly on device).
 2. Enable **Wireless Debugging** in Android Developer Options.
 3. Open Hisn and navigate to the **Provisioning Wizard**:
-   - The app natively supports pairing over local loopback TLS/SPAKE2 (`DeviceOwnerPromoter.kt`) or via **[Shizuku](https://shizuku.rikka.app/)**.
-4. Tap **"Self-Promote to Device Owner"**; the app automatically zeroes `user_setup_complete`, flushes the DPM cache, and promotes itself in seconds without touching your accounts.
+   - The app natively supports automated pairing over local loopback TLS 1.3 / SPAKE2 (`DeviceOwnerPromoter.kt`) directly from the device.
+4. Tap **"Confirm & Activate Maximum Protection"**; the app automatically zeroes `user_setup_complete`, flushes the DPM cache, and promotes itself in seconds without touching your accounts.
 
 ---
 
@@ -291,15 +291,13 @@ adb shell pm enable com.google.android.gms
 
 ---
 
-### 🛠️ Developer De-provisioning & Uninstallation
-Because USB debugging remains permanently active, you can remove Device Owner and uninstall at any time via ADB:
-```bash
-# 1. Remove Device Owner privileges
-adb shell dpm remove-active-admin --user 0 com.drmohammed.antiporn/.AdminReceiver
+### 🛡️ Tamper Resistance & Safe Deactivation Architecture
+To prevent impulsive relapses during psychological vulnerability, Hisn does not expose unauthenticated instant teardown buttons. Complete de-provisioning and Device Owner removal is securely managed from within the app via `DeviceOwnerTeardownManager`:
+* **Standalone Mode:** Requires an immutable 48-hour cooling-off cooldown period before privileges can be revoked.
+* **Supervised Mode:** Requires partner approval or a 24-hour emergency breakout countdown tracked strictly by server timestamps.
 
-# 2. Uninstall the package
-adb uninstall com.drmohammed.antiporn
-```
+> 🛠️ **Engineering & Testing Reference:**  
+> Legitimate developers and security researchers testing on development devices can consult the [Developer De-provisioning Reference in docs/device-owner-guide.md](docs/device-owner-guide.md#developer-de-provisioning) for ADB teardown commands.
 
 ---
 
@@ -310,7 +308,7 @@ The codebase is continuously audited and verified against rigorous static and dy
 | Engineering Metric | Current Verified Value | Architecture Notes |
 | :--- | :---: | :--- |
 | **Automated Test Suites** | **42 Independent Suites** | Covering shields, AI inference, networking, DB migrations, and UI. |
-| **Total Automated Tests** | **319 Unit Tests** | **100% Pass Rate (0 failures, 0 errors, 0 skipped)**. |
+| **Total Automated Tests** | **321 Unit Tests** | **100% Pass Rate (0 failures, 0 errors, 0 skipped)**. |
 | **Main Kotlin Source Code** | **38,281 Lines of Code** | Production code organized across 196 source files. |
 | **Test Kotlin Source Code** | **5,929 Lines of Code** | Comprehensive behavior-driven regression suites. |
 | **Total Codebase Footprint** | **44,210 Lines of Kotlin** | Strictly adheres to Clean Code, SOLID, DRY, and KISS principles. |
@@ -344,7 +342,7 @@ Comprehensive documentation is indexed across [`docs/`](docs/README.md) and [`sc
 ### Clean Clone Setup (Zero Configuration)
 1. Clone the repository:
    ```bash
-   git clone https://github.com/drmohammed/antiporn.git
+   git clone https://github.com/dr-mohammed-hamed/antiporn.git
    cd antiporn
    ```
 2. **Automatic Mock Firebase Setup:**  

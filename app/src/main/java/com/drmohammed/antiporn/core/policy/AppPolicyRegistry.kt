@@ -147,6 +147,17 @@ object AppPolicyRegistry {
         AppRule("com.google.android.apps.searchlite", AppClassification.SEARCH_LOOPHOLE, "Google Go Search Lite"),
 
         // =========================================================================
+        // 12. PERMANENT BLACKLIST: LOCAL ADB & SHELL EXPLOIT TOOLS
+        // =========================================================================
+        AppRule("com.draco.ladb", AppClassification.PERMANENT_BLACKLIST, "LADB Local ADB Shell"),
+        AppRule("in.sunilpaulmathew.ashell", AppClassification.PERMANENT_BLACKLIST, "aShell Local ADB"),
+        AppRule("in.sunilpaulmathew.ashell.you", AppClassification.PERMANENT_BLACKLIST, "aShell You"),
+        AppRule("com.termux", AppClassification.PERMANENT_BLACKLIST, "Termux Terminal"),
+        AppRule("com.termux.api", AppClassification.PERMANENT_BLACKLIST, "Termux API"),
+        AppRule("io.github.muntashirakon.AppManager", AppClassification.PERMANENT_BLACKLIST, "App Manager"),
+        AppRule("me.piebridge.brevent", AppClassification.PERMANENT_BLACKLIST, "Brevent ADB Server"),
+
+        // =========================================================================
         // 13. CURFEW EXEMPT: CLEAN MEDIA PLAYERS & ALTERNATIVE YOUTUBE (NewPipe & Forks)
         // =========================================================================
         AppRule("org.schabi.newpipe.*", AppClassification.CURFEW_EXEMPT_MEDIA, "NewPipe Official, Debug & Forks Wildcard"),

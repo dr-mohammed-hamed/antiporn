@@ -9,11 +9,12 @@
 3. [مقارنة معمارية شاملة بين الطرق الـ 5](#3-مقارنة-معمارية-شاملة-بين-الطرق-ال--5)
 4. [الكود الإنتاجي الجاهز لتطبيقك (Production-Ready Kotlin Implementation)](#4-الكود-الإنتاجي-الجاهز-لتطبيقك)
    - مكتبات التبعيات (Gradle Dependencies & Proguard)
-   - كلاس التفعيل الذاتي الداخلي عبر Shizuku + HiddenApiBypass
+   - كلاس التفعيل الذاتي الداخلي عبر Local Wireless ADB (TLS / SPAKE2) + SetupStateHelper
    - خدعة الحساب الوهمي المؤقت (The Dummy Account Trick)
    - كلاس استعادة النظام والتعافي التلقائي (Failsafe System Recovery)
 5. [أداة التفعيل المستقلة عبر الكمبيوتر (ADB Desktop One-Click Tool)](#5-أداة-التفعيل-المستقلة-عبر-الكمبيوتر)
 6. [التعامل مع استثناءات الشركات المصنعة (Samsung, Xiaomi, Dual Apps)](#6-التعامل-مع-استثناءات-الشركات-المصنعة)
+7. [دليل إلغاء التفعيل الهندسي في بيئات التطوير (Developer De-provisioning Reference)](#developer-de-provisioning)
 
 ---
 
@@ -29,7 +30,7 @@
 | **1. خداع حالة الإعداد (`user_setup_complete` + `forceUpdateUserSetupComplete`)** | **صحيحة وممتازة (Gold Standard)** | الطريقة الأقوى عالمياً. لا تمس أي تطبيق، ولا تحتاج صلاحيات روت، ومطبقة في **Dhizuku 2.13+** و **Déchaîner v1.10.0**. | تحتاج أندرويد 12+ لتعمل دالة `forceUpdateUserSetupComplete` بدون روت. |
 | **2. التجميد المؤقت للحزم (`pm disable-user`)** | **صحيحة وكلاسيكية** | تعمل على الإصدارات القديمة (أندرويد 7 إلى 11). | تفشل على أجهزة سامسونج وشاومي إذا كان حساب الشركة محمياً بنظام `ProtectedPackages`. |
 | **3. وسم `testOnly="true"`** | **صحيحة كودياً، لكن غير صالحة للتطبيقات الأمنية** | تسمح بتجاوز حسابات جوجل دون برامج وسيطة. | **ثغرة أمنية قاتلة:** يمكن لأي شخص إلغاء الـ Device Owner بأمر ADB بسيط `dpm remove-active-admin` دون رمز استرداد! كما أنها تفشل مع واتساب وتيليجرام. |
-| **4. التفعيل الداخلي عبر Shizuku** | **صحيحة وهي الأفضل لتجربة المستخدم (UX)** | لا تتطلب كمبيوتر؛ المستخدم يفعل الصلاحية بضغطة زر واحدة داخل تطبيقك. | تتطلب أن يكون المستخدم قد فعل Shizuku عبر Wireless Debugging. |
+| **4. التفعيل الذاتي المباشر عبر Local Wireless ADB** | **صحيحة ومطبقة إنتاجياً في «حصن»** | لا تتطلب كمبيوتر ولا أي تطبيقات وسيطة؛ التطبيق يتصل ذاتياً بـ loopback 127.0.0.1 عبر SPAKE2/TLS. | تتطلب تفعيل التصحيح اللاسلكي لمرة واحدة وإدخال كود الاقتران. |
 | **5. الحقن المباشر في ملفات الروت (`device_owner_2.xml`)** | **صحيحة 100% لأجهزة الروت** | تتخطى نظام أندرويد بالكامل وتعمل بضمان مطلق. | محصورة فقط بالأجهزة المروّتة (Magisk/KernelSU). |
 
 ---
@@ -86,7 +87,7 @@ graph TD
     
     CheckRoot -->|لا (بدون روت)| CheckAndroidVersion{"إصدار أندرويد؟"}
     
-    CheckAndroidVersion -->|أندرويد 12 فما فوق (API 31+)| Method1["الطريقة 1 و 4 (الخوارزمية الحديثة):<br/>تصفير user_setup_complete + استدعاء forceUpdateUserSetupComplete<br/>(عبر Shizuku أو ADB)"]
+    CheckAndroidVersion -->|أندرويد 12 فما فوق (API 31+)| Method1["الطريقة 1 و 4 (الخوارزمية الحديثة):<br/>تصفير user_setup_complete + استدعاء SetupStateHelper<br/>(عبر Local Wireless ADB المدمج أو ADB الحاسوب)"]
     
     CheckAndroidVersion -->|أندرويد 11 فما دون (API 30-)| Method2["الطريقة 2 (التراجع التلقائي):<br/>تجميد مؤقت للحزم pm disable-user<br/>ثم إعادة تفعيلها فوراً"]
     
@@ -104,9 +105,8 @@ graph TD
 ### أ. إعداد التبعيات في ملف `app/build.gradle.kts`:
 ```kotlin
 dependencies {
-    // 1. Shizuku API للتواصل مع شيل النظام بدون كمبيوتر
-    implementation("dev.rikka.shizuku:api:13.1.5")
-    implementation("dev.rikka.shizuku:provider:13.1.5")
+    // 1. عميل ADB اللاسلكي المدمج للتواصل مع شيل النظام محلياً عبر Loopback (127.0.0.1)
+    implementation("com.github.rhythmcache:adb-kt:v1.0.13")
 
     // 2. مكتبة LSPosed للوصول إلى الدوال المخفية دون حجب أندرويد
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:4.3")
@@ -118,9 +118,9 @@ dependencies {
 
 وفي ملف `app/proguard-rules.pro`:
 ```pro
-# حماية كلاسات الوصول للواجهات المخفية من الحذف عند التصدير
+# حماية كلاسات الوصول للواجهات المخفية وعميل ADB اللاسلكي
 -keep class org.lsposed.hiddenapibypass.** { *; }
--keep class rikka.shizuku.** { *; }
+-keep class io.github.rhythmcache.adb.** { *; }
 ```
 
 ---
@@ -166,190 +166,69 @@ import android.os.Build
 import android.os.IBinder
 import android.os.IInterface
 import android.os.Process
-import org.lsposed.hiddenapibypass.HiddenApiBypass
-import rikka.shizuku.Shizuku
-import rikka.shizuku.ShizukuBinderWrapper
+import io.github.rhythmcache.adb.AdbClient
+import io.github.rhythmcache.adb.FileKeyProvider
 import timber.log.Timber
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.File
 
 object DeviceOwnerActivator {
 
-    private const val DUMMY_ACCOUNT_TYPE = "com.yourapp.dummy.account"
-    private const val DUMMY_ACCOUNT_NAME = "ActivationDummy"
+    private const val LOCALHOST = "127.0.0.1"
 
-    fun getUserId(): Int = Process.myUid() / 100000
 
-    /**
-     * ينفذ أمر شيل عبر وسيط Shizuku المتصل بالهاتف
-     */
-    fun execShizukuCommand(command: String): String {
-        return try {
-            val process = rikka.shizuku.Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
-            val output = StringBuilder()
-            BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    output.append(line).append("\n")
-                }
-            }
-            process.waitFor()
-            output.toString().trim()
-        } catch (e: Exception) {
-            Timber.e(e, "Error executing Shizuku command: $command")
-            ""
-        }
-    }
 
     /**
-     * التفاف وسيط Shizuku حول خدمة DevicePolicyManager للوصول للدوال المخفية
+     * تنفيذ الاقتران اللاسلكي وتعيين Device Owner بنقرة واحدة عبر Local Loopback
      */
-    @SuppressLint("PrivateApi")
-    fun <T> withShizukuDevicePolicyManager(context: Context, action: (DevicePolicyManager) -> T): T {
-        val manager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        val field = manager.javaClass.getDeclaredField("mService").apply { isAccessible = true }
-        val originalService = field.get(manager) as IInterface
-        val wrappedBinder = ShizukuBinderWrapper(originalService.asBinder())
-        val stubClass = Class.forName("android.app.admin.IDevicePolicyManager\$Stub")
-        val asInterface = stubClass.getMethod("asInterface", IBinder::class.java)
-        val proxiedService = asInterface.invoke(null, wrappedBinder)
+    suspend fun pairAndActivate(
+        context: Context,
+        pairingPort: Int,
+        connectPort: Int,
+        pairingCode: String,
+        adminComponent: ComponentName
+    ): Boolean {
+        val appContext = context.applicationContext
+        val keyFile = File(appContext.filesDir, "antiporn_adb.key")
+        val keyProvider = FileKeyProvider(keyFile)
 
-        field.set(manager, proxiedService)
-        return try {
-            action(manager)
-        } finally {
+        // 1. إتمام مصافحة الاقتران عبر بروتوكول SPAKE2 وتوليد مفاتيح TLS
+        Timber.i("Pairing via SPAKE2 TLS to $LOCALHOST:$pairingPort...")
+        AdbClient.pairTls(LOCALHOST, pairingPort, pairingCode.trim(), keyProvider)
+
+        // 2. الاتصال بمنفذ الشيل اللاسلكي المحلي
+        AdbClient.connectTls(LOCALHOST, connectPort, keyProvider).use { client ->
+            val userId = 0
+            val adminShort = adminComponent.flattenToShortString()
+            val dexPath = "/data/local/tmp/setup_helper.dex"
+
+            // منح الأذونات الأساسية
+            client.shell("pm grant ${appContext.packageName} android.permission.WRITE_SECURE_SETTINGS")
+
+            var isBypassed = false
             try {
-                field.set(manager, originalService)
-            } catch (_: Throwable) {}
-        }
-    }
+                // 3. تصفير مؤشر اكتمال إعداد الهاتف مؤقتاً لتخطي فحص الحسابات
+                client.shell("settings --user $userId put secure user_setup_complete 0")
+                isBypassed = true
 
-    /**
-     * استدعاء دالة تحديث الكاش المخفية forceUpdateUserSetupComplete
-     */
-    @SuppressLint("PrivateApi")
-    private fun DevicePolicyManager.forceUpdateUserSetupCompleteCompat(userId: Int) {
-        val clazz = this::class.java
-        runCatching {
-            clazz.getDeclaredMethod("forceUpdateUserSetupComplete", Int::class.javaPrimitiveType!!)
-                .also { it.isAccessible = true }.invoke(this, userId)
-        }.onFailure {
-            runCatching {
-                clazz.getDeclaredMethod("forceUpdateUserSetupComplete")
-                    .also { it.isAccessible = true }.invoke(this)
+                // 4. استدعاء أداة تحديث كاش النظام عبر app_process
+                client.shell("CLASSPATH=$dexPath app_process /system/bin SetupStateHelper $userId")
+
+                // 5. تعيين التطبيق كمسؤول مالك للجهاز (Device Owner)
+                val output = client.shell("dpm set-device-owner --user $userId $adminShort").stdoutText
+                Timber.i("DPM Activation output: $output")
+
+                val success = output.contains("Success", ignoreCase = true) || output.contains("device owner set", ignoreCase = true)
+                return success
+            } finally {
+                // 6. صمام الأمان الحتمي: إعادة إشارة اكتمال الإعداد لحالتها الطبيعية فوراً
+                if (isBypassed) {
+                    client.shell("settings --user $userId put secure user_setup_complete 1")
+                    client.shell("CLASSPATH=$dexPath app_process /system/bin SetupStateHelper $userId")
+                }
+                // إغلاق التصحيح اللاسلكي فوراً لمنع الالتفاف
+                client.shell("setprop service.adb.tcp.port -1")
             }
         }
-    }
-
-    /**
-     * خدعة إنشاء حساب وهمي مؤقت:
-     * تضمن أن hasIncompatibleAccountsOrNonAdb = true
-     * لتخطي رسالة: "Non test-only owner can't be installed with existing accounts"
-     */
-    private fun createDummyAccount(context: Context): Boolean {
-        return try {
-            val am = AccountManager.get(context)
-            val account = Account(DUMMY_ACCOUNT_NAME, DUMMY_ACCOUNT_TYPE)
-            am.addAccountExplicitly(account, "temp_password", null)
-        } catch (e: Exception) {
-            Timber.w(e, "Could not create dummy account")
-            false
-        }
-    }
-
-    private fun removeDummyAccount(context: Context) {
-        try {
-            val am = AccountManager.get(context)
-            val account = Account(DUMMY_ACCOUNT_NAME, DUMMY_ACCOUNT_TYPE)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-                am.removeAccountExplicitly(account)
-            }
-        } catch (e: Exception) {
-            Timber.w(e, "Could not remove dummy account")
-        }
-    }
-
-    /**
-     * صمام الأمان: إعادة ضبط الهاتف إذا تعطل التطبيق أثناء تغيير user_setup_complete
-     */
-    fun restoreStuckUserSetupComplete(context: Context) {
-        if (!Shizuku.pingBinder() || Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) return
-        val userId = getUserId()
-        val setup = execShizukuCommand("settings --user $userId get secure user_setup_complete")
-        if (setup == "0") {
-            val provisioned = execShizukuCommand("settings --user $userId get global device_provisioned")
-            if (provisioned == "1") {
-                execShizukuCommand("settings --user $userId put secure user_setup_complete 1")
-                runCatching {
-                    withShizukuDevicePolicyManager(context) { it.forceUpdateUserSetupCompleteCompat(userId) }
-                }
-            }
-        }
-    }
-
-    /**
-     * الدالة الرئيسية الموحدة لتفعيل Device Owner بأعلى موثوقية
-     */
-    fun activateDeviceOwner(context: Context, adminReceiver: ComponentName): Boolean {
-        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        if (dpm.isDeviceOwnerApp(context.packageName)) return true
-
-        val userId = getUserId()
-        createDummyAccount(context)
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                // =============== الخوارزمية الأولى: أندرويد 12 فما فوق ===============
-                val setupBypassed = try {
-                    execShizukuCommand("settings --user $userId put secure user_setup_complete 0")
-                    withShizukuDevicePolicyManager(context) { it.forceUpdateUserSetupCompleteCompat(userId) }
-                    true
-                } catch (e: Exception) {
-                    false
-                }
-
-                try {
-                    // محاولة التعيين المباشر عبر الشيل
-                    execShizukuCommand("dpm set-device-owner --user $userId ${adminReceiver.flattenToString()}")
-                } finally {
-                    if (setupBypassed) {
-                        execShizukuCommand("settings --user $userId put secure user_setup_complete 1")
-                        withShizukuDevicePolicyManager(context) { it.forceUpdateUserSetupCompleteCompat(userId) }
-                    }
-                }
-
-            } else {
-                // =============== الخوارزمية الثانية: أندرويد 11 فما دون (تجميد الحزم) ===============
-                val packagesWithAccounts = mutableListOf<String>()
-                val dumpsys = execShizukuCommand("dumpsys account")
-                val regex = "Account \\{name=.*?, type=(.*?)\\}".toRegex()
-                dumpsys.lines().forEach { line ->
-                    regex.find(line)?.let { packagesWithAccounts.add(it.groupValues[1]) }
-                }
-
-                // تجميد الحزم مؤقتاً
-                packagesWithAccounts.forEach { pkg ->
-                    execShizukuCommand("pm disable-user --user $userId $pkg")
-                }
-                execShizukuCommand("pm disable-user --user $userId com.google.android.gms")
-
-                try {
-                    Thread.sleep(1500)
-                    execShizukuCommand("dpm set-device-owner --user $userId ${adminReceiver.flattenToString()}")
-                } finally {
-                    // استعادة كافة الحزم فوراً
-                    packagesWithAccounts.forEach { pkg ->
-                        execShizukuCommand("pm enable --user $userId $pkg")
-                    }
-                    execShizukuCommand("pm enable --user $userId com.google.android.gms")
-                }
-            }
-
-        } finally {
-            removeDummyAccount(context)
-        }
-
-        return dpm.isDeviceOwnerApp(context.packageName)
     }
 }
 ```
@@ -436,4 +315,27 @@ pause
 ---
 
 ### خلاصة التوصية لتطبيقك الخاص:
-اعتمد **خوارزمية الكود في القسم 4** داخل تطبيقك مع مكتبة **Shizuku**؛ فهي تمثل قمة التطور التقني في بيئة أندرويد حالياً، وتمنح المستخدم تجربة تفعيل فورية من شاشة الهاتف دون الحاجة لأي جهاز كمبيوتر ودون التضحية بحساباته.
+اعتمد **خوارزمية الكود في القسم 4** داخل تطبيقك عبر **محرك Local Wireless ADB المدمج (DeviceOwnerPromoter.kt)**؛ فهي تمثل قمة التطور التقني والاستقلالية الكاملة، وتمنح المستخدم تجربة تفعيل فورية من شاشة الهاتف دون الحاجة لأي جهاز كمبيوتر أو برامج وسيطة، ودون التضحية بحساباته.
+
+---
+
+<a id="developer-de-provisioning"></a>
+## 7. دليل إلغاء التفعيل الهندسي في بيئات التطوير (Developer De-provisioning Reference)
+
+> ⚠️ **تنبيه أمني للمطورين:**  
+> هذا القسم مخصص لمهندسي البرمجيات ومختبري النظم أثناء العمل في بيئات التطوير وعبر كمبيوتر موثوق متصل بكابل USB. لا ينبغي إتاحة هذه الأوامر بشكل مباشر في الواجهات الموجهة للمستخدمين العاديين، منعاً للقرارات الاندفاعية أثناء لحظات الضعف النفسي.
+
+إذا كنت تختبر التطبيق في بيئة معملية وترغب في سحب صلاحية `Device Owner` وحذف الحزمة بالكامل عبر سطر أوامر ADB:
+
+```bash
+# 1. سحب صلاحية مسؤول الجهاز المالك (Device Owner) للمستخدم الأساسي 0
+adb shell dpm remove-active-admin --user 0 com.drmohammed.antiporn/.AdminReceiver
+
+# 2. التحقق من نجاح إزالة مسؤول الجهاز (يجب ألا تظهر الحزمة في القائمة)
+adb shell dumpsys device_policy | grep "Device Owner"
+
+# 3. إزالة تثبيت التطبيق بالكامل من الجهاز
+adb uninstall com.drmohammed.antiporn
+```
+
+إذا رغبت في إعادة تفعيل الصلاحية مجدداً بعد التعديلات البرمجية، كرر خطوات سكريبت القسم الخامس أو مسار التفعيل اللاسلكي المدمج من داخل التطبيق.

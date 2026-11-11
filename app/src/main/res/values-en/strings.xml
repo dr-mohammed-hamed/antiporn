@@ -179,10 +179,6 @@
     <string name="provisioning_notification_hint">Smart Tip: You can enter the code directly from the notification drawer without leaving Settings!</string>
     <string name="provisioning_tip_notification_title">Time-saving Pro Tip</string>
     <string name="provisioning_tip_notification_body">You can enter the pairing code directly from the top notification without leaving Settings!</string>
-    <string name="provisioning_shizuku_title">Shizuku Fast Track (One Tap)</string>
-    <string name="provisioning_shizuku_desc">Shizuku was detected running on this device! You can activate with one tap without codes.</string>
-    <string name="provisioning_btn_shizuku_activate">Instant Activation via Shizuku</string>
-    <string name="provisioning_shizuku_requesting">Requesting Shizuku permission and activating Device Owner...</string>
     <string name="provisioning_otg_title">Facing issues or no Wi-Fi?</string>
     <string name="provisioning_otg_desc">Connect your phone to another phone via charger cable (Type-C to Type-C) to activate with one click from your friend\'s phone without Wi-Fi or PC.</string>
     <string name="provisioning_radar_active_title">Device Owner Pairing Radar Active</string>

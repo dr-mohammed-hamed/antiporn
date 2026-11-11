@@ -67,9 +67,12 @@ object PackageChangeHandler {
             handlerScope.launch {
                 try {
                     val approvalRepo = ApprovalRepository.getInstance(appContext)
-                    val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any { it.packageName == packageName && it.isApproved }
-                    val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
                     val isHighRisk = com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(packageName)
+                    val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any {
+                        it.packageName == packageName && it.isApproved &&
+                        (!isHighRisk || (it.decidedBy != null && it.decidedBy != "INITIAL_DEVICE_BASELINE" && it.decidedBy != "AUTO_APPROVED_UNLOCKED"))
+                    }
+                    val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
                     val shouldFreeze = (policy.lockNewInstallsUntilApproved || isHighRisk) && !isAlreadyApproved
 
                     Timber.tag(TAG).w("[ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isHighRisk=$isHighRisk | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved | shouldFreeze=$shouldFreeze")

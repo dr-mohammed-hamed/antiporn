@@ -267,7 +267,7 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val failed = dpm.setPackagesSuspended(admin, arrayOf(packageName), true) as Array<String>?
-            failed?.contains(packageName) == false
+            failed == null || !failed.contains(packageName)
         } else {
             false
         }
@@ -313,7 +313,7 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val failed = dpm.setPackagesSuspended(admin, arrayOf(packageName), true) as Array<String>?
-            failed?.contains(packageName) == false
+            failed == null || !failed.contains(packageName)
         } else {
             false
         }

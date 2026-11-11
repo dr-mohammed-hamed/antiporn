@@ -159,7 +159,6 @@ class AppSuspensionShieldTest {
             "com.android.chrome",
             "com.google.android.youtube",
             "org.fdroid.fdroid",
-            "com.termux",
             "com.google.android.googlequicksearchbox",
             "",
             "random.unknown.package"
@@ -172,20 +171,30 @@ class AppSuspensionShieldTest {
     }
 
     @Test
+    fun testLocalAdbToolsClassification() {
+        for (pkg in AppSuspensionShield.LOCAL_ADB_TOOLS) {
+            assertEquals("Local ADB Exploit", AppSuspensionShield.getCategoryForPackage(pkg))
+            assertTrue("Local ADB tool $pkg must be high-risk in AppPolicyRegistry", AppPolicyRegistry.isHighRisk(pkg))
+        }
+    }
+
+    @Test
     fun testPackageCountsAndCategoryIntegrity() {
         assertEquals(11, AppSuspensionShield.TELEGRAM_PACKAGES.size)
         assertEquals(11, AppSuspensionShield.OPEN_SOCIAL_NETWORKS.size)
         assertEquals(14, AppSuspensionShield.PROXY_BROWSERS.size)
         assertEquals(8, AppSuspensionShield.RANDOM_CHAT_APPS.size)
         assertEquals(7, AppSuspensionShield.TIKTOK_PACKAGES.size)
+        assertEquals(7, AppSuspensionShield.LOCAL_ADB_TOOLS.size)
 
         val totalExpected = AppSuspensionShield.TELEGRAM_PACKAGES.size +
             AppSuspensionShield.OPEN_SOCIAL_NETWORKS.size +
             AppSuspensionShield.PROXY_BROWSERS.size +
             AppSuspensionShield.RANDOM_CHAT_APPS.size +
-            AppSuspensionShield.TIKTOK_PACKAGES.size
+            AppSuspensionShield.TIKTOK_PACKAGES.size +
+            AppSuspensionShield.LOCAL_ADB_TOOLS.size
 
-        assertEquals(51, totalExpected)
+        assertEquals(58, totalExpected)
         assertTrue("BLACKLISTED_PACKAGES must be empty under Unified Zero-Trust", AppSuspensionShield.BLACKLISTED_PACKAGES.isEmpty())
         assertEquals(0, AppSuspensionShield.BLACKLISTED_PACKAGES.size)
     }

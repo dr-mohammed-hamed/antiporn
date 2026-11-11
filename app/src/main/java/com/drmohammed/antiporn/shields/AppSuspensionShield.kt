@@ -146,6 +146,19 @@ object AppSuspensionShield : ProtectionShield {
     )
 
     /**
+     * Local ADB and shell exploit tools (LADB, aShell, Termux, App Manager, Brevent).
+     */
+    val LOCAL_ADB_TOOLS: Set<String> = setOf(
+        "com.draco.ladb",
+        "in.sunilpaulmathew.ashell",
+        "in.sunilpaulmathew.ashell.you",
+        "com.termux",
+        "com.termux.api",
+        "io.github.muntashirakon.AppManager",
+        "me.piebridge.brevent"
+    )
+
+    /**
      * Aggregated set of all blacklisted packages, sourced from central [AppPolicyRegistry].
      */
     val BLACKLISTED_PACKAGES: Set<String> get() = AppPolicyRegistry.getBlacklistedPackages()
@@ -165,6 +178,7 @@ object AppSuspensionShield : ProtectionShield {
             PROXY_BROWSERS.contains(packageName) -> "Proxy Browser"
             RANDOM_CHAT_APPS.contains(packageName) -> "Random Chat App"
             TIKTOK_PACKAGES.contains(packageName) -> "TikTok"
+            LOCAL_ADB_TOOLS.contains(packageName) -> "Local ADB Exploit"
             else -> null
         }
     }

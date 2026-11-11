@@ -662,13 +662,6 @@
     <string name="provisioning_tip_notification_title">نصيحة لتوفير الوقت</string>
     <string name="provisioning_tip_notification_body">يمكنك كتابة الرمز مباشرة من شريط الإشعارات العلوي دون مغادرة شاشة الإعدادات!</string>
 
-    <string name="provisioning_shizuku_title">مسار Shizuku السريع (نقرة واحدة)</string>
-
-    <string name="provisioning_shizuku_desc">تم اكتشاف أن تطبيق Shizuku يعمل على هذا الجهاز! يمكنك التفعيل بنقرة واحدة بدون أكواد.</string>
-
-    <string name="provisioning_btn_shizuku_activate">تفعيل فوري عبر Shizuku</string>
-    <string name="provisioning_shizuku_requesting">جاري طلب إذن Shizuku وتفعيل الصلاحية...</string>
-
     <string name="provisioning_otg_title">هل تواجه مشكلة أو لا تملك Wi-Fi؟</string>
 
     <string name="provisioning_otg_desc">يمكنك توصيل هاتفك بهاتف آخر عبر كابل الشاحن (Type-C to Type-C) وتفعيل الحماية بضغطة واحدة من هاتف الصديق دون الحاجة لشبكة Wi-Fi أو كمبيوتر.</string>

@@ -178,4 +178,29 @@ class TelemetryAndGatewayTest {
         assertTrue("Null return from DPM indicates 0 failures, must map to empty array", normalized.isEmpty())
         assertEquals(0, normalized.size)
     }
+
+    @Test
+    fun testSafeDpmPackageBridge_suspensionEvaluationLogic() {
+        val targetPackage = "com.reddit.frontpage"
+
+        // Scenario 1: DPM returns null (success on ColorOS/Realme/AOSP)
+        val resultNull: Array<String>? = null
+        val isSuccessNull = resultNull == null || !resultNull.contains(targetPackage)
+        assertTrue("When DPM returns null, suspension must be evaluated as SUCCESS", isSuccessNull)
+
+        // Scenario 2: DPM returns empty array (standard AOSP success)
+        val resultEmpty: Array<String>? = emptyArray()
+        val isSuccessEmpty = resultEmpty == null || !resultEmpty.contains(targetPackage)
+        assertTrue("When DPM returns emptyArray, suspension must be evaluated as SUCCESS", isSuccessEmpty)
+
+        // Scenario 3: DPM returns array containing the target package (suspension rejected/failed)
+        val resultFailed: Array<String>? = arrayOf(targetPackage)
+        val isSuccessFailed = resultFailed == null || !resultFailed.contains(targetPackage)
+        assertFalse("When DPM returns array containing target package, suspension must be evaluated as FAILURE", isSuccessFailed)
+
+        // Scenario 4: DPM returns array containing a different package (target succeeded)
+        val resultOther: Array<String>? = arrayOf("other.unrelated.package")
+        val isSuccessOther = resultOther == null || !resultOther.contains(targetPackage)
+        assertTrue("When DPM returns different packages, target package must be evaluated as SUCCESS", isSuccessOther)
+    }
 }

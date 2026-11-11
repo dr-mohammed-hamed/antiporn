@@ -34,7 +34,11 @@ class AppPolicyRegistryTest {
             "org.torproject.torbrowser",
             "org.mozilla.firefox",
             "com.duckduckgo.mobile.android",
-            "chat.ometv"
+            "chat.ometv",
+            "com.draco.ladb",
+            "in.sunilpaulmathew.ashell",
+            "com.termux",
+            "io.github.muntashirakon.AppManager"
         )
 
         for (pkg in highRiskPackages) {
@@ -60,7 +64,11 @@ class AppPolicyRegistryTest {
             "org.torproject.torbrowser",
             "org.mozilla.firefox",
             "com.duckduckgo.mobile.android",
-            "chat.ometv"
+            "chat.ometv",
+            "com.draco.ladb",
+            "in.sunilpaulmathew.ashell",
+            "com.termux",
+            "io.github.muntashirakon.AppManager"
         )
 
         for (pkg in highRiskPackages) {

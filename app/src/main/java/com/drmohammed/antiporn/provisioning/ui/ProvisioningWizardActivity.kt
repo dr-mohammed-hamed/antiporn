@@ -75,8 +75,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
     private lateinit var ivRadarIcon: ImageView
     private lateinit var etPairingCode: TextInputEditText
     private lateinit var btnPairAndActivate: MaterialButton
-    private lateinit var cardShizuku: MaterialCardView
-    private lateinit var btnShizukuActivate: MaterialButton
 
     private var discoveredPairingPort = 0
     private var discoveredConnectPort = 0
@@ -161,8 +159,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
         tvRadarStatus = findViewById(R.id.tvRadarStatus)
         etPairingCode = findViewById(R.id.etPairingCode)
         btnPairAndActivate = findViewById(R.id.btnPairAndActivate)
-        cardShizuku = findViewById(R.id.cardShizuku)
-        btnShizukuActivate = findViewById(R.id.btnShizukuActivate)
 
         etPairingCode.doAfterTextChanged { validateInputs() }
     }
@@ -232,10 +228,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
                     }
                 }
             }
-        }
-
-        btnShizukuActivate.setOnClickListener {
-            Toast.makeText(this, getString(R.string.provisioning_shizuku_requesting), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -323,7 +315,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
             updateRadarUi()
         }
         checkDevOptionsStatus()
-        checkShizukuStatus()
         validateInputs()
     }
 
@@ -374,14 +365,6 @@ class ProvisioningWizardActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.btn_back, null)
             .show()
-    }
-
-    private fun checkShizukuStatus() {
-        val isInstalled = try {
-            packageManager.getPackageInfo("moe.shizuku.privileged.api", 0)
-            true
-        } catch (_: PackageManager.NameNotFoundException) { false }
-        cardShizuku.visibility = if (isInstalled) View.VISIBLE else View.GONE
     }
 
     private fun updateStepperUi(devOptionsEnabled: Boolean, portsDiscovered: Boolean) {

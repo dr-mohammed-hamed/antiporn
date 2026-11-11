@@ -667,7 +667,9 @@ object CurfewEnforcer {
             return 0
         }
 
-        val approved = localApprovals.filter { it.isApproved }.map { it.packageName }.toSet()
+        val approved = localApprovals.filter {
+            it.isApproved && !(it.decidedBy == "INITIAL_DEVICE_BASELINE" && com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(it.packageName))
+        }.map { it.packageName }.toSet()
         val unapproved = localApprovals.filter { !it.isApproved }.map { it.packageName }.toSet()
 
         val installed = try {
@@ -685,7 +687,7 @@ object CurfewEnforcer {
         for (app in installed) {
             val pkg = app.packageName
             if (pkg == appContext.packageName) continue
-            if (AppSuspensionShield.isBlacklisted(pkg)) continue
+            if (AppSuspensionShield.isBlacklisted(pkg) || com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(pkg)) continue
             if (customBlacklist.contains(pkg)) continue
             if (unapproved.contains(pkg)) continue
             if (com.drmohammed.antiporn.waqfa.engine.WaqfaCooldownStore.isPackageInCooldown(appContext, pkg)) continue
