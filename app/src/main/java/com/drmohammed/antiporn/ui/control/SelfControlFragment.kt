@@ -77,6 +77,7 @@ class SelfControlFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         initViews()
+        registerPersistentQrResultListeners()
         setupListeners()
         observeViewModel()
     }
@@ -161,7 +162,8 @@ class SelfControlFragment : Fragment() {
                 layoutPendingApps = binding.layoutPendingApps,
                 tvNoPendingApps = binding.tvNoPendingApps,
                 cardPendingApps = binding.cardPendingApps,
-                onReloadRequested = { loadPendingApprovals() }
+                onReloadRequested = { loadPendingApprovals() },
+                lifecycleOwner = viewLifecycleOwner
             )
         }
     }
@@ -192,16 +194,9 @@ class SelfControlFragment : Fragment() {
                     _binding?.switchQrLockEnabled?.isChecked = true
                     isQrPolicyLoading = false
 
-                    val tag = "qr_scanner_disable_barrier"
+                    val tag = TAG_DISABLE_QR_BARRIER
                     if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return@setOnCheckedChangeListener
-                    showQrScannerWithFallback(tag) {
-                        qrManager.setQrLockEnabled(false)
-                        isQrPolicyLoading = true
-                        _binding?.switchQrLockEnabled?.isChecked = false
-                        _binding?.layoutQrActionButtons?.isVisible = false
-                        isQrPolicyLoading = false
-                        Toast.makeText(context ?: ctx, R.string.self_control_qr_disabled_toast, Toast.LENGTH_SHORT).show()
-                    }
+                    showQrScannerWithFallback(tag)
                 } else {
                     _binding?.layoutQrActionButtons?.isVisible = false
                 }
@@ -214,15 +209,10 @@ class SelfControlFragment : Fragment() {
             if (!qrManager.hasToken()) {
                 qrManager.generateAndSaveNewToken()
             }
-            fun showExportDialog() {
-                if (!childFragmentManager.isStateSaved && childFragmentManager.findFragmentByTag(QrExportDialog.TAG) == null) {
-                    QrExportDialog.newInstance().show(childFragmentManager, QrExportDialog.TAG)
-                }
-            }
             if (qrManager.isQrLockEnabled()) {
-                showQrScannerWithFallback("qr_scanner_show_code") { showExportDialog() }
+                showQrScannerWithFallback(TAG_SHOW_QR_CODE)
             } else {
-                showExportDialog()
+                performAuthorizedQrAction(TAG_SHOW_QR_CODE)
             }
         }
 
@@ -230,8 +220,103 @@ class SelfControlFragment : Fragment() {
             val ctx = context?.applicationContext ?: return@setOnClickListener
             val qrManager = SelfControlQrManager.getInstance(ctx)
 
-            fun proceed() {
+            if (qrManager.isQrLockEnabled()) {
+                showQrScannerWithFallback(TAG_REGENERATE_QR_AUTH)
+            } else {
+                performAuthorizedQrAction(TAG_REGENERATE_QR_AUTH)
+            }
+        }
+
+        // --- 5 Distributed Navigation Tiles with QR Guard ---
+
+        // Tile 1: Night Curfew
+        binding.tileCurfew.setOnClickListener {
+            executeWithQrProtection(TAG_NAV_CURFEW)
+        }
+
+        // Tile 2: Sites & Network
+        binding.tileWebFilter.setOnClickListener {
+            executeWithQrProtection(TAG_NAV_WEB)
+        }
+
+        // Tile 3: App Management
+        binding.tileAppManager.setOnClickListener {
+            executeWithQrProtection(TAG_NAV_APPS)
+        }
+
+        // Tile 4: Waqfa System
+        binding.tileWaqfa.setOnClickListener {
+            executeWithQrProtection(TAG_NAV_WAQFA)
+        }
+
+        // Tile 5: Other Settings
+        binding.tileOtherSettings.setOnClickListener {
+            executeWithQrProtection(TAG_NAV_OTHER)
+        }
+    }
+
+    private fun registerPersistentQrResultListeners() {
+        val allTags = listOf(
+            TAG_DISABLE_QR_BARRIER,
+            TAG_SHOW_QR_CODE,
+            TAG_REGENERATE_QR_AUTH,
+            TAG_NAV_CURFEW,
+            TAG_NAV_WEB,
+            TAG_NAV_APPS,
+            TAG_NAV_WAQFA,
+            TAG_NAV_OTHER
+        )
+        for (tag in allTags) {
+            childFragmentManager.setFragmentResultListener(tag, viewLifecycleOwner) { _, bundle ->
+                val verified = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_VERIFIED, false)
+                val bypass = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_EMERGENCY_BYPASS, false)
+                if (verified || bypass) {
+                    performAuthorizedQrAction(tag)
+                }
+            }
+        }
+    }
+
+    private fun executeWithQrProtection(tag: String) {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastTileClickTime < 600L) return
+        lastTileClickTime = now
+
+        val ctx = context?.applicationContext ?: return
+        val qrManager = SelfControlQrManager.getInstance(ctx)
+
+        if (qrManager.isQrLockEnabled()) {
+            showQrScannerWithFallback(tag)
+        } else {
+            performAuthorizedQrAction(tag)
+        }
+    }
+
+    private fun showQrScannerWithFallback(tag: String) {
+        if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return
+        QrScannerBottomSheet.newInstance(tag).show(childFragmentManager, tag)
+    }
+
+    private fun performAuthorizedQrAction(tag: String) {
+        val ctx = context?.applicationContext ?: return
+        when (tag) {
+            TAG_DISABLE_QR_BARRIER -> {
+                val qrManager = SelfControlQrManager.getInstance(ctx)
+                qrManager.setQrLockEnabled(false)
+                isQrPolicyLoading = true
+                _binding?.switchQrLockEnabled?.isChecked = false
+                _binding?.layoutQrActionButtons?.isVisible = false
+                isQrPolicyLoading = false
+                Toast.makeText(context ?: ctx, R.string.self_control_qr_disabled_toast, Toast.LENGTH_SHORT).show()
+            }
+            TAG_SHOW_QR_CODE -> {
+                if (!childFragmentManager.isStateSaved && childFragmentManager.findFragmentByTag(QrExportDialog.TAG) == null) {
+                    QrExportDialog.newInstance().show(childFragmentManager, QrExportDialog.TAG)
+                }
+            }
+            TAG_REGENERATE_QR_AUTH -> {
                 val act = activity ?: return
+                val qrManager = SelfControlQrManager.getInstance(ctx)
                 MaterialAlertDialogBuilder(act)
                     .setTitle(R.string.self_control_qr_regenerate_confirm_title)
                     .setMessage(R.string.self_control_qr_regenerate_confirm_message)
@@ -249,62 +334,34 @@ class SelfControlFragment : Fragment() {
                     }
                     .show()
             }
-
-            if (qrManager.isQrLockEnabled()) {
-                showQrScannerWithFallback("qr_scanner_regenerate_auth") { proceed() }
-            } else {
-                proceed()
-            }
-        }
-
-        // --- 5 Distributed Navigation Tiles with QR Guard ---
-
-        // Tile 1: Night Curfew
-        binding.tileCurfew.setOnClickListener {
-            executeWithQrProtection("qr_nav_curfew") {
+            TAG_NAV_CURFEW -> {
                 val intent = Intent(requireContext(), CurfewSettingsActivity::class.java).apply {
                     putExtra(CurfewSettingsActivity.EXTRA_IS_REMOTE, false)
                     putExtra(CurfewSettingsActivity.EXTRA_POLICY_JSON, selfControlViewModel.uiState.value.policy.toJson())
                 }
                 subScreenLauncher.launch(intent)
             }
-        }
-
-        // Tile 2: Sites & Network
-        binding.tileWebFilter.setOnClickListener {
-            executeWithQrProtection("qr_nav_web") {
+            TAG_NAV_WEB -> {
                 val intent = Intent(requireContext(), WebFilterSettingsActivity::class.java).apply {
                     putExtra(WebFilterSettingsActivity.EXTRA_IS_REMOTE, false)
                     putExtra(WebFilterSettingsActivity.EXTRA_POLICY_JSON, selfControlViewModel.uiState.value.policy.toJson())
                 }
                 subScreenLauncher.launch(intent)
             }
-        }
-
-        // Tile 3: App Management
-        binding.tileAppManager.setOnClickListener {
-            executeWithQrProtection("qr_nav_apps") {
+            TAG_NAV_APPS -> {
                 val intent = Intent(requireContext(), RemoteAppManagerActivity::class.java).apply {
                     putExtra(RemoteAppManagerActivity.EXTRA_IS_LOCAL, true)
                 }
                 subScreenLauncher.launch(intent)
             }
-        }
-
-        // Tile 4: Waqfa System
-        binding.tileWaqfa.setOnClickListener {
-            executeWithQrProtection("qr_nav_waqfa") {
+            TAG_NAV_WAQFA -> {
                 val intent = Intent(requireContext(), WaqfaSettingsActivity::class.java).apply {
                     putExtra(WaqfaSettingsActivity.EXTRA_IS_REMOTE, false)
                     putExtra(WaqfaSettingsActivity.EXTRA_POLICY_JSON, selfControlViewModel.uiState.value.policy.toJson())
                 }
                 subScreenLauncher.launch(intent)
             }
-        }
-
-        // Tile 5: Other Settings
-        binding.tileOtherSettings.setOnClickListener {
-            executeWithQrProtection("qr_nav_other") {
+            TAG_NAV_OTHER -> {
                 val intent = Intent(requireContext(), OtherSettingsActivity::class.java).apply {
                     putExtra(OtherSettingsActivity.EXTRA_IS_REMOTE, false)
                     putExtra(OtherSettingsActivity.EXTRA_POLICY_JSON, selfControlViewModel.uiState.value.policy.toJson())
@@ -312,36 +369,6 @@ class SelfControlFragment : Fragment() {
                 subScreenLauncher.launch(intent)
             }
         }
-    }
-
-    private fun executeWithQrProtection(tag: String, action: () -> Unit) {
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastTileClickTime < 600L) return
-        lastTileClickTime = now
-
-        val ctx = context?.applicationContext ?: return
-        val qrManager = SelfControlQrManager.getInstance(ctx)
-
-        if (qrManager.isQrLockEnabled()) {
-            showQrScannerWithFallback(tag) { action() }
-        } else {
-            action()
-        }
-    }
-
-    private fun showQrScannerWithFallback(tag: String, onAuthorized: () -> Unit) {
-        if (childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(tag) != null) return
-        childFragmentManager.setFragmentResultListener(tag, viewLifecycleOwner) { _, bundle ->
-            val verified = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_VERIFIED, false)
-            val bypass = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_EMERGENCY_BYPASS, false)
-            if (verified || bypass) {
-                onAuthorized()
-            }
-        }
-        QrScannerBottomSheet.newInstance(tag).apply {
-            onVerified = { onAuthorized() }
-            onEmergencyBypassTriggered = { onAuthorized() }
-        }.show(childFragmentManager, tag)
     }
 
     private fun loadPendingApprovals() {
@@ -377,5 +404,13 @@ class SelfControlFragment : Fragment() {
 
     companion object {
         private const val TAG = "AntiPorn_SelfControlFrag"
+        private const val TAG_DISABLE_QR_BARRIER = "qr_scanner_disable_barrier"
+        private const val TAG_SHOW_QR_CODE = "qr_scanner_show_code"
+        private const val TAG_REGENERATE_QR_AUTH = "qr_scanner_regenerate_auth"
+        private const val TAG_NAV_CURFEW = "qr_nav_curfew"
+        private const val TAG_NAV_WEB = "qr_nav_web"
+        private const val TAG_NAV_APPS = "qr_nav_apps"
+        private const val TAG_NAV_WAQFA = "qr_nav_waqfa"
+        private const val TAG_NAV_OTHER = "qr_nav_other"
     }
 }

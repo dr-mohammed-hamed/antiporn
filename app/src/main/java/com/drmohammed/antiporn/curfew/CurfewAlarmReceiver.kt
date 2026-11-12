@@ -63,12 +63,22 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
                 }
 
                 if (action == ACTION_CURFEW_PRE_WARNING) {
+                    if (!CurfewConfig.isCurfewEnabled(appContext)) {
+                        Log.i(TAG, "Ignoring pre-curfew warning: night curfew is disabled in policy")
+                        CurfewScheduler.cancelCurfewAlarms(appContext)
+                        return@launch
+                    }
                     try {
                         val cal = CurfewConfig.getCurfewCalendar(appContext)
-                        val dayOfWeek = cal.get(java.util.Calendar.DAY_OF_WEEK)
-                        val (startH, startM) = CurfewScheduler.getCurfewStartTimeForDay(appContext, dayOfWeek)
+                        if (CurfewEnforcer.isCurfewActive(appContext, cal)) {
+                            Log.i(TAG, "Skipping stale pre-curfew warning: curfew is already active")
+                            return@launch
+                        }
+                        val nextStart = CurfewScheduler.getNextCurfewStart(appContext, cal)
+                        val startH = nextStart.get(java.util.Calendar.HOUR_OF_DAY)
+                        val startM = nextStart.get(java.util.Calendar.MINUTE)
                         val timeFormatted = String.format(java.util.Locale.US, "%02d:%02d", startH, startM)
-                        val yyyyMMdd = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date(TrustedTimeProvider.currentTimeMillis(appContext)))
+                        val yyyyMMdd = formatTargetDateKey(appContext)
 
                         AppNotificationManager.getInstance(appContext).postEventNotification(
                             category = NotificationCategory.CURFEW,
@@ -92,9 +102,14 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
                 CurfewEnforcer.syncBlockState(appContext)
                 CurfewScheduler.scheduleNextAlarms(appContext)
 
+                if (!CurfewConfig.isCurfewEnabled(appContext)) {
+                    Log.i(TAG, "Night curfew is disabled in policy; skipping notification for $action")
+                    return@launch
+                }
+
                 if (action == ACTION_CURFEW_START) {
                     try {
-                        val yyyyMMdd = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date(TrustedTimeProvider.currentTimeMillis(appContext)))
+                        val yyyyMMdd = formatTargetDateKey(appContext)
                         AppNotificationManager.getInstance(appContext).postEventNotification(
                             category = NotificationCategory.CURFEW,
                             title = appContext.getString(R.string.notif_curfew_start_title),
@@ -114,7 +129,7 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
 
                 if (action == ACTION_CURFEW_END) {
                     try {
-                        val yyyyMMdd = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date(TrustedTimeProvider.currentTimeMillis(appContext)))
+                        val yyyyMMdd = formatTargetDateKey(appContext)
                         AppNotificationManager.getInstance(appContext).postEventNotification(
                             category = NotificationCategory.CURFEW,
                             title = appContext.getString(R.string.notif_curfew_end_title),
@@ -146,15 +161,17 @@ class CurfewAlarmReceiver : BroadcastReceiver() {
         const val ACTION_CURFEW_START = "com.drmohammed.antiporn.ACTION_CURFEW_START"
         const val ACTION_CURFEW_END = "com.drmohammed.antiporn.ACTION_CURFEW_END"
 
+        private fun formatTargetDateKey(appContext: Context): String {
+            val tz = java.util.TimeZone.getTimeZone(CurfewConfig.getTargetTimeZoneId(appContext))
+            return java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).apply {
+                timeZone = tz
+            }.format(java.util.Date(TrustedTimeProvider.currentTimeMillis(appContext)))
+        }
+
         private fun rescheduleNapIfNeeded(appContext: Context) {
             try {
-                if (NapController.isNapActive(appContext)) {
-                    val napEndWall = NapController.getEndWall(appContext)
-                    if (napEndWall > TrustedTimeProvider.currentTimeMillis(appContext)) {
-                        CurfewScheduler.scheduleNapEndAlarm(appContext, napEndWall)
-                    } else {
-                        CurfewScheduler.cancelNapEndAlarm(appContext)
-                    }
+                if (NapController.isNapActive(appContext) && NapController.remainingMs(appContext) > 0L) {
+                    CurfewScheduler.scheduleNapEndAlarm(appContext, NapController.getEndWall(appContext))
                 } else {
                     CurfewScheduler.cancelNapEndAlarm(appContext)
                 }

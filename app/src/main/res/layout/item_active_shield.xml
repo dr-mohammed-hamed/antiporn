@@ -58,7 +58,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
                 android:lineSpacingExtra="2dp"
-                android:textColor="?attr/colorOutline"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
                 tools:text="صلاحية إدارة الجهاز نشطة وتتحكم بالنظام بالكامل" />
         </LinearLayout>

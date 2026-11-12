@@ -7,6 +7,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.data.repository.ApprovalRepository
@@ -28,8 +29,19 @@ class SelfControlApprovalsViewBinder(
     private val layoutPendingApps: LinearLayout,
     private val tvNoPendingApps: TextView,
     private val cardPendingApps: View?,
-    private val onReloadRequested: () -> Unit
+    private val onReloadRequested: () -> Unit,
+    private val lifecycleOwner: LifecycleOwner = activity
 ) {
+    init {
+        activity.supportFragmentManager.setFragmentResultListener(REQUEST_KEY_APPROVE_APP, lifecycleOwner) { _, bundle ->
+            val verified = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_VERIFIED, false)
+            val bypass = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_EMERGENCY_BYPASS, false)
+            val targetPkg = bundle.getString(QrScannerBottomSheet.RESULT_KEY_PAYLOAD)
+            if ((verified || bypass) && !targetPkg.isNullOrBlank()) {
+                executeApprovalResolution(targetPkg, isApproved = true, approveBtn = null, rejectBtn = null)
+            }
+        }
+    }
     fun renderPendingApprovals(items: List<Pair<String, String>>) {
         layoutPendingApps.removeAllViews()
         if (items.isEmpty()) {
@@ -69,7 +81,7 @@ class SelfControlApprovalsViewBinder(
             val pkgView = TextView(activity).apply {
                 text = pkg
                 textSize = 11f
-                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutline))
+                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant))
             }
             container.addView(pkgView)
 
@@ -128,58 +140,59 @@ class SelfControlApprovalsViewBinder(
         approveBtn: MaterialButton?,
         rejectBtn: MaterialButton?
     ) {
-        val executeAction = {
-            approveBtn?.isEnabled = false
-            rejectBtn?.isEnabled = false
-            activity.lifecycleScope.launch(Dispatchers.IO) {
-                try {
-                    val repo = ApprovalRepository.getInstance(activity.applicationContext)
-                    if (isApproved) {
-                        repo.unsuspendAndApprove(pkg, "SELF")
-                    } else {
-                        repo.recordRejection(pkg, "SELF")
-                    }
-                    withContext(Dispatchers.Main) {
-                        if (!activity.isFinishing && !activity.isDestroyed) {
-                            onReloadRequested()
-                        }
-                    }
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    Log.e(TAG, "Failed resolving approval for package $pkg (isApproved=$isApproved)", e)
-                    withContext(Dispatchers.Main) {
-                        if (!activity.isFinishing && !activity.isDestroyed) {
-                            approveBtn?.isEnabled = true
-                            rejectBtn?.isEnabled = true
-                            Toast.makeText(activity, R.string.toast_self_policy_save_failed, Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-            }
-        }
-
         if (isApproved) {
             val qrManager = SelfControlQrManager.getInstance(activity.applicationContext)
             if (qrManager.isQrLockEnabled()) {
-                val requestKey = "qr_scanner_approve_app"
-                if (activity.supportFragmentManager.isStateSaved || activity.supportFragmentManager.findFragmentByTag(requestKey) != null) return
-                activity.supportFragmentManager.setFragmentResultListener(requestKey, activity) { _, bundle ->
-                    val verified = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_VERIFIED, false)
-                    val bypass = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_EMERGENCY_BYPASS, false)
-                    if (verified || bypass) {
-                        executeAction()
+                if (activity.supportFragmentManager.isStateSaved ||
+                    activity.supportFragmentManager.findFragmentByTag(REQUEST_KEY_APPROVE_APP) != null
+                ) {
+                    return
+                }
+                QrScannerBottomSheet.newInstance(REQUEST_KEY_APPROVE_APP, payload = pkg)
+                    .show(activity.supportFragmentManager, REQUEST_KEY_APPROVE_APP)
+                return
+            }
+        }
+        executeApprovalResolution(pkg, isApproved, approveBtn, rejectBtn)
+    }
+
+    private fun executeApprovalResolution(
+        pkg: String,
+        isApproved: Boolean,
+        approveBtn: MaterialButton?,
+        rejectBtn: MaterialButton?
+    ) {
+        approveBtn?.isEnabled = false
+        rejectBtn?.isEnabled = false
+        activity.lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val repo = ApprovalRepository.getInstance(activity.applicationContext)
+                if (isApproved) {
+                    repo.unsuspendAndApprove(pkg, "SELF")
+                } else {
+                    repo.recordRejection(pkg, "SELF")
+                }
+                withContext(Dispatchers.Main) {
+                    if (!activity.isFinishing && !activity.isDestroyed) {
+                        onReloadRequested()
                     }
                 }
-                QrScannerBottomSheet.newInstance(requestKey).show(activity.supportFragmentManager, requestKey)
-            } else {
-                executeAction()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.e(TAG, "Failed resolving approval for package $pkg (isApproved=$isApproved)", e)
+                withContext(Dispatchers.Main) {
+                    if (!activity.isFinishing && !activity.isDestroyed) {
+                        approveBtn?.isEnabled = true
+                        rejectBtn?.isEnabled = true
+                        Toast.makeText(activity, R.string.toast_self_policy_save_failed, Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
-        } else {
-            executeAction()
         }
     }
 
     companion object {
         private const val TAG = "SelfControlApprovals"
+        private const val REQUEST_KEY_APPROVE_APP = "qr_scanner_approve_app"
     }
 }

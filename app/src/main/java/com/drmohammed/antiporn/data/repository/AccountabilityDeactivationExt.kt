@@ -1,8 +1,10 @@
 package com.drmohammed.antiporn.data.repository
 
+import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
-import com.drmohammed.antiporn.data.local.db.entity.DevicePolicyEntity
+import com.drmohammed.antiporn.telemetry.AiTelemetryReporter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -15,14 +17,21 @@ private const val TAG = "AntiPorn_AccDeact"
  */
 suspend fun AccountabilityRepository.requestDeviceOwnerDeactivation(hasQr: Boolean): Result<Long> = withContext(Dispatchers.IO) {
     try {
+        TrustedTimeProvider.initialize(appContext)
         if (!TrustedTimeProvider.isTrusted()) {
             TrustedTimeProvider.syncNow(appContext, force = true)
+        }
+        if (!TrustedTimeProvider.isTrusted()) {
+            return@withContext Result.failure(
+                IllegalStateException(appContext.getString(R.string.error_trusted_time_required))
+            )
         }
         val now = TrustedTimeProvider.currentTimeMillis(appContext)
         val delayMs = if (hasQr) DevicePolicyBundle.DEACTIVATION_QR_DELAY_MS else DevicePolicyBundle.DEACTIVATION_DEFAULT_DELAY_MS
         val unlockAt = now + delayMs
 
-        val currentPolicy = policyDao.getDevicePolicyBlocking()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
+        val policyRepo = PolicyRepository.getInstance(appContext)
+        val currentPolicy = policyRepo.getCurrentPolicy()
         val updatedLocal = currentPolicy.copy(
             deactivationStatus = DevicePolicyBundle.DEACTIVATION_STATUS_PENDING,
             deactivationRequestedAt = now,
@@ -30,7 +39,7 @@ suspend fun AccountabilityRepository.requestDeviceOwnerDeactivation(hasQr: Boole
             deactivationHasQr = hasQr,
             updatedAt = now
         )
-        policyDao.saveDevicePolicyBlocking(DevicePolicyEntity.fromBundle(updatedLocal))
+        policyRepo.updateLocalPolicyWithoutEnforcing(updatedLocal)
 
         if (currentPolicy.isSupervised && !currentPolicy.guardianUid.isNullOrBlank()) {
             val myUid = getOrCreateCurrentUid()
@@ -48,6 +57,7 @@ suspend fun AccountabilityRepository.requestDeviceOwnerDeactivation(hasQr: Boole
 
         Result.success(unlockAt)
     } catch (e: Exception) {
+        if (e is CancellationException) throw e
         Timber.tag(TAG).e(e, "Error requesting device owner deactivation")
         Result.failure(e)
     }
@@ -59,7 +69,8 @@ suspend fun AccountabilityRepository.requestDeviceOwnerDeactivation(hasQr: Boole
 suspend fun AccountabilityRepository.cancelDeviceOwnerDeactivation(): Result<Unit> = withContext(Dispatchers.IO) {
     try {
         val now = TrustedTimeProvider.currentTimeMillis(appContext)
-        val currentPolicy = policyDao.getDevicePolicyBlocking()?.toBundle() ?: DevicePolicyBundle.defaultPolicy()
+        val policyRepo = PolicyRepository.getInstance(appContext)
+        val currentPolicy = policyRepo.getCurrentPolicy()
         val updatedLocal = currentPolicy.copy(
             deactivationStatus = DevicePolicyBundle.DEACTIVATION_STATUS_CANCELLED,
             deactivationRequestedAt = null,
@@ -67,7 +78,7 @@ suspend fun AccountabilityRepository.cancelDeviceOwnerDeactivation(): Result<Uni
             deactivationHasQr = false,
             updatedAt = now
         )
-        policyDao.saveDevicePolicyBlocking(DevicePolicyEntity.fromBundle(updatedLocal))
+        policyRepo.updateLocalPolicyWithoutEnforcing(updatedLocal)
 
         if (currentPolicy.isSupervised && !currentPolicy.guardianUid.isNullOrBlank()) {
             val myUid = getOrCreateCurrentUid()
@@ -85,6 +96,7 @@ suspend fun AccountabilityRepository.cancelDeviceOwnerDeactivation(): Result<Uni
 
         Result.success(Unit)
     } catch (e: Exception) {
+        if (e is CancellationException) throw e
         Timber.tag(TAG).e(e, "Error cancelling device owner deactivation")
         Result.failure(e)
     }
@@ -94,6 +106,7 @@ suspend fun AccountabilityRepository.cancelDeviceOwnerDeactivation(): Result<Uni
  * Rejects an active Device Owner deactivation request by the Guardian.
  */
 suspend fun AccountabilityRepository.rejectDeviceOwnerDeactivation(wardUid: String): Result<Unit> = withContext(Dispatchers.IO) {
+    val maskedWard = AiTelemetryReporter.maskIdentifier(wardUid)
     try {
         val docRef = firestore.collection("policies").document(wardUid)
         val updates = mapOf(
@@ -104,10 +117,11 @@ suspend fun AccountabilityRepository.rejectDeviceOwnerDeactivation(wardUid: Stri
             "updatedAt" to TrustedTimeProvider.currentTimeMillis(appContext)
         )
         docRef.update(updates).await()
-        Timber.tag(TAG).i("Guardian rejected device owner deactivation for ward $wardUid")
+        Timber.tag(TAG).i("Guardian rejected device owner deactivation for ward $maskedWard")
         Result.success(Unit)
     } catch (e: Exception) {
-        Timber.tag(TAG).e(e, "Error rejecting device owner deactivation for ward $wardUid")
+        if (e is CancellationException) throw e
+        Timber.tag(TAG).e(e, "Error rejecting device owner deactivation for ward $maskedWard")
         Result.failure(e)
     }
 }

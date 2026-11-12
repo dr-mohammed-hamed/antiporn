@@ -1,6 +1,8 @@
 package com.drmohammed.antiporn.ui.settings
 
+import android.content.Intent
 import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -8,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -55,7 +58,10 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
     private var currentFilter: String? = null
     private var loadJob: Job? = null
     private var isExporting = false
+    @Volatile
     private var isClearing = false
+    private var suppressFilterListener = false
+    private var clearConfirmDialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -73,27 +79,42 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
         }
 
         initViews()
-        handleInitialFilterIntent()
+        restoreOrApplyInitialFilter(savedInstanceState, intent)
         setupListeners()
         loadLogs()
         loadPolicySummary()
     }
 
-    private fun handleInitialFilterIntent() {
-        intent?.getStringExtra(EXTRA_FILTER_TAG)?.let { initialTag ->
-            val chipId = when (initialTag) {
-                BlackBoxRecorder.TAG_SHIELD -> R.id.chipFilterShield
-                BlackBoxRecorder.TAG_CURFEW -> R.id.chipFilterCurfew
-                BlackBoxRecorder.TAG_CLOUD_SYNC -> R.id.chipFilterCloud
-                BlackBoxRecorder.TAG_TIME -> R.id.chipFilterTime
-                BlackBoxRecorder.TAG_DPM -> R.id.chipFilterDpm
-                BlackBoxRecorder.TAG_PAIRING -> R.id.chipFilterPairing
-                else -> null
-            }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(KEY_CURRENT_FILTER, currentFilter)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        restoreOrApplyInitialFilter(savedInstanceState = null, sourceIntent = intent)
+        loadLogs()
+    }
+
+    private fun restoreOrApplyInitialFilter(savedInstanceState: Bundle?, sourceIntent: Intent?) {
+        val tagToApply = if (savedInstanceState != null && savedInstanceState.containsKey(KEY_CURRENT_FILTER)) {
+            savedInstanceState.getString(KEY_CURRENT_FILTER)
+        } else {
+            sourceIntent?.getStringExtra(EXTRA_FILTER_TAG)
+        }
+        val chipId = mapTagToChipId(tagToApply)
+        suppressFilterListener = true
+        try {
             if (chipId != null) {
-                currentFilter = initialTag
+                currentFilter = tagToApply
                 chipGroupFilters.check(chipId)
+            } else {
+                currentFilter = null
+                chipGroupFilters.check(R.id.chipFilterAll)
             }
+        } finally {
+            suppressFilterListener = false
         }
     }
 
@@ -138,37 +159,45 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         chipGroupFilters.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-            currentFilter = when (checkedIds.first()) {
-                R.id.chipFilterShield -> BlackBoxRecorder.TAG_SHIELD
-                R.id.chipFilterCurfew -> BlackBoxRecorder.TAG_CURFEW
-                R.id.chipFilterCloud -> BlackBoxRecorder.TAG_CLOUD_SYNC
-                R.id.chipFilterTime -> BlackBoxRecorder.TAG_TIME
-                R.id.chipFilterDpm -> BlackBoxRecorder.TAG_DPM
-                R.id.chipFilterPairing -> BlackBoxRecorder.TAG_PAIRING
-                else -> null
-            }
+            if (suppressFilterListener || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            currentFilter = mapChipIdToTag(checkedIds.first())
             loadLogs()
         }
+    }
+
+    override fun onDestroy() {
+        clearConfirmDialog?.dismiss()
+        clearConfirmDialog = null
+        super.onDestroy()
     }
 
     private fun loadLogs() {
         // Red-Teaming Scenario 1: Cancel any in-flight query to prevent race conditions on rapid taps
         loadJob?.cancel()
+        val filterSnapshot = currentFilter
         loadJob = lifecycleScope.launch(Dispatchers.IO) {
-            val eventDao = HisnRoomDatabase.getInstance(applicationContext).diagnosticEventDao()
-            val filter = currentFilter
-            val tag = if (filter.isNullOrBlank() || filter == BlackBoxRecorder.CATEGORY_ALL) null else filter
-            val entities = eventDao.getDiagnosticEvents(limit = 300, tag = tag)
-            val events = entities.map { it.toDto() }
-            val totalCount = eventDao.getEventsCount()
+            try {
+                val eventDao = HisnRoomDatabase.getInstance(applicationContext).diagnosticEventDao()
+                val tag = if (filterSnapshot.isNullOrBlank() || filterSnapshot == BlackBoxRecorder.CATEGORY_ALL) null else filterSnapshot
+                val entities = eventDao.getDiagnosticEvents(limit = 300, tag = tag)
+                val events = entities.map { it.toDto() }
+                val totalCount = eventDao.getEventsCount()
 
-            withContext(Dispatchers.Main) {
-                if (isFinishing || isDestroyed) return@withContext
-                adapter.submitList(events)
-                tvLogsCount.text = getString(R.string.total_events_count_format, events.size, totalCount)
-                tvEmptyLogs.visibility = if (events.isEmpty()) View.VISIBLE else View.GONE
-                rvLogs.visibility = if (events.isEmpty()) View.GONE else View.VISIBLE
+                withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
+                    adapter.submitList(events)
+                    tvLogsCount.text = getString(R.string.total_events_count_format, events.size, totalCount)
+                    tvEmptyLogs.visibility = if (events.isEmpty()) View.VISIBLE else View.GONE
+                    rvLogs.visibility = if (events.isEmpty()) View.GONE else View.VISIBLE
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Error loading diagnostic logs")
+                withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
+                    Toast.makeText(applicationContext, R.string.error_unknown, Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -178,11 +207,15 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
             val policy = try {
                 PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
             } catch (e: Exception) {
+                Timber.w(e, "Failed loading current policy for log viewer summary")
                 null
             }
+            var statusUnavailable = false
             val isCurfewRunning = try {
                 CurfewEnforcer.isEffectiveBlockActive(applicationContext)
             } catch (e: Exception) {
+                Timber.w(e, "Failed evaluating active curfew block state for log viewer summary")
+                statusUnavailable = true
                 false
             }
 
@@ -193,10 +226,10 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
                     return@withContext
                 }
                 tvActivePolicySummary.visibility = View.VISIBLE
-                val statusStr = if (isCurfewRunning) {
-                    getString(R.string.status_curfew_active)
-                } else {
-                    getString(R.string.status_curfew_normal)
+                val statusStr = when {
+                    statusUnavailable -> getString(R.string.error_unknown)
+                    isCurfewRunning -> getString(R.string.status_curfew_active)
+                    else -> getString(R.string.status_curfew_normal)
                 }
                 tvActivePolicySummary.text = getString(
                     R.string.policy_summary_format,
@@ -223,11 +256,16 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
                     startActivity(chooser)
                 } catch (e: Exception) {
                     Timber.e(e, "Error launching share chooser")
-                    Toast.makeText(applicationContext, R.string.error_share_report_failed, Toast.LENGTH_SHORT).show()
+                    if (!isFinishing && !isDestroyed) {
+                        Toast.makeText(applicationContext, R.string.error_share_report_failed, Toast.LENGTH_SHORT).show()
+                    }
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Timber.e(e, "Error generating telemetry report file")
-                Toast.makeText(applicationContext, R.string.error_share_report_failed, Toast.LENGTH_SHORT).show()
+                if (!isFinishing && !isDestroyed) {
+                    Toast.makeText(applicationContext, R.string.error_share_report_failed, Toast.LENGTH_SHORT).show()
+                }
             } finally {
                 isExporting = false
             }
@@ -235,8 +273,8 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
     }
 
     private fun showClearConfirmationDialog() {
-        if (isClearing) return
-        MaterialAlertDialogBuilder(this)
+        if (isClearing || isFinishing || isDestroyed || clearConfirmDialog?.isShowing == true) return
+        clearConfirmDialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_clear_logs_title)
             .setMessage(R.string.dialog_clear_logs_msg)
             .setPositiveButton(R.string.btn_delete) { dialog, _ ->
@@ -252,19 +290,52 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
                             Toast.makeText(applicationContext, R.string.toast_logs_cleared, Toast.LENGTH_SHORT).show()
                             loadLogs()
                         }
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        Timber.e(e, "Error clearing diagnostic logs")
+                        withContext(Dispatchers.Main) {
+                            if (isFinishing || isDestroyed) return@withContext
+                            Toast.makeText(applicationContext, R.string.error_unknown, Toast.LENGTH_SHORT).show()
+                        }
                     } finally {
                         isClearing = false
                     }
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
+            .setOnDismissListener {
+                clearConfirmDialog = null
+            }
             .show()
     }
 
     companion object {
         const val EXTRA_FILTER_TAG = "extra_filter_tag"
+        private const val KEY_CURRENT_FILTER = "key_current_filter"
         private const val MENU_SHARE = 101
         private const val MENU_CLEAR = 102
+
+        internal fun mapChipIdToTag(chipId: Int): String? = when (chipId) {
+            R.id.chipFilterShield -> BlackBoxRecorder.TAG_SHIELD
+            R.id.chipFilterCurfew -> BlackBoxRecorder.TAG_CURFEW
+            R.id.chipFilterCloud -> BlackBoxRecorder.TAG_CLOUD_SYNC
+            R.id.chipFilterTime -> BlackBoxRecorder.TAG_TIME
+            R.id.chipFilterDpm -> BlackBoxRecorder.TAG_DPM
+            R.id.chipFilterPairing -> BlackBoxRecorder.TAG_PAIRING
+            R.id.chipFilterNetwork -> BlackBoxRecorder.TAG_NETWORK
+            else -> null
+        }
+
+        internal fun mapTagToChipId(tag: String?): Int? = when (tag) {
+            BlackBoxRecorder.TAG_SHIELD -> R.id.chipFilterShield
+            BlackBoxRecorder.TAG_CURFEW -> R.id.chipFilterCurfew
+            BlackBoxRecorder.TAG_CLOUD_SYNC -> R.id.chipFilterCloud
+            BlackBoxRecorder.TAG_TIME -> R.id.chipFilterTime
+            BlackBoxRecorder.TAG_DPM -> R.id.chipFilterDpm
+            BlackBoxRecorder.TAG_PAIRING -> R.id.chipFilterPairing
+            BlackBoxRecorder.TAG_NETWORK -> R.id.chipFilterNetwork
+            else -> null
+        }
     }
 }
 
@@ -273,16 +344,21 @@ class DiagnosticLogViewerActivity : AppCompatActivity() {
  */
 class DiagnosticLogAdapter : ListAdapter<DiagnosticEventDto, DiagnosticLogAdapter.LogViewHolder>(DiagnosticEventDiffCallback) {
 
+    private val tagColorCache = HashMap<String, Pair<Int, Int>>()
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): LogViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_diagnostic_log, parent, false)
-        return LogViewHolder(view)
+        return LogViewHolder(view, tagColorCache)
     }
 
     override fun onBindViewHolder(holder: LogViewHolder, position: Int) {
         holder.bind(getItem(position))
     }
 
-    class LogViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    class LogViewHolder(
+        itemView: View,
+        private val tagColorCache: MutableMap<String, Pair<Int, Int>>
+    ) : RecyclerView.ViewHolder(itemView) {
         private val viewStatusDot: View = itemView.findViewById(R.id.viewStatusDot)
         private val tvLogTag: TextView = itemView.findViewById(R.id.tvLogTag)
         private val tvLogAction: TextView = itemView.findViewById(R.id.tvLogAction)
@@ -297,6 +373,7 @@ class DiagnosticLogAdapter : ListAdapter<DiagnosticEventDto, DiagnosticLogAdapte
             tvLogTime.text = formatTimeOnly(event.timestamp)
 
             val context = itemView.context
+            styleTagBadge(context, event.tag)
             val successColor = ContextCompat.getColor(context, R.color.status_green)
             val fallbackErrorColor = ContextCompat.getColor(context, R.color.status_red)
             val failureColor = MaterialColors.getColor(
@@ -311,7 +388,7 @@ class DiagnosticLogAdapter : ListAdapter<DiagnosticEventDto, DiagnosticLogAdapte
             } else {
                 viewStatusDot.backgroundTintList = ColorStateList.valueOf(failureColor)
                 if (!event.errorDetails.isNullOrBlank()) {
-                    tvLogError.text = event.errorDetails
+                    tvLogError.text = AiTelemetryReporter.redactSensitiveIdentifiers(event.errorDetails)
                     tvLogError.visibility = View.VISIBLE
                 } else {
                     tvLogError.visibility = View.GONE
@@ -327,12 +404,55 @@ class DiagnosticLogAdapter : ListAdapter<DiagnosticEventDto, DiagnosticLogAdapte
 
             val meta = event.contextMetadata
             if (!meta.isNullOrBlank()) {
-                tvLogDetails.text = meta
+                tvLogDetails.text = AiTelemetryReporter.redactSensitiveIdentifiers(meta)
                 tvLogDetails.visibility = View.VISIBLE
             } else {
                 tvLogDetails.visibility = View.GONE
             }
         }
+
+        private fun styleTagBadge(context: android.content.Context, tag: String) {
+            val (bgColor, fgColor) = tagColorCache.getOrPut(tag) {
+                val (bgAttr, fgAttr, fallbackBg, fallbackFg) = when (tag) {
+                    BlackBoxRecorder.TAG_NETWORK -> TagBadgeColors(
+                        bgAttr = com.google.android.material.R.attr.colorSecondaryContainer,
+                        fgAttr = com.google.android.material.R.attr.colorOnSecondaryContainer,
+                        fallbackBg = R.color.md_theme_light_secondaryContainer,
+                        fallbackFg = R.color.md_theme_light_onSecondaryContainer
+                    )
+                    BlackBoxRecorder.TAG_TIME -> TagBadgeColors(
+                        bgAttr = com.google.android.material.R.attr.colorPrimaryContainer,
+                        fgAttr = com.google.android.material.R.attr.colorOnPrimaryContainer,
+                        fallbackBg = R.color.md_theme_light_primaryContainer,
+                        fallbackFg = R.color.md_theme_light_onPrimaryContainer
+                    )
+                    else -> TagBadgeColors(
+                        bgAttr = com.google.android.material.R.attr.colorSurfaceVariant,
+                        fgAttr = com.google.android.material.R.attr.colorOnSurfaceVariant,
+                        fallbackBg = R.color.md_theme_light_surfaceVariant,
+                        fallbackFg = R.color.md_theme_light_onSurfaceVariant
+                    )
+                }
+                val resolvedBg = MaterialColors.getColor(context, bgAttr, ContextCompat.getColor(context, fallbackBg))
+                val resolvedFg = MaterialColors.getColor(context, fgAttr, ContextCompat.getColor(context, fallbackFg))
+                resolvedBg to resolvedFg
+            }
+            val cornerRadiusPx = 6f * context.resources.displayMetrics.density
+            val badgeDrawable = (tvLogTag.background as? GradientDrawable) ?: GradientDrawable().also {
+                it.shape = GradientDrawable.RECTANGLE
+                tvLogTag.background = it
+            }
+            badgeDrawable.cornerRadius = cornerRadiusPx
+            badgeDrawable.setColor(bgColor)
+            tvLogTag.setTextColor(fgColor)
+        }
+
+        private data class TagBadgeColors(
+            val bgAttr: Int,
+            val fgAttr: Int,
+            val fallbackBg: Int,
+            val fallbackFg: Int
+        )
 
         companion object {
             private val timeFormat = ThreadLocal.withInitial {
@@ -343,6 +463,7 @@ class DiagnosticLogAdapter : ListAdapter<DiagnosticEventDto, DiagnosticLogAdapte
                 return try {
                     timeFormat.get()?.format(Date(timestamp)) ?: timestamp.toString()
                 } catch (e: Exception) {
+                    Timber.w(e, "Failed formatting diagnostic log timestamp %d", timestamp)
                     timestamp.toString()
                 }
             }

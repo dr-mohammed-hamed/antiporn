@@ -176,12 +176,14 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
     suspend fun isUninstallBlocked(
         context: Context,
         packageName: String,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Boolean> = execute(
         context = context,
         tag = tag,
         actionName = "isUninstallBlocked",
-        metadata = "pkg=$packageName"
+        metadata = "pkg=$packageName",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         dpm.isUninstallBlocked(admin, packageName)
     }
@@ -189,12 +191,14 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
     fun isUninstallBlockedBlocking(
         context: Context,
         packageName: String,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Boolean> = executeBlocking(
         context = context,
         tag = tag,
         actionName = "isUninstallBlockedBlocking",
-        metadata = "pkg=$packageName"
+        metadata = "pkg=$packageName",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         dpm.isUninstallBlocked(admin, packageName)
     }
@@ -230,7 +234,7 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
     suspend fun setPackageSuspendedWithMessage(
         context: Context,
         packageName: String,
-        message: String,
+        @Suppress("UNUSED_PARAMETER") message: String,
         tag: String = BlackBoxRecorder.TAG_DPM
     ): DpmExecutionResult<Boolean> = execute(
         context = context,
@@ -238,45 +242,13 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
         actionName = "setPackageSuspendedWithMessage",
         metadata = "pkg=$packageName"
     ) { dpm, admin ->
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                val builderClass = Class.forName("android.content.pm.SuspendDialogInfo\$Builder")
-                val builder = builderClass.getDeclaredConstructor().newInstance()
-                val setMessageMethod = builderClass.getMethod("setMessage", String::class.java)
-                setMessageMethod.invoke(builder, message)
-                val buildMethod = builderClass.getMethod("build")
-                val dialogInfo = buildMethod.invoke(builder)
-
-                val suspendMethod = DevicePolicyManager::class.java.getMethod(
-                    "setPackagesSuspended",
-                    ComponentName::class.java,
-                    Array<String>::class.java,
-                    Boolean::class.javaPrimitiveType,
-                    android.os.PersistableBundle::class.java,
-                    android.os.PersistableBundle::class.java,
-                    Class.forName("android.content.pm.SuspendDialogInfo")
-                )
-                val rawResult = suspendMethod.invoke(dpm, admin, arrayOf(packageName), true, null, null, dialogInfo)
-                val failedPkgs = (rawResult as? Array<*>)?.filterIsInstance<String>() ?: emptyList()
-                if (rawResult != null && !failedPkgs.contains(packageName)) {
-                    return@execute true
-                }
-            } catch (e: Exception) {
-                Log.w("AntiPorn_DpmGateway", "Reflection for SuspendDialogInfo failed, falling back to standard suspension: ${e.message}")
-            }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val failed = dpm.setPackagesSuspended(admin, arrayOf(packageName), true) as Array<String>?
-            failed == null || !failed.contains(packageName)
-        } else {
-            false
-        }
+        setSinglePackageSuspended(dpm, admin, packageName)
     }
 
     fun setPackageSuspendedWithMessageBlocking(
         context: Context,
         packageName: String,
-        message: String,
+        @Suppress("UNUSED_PARAMETER") message: String,
         tag: String = BlackBoxRecorder.TAG_DPM
     ): DpmExecutionResult<Boolean> = executeBlocking(
         context = context,
@@ -284,34 +256,15 @@ interface SafeDpmPackageBridge : SafeDpmBaseGateway {
         actionName = "setPackageSuspendedWithMessageBlocking",
         metadata = "pkg=$packageName"
     ) { dpm, admin ->
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                val builderClass = Class.forName("android.content.pm.SuspendDialogInfo\$Builder")
-                val builder = builderClass.getDeclaredConstructor().newInstance()
-                val setMessageMethod = builderClass.getMethod("setMessage", String::class.java)
-                setMessageMethod.invoke(builder, message)
-                val buildMethod = builderClass.getMethod("build")
-                val dialogInfo = buildMethod.invoke(builder)
+        setSinglePackageSuspended(dpm, admin, packageName)
+    }
 
-                val suspendMethod = DevicePolicyManager::class.java.getMethod(
-                    "setPackagesSuspended",
-                    ComponentName::class.java,
-                    Array<String>::class.java,
-                    Boolean::class.javaPrimitiveType,
-                    android.os.PersistableBundle::class.java,
-                    android.os.PersistableBundle::class.java,
-                    Class.forName("android.content.pm.SuspendDialogInfo")
-                )
-                val rawResult = suspendMethod.invoke(dpm, admin, arrayOf(packageName), true, null, null, dialogInfo)
-                val failedPkgs = (rawResult as? Array<*>)?.filterIsInstance<String>() ?: emptyList()
-                if (rawResult != null && !failedPkgs.contains(packageName)) {
-                    return@executeBlocking true
-                }
-            } catch (e: Exception) {
-                Log.w("AntiPorn_DpmGateway", "Reflection for SuspendDialogInfo failed, falling back to standard suspension: ${e.message}")
-            }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+    private fun setSinglePackageSuspended(
+        dpm: DevicePolicyManager,
+        admin: ComponentName,
+        packageName: String
+    ): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val failed = dpm.setPackagesSuspended(admin, arrayOf(packageName), true) as Array<String>?
             failed == null || !failed.contains(packageName)
         } else {

@@ -1,5 +1,6 @@
 package com.drmohammed.antiporn.telemetry
 
+import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
@@ -64,22 +65,26 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
 
     suspend fun getUserRestrictions(
         context: Context,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Bundle?> = execute(
         context = context,
         tag = tag,
-        actionName = "getUserRestrictions"
+        actionName = "getUserRestrictions",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         dpm.getUserRestrictions(admin)
     }
 
     fun getUserRestrictionsBlocking(
         context: Context,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Bundle?> = executeBlocking(
         context = context,
         tag = tag,
-        actionName = "getUserRestrictionsBlocking"
+        actionName = "getUserRestrictionsBlocking",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         dpm.getUserRestrictions(admin)
     }
@@ -93,8 +98,18 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
             val bundle = getUserRestrictionsBlocking(context, tag).getOrNull()
             bundle?.getBoolean(userRestriction, false) == true
         } catch (e: Exception) {
+            android.util.Log.w("AntiPorn_DpmGateway", "Error checking user restriction $userRestriction", e)
             false
         }
+    }
+
+    private fun validatePrivateDnsResult(resultCode: Int): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            resultCode != DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR
+        ) {
+            throw IllegalStateException("DPM private DNS configuration failed with error code: $resultCode")
+        }
+        return resultCode
     }
 
     suspend fun setGlobalPrivateDns(
@@ -108,11 +123,12 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
         metadata = "host=$host"
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (host.isNullOrBlank()) {
+            val status = if (host.isNullOrBlank()) {
                 dpm.setGlobalPrivateDnsModeOpportunistic(admin)
             } else {
                 dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, host)
             }
+            validatePrivateDnsResult(status)
         } else {
             0
         }
@@ -129,11 +145,12 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
         metadata = "host=$host"
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (host.isNullOrBlank()) {
+            val status = if (host.isNullOrBlank()) {
                 dpm.setGlobalPrivateDnsModeOpportunistic(admin)
             } else {
                 dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, host)
             }
+            validatePrivateDnsResult(status)
         } else {
             0
         }
@@ -149,7 +166,7 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
         metadata = "mode=opportunistic"
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            dpm.setGlobalPrivateDnsModeOpportunistic(admin)
+            validatePrivateDnsResult(dpm.setGlobalPrivateDnsModeOpportunistic(admin))
         } else {
             0
         }
@@ -165,7 +182,7 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
         metadata = "mode=opportunistic"
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            dpm.setGlobalPrivateDnsModeOpportunistic(admin)
+            validatePrivateDnsResult(dpm.setGlobalPrivateDnsModeOpportunistic(admin))
         } else {
             0
         }
@@ -173,11 +190,13 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
 
     suspend fun getGlobalPrivateDnsMode(
         context: Context,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Int> = execute(
         context = context,
         tag = tag,
-        actionName = "getGlobalPrivateDnsMode"
+        actionName = "getGlobalPrivateDnsMode",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             dpm.getGlobalPrivateDnsMode(admin)
@@ -188,11 +207,13 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
 
     fun getGlobalPrivateDnsModeBlocking(
         context: Context,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Int> = executeBlocking(
         context = context,
         tag = tag,
-        actionName = "getGlobalPrivateDnsModeBlocking"
+        actionName = "getGlobalPrivateDnsModeBlocking",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             dpm.getGlobalPrivateDnsMode(admin)
@@ -203,11 +224,13 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
 
     suspend fun getGlobalPrivateDnsHost(
         context: Context,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<String?> = execute(
         context = context,
         tag = tag,
-        actionName = "getGlobalPrivateDnsHost"
+        actionName = "getGlobalPrivateDnsHost",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             dpm.getGlobalPrivateDnsHost(admin)
@@ -218,11 +241,13 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
 
     fun getGlobalPrivateDnsHostBlocking(
         context: Context,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<String?> = executeBlocking(
         context = context,
         tag = tag,
-        actionName = "getGlobalPrivateDnsHostBlocking"
+        actionName = "getGlobalPrivateDnsHostBlocking",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             dpm.getGlobalPrivateDnsHost(admin)
@@ -271,33 +296,39 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
 
     suspend fun getAlwaysOnVpnPackage(
         context: Context,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<String?> = execute(
         context = context,
         tag = tag,
-        actionName = "getAlwaysOnVpnPackage"
+        actionName = "getAlwaysOnVpnPackage",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         dpm.getAlwaysOnVpnPackage(admin)
     }
 
     fun getAlwaysOnVpnPackageBlocking(
         context: Context,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<String?> = executeBlocking(
         context = context,
         tag = tag,
-        actionName = "getAlwaysOnVpnPackageBlocking"
+        actionName = "getAlwaysOnVpnPackageBlocking",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         dpm.getAlwaysOnVpnPackage(admin)
     }
 
     suspend fun isAlwaysOnVpnLockdownEnabled(
         context: Context,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Boolean> = execute(
         context = context,
         tag = tag,
-        actionName = "isAlwaysOnVpnLockdownEnabled"
+        actionName = "isAlwaysOnVpnLockdownEnabled",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             dpm.isAlwaysOnVpnLockdownEnabled(admin)
@@ -308,11 +339,13 @@ interface SafeDpmPolicyBridge : SafeDpmBaseGateway {
 
     fun isAlwaysOnVpnLockdownEnabledBlocking(
         context: Context,
-        tag: String = BlackBoxRecorder.TAG_DPM
+        tag: String = BlackBoxRecorder.TAG_DPM,
+        recordSuccess: Boolean = false
     ): DpmExecutionResult<Boolean> = executeBlocking(
         context = context,
         tag = tag,
-        actionName = "isAlwaysOnVpnLockdownEnabledBlocking"
+        actionName = "isAlwaysOnVpnLockdownEnabledBlocking",
+        recordSuccess = recordSuccess
     ) { dpm, admin ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             dpm.isAlwaysOnVpnLockdownEnabled(admin)

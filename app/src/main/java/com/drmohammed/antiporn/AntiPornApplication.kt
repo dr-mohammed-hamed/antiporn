@@ -66,9 +66,27 @@ class AntiPornApplication : Application(), Configuration.Provider {
         // Initialize tamper-proof Trusted Time subsystem on cold boot
         TrustedTimeProvider.initialize(this)
         TrustedTimeProvider.onTimeDriftCorrected = { driftMs ->
-            Timber.i("Trusted time drift of ${driftMs}ms corrected; rescheduling alarms and verifying curfew")
+            Timber.i("Trusted time drift of ${driftMs}ms corrected; rescheduling alarms and verifying curfew/block state")
             com.drmohammed.antiporn.curfew.CurfewScheduler.scheduleNextAlarms(this)
-            com.drmohammed.antiporn.curfew.CurfewEnforcer.enforce(this, com.drmohammed.antiporn.curfew.CurfewEnforcer.isEffectiveCurfewActive(this))
+            if (com.drmohammed.antiporn.curfew.NapController.isNapActive(this) &&
+                com.drmohammed.antiporn.curfew.NapController.remainingMs(this) > 0L
+            ) {
+                com.drmohammed.antiporn.curfew.CurfewScheduler.scheduleNapEndAlarm(
+                    this,
+                    com.drmohammed.antiporn.curfew.NapController.getEndWall(this)
+                )
+            } else {
+                com.drmohammed.antiporn.curfew.CurfewScheduler.cancelNapEndAlarm(this)
+            }
+            if (com.drmohammed.antiporn.curfew.CurfewEnforcer.isSnoozeActive(this)) {
+                com.drmohammed.antiporn.curfew.CurfewScheduler.scheduleCurfewSnoozeAlarm(
+                    this,
+                    com.drmohammed.antiporn.curfew.CurfewEnforcer.getSnoozeEndWall(this)
+                )
+            } else {
+                com.drmohammed.antiporn.curfew.CurfewScheduler.cancelCurfewSnoozeAlarm(this)
+            }
+            com.drmohammed.antiporn.curfew.CurfewEnforcer.syncBlockStateAsync(this)
         }
         TrustedTimeProvider.syncNowAsync(this)
 
@@ -111,6 +129,7 @@ class AntiPornApplication : Application(), Configuration.Provider {
                 val prunedNotifs = try {
                     db.inAppNotificationDao().pruneOldNotifications(maxKeep = 200, olderThanMs = cutoff)
                 } catch (e: Exception) {
+                    Timber.w(e, "Failed to prune old in-app notifications")
                     0
                 }
                 if (pruned > 0 || capped > 0 || prunedNotifs > 0) {

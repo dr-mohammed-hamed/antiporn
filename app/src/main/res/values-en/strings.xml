@@ -44,11 +44,11 @@
     <string name="notif_nap_ended_desc_curfew_still_active">Nap mode finished, but curfew protection remains active on your device.</string>
 
     <string name="notif_curfew_active_title">Night Curfew Active: Internet Isolated</string>
-    <string name="notif_curfew_active_desc_format">Internet and apps isolated until %1$02d:%2$02d AM. Calls and SMS work normally.</string>
+    <string name="notif_curfew_active_desc_format">Internet and apps isolated until %1$s. Calls and SMS work normally.</string>
 
     <string name="notif_apps_suspended_title">Distraction Apps Temporarily Paused</string>
     <string name="notif_apps_suspended_nap_desc">Nap mode active: Distraction apps paused to protect your focus.</string>
-    <string name="notif_apps_suspended_curfew_desc_format">Night curfew active: Apps paused until %1$02d:%2$02d AM to protect your sleep.</string>
+    <string name="notif_apps_suspended_curfew_desc_format">Night curfew active: Apps paused until %1$s to protect your sleep.</string>
 
     <string name="notif_approval_granted_title">Application Approved</string>
     <string name="notif_approval_granted_desc">Guardian %1$s approved application %2$s.</string>
@@ -151,7 +151,7 @@
     <string name="stepper_step_2">2. Pairing &amp; Activate</string>
 
     <string name="provisioning_zero_account_banner_title">Zero-Account Instant Activation</string>
-    <string name="provisioning_zero_account_banner_desc">AntiPorn automatically bypasses account restrictions; your Google, WhatsApp, and Telegram accounts remain 100%% safe and intact.</string>
+    <string name="provisioning_zero_account_banner_desc" formatted="false">AntiPorn automatically bypasses account restrictions; your Google, WhatsApp, and Telegram accounts remain 100% safe and intact.</string>
 
     <string name="provisioning_legacy_title">Android 7 to 10 Devices</string>
     <string name="provisioning_legacy_desc">Because Android 10 and below do not support on-device Wireless Debugging pairing, please connect your phone via USB cable to PureSite to activate in 1 click without removing accounts.</string>
@@ -350,7 +350,7 @@
     <string name="shield_active_dns_title">AntiPorn DNS Shield Active</string>
     <string name="shield_active_dns_desc">Encrypted DNS (%1$s) enforced, blocking adult websites.</string>
     <string name="shield_active_curfew_title">Night Curfew Shield</string>
-    <string name="shield_active_curfew_desc">Active to suspend entertainment apps and isolate network during night hours (20:00 - 07:00).</string>
+    <string name="shield_active_curfew_desc">Active to suspend entertainment apps and isolate network during scheduled night hours.</string>
     <string name="shield_active_browser_title">Incognito Lock &amp; SafeSearch Shield</string>
     <string name="shield_active_browser_desc">Disabled across all browsers with strict Google SafeSearch enforced.</string>
     <string name="shield_active_time_title">Time Tamper Prevention Shield</string>
@@ -502,12 +502,14 @@
     <string name="card_curfew_title">Curfew &amp; Focus Shield</string>
     <string name="card_curfew_active_desc">Curfew is currently active. Apps are suspended.</string>
     <string name="card_curfew_active_desc_test">Curfew test mode active.</string>
-    <string name="card_curfew_scheduled_desc">Scheduled daily (8:00 PM - 7:00 AM) - Allowed apps active</string>
+    <string name="card_curfew_scheduled_desc">Scheduled daily - Allowed apps active</string>
+    <string name="card_curfew_off_optional_desc">Off by choice — applies only when enabled</string>
     <string name="card_curfew_inactive_desc">Curfew is currently inactive.</string>
     <string name="card_curfew_pending">Curfew active: store suspension and VPN blackhole require enforcement.</string>
     <string name="card_curfew_subtext">Focus and bedtime restriction.</string>
     <string name="shield_curfew_active_applied">Curfew active: restrictions applied.</string>
     <string name="shield_curfew_scheduled_applied">Curfew schedule registered.</string>
+    <string name="shield_curfew_disabled_applied">Night curfew is currently off (optional).</string>
     <string name="btn_test_curfew_on">Enable Test Curfew</string>
     <string name="btn_test_curfew_off">Disable Test Curfew</string>
     <string name="toast_curfew_test_on">Test curfew activated.</string>
@@ -636,6 +638,8 @@
     <string name="self_control_security_switches_desc">System-level restrictions to prevent workarounds.</string>
     <string name="toast_self_policy_saved">Self-control policy saved and enforced.</string>
     <string name="toast_self_policy_save_failed">Failed saving self-control policy.</string>
+    <string name="toast_guardian_policy_saved">Guardian policy sent and saved.</string>
+    <string name="toast_guardian_policy_save_failed">Failed sending guardian policy. Please retry.</string>
     <string name="gate_open_title">Unrestricted Access</string>
     <string name="gate_access_denied">Access Denied: QR code verification required.</string>
     <string name="gate_access_denied_by_guardian">Self-control has been disabled by your supervisor. All shields are remotely managed.</string>
@@ -650,7 +654,7 @@
     <string name="browser_filter_card_desc">Specify allowed or blocked websites across supported Chromium browsers via Device Owner</string>
     <string name="browser_filter_scope_title">Filtering Scope &amp; Power</string>
     <string name="browser_filter_scope_browser_only">Browser-Only (Lightweight - No VPN)</string>
-    <string name="browser_filter_scope_browser_only_desc">Restricts blocked websites inside Chrome and supported browsers only. The device runs pure high-speed Private DNS with 0% extra battery drain and no daytime VPN.</string>
+    <string name="browser_filter_scope_browser_only_desc" formatted="false">Restricts blocked websites inside Chrome and supported browsers only. The device runs pure high-speed Private DNS with 0% extra battery drain and no daytime VPN.</string>
     <string name="browser_filter_scope_full_system">Full-System (Extreme Filtering - Local VPN)</string>
     <string name="browser_filter_scope_full_system_desc">Runs 24/7 local inspection tunnel to filter and block domains across all apps, games, and browsers on the device.</string>
     <string name="browser_filter_btn_manage">Manage Browser Websites</string>
@@ -722,6 +726,7 @@
     <string name="filter_chip_time">Time</string>
     <string name="filter_chip_dpm">System DPM</string>
     <string name="filter_chip_pairing">Pairing &amp; Sync</string>
+    <string name="filter_chip_network">Network</string>
     <string name="menu_clear_logs">Clear Logs</string>
     <string name="dialog_clear_logs_title">Confirm Clear Logs</string>
     <string name="dialog_clear_logs_msg">Are you sure you want to clear all black-box diagnostic events from this device? This action cannot be undone.</string>
@@ -790,7 +795,6 @@
     <string name="label_requested_time">Requested: %1$s</string>
     <string name="label_decided_time">Decided: %1$s</string>
     <string name="filter_all_wards">All Wards</string>
-    <string name="default_web_client_id" translatable="false"></string>
 
     <!-- Partner & Device Name Strings -->
     <string name="toast_rename_failed">Failed to update device name</string>
@@ -890,6 +894,9 @@
     <string name="curfew_picker_opt_net">Net</string>
     <string name="curfew_picker_btn_confirm">Confirm Selection</string>
     <string name="curfew_picker_btn_confirm_count">Confirm Selection (%1$d)</string>
+    <string name="dialog_curfew_immediate_title">Activate Night Curfew Now?</string>
+    <string name="dialog_curfew_immediate_msg">The current time falls within your selected night curfew window. Confirming will immediately suspend non-allowed apps and isolate internet access (if enabled) until the end of the scheduled period.</string>
+    <string name="btn_curfew_enable_now">Enable &amp; Apply Now</string>
 
     <!-- Web & Network Sub-Screen -->
     <string name="web_filter_title">Sites &amp; Network</string>
@@ -970,4 +977,12 @@
     <string name="waqfa_engine_status_dormant_clickable">Engine Inactive • Tap to activate</string>
     <string name="waqfa_engine_status_instant_toast">Instant Accessibility Engine (0ms) is active at maximum performance</string>
     <string name="waqfa_engine_status_remote_toast">Waqfa engine status depends on permissions of the supervised ward device</string>
+
+    <!-- Audit Hardening & Resilience Additions -->
+    <string name="qr_emergency_trusted_time_required">Trusted network time is required before requesting an emergency unlock delay. Connect to the internet and try again.</string>
+    <string name="card_instant_kill_pending">Instant internet kill is enabled, but VPN isolation requires enforcement.</string>
+    <string name="error_evaluating_protection">Failed evaluating protection status</string>
+    <string name="badge_count_overflow">99+</string>
+    <string name="toast_curfew_invalid_same_start_end">Curfew start and end times cannot be identical.</string>
+    <string name="shield_dns_local_filter_needs_sync">Local DNS filter is active, but Private DNS or restrictions need synchronization.</string>
 </resources>

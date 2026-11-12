@@ -206,7 +206,7 @@
                                     android:layout_weight="1.3"
                                     android:layout_gravity="center"
                                     android:src="@drawable/ic_close"
-                                    app:tint="?attr/colorOutline"
+                                    app:tint="?attr/colorOnSurfaceVariant"
                                     android:contentDescription="@null" />
 
                                 <ImageView
@@ -383,7 +383,7 @@
                                     android:layout_weight="1.4"
                                     android:layout_gravity="center"
                                     android:src="@drawable/ic_close"
-                                    app:tint="?attr/colorOutline"
+                                    app:tint="?attr/colorOnSurfaceVariant"
                                     android:contentDescription="@null" />
 
                                 <TextView
@@ -601,7 +601,8 @@
                             android:id="@+id/btnAddBlockedUrl"
                             style="@style/Widget.Material3.Button.TonalButton"
                             android:layout_width="wrap_content"
-                            android:layout_height="36dp"
+                            android:layout_height="wrap_content"
+                            android:minHeight="48dp"
                             android:paddingHorizontal="12dp"
                             android:paddingVertical="0dp"
                             android:text="@string/btn_add_blocked_url"
@@ -624,7 +625,7 @@
                             android:id="@+id/btnTabBlocked"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="0dp"
-                            android:layout_height="40dp"
+                            android:layout_height="48dp"
                             android:layout_weight="1"
                             android:fontFamily="@font/tajawal"
                             android:paddingVertical="0dp"
@@ -635,7 +636,7 @@
                             android:id="@+id/btnTabAllowed"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="0dp"
-                            android:layout_height="40dp"
+                            android:layout_height="48dp"
                             android:layout_weight="1"
                             android:fontFamily="@font/tajawal"
                             android:paddingVertical="0dp"
@@ -659,7 +660,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:gravity="center_vertical"
-                            android:minHeight="44dp"
+                            android:minHeight="48dp"
                             android:orientation="horizontal"
                             android:paddingHorizontal="12dp">
 
@@ -685,7 +686,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
                         android:text="@string/empty_blocked_urls"
-                        android:textColor="?attr/colorOutline"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp"
                         android:visibility="gone" />
 
@@ -724,7 +725,8 @@
                 android:id="@+id/btnSaveWebFilterChanges"
                 style="@style/Widget.Material3.Button"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
                 android:fontFamily="@font/tajawal"
                 android:text="@string/btn_save_changes"
                 android:textSize="15sp"

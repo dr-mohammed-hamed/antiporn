@@ -105,7 +105,7 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
             Log.e(TAG, "Failed to initialize BarcodeScanner client", e)
             barcodeScanner = null
             binding.tvScanStatus.text = getString(R.string.qr_scan_error_init)
-            binding.tvScanStatus.setTextColor(Color.parseColor("#EF4444"))
+            binding.tvScanStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.status_red))
         }
 
         binding.btnCloseScanner.setOnClickListener {
@@ -267,9 +267,17 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
 
                 viewLifecycleOwner.lifecycleScope.launch {
                     delay(400)
+                    if (!isAdded || isRemoving) return@launch
                     val reqKey = arguments?.getString(EXTRA_REQUEST_KEY)
+                    val payload = arguments?.getString(EXTRA_PAYLOAD)
                     if (reqKey != null) {
-                        parentFragmentManager.setFragmentResult(reqKey, Bundle().apply { putBoolean(RESULT_KEY_VERIFIED, true) })
+                        parentFragmentManager.setFragmentResult(
+                            reqKey,
+                            Bundle().apply {
+                                putBoolean(RESULT_KEY_VERIFIED, true)
+                                if (payload != null) putString(RESULT_KEY_PAYLOAD, payload)
+                            }
+                        )
                     } else {
                         onVerified?.invoke()
                     }
@@ -370,9 +378,17 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
                 binding.tvEmergencyBypassInfo.text = getString(R.string.qr_emergency_bypass_ready)
                 binding.btnEmergencyBypass.text = getString(R.string.qr_emergency_bypass_ready)
                 binding.btnEmergencyBypass.setOnClickListener {
+                    if (!isAdded || isRemoving) return@setOnClickListener
                     val reqKey = arguments?.getString(EXTRA_REQUEST_KEY)
+                    val payload = arguments?.getString(EXTRA_PAYLOAD)
                     if (reqKey != null) {
-                        parentFragmentManager.setFragmentResult(reqKey, Bundle().apply { putBoolean(RESULT_KEY_EMERGENCY_BYPASS, true) })
+                        parentFragmentManager.setFragmentResult(
+                            reqKey,
+                            Bundle().apply {
+                                putBoolean(RESULT_KEY_EMERGENCY_BYPASS, true)
+                                if (payload != null) putString(RESULT_KEY_PAYLOAD, payload)
+                            }
+                        )
                     } else {
                         onEmergencyBypassTriggered?.invoke()
                     }
@@ -400,12 +416,23 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun showEmergencyConfirmationDialog(hours: Int) {
-        MaterialAlertDialogBuilder(requireContext())
+        val ctx = context ?: return
+        MaterialAlertDialogBuilder(ctx)
             .setTitle(R.string.qr_emergency_confirm_title)
             .setMessage(getString(R.string.qr_emergency_confirm_message, hours))
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                qrManager.requestEmergencyDelay()
-                refreshEmergencyDelayState()
+                val started = qrManager.requestEmergencyDelay()
+                if (isAdded && _binding != null) {
+                    refreshEmergencyDelayState()
+                    if (!started) {
+                        binding.tvEmergencyBypassInfo.text = getString(R.string.qr_emergency_trusted_time_required)
+                        android.widget.Toast.makeText(
+                            ctx.applicationContext ?: ctx,
+                            R.string.qr_emergency_trusted_time_required,
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -438,14 +465,17 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
     companion object {
         const val TAG = "QrScannerBottomSheet"
         const val EXTRA_REQUEST_KEY = "extra_request_key"
+        const val EXTRA_PAYLOAD = "extra_payload"
         const val RESULT_KEY_VERIFIED = "result_key_verified"
         const val RESULT_KEY_EMERGENCY_BYPASS = "result_key_emergency_bypass"
+        const val RESULT_KEY_PAYLOAD = "result_key_payload"
 
-        fun newInstance(requestKey: String? = null): QrScannerBottomSheet {
+        fun newInstance(requestKey: String? = null, payload: String? = null): QrScannerBottomSheet {
             return QrScannerBottomSheet().apply {
-                if (requestKey != null) {
+                if (requestKey != null || payload != null) {
                     arguments = Bundle().apply {
-                        putString(EXTRA_REQUEST_KEY, requestKey)
+                        if (requestKey != null) putString(EXTRA_REQUEST_KEY, requestKey)
+                        if (payload != null) putString(EXTRA_PAYLOAD, payload)
                     }
                 }
             }

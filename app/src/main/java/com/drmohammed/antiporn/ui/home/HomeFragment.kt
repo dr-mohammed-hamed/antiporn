@@ -5,10 +5,12 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
@@ -17,17 +19,11 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.ShieldStatus
-import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewForegroundWatcher
 import com.drmohammed.antiporn.curfew.NapController
 import com.drmohammed.antiporn.databinding.FragmentHomeBinding
 import com.drmohammed.antiporn.provisioning.ui.ProvisioningWizardActivity
-import com.drmohammed.antiporn.shields.AppSuspensionShield
-import com.drmohammed.antiporn.shields.BrowserShield
-import com.drmohammed.antiporn.shields.CurfewShield
 import com.drmohammed.antiporn.shields.DnsShield
-import com.drmohammed.antiporn.shields.SystemTamperShield
-import com.drmohammed.antiporn.shields.VpnShield
 import com.drmohammed.antiporn.ui.ProtectionUiState
 import com.drmohammed.antiporn.ui.shields.ActiveShieldsBottomSheet
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -61,6 +57,8 @@ class HomeFragment : Fragment() {
     private var lastEnforceClickTime = 0L
     private var lastBellClickTime = 0L
     private var lastProvisioningClickTime = 0L
+    private var wasStopped = false
+    private var napConfirmDialog: AlertDialog? = null
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -91,9 +89,16 @@ class HomeFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        homeViewModel.refreshProtectionState(isEnforcing = false)
+        val forceRefresh = wasStopped
+        wasStopped = false
+        homeViewModel.refreshProtectionState(isEnforcing = false, force = forceRefresh)
         homeViewModel.tickNap()
         checkUsageAccess()
+    }
+
+    override fun onStop() {
+        wasStopped = true
+        super.onStop()
     }
 
     private fun observeViewModel() {
@@ -108,7 +113,11 @@ class HomeFragment : Fragment() {
                     notificationRepo.unreadCountFlow.collect { count ->
                         if (count > 0) {
                             binding.tvNotificationBadge.visibility = View.VISIBLE
-                            binding.tvNotificationBadge.text = if (count > 99) "99+" else count.toString()
+                            binding.tvNotificationBadge.text = if (count > 99) {
+                                getString(R.string.badge_count_overflow)
+                            } else {
+                                count.toString()
+                            }
                         } else {
                             binding.tvNotificationBadge.visibility = View.GONE
                         }
@@ -121,7 +130,7 @@ class HomeFragment : Fragment() {
     private fun render(state: HomeUiState) {
         if (_binding == null) return
 
-        updateProtectionState(state.protectionState)
+        updateProtectionState(state.protectionState, state.isApplying)
         updateNapCountdown(state.napRemainingMs, state.isNapActive, state.isCurfewActive)
 
         binding.btnGrantUsageAccess.visibility = if (!state.hasUsageAccess) View.VISIBLE else View.GONE
@@ -132,8 +141,13 @@ class HomeFragment : Fragment() {
             val now = SystemClock.elapsedRealtime()
             if (now - lastBellClickTime < 500L) return@setOnClickListener
             lastBellClickTime = now
-            val intent = Intent(requireContext(), NotificationCenterActivity::class.java)
-            startActivity(intent)
+            val ctx = context ?: return@setOnClickListener
+            if (!isAdded || activity?.isFinishing == true || activity?.isDestroyed == true) return@setOnClickListener
+            try {
+                startActivity(Intent(ctx, NotificationCenterActivity::class.java))
+            } catch (e: Exception) {
+                Log.w("HomeFragment", "Unable to launch NotificationCenterActivity", e)
+            }
         }
 
         binding.layoutHeroShield.setOnClickListener {
@@ -150,29 +164,46 @@ class HomeFragment : Fragment() {
             lastNapTapTime = now
 
             val ctx = context ?: return@setOnClickListener
-            if (CurfewEnforcer.isCurfewActive(ctx)) {
-                Toast.makeText(ctx, R.string.card_curfew_night_locked_hint, Toast.LENGTH_SHORT).show()
+            if (!isAdded || activity?.isFinishing == true || activity?.isDestroyed == true) return@setOnClickListener
+            if (HomeViewModel.isEnforcedCurfewActive(ctx)) {
+                Toast.makeText(ctx.applicationContext, R.string.card_curfew_night_locked_hint, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            MaterialAlertDialogBuilder(ctx)
+            if (napConfirmDialog?.isShowing == true) return@setOnClickListener
+            napConfirmDialog = MaterialAlertDialogBuilder(ctx)
                 .setTitle(R.string.dialog_nap_confirm_title)
                 .setMessage(R.string.dialog_nap_confirm_msg)
                 .setPositiveButton(android.R.string.ok) { dialog, _ ->
                     dialog.dismiss()
                     _binding?.btnHeroNapStart?.isEnabled = false
                     _binding?.btnHeroNapExtend?.isEnabled = false
+                    val appCtx = ctx.applicationContext
                     homeViewModel.startNap { success ->
                         if (isAdded && _binding != null) {
-                            binding.btnHeroNapStart.isEnabled = true
                             binding.btnHeroNapExtend.isEnabled = true
                             if (success) {
-                                Toast.makeText(ctx, R.string.toast_nap_started, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(appCtx, R.string.toast_nap_started, Toast.LENGTH_SHORT).show()
+                                updateNapDisplay()
+                            } else {
+                                if (!NapController.isNapActive(appCtx) && !HomeViewModel.isEnforcedCurfewActive(appCtx)) {
+                                    binding.btnHeroNapStart.isEnabled = true
+                                }
+                                val errorRes = when {
+                                    HomeViewModel.isEnforcedCurfewActive(appCtx) -> R.string.card_curfew_night_locked_hint
+                                    !ProtectionEngine.isDeviceOwner(appCtx) -> R.string.status_no_device_owner_title
+                                    else -> R.string.status_need_enforce_desc
+                                }
+                                Toast.makeText(appCtx, errorRes, Toast.LENGTH_SHORT).show()
+                                updateNapDisplay()
                             }
                         }
                     }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
+                .setOnDismissListener {
+                    napConfirmDialog = null
+                }
                 .show()
         }
 
@@ -184,13 +215,22 @@ class HomeFragment : Fragment() {
             val ctx = context ?: return@setOnClickListener
             if (!NapController.isNapActive(ctx)) return@setOnClickListener
 
+            val appCtx = ctx.applicationContext
             binding.btnHeroNapExtend.isEnabled = false
             homeViewModel.extendNap { success ->
                 if (isAdded && _binding != null) {
                     binding.btnHeroNapExtend.isEnabled = true
                     if (success) {
-                        Toast.makeText(ctx, R.string.toast_nap_extended, Toast.LENGTH_SHORT).show()
+                        Toast.makeText(appCtx, R.string.toast_nap_extended, Toast.LENGTH_SHORT).show()
+                    } else {
+                        val errorRes = if (!ProtectionEngine.isDeviceOwner(appCtx)) {
+                            R.string.status_no_device_owner_title
+                        } else {
+                            R.string.status_need_enforce_desc
+                        }
+                        Toast.makeText(appCtx, errorRes, Toast.LENGTH_SHORT).show()
                     }
+                    updateNapDisplay()
                 }
             }
         }
@@ -214,26 +254,31 @@ class HomeFragment : Fragment() {
                 return@setOnClickListener
             }
 
-            binding.btnEnforceNow.isEnabled = false
+            val appCtx = ctx.applicationContext
             homeViewModel.toggleProtection { success, errorMsg ->
                 if (isAdded && _binding != null) {
-                    binding.btnEnforceNow.isEnabled = true
                     val message = if (success) {
-                        getString(R.string.toast_enforce_success, DnsShield.getEffectiveDnsHost(ctx))
+                        getString(R.string.toast_enforce_success, DnsShield.getEffectiveDnsHost(appCtx))
                     } else {
                         errorMsg ?: getString(R.string.status_need_enforce_desc)
                     }
-                    Toast.makeText(ctx, message, Toast.LENGTH_LONG).show()
+                    Toast.makeText(appCtx, message, Toast.LENGTH_LONG).show()
                 }
             }
         }
 
         binding.btnGrantUsageAccess.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            val ctx = context ?: return@setOnClickListener
+            try {
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            } catch (e: Exception) {
+                Log.w("HomeFragment", "Unable to open Usage Access Settings", e)
+                Toast.makeText(ctx.applicationContext, R.string.toast_open_settings_failed, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    fun updateProtectionState(state: ProtectionUiState) {
+    fun updateProtectionState(state: ProtectionUiState, isApplying: Boolean = false) {
         if (!isAdded || _binding == null) return
 
         val ctx = context ?: return
@@ -243,17 +288,28 @@ class HomeFragment : Fragment() {
                 binding.btnEnforceNow.setText(R.string.btn_enforcing)
             }
             is ProtectionUiState.Error -> {
-                binding.btnEnforceNow.isEnabled = true
-                binding.btnEnforceNow.setText(R.string.btn_enforce_now)
+                binding.btnEnforceNow.isEnabled = !isApplying
+                binding.btnEnforceNow.setText(if (isApplying) R.string.btn_enforcing else R.string.btn_enforce_now)
+                binding.cardHomeNotice.visibility = View.VISIBLE
+                binding.tvHomeNoticeTitle.text = getString(R.string.status_need_enforce_title)
+                binding.tvHomeNoticeDesc.text = state.message
+                binding.tvHeroShieldStatus.text = getString(R.string.home_shield_inactive)
+                binding.tvHeroShieldStatus.setTextColor(ContextCompat.getColor(ctx, R.color.shield_amber_calm))
+                binding.tvHeroShieldStatus.setBackgroundResource(R.drawable.bg_shield_status_badge_amber)
+                binding.frameHeroShieldGlow.setBackgroundResource(R.drawable.bg_hero_shield_inactive)
             }
             is ProtectionUiState.Success -> {
-                binding.btnEnforceNow.isEnabled = !state.isEnforcing
-                binding.btnEnforceNow.setText(if (state.isEnforcing) R.string.btn_enforcing else R.string.btn_enforce_now)
+                val canEnforce = !isApplying && !state.isEnforcing
+                binding.btnEnforceNow.isEnabled = canEnforce
+                binding.btnEnforceNow.setText(if (canEnforce) R.string.btn_enforce_now else R.string.btn_enforcing)
 
                 if (state.isDeviceOwner) {
                     binding.cardAdbHelp.visibility = View.GONE
 
-                    val allActive = ProtectionEngine.shields.all { state.shields[it.id] is ShieldStatus.Active }
+                    val isHealthyStatus: (ShieldStatus?) -> Boolean = { status ->
+                        status is ShieldStatus.Active || status is ShieldStatus.Unsupported
+                    }
+                    val allActive = ProtectionEngine.shields.all { isHealthyStatus(state.shields[it.id]) }
 
                     if (allActive) {
                         binding.cardHomeNotice.visibility = View.GONE
@@ -265,7 +321,7 @@ class HomeFragment : Fragment() {
                         binding.cardHomeNotice.visibility = View.VISIBLE
 
                         val firstFailingShield = ProtectionEngine.shields.firstOrNull { shield ->
-                            state.shields[shield.id] !is ShieldStatus.Active
+                            !isHealthyStatus(state.shields[shield.id])
                         }
                         val failingStatus = firstFailingShield?.let { state.shields[it.id] }
                         val shieldTitle = firstFailingShield?.let { getString(it.titleResId) }
@@ -293,8 +349,7 @@ class HomeFragment : Fragment() {
                     binding.cardHomeNotice.visibility = View.VISIBLE
                     binding.tvHomeNoticeTitle.text = getString(R.string.status_no_device_owner_title)
                     binding.tvHomeNoticeDesc.text = getString(R.string.status_no_device_owner_desc)
-                    binding.btnEnforceNow.isEnabled = true
-                    binding.btnEnforceNow.setText(R.string.btn_activate_device_owner_now)
+                    binding.btnEnforceNow.setText(if (canEnforce) R.string.btn_activate_device_owner_now else R.string.btn_enforcing)
 
                     binding.tvHeroShieldStatus.text = getString(R.string.home_shield_inactive)
                     binding.tvHeroShieldStatus.setTextColor(ContextCompat.getColor(ctx, R.color.shield_amber_calm))
@@ -321,7 +376,7 @@ class HomeFragment : Fragment() {
      */
     fun updateNapCountdown(remainingMs: Long) {
         val ctx = context ?: return
-        val isNight = CurfewEnforcer.isCurfewActive(ctx)
+        val isNight = HomeViewModel.isEnforcedCurfewActive(ctx)
         val isNap = remainingMs > 0L
         updateNapCountdown(remainingMs, isNap, isNight)
     }
@@ -360,6 +415,8 @@ class HomeFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        napConfirmDialog?.dismiss()
+        napConfirmDialog = null
         super.onDestroyView()
         _binding = null
     }

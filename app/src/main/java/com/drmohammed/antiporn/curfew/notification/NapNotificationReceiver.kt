@@ -3,6 +3,8 @@ package com.drmohammed.antiporn.curfew.notification
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
@@ -10,6 +12,10 @@ import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
 import com.drmohammed.antiporn.curfew.NapController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -33,29 +39,47 @@ class NapNotificationReceiver : BroadcastReceiver() {
             }
 
             val appContext = context.applicationContext
-            if (!NapController.isNapActive(appContext)) {
-                Log.w(TAG, "Attempted to extend nap when nap is not active; syncing notification")
-                ProtectionNotificationCoordinator.syncProtectionNotification(appContext)
-                return
+            val pendingResult = goAsync()
+            val finished = AtomicBoolean(false)
+            fun finishOnce() {
+                if (finished.compareAndSet(false, true)) {
+                    pendingResult.finish()
+                }
             }
 
-            Log.i(TAG, "Received ACTION_EXTEND_NAP from notification action button")
-
-            val pendingResult = goAsync()
-            try {
-                NapController.extendNap(appContext)
-                CurfewScheduler.scheduleNapEndAlarm(appContext, NapController.getEndWall(appContext))
-                CurfewEnforcer.syncBlockStateAsync(appContext) {
-                    try {
+            CoroutineScope(Dispatchers.IO).launch {
+                var delegatedToSyncCallback = false
+                try {
+                    if (!NapController.isNapActive(appContext)) {
+                        Log.w(TAG, "Attempted to extend nap when nap is not active; syncing notification")
                         ProtectionNotificationCoordinator.syncProtectionNotification(appContext)
-                        Toast.makeText(appContext, R.string.toast_nap_extended, Toast.LENGTH_SHORT).show()
-                    } finally {
-                        pendingResult.finish()
+                        return@launch
+                    }
+
+                    Log.i(TAG, "Received ACTION_EXTEND_NAP from notification action button")
+                    NapController.extendNap(appContext)
+                    CurfewScheduler.scheduleNapEndAlarm(appContext, NapController.getEndWall(appContext))
+                    delegatedToSyncCallback = true
+                    CurfewEnforcer.syncBlockStateAsync(appContext) {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                ProtectionNotificationCoordinator.syncProtectionNotification(appContext)
+                                Handler(Looper.getMainLooper()).post {
+                                    Toast.makeText(appContext, R.string.toast_nap_extended, Toast.LENGTH_SHORT).show()
+                                }
+                            } finally {
+                                finishOnce()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error extending nap in receiver", e)
+                    delegatedToSyncCallback = false
+                } finally {
+                    if (!delegatedToSyncCallback) {
+                        finishOnce()
                     }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error extending nap in receiver", e)
-                pendingResult.finish()
             }
         }
     }

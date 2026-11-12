@@ -61,7 +61,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/bottom_sheet_shields_subtitle"
-                android:textColor="?attr/colorOutline"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -82,7 +82,7 @@
     <!-- Scrollable Shields List -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true"
         android:overScrollMode="never">
@@ -133,7 +133,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="24dp"
                     android:text="@string/bottom_sheet_empty_desc"
-                    android:textColor="?attr/colorOutline"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp" />
             </LinearLayout>
         </LinearLayout>

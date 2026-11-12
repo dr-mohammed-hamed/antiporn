@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -74,6 +75,7 @@ object TrustedTimeProvider {
     const val KEY_BOOT_COUNT = "boot_count"
     const val KEY_TRUSTED_TIME_ZONE_ID = "trusted_time_zone_id"
     const val KEY_HAS_EVER_SYNCED = "has_ever_synced"
+    const val KEY_OFFLINE_ESTIMATED_TIME = "offline_estimated_time"
 
     /** Minimum interval between successful network syncs to debounce callbacks (15 minutes). */
     const val MIN_SYNC_INTERVAL_MS = 15 * 60 * 1000L
@@ -93,6 +95,8 @@ object TrustedTimeProvider {
     /** Injectable time providers for unit testability without Robolectric. */
     var elapsedRealtimeProvider: () -> Long = { SystemClock.elapsedRealtime() }
     var wallTimeProvider: () -> Long = { System.currentTimeMillis() }
+    @VisibleForTesting
+    internal var sntpRequester: () -> SntpResult? = { SntpClient.requestTime() }
 
     /** Notification listener for significant time drift corrections (e.g. to reschedule alarms). */
     @Volatile
@@ -104,7 +108,7 @@ object TrustedTimeProvider {
     )
 
     private val lastKnownTrueTimeMs = AtomicLong(0L)
-    @Volatile private var lastPersistedElapsedMs: Long = 0L
+    private val lastPersistedElapsedMs = AtomicLong(0L)
     @Volatile private var lastSyncElapsedRealtime: Long = 0L
     @Volatile private var hasEverSyncedFlag: Boolean = false
     @Volatile private var trustedTimeZoneId: String = CurfewConfig.getDefaultFallbackTimeZone()
@@ -112,9 +116,12 @@ object TrustedTimeProvider {
     @Volatile private var cachedAppContext: Context? = null
 
     private val stateLock = Any()
+    private val persistLock = Any()
+    private val persistGen = AtomicLong(0L)
 
-    /** Background CoroutineScope for asynchronous network syncs and debounced disk persistence. */
+    /** Background CoroutineScope for asynchronous network syncs and single-thread executor for serialized persistence. */
     private val timeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val persistExecutor = Executors.newSingleThreadExecutor()
 
     /** Handler targeting Android main thread for UI completion callbacks (lazily evaluated). */
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
@@ -124,7 +131,7 @@ object TrustedTimeProvider {
      * Safe to call multiple times; subsequent calls are fast no-ops.
      */
     fun initialize(context: Context) {
-        ensureInitialized(context.applicationContext)
+        ensureInitialized(context.applicationContext ?: context)
     }
 
     /**
@@ -150,8 +157,16 @@ object TrustedTimeProvider {
             wall
         }
 
+        if (!hasEverSyncedFlag) {
+            return computed
+        }
+
         val currentLast = lastKnownTrueTimeMs.get()
         val finalTime = maxOf(computed, currentLast)
+        if (!anchor.isStrictlyTrusted) {
+            // Keep offline wallDelta heuristics strictly in currentAnchor without polluting verified lastKnownTrueTimeMs.
+            return finalTime
+        }
         val updated = lastKnownTrueTimeMs.accumulateAndGet(finalTime, ::maxOf)
         if (updated > currentLast) {
             maybeDebouncePersist(nowElapsed, updated)
@@ -163,7 +178,7 @@ object TrustedTimeProvider {
      * Overload ensuring initialization before returning trusted epoch time.
      */
     fun currentTimeMillis(context: Context): Long {
-        ensureInitialized(context.applicationContext)
+        ensureInitialized(context.applicationContext ?: context)
         return currentTimeMillis()
     }
 
@@ -175,23 +190,29 @@ object TrustedTimeProvider {
      * @return True if sync succeeded, false otherwise.
      */
     fun syncNow(context: Context, force: Boolean = false): Boolean {
-        val appContext = context.applicationContext
+        val appContext = context.applicationContext ?: context
         ensureInitialized(appContext)
         updateTrustedTimeZoneFromPolicy(appContext)
 
         val nowElapsed = elapsedRealtimeProvider()
         val isCurrentAnchorTrusted = currentAnchor.get().isStrictlyTrusted
         if (!force && isCurrentAnchorTrusted && (nowElapsed - lastSyncElapsedRealtime < MIN_SYNC_INTERVAL_MS)) {
-            Log.d(TAG, "syncNow skipped: already synchronized within debounce interval (${(nowElapsed - lastSyncElapsedRealtime) / 1000}s ago)")
+            safeLog(Log.DEBUG, "syncNow skipped: already synchronized within debounce interval (${(nowElapsed - lastSyncElapsedRealtime) / 1000}s ago)")
             return true
         }
 
-        val result = SntpClient.requestTime()
+        val result = sntpRequester()
         return if (result != null) {
             val currentLast = lastKnownTrueTimeMs.get()
-            if (currentLast > 0L && (result.timeMs < currentLast || result.timeMs > currentLast + SntpClient.MAX_HTTP_FUTURE_DRIFT_MS)) {
-                Log.w(TAG, "Rejecting sync result out of bounds: time=${result.timeMs}, lastKnown=$currentLast")
-                return false
+            if (hasEverSynced() && currentLast > 0L) {
+                if (result.timeMs < currentLast) {
+                    safeLog(Log.WARN, "Rejecting sync result earlier than lastKnown: time=${result.timeMs}, lastKnown=$currentLast")
+                    return false
+                }
+                if (result.timeMs > currentLast + SntpClient.MAX_HTTP_FUTURE_DRIFT_MS && !result.isQuorumVerified) {
+                    safeLog(Log.WARN, "Rejecting unverified large future jump (>30 days): time=${result.timeMs}, lastKnown=$currentLast")
+                    return false
+                }
             }
             var driftToNotify: Long? = null
 
@@ -208,7 +229,7 @@ object TrustedTimeProvider {
 
                 lastKnownTrueTimeMs.accumulateAndGet(result.timeMs, ::maxOf)
                 lastSyncElapsedRealtime = result.elapsedRealtimeMs
-                lastPersistedElapsedMs = result.elapsedRealtimeMs
+                lastPersistedElapsedMs.set(result.elapsedRealtimeMs)
                 hasEverSyncedFlag = true
 
                 val newComputed = currentTimeMillis()
@@ -219,25 +240,26 @@ object TrustedTimeProvider {
 
                 val currentBootCount = getSystemBootCount(appContext)
                 val nowWall = wallTimeProvider()
-                val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                val editor = prefs.edit()
-                    .putLong(KEY_ANCHOR_TIME, result.timeMs)
-                    .putLong(KEY_ANCHOR_ELAPSED, result.elapsedRealtimeMs)
-                    .putLong(KEY_LAST_KNOWN_TRUE_TIME, lastKnownTrueTimeMs.get())
-                    .putLong(KEY_LAST_ELAPSED, result.elapsedRealtimeMs)
-                    .putLong(KEY_LAST_SAVED_WALL_TIME, nowWall)
-                    .putBoolean(KEY_HAS_EVER_SYNCED, true)
-                    .putString(KEY_TRUSTED_TIME_ZONE_ID, trustedTimeZoneId)
-
-                if (currentBootCount != -1) {
-                    editor.putInt(KEY_BOOT_COUNT, currentBootCount)
+                val syncedLastKnown = lastKnownTrueTimeMs.get()
+                persistGen.incrementAndGet()
+                commitPrefs(appContext) {
+                    putLong(KEY_ANCHOR_TIME, result.timeMs)
+                        .putLong(KEY_ANCHOR_ELAPSED, result.elapsedRealtimeMs)
+                        .putLong(KEY_LAST_KNOWN_TRUE_TIME, syncedLastKnown)
+                        .putLong(KEY_OFFLINE_ESTIMATED_TIME, syncedLastKnown)
+                        .putLong(KEY_LAST_ELAPSED, result.elapsedRealtimeMs)
+                        .putLong(KEY_LAST_SAVED_WALL_TIME, nowWall)
+                        .putBoolean(KEY_HAS_EVER_SYNCED, true)
+                        .putString(KEY_TRUSTED_TIME_ZONE_ID, trustedTimeZoneId)
+                    if (currentBootCount != -1) {
+                        putInt(KEY_BOOT_COUNT, currentBootCount)
+                    }
                 }
-                editor.apply()
             }
 
             driftToNotify?.let { drift ->
-                Log.i(TAG, "TrustedTime detected significant time drift ($drift ms). Triggering onTimeDriftCorrected listener.")
-                com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordTime(
+                safeLog(Log.INFO, "TrustedTime detected significant time drift ($drift ms). Triggering onTimeDriftCorrected listener.")
+                safeRecordTime(
                     context,
                     "TIME_DRIFT_DETECTED",
                     isSuccess = true,
@@ -246,12 +268,12 @@ object TrustedTimeProvider {
                 try {
                     onTimeDriftCorrected?.invoke(drift)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Unhandled exception in onTimeDriftCorrected callback", e)
+                    safeLog(Log.ERROR, "Unhandled exception in onTimeDriftCorrected callback", e)
                 }
             }
 
-            Log.i(TAG, "TrustedTime synchronized via ${result.source}: trueTime=${result.timeMs}, latency=${result.roundTripLatencyMs}ms")
-            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordTime(
+            safeLog(Log.INFO, "TrustedTime synchronized via ${result.source}: trueTime=${result.timeMs}, latency=${result.roundTripLatencyMs}ms")
+            safeRecordTime(
                 context,
                 "SNTP_SYNC_SUCCESS",
                 isSuccess = true,
@@ -259,8 +281,8 @@ object TrustedTimeProvider {
             )
             true
         } else {
-            Log.w(TAG, "TrustedTime network synchronization failed across all sources")
-            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordTime(
+            safeLog(Log.WARN, "TrustedTime network synchronization failed across all sources")
+            safeRecordTime(
                 context,
                 "SNTP_SYNC_FAILED",
                 isSuccess = false,
@@ -283,7 +305,7 @@ object TrustedTimeProvider {
      * @param onComplete Optional callback delivered on the main UI thread with sync status.
      */
     fun syncNowAsync(context: Context, force: Boolean = false, onComplete: ((Boolean) -> Unit)? = null) {
-        val appContext = context.applicationContext
+        val appContext = context.applicationContext ?: context
         timeScope.launch {
             val success = syncNow(appContext, force)
             if (onComplete != null) {
@@ -323,7 +345,7 @@ object TrustedTimeProvider {
      * set to the current trusted time, after refreshing timezone preferences if needed.
      */
     fun getCurfewCalendar(context: Context): Calendar {
-        val appContext = context.applicationContext
+        val appContext = context.applicationContext ?: context
         ensureInitialized(appContext)
         updateTrustedTimeZoneFromPolicy(appContext)
         val tz = TimeZone.getTimeZone(trustedTimeZoneId)
@@ -342,7 +364,10 @@ object TrustedTimeProvider {
      * @param targetTrueTimeMs Desired future epoch time in milliseconds.
      * @return Monotonic elapsed realtime timestamp for AlarmManager.
      */
-    fun computeElapsedTrigger(targetTrueTimeMs: Long): Long {
+    fun computeElapsedTrigger(targetTrueTimeMs: Long, context: Context? = null): Long {
+        if (context != null) {
+            ensureInitialized(context.applicationContext ?: context)
+        }
         val currentTrue = currentTimeMillis()
         val delayMs = maxOf(0L, targetTrueTimeMs - currentTrue)
         return elapsedRealtimeProvider() + delayMs
@@ -372,7 +397,7 @@ object TrustedTimeProvider {
     /**
      * Returns true if time was synchronized via network at least once in application history.
      */
-    fun hasEverSynced(): Boolean = hasEverSyncedFlag || lastKnownTrueTimeMs.get() > 0L
+    fun hasEverSynced(): Boolean = hasEverSyncedFlag
 
     /**
      * Returns the active trusted timezone ID.
@@ -392,6 +417,7 @@ object TrustedTimeProvider {
             val savedAnchorTime = prefs.getLong(KEY_ANCHOR_TIME, 0L)
             val savedAnchorElapsed = prefs.getLong(KEY_ANCHOR_ELAPSED, 0L)
             val savedLastKnown = prefs.getLong(KEY_LAST_KNOWN_TRUE_TIME, 0L)
+            val savedOfflineEstimated = prefs.getLong(KEY_OFFLINE_ESTIMATED_TIME, 0L)
             val savedLastElapsed = prefs.getLong(KEY_LAST_ELAPSED, 0L)
             val savedLastWall = prefs.getLong(KEY_LAST_SAVED_WALL_TIME, 0L)
             val savedTz = prefs.getString(KEY_TRUSTED_TIME_ZONE_ID, DEFAULT_TIMEZONE_ID) ?: DEFAULT_TIMEZONE_ID
@@ -402,8 +428,8 @@ object TrustedTimeProvider {
             val currentBootCount = getSystemBootCount(appContext)
 
             trustedTimeZoneId = savedTz
-            hasEverSyncedFlag = savedHasEverSynced || savedAnchorTime > 0L || savedLastKnown > 0L
-            lastKnownTrueTimeMs.set(savedLastKnown)
+            hasEverSyncedFlag = savedHasEverSynced || savedAnchorTime > 0L
+            lastKnownTrueTimeMs.set(if (hasEverSyncedFlag) savedLastKnown else 0L)
 
             // Detect whether the device has rebooted since last recorded state
             val rebootDetected = (savedBootCount != -1 && currentBootCount != -1 && currentBootCount != savedBootCount) ||
@@ -423,35 +449,67 @@ object TrustedTimeProvider {
             } else {
                 // Device rebooted or cold boot without network synchronization
                 val currentWall = wallTimeProvider()
-                val wallDelta = if (savedLastWall > 0L) currentWall - savedLastWall else 0L
+                if (hasEverSyncedFlag && savedLastKnown > 0L) {
+                    val persistedFloor = maxOf(savedLastKnown, savedOfflineEstimated)
+                    val wallDelta = if (savedLastWall > 0L) currentWall - savedLastWall else 0L
 
-                val offlineAnchorTime = if (wallDelta > 0L) {
-                    val clampedDelta = minOf(wallDelta, MAX_OFFLINE_ADVANCE_MS)
-                    savedLastKnown + clampedDelta
-                } else {
-                    // Anti-rollback: wall clock was turned backward or was identical
-                    savedLastKnown
-                }
+                    val offlineAnchorTime = if (wallDelta > 0L) {
+                        val clampedDelta = minOf(wallDelta, MAX_OFFLINE_ADVANCE_MS)
+                        savedLastKnown + clampedDelta
+                    } else {
+                        // Anti-rollback: wall clock was turned backward or was identical
+                        savedLastKnown
+                    }
 
-                val finalTime = maxOf(offlineAnchorTime, savedLastKnown)
-                lastKnownTrueTimeMs.set(finalTime)
-                currentAnchor.set(
-                    TimeAnchor(
-                        trueTimeMs = finalTime,
-                        elapsedMs = currentElapsed,
-                        isStrictlyTrusted = false,
-                        isDegradedOffline = true
+                    val finalTime = maxOf(offlineAnchorTime, persistedFloor)
+                    lastKnownTrueTimeMs.set(savedLastKnown)
+                    currentAnchor.set(
+                        TimeAnchor(
+                            trueTimeMs = finalTime,
+                            elapsedMs = currentElapsed,
+                            isStrictlyTrusted = false,
+                            isDegradedOffline = true
+                        )
                     )
-                )
-                Log.d(TAG, "TrustedTime detected reboot/cold boot. Offline mode active: anchorTime=$finalTime, wallDelta=$wallDelta, clamped=${wallDelta > MAX_OFFLINE_ADVANCE_MS}")
+                    safeLog(Log.DEBUG, "TrustedTime detected reboot/cold boot. Offline mode active: anchorTime=$finalTime, lastKnownVerified=$savedLastKnown, persistedFloor=$persistedFloor, wallDelta=$wallDelta, clamped=${wallDelta > MAX_OFFLINE_ADVANCE_MS}")
+                } else {
+                    val baselineTime = maxOf(currentWall, 0L)
+                    lastKnownTrueTimeMs.set(0L)
+                    currentAnchor.set(
+                        TimeAnchor(
+                            trueTimeMs = baselineTime,
+                            elapsedMs = currentElapsed,
+                            isStrictlyTrusted = false,
+                            isDegradedOffline = true
+                        )
+                    )
+                    safeLog(Log.DEBUG, "TrustedTime cold boot with no prior sync; initialized baseline offline anchor=$baselineTime")
+                }
             }
 
-            if (savedBootCount == -1 && currentBootCount != -1) {
-                prefs.edit().putInt(KEY_BOOT_COUNT, currentBootCount).apply()
+            if (currentBootCount != -1 && savedBootCount != currentBootCount) {
+                commitPrefs(appContext) {
+                    putInt(KEY_BOOT_COUNT, currentBootCount)
+                }
             }
 
-            lastPersistedElapsedMs = currentElapsed
+            lastPersistedElapsedMs.set(currentElapsed)
             isInitialized = true
+        }
+    }
+
+    @SuppressLint("ApplySharedPref")
+    private fun commitPrefs(
+        appContext: Context,
+        expectedGen: Long? = null,
+        block: android.content.SharedPreferences.Editor.() -> Unit
+    ) {
+        synchronized(persistLock) {
+            if (expectedGen != null && persistGen.get() != expectedGen) return
+            appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .apply(block)
+                .commit()
         }
     }
 
@@ -462,19 +520,40 @@ object TrustedTimeProvider {
     @SuppressLint("ApplySharedPref")
     fun persistOnShutdown(context: Context) {
         try {
-            ensureInitialized(context.applicationContext)
+            val appContext = context.applicationContext ?: context
+            ensureInitialized(appContext)
             val nowElapsed = elapsedRealtimeProvider()
             val nowTrue = currentTimeMillis()
+            val verifiedLastKnown = lastKnownTrueTimeMs.get()
+            val isStrictlyTrusted = currentAnchor.get().isStrictlyTrusted
             val nowWall = wallTimeProvider()
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .putLong(KEY_LAST_KNOWN_TRUE_TIME, nowTrue)
-                .putLong(KEY_LAST_ELAPSED, nowElapsed)
-                .putLong(KEY_LAST_SAVED_WALL_TIME, nowWall)
-                .commit()
-            Log.i(TAG, "Persisted shutdown timestamp synchronously: trueTime=$nowTrue, wallTime=$nowWall, elapsed=$nowElapsed")
+            val currentBootCount = getSystemBootCount(appContext)
+            persistGen.incrementAndGet()
+            val existingOffline = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getLong(KEY_OFFLINE_ESTIMATED_TIME, 0L)
+            commitPrefs(appContext) {
+                putLong(KEY_LAST_ELAPSED, nowElapsed)
+                if (currentBootCount != -1) {
+                    putInt(KEY_BOOT_COUNT, currentBootCount)
+                }
+                if (isStrictlyTrusted) {
+                    putLong(KEY_LAST_SAVED_WALL_TIME, nowWall)
+                    if (hasEverSyncedFlag && verifiedLastKnown > 0L) {
+                        putLong(KEY_LAST_KNOWN_TRUE_TIME, verifiedLastKnown)
+                        putLong(KEY_OFFLINE_ESTIMATED_TIME, verifiedLastKnown)
+                    }
+                } else if (hasEverSyncedFlag && verifiedLastKnown > 0L) {
+                    // Offline shutdown: keep KEY_LAST_SAVED_WALL_TIME & KEY_LAST_KNOWN_TRUE_TIME intact
+                    // so chained offline reboots remain bounded by MAX_OFFLINE_ADVANCE_MS while preserving monotonic floor.
+                    putLong(KEY_OFFLINE_ESTIMATED_TIME, maxOf(nowTrue, verifiedLastKnown, existingOffline))
+                }
+            }
+            safeLog(
+                Log.INFO,
+                "Persisted shutdown timestamp synchronously: effectiveTime=$nowTrue, verifiedLastKnown=$verifiedLastKnown, wallTime=$nowWall, elapsed=$nowElapsed, synced=$hasEverSyncedFlag"
+            )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed synchronous persistence during device shutdown", e)
+            safeLog(Log.ERROR, "Failed synchronous persistence during device shutdown", e)
         }
     }
 
@@ -486,37 +565,40 @@ object TrustedTimeProvider {
             val policyTz = CurfewConfig.getTargetTimeZoneId(appContext)
             if (policyTz.isNotBlank() && policyTz != trustedTimeZoneId) {
                 trustedTimeZoneId = policyTz
-                appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(KEY_TRUSTED_TIME_ZONE_ID, policyTz)
-                    .apply()
-                Log.i(TAG, "Updated trusted timezone from policy: $policyTz")
+                commitPrefs(appContext) {
+                    putString(KEY_TRUSTED_TIME_ZONE_ID, policyTz)
+                }
+                safeLog(Log.INFO, "Updated trusted timezone from policy: $policyTz")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed updating trusted timezone from policy", e)
+            safeLog(Log.WARN, "Failed updating trusted timezone from policy", e)
         }
     }
 
     /**
      * Debounces persisting advancing [lastKnownTrueTimeMs] and wall clock reference to SharedPreferences.
-     * Executes asynchronously on [backgroundExecutor] to ensure [currentTimeMillis]
-     * remains strictly non-blocking O(1).
+     * Executes asynchronously on a serialized single-thread executor to ensure [currentTimeMillis]
+     * remains strictly non-blocking O(1) while preventing .apply()/.commit() overwrite races.
      */
     private fun maybeDebouncePersist(nowElapsed: Long, timeToPersist: Long) {
-        if (nowElapsed - lastPersistedElapsedMs >= DEBOUNCE_PERSIST_MS) {
-            lastPersistedElapsedMs = nowElapsed
+        if (!hasEverSyncedFlag || !currentAnchor.get().isStrictlyTrusted) return
+        val prevPersisted = lastPersistedElapsedMs.get()
+        if (nowElapsed - prevPersisted >= DEBOUNCE_PERSIST_MS &&
+            lastPersistedElapsedMs.compareAndSet(prevPersisted, nowElapsed)
+        ) {
+            val capturedGen = persistGen.get()
             val nowWall = wallTimeProvider()
             val ctx = cachedAppContext ?: return
-            timeScope.launch {
+            persistExecutor.execute {
                 try {
-                    ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                        .edit()
-                        .putLong(KEY_LAST_KNOWN_TRUE_TIME, timeToPersist)
-                        .putLong(KEY_LAST_ELAPSED, nowElapsed)
-                        .putLong(KEY_LAST_SAVED_WALL_TIME, nowWall)
-                        .apply()
+                    commitPrefs(ctx, expectedGen = capturedGen) {
+                        putLong(KEY_LAST_KNOWN_TRUE_TIME, timeToPersist)
+                            .putLong(KEY_OFFLINE_ESTIMATED_TIME, timeToPersist)
+                            .putLong(KEY_LAST_ELAPSED, nowElapsed)
+                            .putLong(KEY_LAST_SAVED_WALL_TIME, nowWall)
+                    }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed debounced persistence of lastKnownTrueTime", e)
+                    safeLog(Log.WARN, "Failed debounced persistence of lastKnownTrueTime", e)
                 }
             }
         }
@@ -529,23 +611,58 @@ object TrustedTimeProvider {
         return try {
             Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1)
         } catch (e: Exception) {
-            Log.w(TAG, "Unable to read Settings.Global.BOOT_COUNT: ${e.message}")
+            safeLog(Log.WARN, "Unable to read Settings.Global.BOOT_COUNT: ${e.message}")
             -1
+        }
+    }
+
+    private fun safeRecordTime(
+        context: Context,
+        action: String,
+        isSuccess: Boolean,
+        details: String? = null,
+        error: String? = null
+    ) {
+        try {
+            com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordTime(
+                context,
+                action,
+                isSuccess = isSuccess,
+                details = details,
+                error = error
+            )
+        } catch (e: Throwable) {
+            safeLog(Log.DEBUG, "Skipping BlackBoxRecorder.recordTime in test/stub context: ${e.message}")
+        }
+    }
+
+    private fun safeLog(priority: Int, message: String, throwable: Throwable? = null) {
+        try {
+            when (priority) {
+                Log.DEBUG -> Log.d(TAG, message, throwable)
+                Log.INFO -> Log.i(TAG, message, throwable)
+                Log.WARN -> Log.w(TAG, message, throwable)
+                else -> Log.e(TAG, message, throwable)
+            }
+        } catch (e: RuntimeException) {
+            if (e.message?.contains("not mocked") != true) throw e
         }
     }
 
     @VisibleForTesting
     fun resetForTesting() {
         synchronized(stateLock) {
+            persistGen.incrementAndGet()
             currentAnchor.set(TimeAnchor(0L, 0L, isStrictlyTrusted = false, isDegradedOffline = false))
             lastKnownTrueTimeMs.set(0L)
-            lastPersistedElapsedMs = 0L
+            lastPersistedElapsedMs.set(0L)
             lastSyncElapsedRealtime = 0L
             hasEverSyncedFlag = false
             trustedTimeZoneId = DEFAULT_TIMEZONE_ID
             isInitialized = false
             cachedAppContext = null
             onTimeDriftCorrected = null
+            sntpRequester = { SntpClient.requestTime() }
         }
     }
 

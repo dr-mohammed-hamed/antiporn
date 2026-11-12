@@ -12,7 +12,7 @@ import org.json.JSONObject
 data class DevicePolicyBundle(
     val curfewStartHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR, val curfewStartMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE,
     val curfewEndHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR, val curfewEndMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE,
-    val isCurfewEnabled: Boolean = true,
+    val isCurfewEnabled: Boolean = false,
     val isInstantInternetKillEnabled: Boolean = false,
     val isWeekendCurfewEnabled: Boolean = false,
     val weekendCurfewStartHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_HOUR, val weekendCurfewStartMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.START_MINUTE,
@@ -50,7 +50,7 @@ data class DevicePolicyBundle(
     val lastSelfModifiedAt: Long? = null,
     val waqfaConfig: WaqfaConfig = WaqfaConfig(),
     val version: Long = 1L,
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = 0L
 ) {
 
     fun toMap(): Map<String, Any?> {
@@ -324,7 +324,10 @@ data class DevicePolicyBundle(
             return set
         }
 
-        fun fromJson(jsonStr: String): DevicePolicyBundle {
+        fun fromJson(jsonStr: String): DevicePolicyBundle = fromJsonOrNull(jsonStr) ?: defaultPolicy()
+
+        fun fromJsonOrNull(jsonStr: String): DevicePolicyBundle? {
+            if (jsonStr.isBlank()) return null
             return try {
                 val json = JSONObject(jsonStr)
                 val blacklist = json.optJSONArray("customBlacklistPackages").toStringSet()
@@ -403,7 +406,7 @@ data class DevicePolicyBundle(
                     lastSelfModifiedAt = lastSelfModifiedAt,
                     waqfaConfig = waqfa,
                     version = json.optLong("version", 1L),
-                    updatedAt = json.optLong("updatedAt", System.currentTimeMillis())
+                    updatedAt = json.optLong("updatedAt", 0L)
                 )
             } catch (e: Exception) {
                 try {
@@ -411,7 +414,7 @@ data class DevicePolicyBundle(
                 } catch (_: Throwable) {
                     /* safe fallback for unit tests */
                 }
-                defaultPolicy()
+                null
             }
         }
     }

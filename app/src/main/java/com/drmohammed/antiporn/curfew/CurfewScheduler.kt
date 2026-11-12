@@ -40,13 +40,26 @@ object CurfewScheduler {
      * accounting for weekend curfew schedules when enabled.
      */
     fun getCurfewEndTimeForDay(context: Context, dayOfWeek: Int): Pair<Int, Int> {
-        return if (CurfewConfig.isWeekendCurfewEnabled(context) &&
-            (dayOfWeek == Calendar.FRIDAY || dayOfWeek == Calendar.SATURDAY)
-        ) {
-            CurfewConfig.getWeekendCurfewEndHour(context) to CurfewConfig.getWeekendCurfewEndMinute(context)
-        } else {
-            CurfewConfig.getCurfewEndHour(context) to CurfewConfig.getCurfewEndMinute(context)
+        if (!CurfewConfig.isWeekendCurfewEnabled(context)) {
+            return CurfewConfig.getCurfewEndHour(context) to CurfewConfig.getCurfewEndMinute(context)
         }
+        if (dayOfWeek == Calendar.FRIDAY || dayOfWeek == Calendar.SATURDAY) {
+            return CurfewConfig.getWeekendCurfewEndHour(context) to CurfewConfig.getWeekendCurfewEndMinute(context)
+        }
+        if (dayOfWeek == Calendar.THURSDAY) {
+            val weekdayStartMin = CurfewConfig.getCurfewStartHour(context) * 60 + CurfewConfig.getCurfewStartMinute(context)
+            val weekdayEndH = CurfewConfig.getCurfewEndHour(context)
+            val weekdayEndM = CurfewConfig.getCurfewEndMinute(context)
+            val weekdayEndMin = weekdayEndH * 60 + weekdayEndM
+            val weekendStartMin = CurfewConfig.getWeekendCurfewStartHour(context) * 60 + CurfewConfig.getWeekendCurfewStartMinute(context)
+            val weekendEndH = CurfewConfig.getWeekendCurfewEndHour(context)
+            val weekendEndM = CurfewConfig.getWeekendCurfewEndMinute(context)
+            val weekendEndMin = weekendEndH * 60 + weekendEndM
+            if (weekdayStartMin <= weekdayEndMin && weekendStartMin < weekendEndMin) {
+                return weekendEndH to weekendEndM
+            }
+        }
+        return CurfewConfig.getCurfewEndHour(context) to CurfewConfig.getCurfewEndMinute(context)
     }
 
     /**
@@ -76,21 +89,46 @@ object CurfewScheduler {
      * day-specific and weekend-specific schedules across upcoming days.
      */
     fun getNextCurfewEnd(context: Context, now: Calendar = CurfewConfig.getCurfewCalendar(context)): Calendar {
+        val startH = CurfewConfig.getCurfewStartHour(context)
+        val startM = CurfewConfig.getCurfewStartMinute(context)
+        val endH = CurfewConfig.getCurfewEndHour(context)
+        val endM = CurfewConfig.getCurfewEndMinute(context)
+        val isWeekend = CurfewConfig.isWeekendCurfewEnabled(context)
+        val weekendStartH = CurfewConfig.getWeekendCurfewStartHour(context)
+        val weekendStartM = CurfewConfig.getWeekendCurfewStartMinute(context)
+        val weekendEndH = CurfewConfig.getWeekendCurfewEndHour(context)
+        val weekendEndM = CurfewConfig.getWeekendCurfewEndMinute(context)
+
         for (dayOffset in 0..7) {
-            val candidate = (now.clone() as Calendar).apply {
+            val dayBase = (now.clone() as Calendar).apply {
                 add(Calendar.DAY_OF_YEAR, dayOffset)
-                val dayOfWeek = get(Calendar.DAY_OF_WEEK)
-                val (hour, minute) = getCurfewEndTimeForDay(context, dayOfWeek)
-                set(Calendar.HOUR_OF_DAY, hour)
-                set(Calendar.MINUTE, minute)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
             }
-            if (candidate.timeInMillis > now.timeInMillis) {
-                return candidate
+            val dayOfWeek = dayBase.get(Calendar.DAY_OF_WEEK)
+            val dayEndTimes = CurfewScheduleExt.getCurfewEndTimesForDay(
+                dayOfWeek = dayOfWeek,
+                startHour = startH,
+                startMinute = startM,
+                endHour = endH,
+                endMinute = endM,
+                isWeekendCurfewEnabled = isWeekend,
+                weekendStartHour = weekendStartH,
+                weekendStartMinute = weekendStartM,
+                weekendEndHour = weekendEndH,
+                weekendEndMinute = weekendEndM
+            )
+            for ((hour, minute) in dayEndTimes) {
+                val candidate = (dayBase.clone() as Calendar).apply {
+                    set(Calendar.HOUR_OF_DAY, hour)
+                    set(Calendar.MINUTE, minute)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                if (candidate.timeInMillis > now.timeInMillis) {
+                    return candidate
+                }
             }
         }
-        return getNextOccurrence(CurfewConfig.getCurfewEndHour(context), CurfewConfig.getCurfewEndMinute(context), now)
+        return getNextOccurrence(endH, endM, now)
     }
 
     /**
@@ -110,51 +148,89 @@ object CurfewScheduler {
         return target
     }
 
+    private fun createCurfewIntent(context: Context, action: String): Intent =
+        Intent(context, CurfewAlarmReceiver::class.java).apply {
+            this.action = action
+        }
+
+    private fun buildCurfewPendingIntent(context: Context, requestCode: Int, action: String): PendingIntent {
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return PendingIntent.getBroadcast(context, requestCode, createCurfewIntent(context, action), flags)
+    }
+
+    /**
+     * Cancels all scheduled night curfew alarms (pre-warning, start, and end),
+     * leaving nap and snooze alarms untouched.
+     */
+    fun cancelCurfewAlarms(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val flags = PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            val curfewAlarms = listOf(
+                REQUEST_CODE_PRE_WARNING to CurfewAlarmReceiver.ACTION_CURFEW_PRE_WARNING,
+                REQUEST_CODE_START to CurfewAlarmReceiver.ACTION_CURFEW_START,
+                REQUEST_CODE_END to CurfewAlarmReceiver.ACTION_CURFEW_END
+            )
+            var cancelledCount = 0
+            for ((requestCode, action) in curfewAlarms) {
+                val pi = PendingIntent.getBroadcast(context, requestCode, createCurfewIntent(context, action), flags)
+                if (pi != null) {
+                    alarmManager.cancel(pi)
+                    pi.cancel()
+                    cancelledCount++
+                }
+            }
+            Log.i(TAG, "Cancelled $cancelledCount night curfew alarm(s)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to cancel curfew alarms", e)
+        }
+    }
+
     /**
      * Schedules the next exact alarms for Curfew Start and Curfew End,
      * properly accounting for weekday vs weekend timings.
      */
     fun scheduleNextAlarms(context: Context) {
+        if (!CurfewConfig.isCurfewEnabled(context)) {
+            Log.i(TAG, "Night curfew is disabled in policy; cancelling curfew alarms and skipping scheduling")
+            cancelCurfewAlarms(context)
+            return
+        }
+
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: run {
             Log.e(TAG, "AlarmManager not available")
             return
         }
 
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-
         val now = CurfewConfig.getCurfewCalendar(context)
         val nextStart = getNextCurfewStart(context, now)
         val nextEnd = getNextCurfewEnd(context, now)
 
-        val startIntent = Intent(context, CurfewAlarmReceiver::class.java).apply {
-            action = CurfewAlarmReceiver.ACTION_CURFEW_START
-        }
-        val startPendingIntent = PendingIntent.getBroadcast(context, REQUEST_CODE_START, startIntent, flags)
-
-        val endIntent = Intent(context, CurfewAlarmReceiver::class.java).apply {
-            action = CurfewAlarmReceiver.ACTION_CURFEW_END
-        }
-        val endPendingIntent = PendingIntent.getBroadcast(context, REQUEST_CODE_END, endIntent, flags)
+        val startPendingIntent = buildCurfewPendingIntent(context, REQUEST_CODE_START, CurfewAlarmReceiver.ACTION_CURFEW_START)
+        val endPendingIntent = buildCurfewPendingIntent(context, REQUEST_CODE_END, CurfewAlarmReceiver.ACTION_CURFEW_END)
 
         try {
-            val startElapsed = TrustedTimeProvider.computeElapsedTrigger(nextStart.timeInMillis)
-            val endElapsed = TrustedTimeProvider.computeElapsedTrigger(nextEnd.timeInMillis)
+            val startElapsed = TrustedTimeProvider.computeElapsedTrigger(nextStart.timeInMillis, context)
+            val endElapsed = TrustedTimeProvider.computeElapsedTrigger(nextEnd.timeInMillis, context)
             setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, startElapsed, startPendingIntent)
             setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, endElapsed, endPendingIntent)
 
             // Pre-Curfew 15-Minute Warning Alarm (Strictly guarded against retroactive triggers)
             val nowMs = TrustedTimeProvider.currentTimeMillis(context)
             val preWarningMs = nextStart.timeInMillis - 15 * 60 * 1000L
+            val preWarningPendingIntent = buildCurfewPendingIntent(
+                context,
+                REQUEST_CODE_PRE_WARNING,
+                CurfewAlarmReceiver.ACTION_CURFEW_PRE_WARNING
+            )
             if (preWarningMs > nowMs) {
-                val preWarningIntent = Intent(context, CurfewAlarmReceiver::class.java).apply {
-                    action = CurfewAlarmReceiver.ACTION_CURFEW_PRE_WARNING
-                }
-                val preWarningPendingIntent = PendingIntent.getBroadcast(context, REQUEST_CODE_PRE_WARNING, preWarningIntent, flags)
-                val preElapsed = TrustedTimeProvider.computeElapsedTrigger(preWarningMs)
+                val preElapsed = TrustedTimeProvider.computeElapsedTrigger(preWarningMs, context)
                 setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, preElapsed, preWarningPendingIntent)
                 Log.i(TAG, "Scheduled pre-curfew 15-minute warning alarm at $preWarningMs (elapsed=$preElapsed)")
             } else {
-                Log.d(TAG, "Skipping pre-curfew warning for today because remaining time is less than 15 minutes")
+                alarmManager.cancel(preWarningPendingIntent)
+                preWarningPendingIntent.cancel()
+                Log.d(TAG, "Cancelled/skipped stale pre-curfew warning alarm because remaining time is less than 15 minutes")
             }
 
             Log.i(TAG, "Scheduled exact curfew alarms via ELAPSED_REALTIME: Start at ${nextStart.time} (elapsed=$startElapsed), End at ${nextEnd.time} (elapsed=$endElapsed)")
@@ -197,10 +273,15 @@ object CurfewScheduler {
             return
         }
         try {
+            val remaining = NapController.remainingMs(context)
+            if (remaining <= 0L) {
+                cancelNapEndAlarm(context)
+                return
+            }
             val piElapsed = buildNapEndPendingIntent(context, NapConfig.REQUEST_CODE_NAP_END_ELAPSED)
-            val elapsedTrigger = TrustedTimeProvider.computeElapsedTrigger(triggerWallMs)
+            val elapsedTrigger = SystemClock.elapsedRealtime() + remaining
             setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsedTrigger, piElapsed)
-            Log.i(TAG, "Scheduled nap end alarm via ELAPSED_REALTIME: wall=$triggerWallMs elapsedTrigger=$elapsedTrigger")
+            Log.i(TAG, "Scheduled nap end alarm via ELAPSED_REALTIME: wall=$triggerWallMs remainingMs=$remaining elapsedTrigger=$elapsedTrigger")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule nap end alarms", e)
         }
@@ -224,18 +305,22 @@ object CurfewScheduler {
         }
     }
 
-    private const val REQUEST_CODE_SNOOZE = 3003
+    private const val REQUEST_CODE_SNOOZE = 3005
 
     fun scheduleCurfewSnoozeAlarm(context: Context, triggerWallMs: Long) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        val intent = Intent(context, CurfewAlarmReceiver::class.java).apply {
-            action = CurfewConfig.ACTION_CURFEW_SNOOZE_END
+        try {
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            val intent = Intent(context, CurfewAlarmReceiver::class.java).apply {
+                action = CurfewConfig.ACTION_CURFEW_SNOOZE_END
+            }
+            val pi = PendingIntent.getBroadcast(context, REQUEST_CODE_SNOOZE, intent, flags)
+            val elapsedTrigger = TrustedTimeProvider.computeElapsedTrigger(triggerWallMs, context)
+            setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsedTrigger, pi)
+            Log.i(TAG, "Scheduled snooze expiration alarm via ELAPSED_REALTIME at $triggerWallMs (elapsed=$elapsedTrigger)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to schedule curfew snooze alarm", e)
         }
-        val pi = PendingIntent.getBroadcast(context, REQUEST_CODE_SNOOZE, intent, flags)
-        val elapsedTrigger = TrustedTimeProvider.computeElapsedTrigger(triggerWallMs)
-        setExactCompat(alarmManager, AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsedTrigger, pi)
-        Log.i(TAG, "Scheduled snooze expiration alarm via ELAPSED_REALTIME at $triggerWallMs (elapsed=$elapsedTrigger)")
     }
 
     fun cancelCurfewSnoozeAlarm(context: Context) {

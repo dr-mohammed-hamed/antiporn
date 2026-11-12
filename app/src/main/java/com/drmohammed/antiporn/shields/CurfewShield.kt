@@ -3,17 +3,17 @@ package com.drmohammed.antiporn.shields
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
-import android.os.Build
+import android.content.pm.PackageManager
 import android.util.Log
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.contract.ProtectionShield
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.ShieldResult
 import com.drmohammed.antiporn.core.model.ShieldStatus
-import com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
+import com.drmohammed.antiporn.curfew.CurfewVpnDnsBridge
 
 /**
  * Isolated protection shield managing scheduled night curfew (8:00 PM - 7:00 AM)
@@ -37,14 +37,28 @@ object CurfewShield : ProtectionShield {
 
         return try {
             CurfewScheduler.scheduleNextAlarms(context)
-            CurfewEnforcer.syncBlockState(context)
-            val isActive = CurfewEnforcer.isEffectiveBlockActive(context)
-            val msg = if (isActive) {
-                context.getString(R.string.shield_curfew_active_applied)
-            } else {
-                context.getString(R.string.shield_curfew_scheduled_applied)
+            val synced = CurfewEnforcer.syncBlockState(context)
+            if (!synced) {
+                val msgRes = if (!CurfewConfig.isCurfewEnabled(context) &&
+                    CurfewConfig.isInstantInternetKillEnabled(context)
+                ) {
+                    R.string.card_instant_kill_pending
+                } else {
+                    R.string.card_curfew_pending
+                }
+                return ShieldResult(
+                    shieldId = id,
+                    success = false,
+                    message = context.getString(msgRes)
+                )
             }
-            ShieldResult(shieldId = id, success = true, message = msg)
+            val isActive = CurfewEnforcer.isEffectiveBlockActive(context)
+            val msgResId = when {
+                isActive -> R.string.shield_curfew_active_applied
+                !CurfewConfig.isCurfewEnabled(context) -> R.string.shield_curfew_disabled_applied
+                else -> R.string.shield_curfew_scheduled_applied
+            }
+            ShieldResult(shieldId = id, success = true, message = context.getString(msgResId))
         } catch (e: Exception) {
             Log.e(TAG, "Error applying CurfewShield", e)
             ShieldResult(shieldId = id, success = false, message = e.localizedMessage ?: context.getString(R.string.error_unknown))
@@ -60,15 +74,13 @@ object CurfewShield : ProtectionShield {
             val isActive = CurfewEnforcer.isEffectiveBlockActive(context)
             if (isActive) {
                 // Ground-truth verification: Ensure OEM stores and search loophole apps are suspended (Zero Hiding policy).
-                // Note: Google Play Store and Google Search are intentionally kept unsuspended for licensing and IPC background services,
-                // while their external traffic is halted via the Always-On VPN Blackhole during active night curfew.
                 val packagesToVerify = CurfewConfig.OEM_APP_STORES + CurfewConfig.CURFEW_SEARCH_APPS
                 val allStoresSuspended = packagesToVerify.all { pkg ->
                     try {
                         val isInstalled = try {
                             context.packageManager.getPackageInfo(pkg, 0)
                             true
-                        } catch (e: Exception) {
+                        } catch (_: PackageManager.NameNotFoundException) {
                             false
                         }
                         if (isInstalled) dpm.isPackageSuspended(admin, pkg) else true
@@ -80,18 +92,7 @@ object CurfewShield : ProtectionShield {
 
                 val isVpnBlackholeConfigured = CurfewConfig.isVpnBlackholeEnabled(context)
                 val isVpnEnforced = if (isVpnBlackholeConfigured) {
-                    try {
-                        val isPkgMatch = dpm.getAlwaysOnVpnPackage(admin) == context.packageName
-                        val isLockdown = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            dpm.isAlwaysOnVpnLockdownEnabled(admin)
-                        } else {
-                            true
-                        }
-                        isPkgMatch && isLockdown
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed to query always-on VPN package during curfew check", e)
-                        false
-                    }
+                    CurfewVpnDnsBridge.isBlackholeVpnLockdownEnforced(context, dpm, admin)
                 } else {
                     true
                 }
@@ -108,32 +109,72 @@ object CurfewShield : ProtectionShield {
                     ShieldStatus.Active(context.getString(R.string.card_curfew_active_desc))
                 }
             } else {
-                val isLockdownLingering = try {
-                    val isBlackholeRunning = CurfewBlackholeVpnService.isRunning &&
-                            CurfewBlackholeVpnService.currentMode == CurfewBlackholeVpnService.VpnMode.CURFEW_BLACKHOLE
-                    val isVpnLingeringWhenIdle = CurfewBlackholeVpnService.evaluateRequiredMode(context) == CurfewBlackholeVpnService.VpnMode.IDLE &&
-                            dpm.getAlwaysOnVpnPackage(admin) == context.packageName
-                    val isLockdownActive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        dpm.isAlwaysOnVpnLockdownEnabled(admin)
-                    } else {
-                        false
-                    }
-                    isBlackholeRunning || isVpnLingeringWhenIdle || isLockdownActive
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to query always-on VPN lockdown during release check", e)
+                val isInstantKill = CurfewConfig.isInstantInternetKillEnabled(context)
+                val isCurfewEnabled = CurfewConfig.isCurfewEnabled(context)
+                val isInstantVpnEnforced = if (isInstantKill) {
+                    CurfewVpnDnsBridge.isBlackholeVpnLockdownEnforced(context, dpm, admin)
+                } else {
+                    false
+                }
+                val isLockdownLingering = if (!isInstantKill) {
+                    CurfewVpnDnsBridge.isLingeringVpnLockdownPresent(context, dpm, admin)
+                } else {
                     false
                 }
 
-                if (isLockdownLingering) {
-                    Log.w(TAG, "Curfew is inactive but Blackhole VPN lockdown is still active!")
-                    ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_pending))
+                val outcome = resolveInactiveOutcome(
+                    isCurfewEnabled = isCurfewEnabled,
+                    isInstantKillEnabled = isInstantKill,
+                    isInstantVpnEnforced = isInstantVpnEnforced,
+                    isLockdownLingering = isLockdownLingering
+                )
+
+                if (outcome.needsEnforcement) {
+                    if (isInstantKill) {
+                        Log.w(TAG, "Instant Internet Kill is enabled while curfew is inactive, but Blackhole VPN lockdown is unverified!")
+                    } else {
+                        Log.w(TAG, "Curfew is inactive but Blackhole VPN lockdown is still active!")
+                    }
+                    ShieldStatus.NeedsEnforcement(context.getString(outcome.messageResId))
                 } else {
-                    ShieldStatus.Active(context.getString(R.string.card_curfew_scheduled_desc))
+                    ShieldStatus.Active(context.getString(outcome.messageResId))
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking CurfewShield status", e)
             ShieldStatus.NeedsEnforcement(context.getString(R.string.card_curfew_pending))
         }
+    }
+
+    internal data class InactiveCurfewOutcome(
+        val needsEnforcement: Boolean,
+        val messageResId: Int
+    )
+
+    internal fun resolveInactiveOutcome(
+        isCurfewEnabled: Boolean,
+        isInstantKillEnabled: Boolean,
+        isInstantVpnEnforced: Boolean,
+        isLockdownLingering: Boolean
+    ): InactiveCurfewOutcome {
+        val needsEnforcement = if (isInstantKillEnabled) {
+            !isInstantVpnEnforced
+        } else {
+            isLockdownLingering
+        }
+        val activeDescResId = if (!isCurfewEnabled) {
+            R.string.card_curfew_off_optional_desc
+        } else {
+            R.string.card_curfew_scheduled_desc
+        }
+        val pendingDescResId = if (isInstantKillEnabled && !isCurfewEnabled) {
+            R.string.card_instant_kill_pending
+        } else {
+            R.string.card_curfew_pending
+        }
+        return InactiveCurfewOutcome(
+            needsEnforcement = needsEnforcement,
+            messageResId = if (needsEnforcement) pendingDescResId else activeDescResId
+        )
     }
 }

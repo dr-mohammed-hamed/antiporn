@@ -44,6 +44,8 @@ object ProtectionEngine {
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val pendingCallbacks = CopyOnWriteArrayList<(List<ShieldResult>) -> Unit>()
     private val isEnforcing = AtomicBoolean(false)
+    @Volatile
+    private var needsRerun: Boolean = false
     private val lastRecordedShieldFailures = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     fun getAdminComponent(context: Context): ComponentName {
@@ -54,7 +56,7 @@ object ProtectionEngine {
      * Suspending version: Applies all registered security shields asynchronously on [Dispatchers.IO].
      */
     suspend fun applyAll(context: Context): List<ShieldResult> = withContext(Dispatchers.IO) {
-        applyAllSync(context.applicationContext)
+        applyAllSync(context.applicationContext ?: context)
     }
 
     /**
@@ -68,40 +70,52 @@ object ProtectionEngine {
             }
 
             if (!isEnforcing.compareAndSet(false, true)) {
-                Log.i(TAG, "Enforcement in progress, queued callback for completion notification")
+                needsRerun = true
+                Log.i(TAG, "Enforcement in progress, queued callback and scheduled rerun for completion notification")
                 return
             }
+            needsRerun = false
         }
 
-        val appContext = context.applicationContext
+        val appContext = context.applicationContext ?: context
         engineScope.launch {
-            val results = try {
-                applyAllSync(appContext)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Fatal error executing applyAllSync", t)
-                listOf(
-                    ShieldResult(
-                        shieldId = "engine",
-                        success = false,
-                        message = appContext.getString(R.string.toast_error_applying, t.localizedMessage ?: "Unknown")
+            while (true) {
+                val results = try {
+                    applyAllSync(appContext)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Fatal error executing applyAllSync", t)
+                    listOf(
+                        ShieldResult(
+                            shieldId = "engine",
+                            success = false,
+                            message = appContext.getString(R.string.toast_error_applying, t.localizedMessage ?: "Unknown")
+                        )
                     )
-                )
-            }
-
-            withContext(Dispatchers.Main) {
-                val callbacks = mutableListOf<(List<ShieldResult>) -> Unit>()
-                synchronized(pendingCallbacks) {
-                    callbacks.addAll(pendingCallbacks)
-                    pendingCallbacks.clear()
-                    isEnforcing.set(false)
                 }
 
-                for (cb in callbacks) {
-                    try {
-                        cb.invoke(results)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error invoking completion callback", e)
+                val callbacksToNotify: List<(List<ShieldResult>) -> Unit>? = synchronized(pendingCallbacks) {
+                    if (needsRerun) {
+                        needsRerun = false
+                        null
+                    } else {
+                        val copy = pendingCallbacks.toList()
+                        pendingCallbacks.clear()
+                        isEnforcing.set(false)
+                        copy
                     }
+                }
+
+                if (callbacksToNotify != null) {
+                    withContext(Dispatchers.Main) {
+                        for (cb in callbacksToNotify) {
+                            try {
+                                cb.invoke(results)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error invoking completion callback", e)
+                            }
+                        }
+                    }
+                    break
                 }
             }
         }
@@ -112,7 +126,7 @@ object ProtectionEngine {
      * MUST be called from a background thread.
      */
     fun applyAllSync(context: Context): List<ShieldResult> {
-        val appContext = context.applicationContext
+        val appContext = context.applicationContext ?: context
         if (!isDeviceOwner(appContext)) {
             Log.w(TAG, "App is not Device/Profile Owner. Cannot apply shields.")
             return listOf(
@@ -173,7 +187,7 @@ object ProtectionEngine {
      * Evaluates the active status of every registered shield.
      */
     fun evaluateSystemStatus(context: Context): Map<String, ShieldStatus> {
-        val appContext = context.applicationContext
+        val appContext = context.applicationContext ?: context
         if (!isDeviceOwner(appContext)) {
             return shields.associate { it.id to ShieldStatus.Disabled(appContext.getString(R.string.card_device_owner_inactive)) }
         }
@@ -182,7 +196,8 @@ object ProtectionEngine {
             context = appContext,
             tag = com.drmohammed.antiporn.telemetry.BlackBoxRecorder.TAG_SHIELD,
             actionName = "evaluateSystemStatus",
-            requireDeviceOwner = true
+            requireDeviceOwner = true,
+            recordSuccess = false
         ) { dpm, admin ->
             val statusMap = mutableMapOf<String, ShieldStatus>()
             for (shield in shields) {
@@ -223,7 +238,17 @@ object ProtectionEngine {
             statusMap
         }
 
-        return dpmResult.getOrNull() ?: shields.associate { it.id to ShieldStatus.Disabled(appContext.getString(R.string.toast_dpm_missing)) }
+        val statusMap = dpmResult.getOrNull()
+        if (statusMap != null) {
+            val allHealthy = statusMap.isNotEmpty() && statusMap.values.all {
+                it is ShieldStatus.Active || it is ShieldStatus.Unsupported
+            }
+            if (allHealthy) {
+                com.drmohammed.antiporn.telemetry.BlackBoxRecorder.markHealthyShieldCheck(appContext)
+            }
+            return statusMap
+        }
+        return shields.associate { it.id to ShieldStatus.Disabled(appContext.getString(R.string.toast_dpm_missing)) }
     }
 
     /**
@@ -239,6 +264,6 @@ object ProtectionEngine {
     fun isSystemFullyProtected(context: Context): Boolean {
         if (!isDeviceOwner(context)) return false
         val statuses = evaluateSystemStatus(context)
-        return statuses.values.all { it is ShieldStatus.Active }
+        return statuses.values.all { it is ShieldStatus.Active || it is ShieldStatus.Unsupported }
     }
 }

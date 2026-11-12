@@ -1,5 +1,8 @@
 package com.drmohammed.antiporn.curfew
 
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -25,6 +28,7 @@ class NapTest {
         assertEquals("key_nap_end_elapsed", NapConfig.KEY_NAP_END_ELAPSED)
         assertEquals("key_nap_end_wall_ms", NapConfig.KEY_NAP_END_WALL_MS)
         assertEquals("key_nap_active", NapConfig.KEY_NAP_ACTIVE)
+        assertEquals("key_nap_boot_count", NapConfig.KEY_NAP_BOOT_COUNT)
         assertEquals(3_600_000L, NapConfig.NAP_DURATION_MS)
         assertEquals(3_600_000L, NapConfig.EXTEND_STEP_MS)
         assertEquals("com.drmohammed.antiporn.ACTION_NAP_END", NapConfig.ACTION_NAP_END)
@@ -86,7 +90,7 @@ class NapTest {
         assertFalse("Nap itself must be expired at its end", napActiveAt21)
 
         val nightActiveAt21 = CurfewEnforcer.isCurfewActive(napCalendar(21, 0))
-        assertTrue("21:00 is inside night curfew 20:30-07:00", nightActiveAt21)
+        assertTrue("21:00 is inside night curfew 20:00-07:00", nightActiveAt21)
 
         val effectiveBlock = napActiveAt21 || nightActiveAt21
         assertTrue("Effective block must stay locked across nap/night overlap", effectiveBlock)
@@ -170,5 +174,81 @@ class NapTest {
         val declaredClear = NapController::class.java.declaredMethods.firstOrNull { it.name == "clearNap" }
         assertTrue("Private clearNap must exist for expiry cleanup", declaredClear != null)
         assertTrue("clearNap must be private", Modifier.isPrivate(declaredClear!!.modifiers))
+    }
+
+    @Test
+    fun bootCountChangeDetectedEvenAfterUptimeExceedsPreRebootStartElapsed() {
+        val prefs = InMemoryNapPrefs()
+        val context = object : ContextWrapper(null) {
+            override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences = prefs
+            override fun getApplicationContext(): Context = this
+        }
+        val origElapsed = NapController.elapsedProvider
+        val origWall = NapController.wallProvider
+        val origBoot = NapController.bootCountProvider
+        try {
+            var fakeElapsed = 10_000L
+            var fakeWall = 1_000_000L
+            var fakeBoot = 5
+            NapController.elapsedProvider = { fakeElapsed }
+            NapController.wallProvider = { fakeWall }
+            NapController.bootCountProvider = { fakeBoot }
+
+            NapController.startNap(context)
+            assertTrue(NapController.isNapActive(context))
+
+            // Simulate reboot where device stays up long enough that elapsedRealtime exceeds old startElapsed,
+            // AND wall clock moved past the 60-minute expiry window.
+            fakeBoot = 6
+            fakeElapsed = 20_000L
+            fakeWall = 1_000_000L + NapConfig.NAP_DURATION_MS + 5_000L
+
+            assertFalse(
+                "BOOT_COUNT increment must detect reboot and expire nap when wall clock passed endWall",
+                NapController.isNapActive(context)
+            )
+            assertEquals(0L, NapController.remainingMs(context))
+        } finally {
+            NapController.elapsedProvider = origElapsed
+            NapController.wallProvider = origWall
+            NapController.bootCountProvider = origBoot
+        }
+    }
+
+    private class InMemoryNapPrefs : SharedPreferences {
+        private val values = mutableMapOf<String, Any?>()
+
+        override fun getAll(): MutableMap<String, *> = values.toMutableMap()
+        override fun getString(key: String?, defValue: String?): String? = values[key] as? String ?: defValue
+        override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
+            @Suppress("UNCHECKED_CAST") ((values[key] as? Set<String>)?.toMutableSet() ?: defValues)
+        override fun getInt(key: String?, defValue: Int): Int = values[key] as? Int ?: defValue
+        override fun getLong(key: String?, defValue: Long): Long = values[key] as? Long ?: defValue
+        override fun getFloat(key: String?, defValue: Float): Float = values[key] as? Float ?: defValue
+        override fun getBoolean(key: String?, defValue: Boolean): Boolean = values[key] as? Boolean ?: defValue
+        override fun contains(key: String?): Boolean = values.containsKey(key)
+        override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+        override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+        override fun edit(): SharedPreferences.Editor = object : SharedPreferences.Editor {
+            private val pending = mutableMapOf<String, Any?>()
+            private var clearAll = false
+
+            override fun putString(key: String?, value: String?) = apply { if (key != null) pending[key] = value }
+            override fun putStringSet(key: String?, v: MutableSet<String>?) = apply { if (key != null) pending[key] = v?.toSet() }
+            override fun putInt(key: String?, value: Int) = apply { if (key != null) pending[key] = value }
+            override fun putLong(key: String?, value: Long) = apply { if (key != null) pending[key] = value }
+            override fun putFloat(key: String?, value: Float) = apply { if (key != null) pending[key] = value }
+            override fun putBoolean(key: String?, value: Boolean) = apply { if (key != null) pending[key] = value }
+            override fun remove(key: String?) = apply { if (key != null) pending[key] = null }
+            override fun clear() = apply { clearAll = true }
+            override fun commit(): Boolean { apply(); return true }
+            override fun apply() {
+                if (clearAll) { values.clear(); clearAll = false }
+                for ((k, v) in pending) {
+                    if (v == null) values.remove(k) else values[k] = v
+                }
+                pending.clear()
+            }
+        }
     }
 }

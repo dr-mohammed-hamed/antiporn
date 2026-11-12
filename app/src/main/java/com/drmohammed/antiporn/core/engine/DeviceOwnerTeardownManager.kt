@@ -44,6 +44,15 @@ object DeviceOwnerTeardownManager {
 
         val policyRepo = PolicyRepository.getInstance(appContext)
         val currentPolicy = policyRepo.getCurrentPolicy()
+        if (!TrustedTimeProvider.isTrusted()) {
+            TrustedTimeProvider.syncNow(appContext)
+        }
+        if (!TrustedTimeProvider.isTrusted()) {
+            Timber.tag(TAG).w("Teardown rejected: trusted network time unavailable")
+            return@withContext Result.failure(
+                IllegalStateException(appContext.getString(com.drmohammed.antiporn.R.string.error_trusted_time_required))
+            )
+        }
         val now = TrustedTimeProvider.currentTimeMillis(appContext)
         val unlockAt = currentPolicy.deactivationUnlockAt ?: Long.MAX_VALUE
 
@@ -63,7 +72,7 @@ object DeviceOwnerTeardownManager {
                 val snapshot = FirebaseFirestore.getInstance()
                     .collection("policies")
                     .document(myUid)
-                    .get()
+                    .get(com.google.firebase.firestore.Source.SERVER)
                     .await()
                 val remoteStatus = snapshot.getString("deactivationStatus")
                 val remoteUnlockAt = snapshot.getLong("deactivationUnlockAt") ?: Long.MAX_VALUE
@@ -72,6 +81,7 @@ object DeviceOwnerTeardownManager {
                     return@withContext Result.failure(IllegalStateException("Server deactivation verification failed"))
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Timber.tag(TAG).e(e, "Teardown aborted: failed to verify server timestamp with Firestore")
                 return@withContext Result.failure(IllegalStateException("Failed to verify deactivation with guardian server: ${e.message}", e))
             }
@@ -134,19 +144,23 @@ object DeviceOwnerTeardownManager {
                 UserManager.DISALLOW_SAFE_BOOT,
                 UserManager.DISALLOW_FACTORY_RESET,
                 UserManager.DISALLOW_ADD_USER,
-                UserManager.DISALLOW_ADD_MANAGED_PROFILE,
                 UserManager.DISALLOW_APPS_CONTROL,
                 UserManager.DISALLOW_INSTALL_APPS,
                 UserManager.DISALLOW_UNINSTALL_APPS,
                 UserManager.DISALLOW_MODIFY_ACCOUNTS
             )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                restrictionsToClear.add(UserManager.DISALLOW_ADD_MANAGED_PROFILE)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 restrictionsToClear.add(UserManager.DISALLOW_USER_SWITCH)
+                restrictionsToClear.add(UserManager.DISALLOW_CONFIG_DATE_TIME)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 restrictionsToClear.add(UserManager.DISALLOW_CONFIG_PRIVATE_DNS)
             }
             restrictionsToClear.add(UserManager.DISALLOW_NETWORK_RESET)
             restrictionsToClear.add(UserManager.DISALLOW_CONFIG_VPN)
-            restrictionsToClear.add(UserManager.DISALLOW_CONFIG_DATE_TIME)
 
             for (restriction in restrictionsToClear) {
                 try {
@@ -158,7 +172,7 @@ object DeviceOwnerTeardownManager {
             }
 
             // 3b. إعادة وضع خادم الـ DNS الخاص إلى الوضع التلقائي الطبيعي
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 try {
                     dpm.setGlobalPrivateDnsModeOpportunistic(admin)
                     Timber.tag(TAG).i("Private DNS mode restored to Opportunistic (System Default)")
@@ -235,9 +249,10 @@ object DeviceOwnerTeardownManager {
                         .document(myUid)
                         .update(updates)
                         .await()
-                    Timber.tag(TAG).i("Deactivation completed pushed to Firestore for uid: $myUid")
+                    Timber.tag(TAG).i("Deactivation completed pushed to Firestore for uid: ${com.drmohammed.antiporn.telemetry.AiTelemetryReporter.maskIdentifier(myUid)}")
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Timber.tag(TAG).w("Failed to push deactivation completed to Firestore: ${e.message}")
             }
 
@@ -283,17 +298,18 @@ object DeviceOwnerTeardownManager {
             )
 
             Result.success(Unit)
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "[TEARDOWN_FATAL] Failed to execute clearDeviceOwnerApp cleanly")
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            Timber.tag(TAG).e(t, "[TEARDOWN_FATAL] Failed to execute clearDeviceOwnerApp cleanly")
             BlackBoxRecorder.recordDpm(
                 context = appContext,
                 action = "DEVICE_OWNER_TEARDOWN_FAILED",
                 latencyMs = 0L,
                 isSuccess = false,
-                details = "Error: ${e.message}",
-                error = e.message
+                details = "Error: ${t.message}",
+                error = t.message
             )
-            Result.failure(e)
+            Result.failure(t)
         }
     }
 }

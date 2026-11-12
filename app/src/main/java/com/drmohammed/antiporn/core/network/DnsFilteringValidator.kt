@@ -9,7 +9,9 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.util.Random
+import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SNIHostName
+import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
@@ -67,6 +69,9 @@ object DnsFilteringValidator {
      */
     fun validateDnsHost(host: String): ValidationResult {
         val cleanHost = host.trim().lowercase()
+        if (cleanHost.isBlank() || cleanHost.any { it.isWhitespace() }) {
+            return ValidationResult.Unreachable("Invalid or empty DNS hostname")
+        }
 
         // 1. Instant approval for verified static family presets
         if (isKnownFamilyPreset(cleanHost)) {
@@ -82,18 +87,22 @@ object DnsFilteringValidator {
             socket = rawSocket
             rawSocket.soTimeout = READ_TIMEOUT_MS
 
-            // Attach TLS Server Name Indication (SNI) for strict DoT resolvers
+            // Attach TLS SNI and strict HTTPS-style endpoint hostname verification
             try {
                 val sslParams = rawSocket.sslParameters
                 sslParams.serverNames = listOf(SNIHostName(cleanHost))
+                sslParams.endpointIdentificationAlgorithm = "HTTPS"
                 rawSocket.sslParameters = sslParams
             } catch (e: Exception) {
-                Log.d(TAG, "Skipping SNI for host $cleanHost: ${e.message}")
+                Log.w(TAG, "Failed configuring SNI/endpoint identification for $cleanHost: ${e.message}")
             }
 
             rawSocket.connect(InetSocketAddress(cleanHost, DOT_PORT), CONNECT_TIMEOUT_MS)
             rawSocket.startHandshake()
-            Log.d(TAG, "TLS Handshake successful with $cleanHost")
+            if (!HttpsURLConnection.getDefaultHostnameVerifier().verify(cleanHost, rawSocket.session)) {
+                throw SSLPeerUnverifiedException("TLS certificate hostname mismatch for $cleanHost")
+            }
+            Log.d(TAG, "TLS Handshake and hostname verification successful with $cleanHost")
 
             val outStream = DataOutputStream(rawSocket.outputStream)
             val inStream = DataInputStream(rawSocket.inputStream)
@@ -116,10 +125,21 @@ object DnsFilteringValidator {
                     return ValidationResult.ResolverBroken("Query timed out or connection dropped during verification ($adultDomain)")
                 }
 
-                // If resolver returned NXDOMAIN (3) or REFUSED (5) or NOERROR with 0 answers -> BLOCKED!
-                if (adultResponse.rcode == 3 || adultResponse.rcode == 5 || adultResponse.ips.isEmpty()) {
+                // Treat SERVFAIL/FORMERR/NOTIMP (anything outside NOERROR=0, NXDOMAIN=3, REFUSED=5) as broken, not blocked
+                if (adultResponse.rcode != 0 && adultResponse.rcode != 3 && adultResponse.rcode != 5) {
+                    Log.w(TAG, "Resolver returned unexpected RCODE=${adultResponse.rcode} for $adultDomain")
+                    return ValidationResult.ResolverBroken("Unexpected DNS error (RCODE=${adultResponse.rcode}) for $adultDomain")
+                }
+
+                // Explicit block signals: NXDOMAIN (3), REFUSED (5), or NOERROR with ANCOUNT == 0 (NODATA)
+                if (adultResponse.rcode == 3 || adultResponse.rcode == 5 || (adultResponse.rcode == 0 && adultResponse.ancount == 0)) {
                     Log.d(TAG, "Adult domain $adultDomain is blocked by RCODE/empty (RCODE=${adultResponse.rcode})")
                     continue
+                }
+
+                if (adultResponse.ips.isEmpty()) {
+                    Log.w(TAG, "Resolver returned NOERROR with non-A answer (ancount=${adultResponse.ancount}) and no sinkhole IP for $adultDomain")
+                    return ValidationResult.ResolverBroken("Ambiguous non-A answer without sinkhole IP ($adultDomain)")
                 }
 
                 // Check if any returned IP is a live routable public IP
@@ -152,8 +172,25 @@ object DnsFilteringValidator {
     }
 
     private fun isSinkholeOrLocal(ip: String): Boolean {
-        if (ip in SINKHOLE_IPS) return true
-        if (ip.startsWith("0.") || ip.startsWith("127.")) return true
+        val cleanIp = ip.trim().lowercase()
+        if (cleanIp in SINKHOLE_IPS) return true
+        if (cleanIp.startsWith("0.") ||
+            cleanIp.startsWith("127.") ||
+            cleanIp.startsWith("10.") ||
+            cleanIp.startsWith("169.254.") ||
+            cleanIp.startsWith("192.168.") ||
+            cleanIp.startsWith("::ffff:0.") ||
+            cleanIp.startsWith("::ffff:127.") ||
+            cleanIp.startsWith("fe80:") ||
+            cleanIp.startsWith("fc") ||
+            cleanIp.startsWith("fd")
+        ) {
+            return true
+        }
+        if (cleanIp.startsWith("172.")) {
+            val secondOctet = cleanIp.substringAfter("172.").substringBefore('.').toIntOrNull()
+            if (secondOctet != null && secondOctet in 16..31) return true
+        }
         return false
     }
 
@@ -249,6 +286,9 @@ object DnsFilteringValidator {
             // Skip Question records
             for (i in 0 until qdcount) {
                 offset = skipDomainName(bytes, offset)
+                if (offset < 0 || offset + 4 > bytes.size) {
+                    return DnsResponse(txId = parsedTxId, rcode = -1, ancount = 0, ips = emptyList())
+                }
                 offset += 4 // QTYPE (2) + QCLASS (2)
             }
 
@@ -257,13 +297,18 @@ object DnsFilteringValidator {
             for (i in 0 until ancount) {
                 if (offset >= bytes.size) break
                 offset = skipDomainName(bytes, offset)
-                if (offset + 10 > bytes.size) break
+                if (offset < 0 || offset + 10 > bytes.size) {
+                    return DnsResponse(txId = parsedTxId, rcode = -1, ancount = 0, ips = emptyList())
+                }
 
                 val type = ((bytes[offset].toInt() and 0xFF) shl 8) or (bytes[offset + 1].toInt() and 0xFF)
                 val rdlength = ((bytes[offset + 8].toInt() and 0xFF) shl 8) or (bytes[offset + 9].toInt() and 0xFF)
                 offset += 10
+                if (offset + rdlength > bytes.size) {
+                    return DnsResponse(txId = parsedTxId, rcode = -1, ancount = 0, ips = emptyList())
+                }
 
-                if (type == 1 && rdlength == 4 && offset + 4 <= bytes.size) { // A record
+                if (type == 1 && rdlength == 4) { // A record
                     val ip = "${bytes[offset].toInt() and 0xFF}.${bytes[offset + 1].toInt() and 0xFF}.${bytes[offset + 2].toInt() and 0xFF}.${bytes[offset + 3].toInt() and 0xFF}"
                     ips.add(ip)
                 }
@@ -275,18 +320,26 @@ object DnsFilteringValidator {
 
         private fun skipDomainName(bytes: ByteArray, startOffset: Int): Int {
             var offset = startOffset
-            while (offset < bytes.size) {
+            while (offset in bytes.indices) {
                 val len = bytes[offset].toInt() and 0xFF
-                if (len == 0) {
-                    return offset + 1
-                } else if ((len and 0xC0) == 0xC0) {
-                    // Pointer (2 bytes)
-                    return offset + 2
-                } else {
-                    offset += 1 + len
+                when {
+                    len == 0 -> return offset + 1
+                    (len and 0xC0) == 0xC0 -> {
+                        // Pointer (2 bytes)
+                        return if (offset + 2 <= bytes.size) offset + 2 else -1
+                    }
+                    (len and 0xC0) != 0 -> {
+                        // Reserved/malformed DNS label header
+                        return -1
+                    }
+                    else -> {
+                        val next = offset + 1 + len
+                        if (next > bytes.size) return -1
+                        offset = next
+                    }
                 }
             }
-            return offset
+            return -1
         }
     }
 }

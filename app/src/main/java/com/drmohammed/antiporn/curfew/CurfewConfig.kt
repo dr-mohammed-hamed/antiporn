@@ -35,12 +35,24 @@ object CurfewConfig {
         }
     }
 
+    private fun safeLogFallback(isError: Boolean, message: String, throwable: Throwable) {
+        try {
+            if (isError) {
+                Log.e("AntiPorn_CurfewConfig", message, throwable)
+            } else {
+                Log.w("AntiPorn_CurfewConfig", message, throwable)
+            }
+        } catch (e: RuntimeException) {
+            if (e.message?.contains("not mocked") != true) throw e
+        }
+    }
+
     fun getTargetTimeZoneId(context: Context): String {
         val tzId = try {
             com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context)
                 .getCurrentPolicy().timeZoneId
         } catch (e: Exception) {
-            Log.w("AntiPorn_CurfewConfig", "Failed reading policy timezone, falling back to default", e)
+            safeLogFallback(false, "Failed reading policy timezone, falling back to default", e)
             getDefaultFallbackTimeZone()
         }
 
@@ -64,77 +76,88 @@ object CurfewConfig {
     fun getCurfewStartHour(context: Context): Int = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().curfewStartHour
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         START_HOUR
     }
 
     fun getCurfewStartMinute(context: Context): Int = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().curfewStartMinute
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         START_MINUTE
     }
 
     fun getCurfewEndHour(context: Context): Int = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().curfewEndHour
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         END_HOUR
     }
 
     fun getCurfewEndMinute(context: Context): Int = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().curfewEndMinute
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         END_MINUTE
     }
 
     fun isCurfewEnabled(context: Context): Boolean = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isCurfewEnabled
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(true, "Failed reading config, falling back to default", e)
+        false
+    }
+
+    /**
+     * Fail-secure curfew enabled lookup for release rejection & enforcement invariants:
+     * returns true if policy lookup fails so active curfews cannot be bypassed by repository errors.
+     */
+    fun isCurfewEnabledFailSecure(context: Context): Boolean = try {
+        com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isCurfewEnabled
+    } catch (e: Exception) {
+        safeLogFallback(true, "Failed reading curfew enabled config - failing secure (true)", e)
         true
     }
 
     fun isInstantInternetKillEnabled(context: Context): Boolean = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isInstantInternetKillEnabled
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         false
     }
 
     fun isWeekendCurfewEnabled(context: Context): Boolean = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isWeekendCurfewEnabled
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         false
     }
 
     fun getWeekendCurfewStartHour(context: Context): Int = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().weekendCurfewStartHour
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         START_HOUR
     }
 
     fun getWeekendCurfewStartMinute(context: Context): Int = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().weekendCurfewStartMinute
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         START_MINUTE
     }
 
     fun getWeekendCurfewEndHour(context: Context): Int = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().weekendCurfewEndHour
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         END_HOUR
     }
 
     fun getWeekendCurfewEndMinute(context: Context): Int = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().weekendCurfewEndMinute
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         END_MINUTE
     }
 
@@ -148,7 +171,7 @@ object CurfewConfig {
     fun isVpnBlackholeEnabled(context: Context): Boolean = try {
         com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context).getCurrentPolicy().isVpnBlackholeEnabled
     } catch (e: Exception) {
-        Log.w("AntiPorn_CurfewConfig", "Failed reading config, falling back to default", e)
+        safeLogFallback(false, "Failed reading config, falling back to default", e)
         DEFAULT_VPN_BLACKHOLE_ENABLED
     }
 
@@ -158,32 +181,88 @@ object CurfewConfig {
     const val KEY_MANUAL_TEST_ACTIVE = "key_manual_test_active"
     const val KEY_CURFEW_VPN_BYPASS_PACKAGES = "key_curfew_vpn_bypass_packages"
     const val KEY_CURFEW_SNOOZE_END_WALL = "key_curfew_snooze_end_wall"
+    private const val KEY_LAST_BLOCK_ENFORCED = "last_block_enforced"
     const val ACTION_CURFEW_SNOOZE = "com.drmohammed.antiporn.ACTION_CURFEW_SNOOZE"
     const val ACTION_CURFEW_SNOOZE_END = "com.drmohammed.antiporn.ACTION_CURFEW_SNOOZE_END"
+
+    fun isLastBlockEnforced(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_LAST_BLOCK_ENFORCED, false)
+    }
+
+    fun setLastBlockEnforced(context: Context, enforced: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_LAST_BLOCK_ENFORCED, enforced).commit()
+    }
+
+    fun getTrackedSuspendedPackages(context: Context): Set<String> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getStringSet(KEY_CURFEW_SUSPENDED_PACKAGES, emptySet())?.toSet() ?: emptySet()
+    }
+
+    fun addTrackedSuspendedPackages(context: Context, packages: Collection<String>) {
+        if (packages.isEmpty()) return
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val updated = prefs.getStringSet(KEY_CURFEW_SUSPENDED_PACKAGES, emptySet())?.toMutableSet()
+            ?: mutableSetOf()
+        if (updated.addAll(packages)) {
+            prefs.edit().putStringSet(KEY_CURFEW_SUSPENDED_PACKAGES, updated).commit()
+        }
+    }
+
+    fun removeTrackedSuspendedPackages(context: Context, packages: Collection<String>) {
+        if (packages.isEmpty()) return
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val updated = prefs.getStringSet(KEY_CURFEW_SUSPENDED_PACKAGES, emptySet())?.toMutableSet()
+            ?: return
+        if (updated.removeAll(packages.toSet())) {
+            val editor = prefs.edit()
+            if (updated.isEmpty()) {
+                editor.remove(KEY_CURFEW_SUSPENDED_PACKAGES)
+            } else {
+                editor.putStringSet(KEY_CURFEW_SUSPENDED_PACKAGES, updated)
+            }
+            editor.commit()
+        }
+    }
+
+    fun clearTrackedSuspendedPackages(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.contains(KEY_CURFEW_SUSPENDED_PACKAGES)) {
+            prefs.edit().remove(KEY_CURFEW_SUSPENDED_PACKAGES).commit()
+        }
+    }
 
     /**
      * Packages explicitly permitted to bypass the curfew blackhole VPN.
      * Guaranteed to always include AntiPorn self-package so background IPC,
-     * Firebase FCM push notifications, and Firestore policy synchronization remain active.
+     * Firebase FCM push notifications, and Firestore policy synchronization remain active,
+     * while stripping blacklisted, custom-blacklisted, high-risk apps, and restricted browsers.
      */
     fun getVpnBypassedPackages(context: Context): Set<String> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val custom = prefs.getStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, emptySet())?.toSet() ?: emptySet()
-        val policyPackages = try {
-            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context)
-                .getCurrentPolicy().curfewVpnBypassPackages
+        val (policyPackages, policyBlacklist) = try {
+            val policy = com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(context)
+                .getCurrentPolicy()
+            policy.curfewVpnBypassPackages to policy.customBlacklistPackages
         } catch (e: Exception) {
-            android.util.Log.w("AntiPorn_CurfewConfig", "Failed to retrieve policy curfew VPN bypass packages, falling back to prefs", e)
-            null
+            Log.w("AntiPorn_CurfewConfig", "Failed to retrieve policy curfew VPN bypass packages, falling back to prefs", e)
+            null to emptySet()
         }
-        val effectivePackages = policyPackages ?: custom
+        val effectivePackages = (policyPackages ?: custom).filterNot { pkg ->
+            com.drmohammed.antiporn.shields.AppSuspensionShield.isBlacklisted(pkg) ||
+                AppPolicyRegistry.isRestrictedBrowser(pkg) ||
+                AppPolicyRegistry.isHighRisk(pkg) ||
+                policyBlacklist.contains(pkg)
+        }.toSet()
         return effectivePackages + context.packageName
     }
 
     fun setVpnBypassedPackages(context: Context, packages: Set<String>) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val toSave = packages - context.packageName
-        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, toSave).apply()
+        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, toSave).commit()
     }
 
     fun addVpnBypassedPackage(context: Context, packageName: String) {
@@ -191,7 +270,7 @@ object CurfewConfig {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val current = prefs.getStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, emptySet())?.toMutableSet() ?: mutableSetOf()
         current.add(packageName)
-        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, current).apply()
+        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, current).commit()
     }
 
     fun removeVpnBypassedPackage(context: Context, packageName: String) {
@@ -199,7 +278,7 @@ object CurfewConfig {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val current = prefs.getStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, emptySet())?.toMutableSet() ?: mutableSetOf()
         current.remove(packageName)
-        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, current).apply()
+        prefs.edit().putStringSet(KEY_CURFEW_VPN_BYPASS_PACKAGES, current).commit()
     }
 
     /**

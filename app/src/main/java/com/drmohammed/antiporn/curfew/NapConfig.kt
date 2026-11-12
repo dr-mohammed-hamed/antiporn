@@ -14,6 +14,7 @@ object NapConfig {
     const val KEY_NAP_END_ELAPSED = "key_nap_end_elapsed"
     const val KEY_NAP_END_WALL_MS = "key_nap_end_wall_ms"
     const val KEY_NAP_ACTIVE = "key_nap_active"
+    const val KEY_NAP_BOOT_COUNT = "key_nap_boot_count"
     const val NAP_DURATION_MS: Long = 60 * 60 * 1000L
     const val EXTEND_STEP_MS: Long = 60 * 60 * 1000L
     const val ACTION_NAP_END = "com.drmohammed.antiporn.ACTION_NAP_END"

@@ -3,11 +3,12 @@ package com.drmohammed.antiporn.ui.control.curfew
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -15,22 +16,16 @@ import androidx.lifecycle.lifecycleScope
 import com.drmohammed.antiporn.R
 import com.drmohammed.antiporn.core.engine.ProtectionEngine
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
+import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.curfew.CurfewScheduler
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.ui.control.gate.SelfControlAccessGateRegistry
-import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.materialswitch.MaterialSwitch
-import com.google.android.material.timepicker.MaterialTimePicker
-import com.google.android.material.timepicker.TimeFormat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 
 /**
  * Dedicated Sub-Screen for Night Curfew Settings.
@@ -41,40 +36,15 @@ class CurfewSettingsActivity : AppCompatActivity() {
     private var isRemote = false
     private var wardId: String = ""
     private lateinit var initialPolicy: DevicePolicyBundle
-
-    private var selectedStartHour = 20
-    private var selectedStartMinute = 30
-    private var selectedEndHour = 7
-    private var selectedEndMinute = 0
-
-    private var selectedWeekendStartHour = 20
-    private var selectedWeekendStartMinute = 30
-    private var selectedWeekendEndHour = 7
-    private var selectedWeekendEndMinute = 0
-    private var selectedCurfewWhitelist = emptySet<String>()
-    private var selectedCurfewVpnBypass = emptySet<String>()
-
-    private var isCurfewEnabled = true
-    private var isWeekendCurfewEnabled = false
-    private var isCurfewInternetKillEnabled = false
-
-    private lateinit var toolbar: MaterialToolbar
-    private lateinit var switchCurfewMaster: MaterialSwitch
-    private lateinit var btnChangeStartTime: MaterialButton
-    private lateinit var btnChangeEndTime: MaterialButton
-    private lateinit var switchWeekendCurfew: MaterialSwitch
-    private lateinit var layoutWeekendTimingContent: View
-    private lateinit var btnChangeWeekendStartTime: MaterialButton
-    private lateinit var btnChangeWeekendEndTime: MaterialButton
-    private lateinit var switchCurfewInternetKill: MaterialSwitch
-    private lateinit var tvCurfewAllowedAppsCount: TextView
-    private lateinit var btnSelectCurfewApps: MaterialButton
-    private lateinit var btnSaveCurfewChanges: MaterialButton
+    private lateinit var viewBinder: CurfewSettingsViewBinder
 
     private var isSaving = false
+    private var immediateConfirmDialog: AlertDialog? = null
+    private var discardConfirmDialog: AlertDialog? = null
 
     private val backPressedCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
+            if (isSaving) return
             if (hasUnsavedChanges()) {
                 showDiscardConfirmationDialog()
             } else {
@@ -100,13 +70,28 @@ class CurfewSettingsActivity : AppCompatActivity() {
             return
         }
 
-        initialPolicy = if (isRemote && !policyJson.isNullOrBlank()) {
-            DevicePolicyBundle.fromJson(policyJson)
+        if (isRemote) {
+            if (wardId.isBlank() || policyJson.isNullOrBlank()) {
+                Log.e(TAG, "Refusing remote curfew settings launch: missing EXTRA_WARD_ID or EXTRA_POLICY_JSON")
+                Toast.makeText(applicationContext, R.string.toast_guardian_policy_save_failed, Toast.LENGTH_LONG).show()
+                finish()
+                return
+            }
+            val parsed = DevicePolicyBundle.fromJsonOrNull(policyJson)
+            if (parsed == null) {
+                Log.e(TAG, "Refusing remote curfew settings launch: invalid EXTRA_POLICY_JSON")
+                Toast.makeText(applicationContext, R.string.toast_guardian_policy_save_failed, Toast.LENGTH_LONG).show()
+                finish()
+                return
+            }
+            initialPolicy = parsed
         } else {
-            PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+            initialPolicy = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
         }
 
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
+
+        viewBinder = CurfewSettingsViewBinder(this)
 
         supportFragmentManager.setFragmentResultListener(
             CurfewAppPickerBottomSheet.REQUEST_KEY,
@@ -114,18 +99,34 @@ class CurfewSettingsActivity : AppCompatActivity() {
         ) { _, bundle ->
             val whitelist = bundle.getStringArrayList(CurfewAppPickerBottomSheet.RESULT_WHITELIST)?.toSet() ?: emptySet()
             val vpnBypass = bundle.getStringArrayList(CurfewAppPickerBottomSheet.RESULT_VPN_BYPASS)?.toSet() ?: emptySet()
-            selectedCurfewWhitelist = whitelist
-            selectedCurfewVpnBypass = vpnBypass
-            updateAllowedAppsLabel()
+            viewBinder.selectedCurfewWhitelist = whitelist
+            viewBinder.selectedCurfewVpnBypass = vpnBypass
+            viewBinder.updateAllowedAppsLabel()
             updateSaveButtonState()
         }
 
-        initViews()
-        bindInitialPolicy()
-        setupListeners()
-        updateTimingLabels()
-        updateAllowedAppsLabel()
+        viewBinder.bindViews(canGoBack = { !isSaving })
+        viewBinder.applyInitialPolicy(initialPolicy)
+        if (savedInstanceState != null) {
+            viewBinder.restoreInstanceState(savedInstanceState)
+        }
+        viewBinder.setupListeners(
+            isRemote = isRemote,
+            wardId = wardId,
+            initialBlacklist = initialPolicy.customBlacklistPackages,
+            onDirtyStateChanged = ::updateSaveButtonState,
+            onSaveClicked = ::saveChanges
+        )
+        viewBinder.updateTimingLabels()
+        viewBinder.updateAllowedAppsLabel()
         updateSaveButtonState()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (::viewBinder.isInitialized) {
+            viewBinder.saveInstanceState(outState)
+        }
     }
 
     override fun onResume() {
@@ -134,6 +135,14 @@ class CurfewSettingsActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.gate_access_denied_by_guardian, Toast.LENGTH_SHORT).show()
             finish()
         }
+    }
+
+    override fun onDestroy() {
+        immediateConfirmDialog?.dismiss()
+        immediateConfirmDialog = null
+        discardConfirmDialog?.dismiss()
+        discardConfirmDialog = null
+        super.onDestroy()
     }
 
     private fun applyWindowInsets() {
@@ -148,261 +157,151 @@ class CurfewSettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun initViews() {
-        toolbar = findViewById(R.id.toolbarCurfew)
-        toolbar.setNavigationOnClickListener {
-            onBackPressedDispatcher.onBackPressed()
-        }
-
-        switchCurfewMaster = findViewById(R.id.switchCurfewMaster)
-        btnChangeStartTime = findViewById(R.id.btnChangeStartTime)
-        btnChangeEndTime = findViewById(R.id.btnChangeEndTime)
-        switchWeekendCurfew = findViewById(R.id.switchWeekendCurfew)
-        layoutWeekendTimingContent = findViewById(R.id.layoutWeekendTimingContent)
-        btnChangeWeekendStartTime = findViewById(R.id.btnChangeWeekendStartTime)
-        btnChangeWeekendEndTime = findViewById(R.id.btnChangeWeekendEndTime)
-        switchCurfewInternetKill = findViewById(R.id.switchCurfewInternetKill)
-        tvCurfewAllowedAppsCount = findViewById(R.id.tvCurfewAllowedAppsCount)
-        btnSelectCurfewApps = findViewById(R.id.btnSelectCurfewApps)
-        btnSaveCurfewChanges = findViewById(R.id.btnSaveCurfewChanges)
-    }
-
-    private fun bindInitialPolicy() {
-        selectedStartHour = initialPolicy.curfewStartHour
-        selectedStartMinute = initialPolicy.curfewStartMinute
-        selectedEndHour = initialPolicy.curfewEndHour
-        selectedEndMinute = initialPolicy.curfewEndMinute
-
-        selectedWeekendStartHour = initialPolicy.weekendCurfewStartHour
-        selectedWeekendStartMinute = initialPolicy.weekendCurfewStartMinute
-        selectedWeekendEndHour = initialPolicy.weekendCurfewEndHour
-        selectedWeekendEndMinute = initialPolicy.weekendCurfewEndMinute
-
-        isCurfewEnabled = initialPolicy.isCurfewEnabled
-        isWeekendCurfewEnabled = initialPolicy.isWeekendCurfewEnabled
-        isCurfewInternetKillEnabled = initialPolicy.isVpnBlackholeEnabled
-        selectedCurfewWhitelist = initialPolicy.customCurfewWhitelistPackages
-        selectedCurfewVpnBypass = initialPolicy.curfewVpnBypassPackages
-
-        switchCurfewMaster.isChecked = isCurfewEnabled
-        switchWeekendCurfew.isChecked = isWeekendCurfewEnabled
-        layoutWeekendTimingContent.visibility = if (isWeekendCurfewEnabled) View.VISIBLE else View.GONE
-        switchCurfewInternetKill.isChecked = isCurfewInternetKillEnabled
-    }
-
-    private fun setupListeners() {
-        switchCurfewMaster.setOnCheckedChangeListener { _, isChecked ->
-            isCurfewEnabled = isChecked
-            updateSaveButtonState()
-        }
-
-        switchWeekendCurfew.setOnCheckedChangeListener { _, isChecked ->
-            isWeekendCurfewEnabled = isChecked
-            layoutWeekendTimingContent.visibility = if (isChecked) View.VISIBLE else View.GONE
-            updateSaveButtonState()
-        }
-
-        switchCurfewInternetKill.setOnCheckedChangeListener { _, isChecked ->
-            isCurfewInternetKillEnabled = isChecked
-            updateSaveButtonState()
-        }
-
-        btnChangeStartTime.setOnClickListener {
-            showTimePicker(selectedStartHour, selectedStartMinute, getString(R.string.guardian_curfew_start_label)) { h, m ->
-                selectedStartHour = h
-                selectedStartMinute = m
-                updateTimingLabels()
-                updateSaveButtonState()
-            }
-        }
-
-        btnChangeEndTime.setOnClickListener {
-            showTimePicker(selectedEndHour, selectedEndMinute, getString(R.string.guardian_curfew_end_label)) { h, m ->
-                selectedEndHour = h
-                selectedEndMinute = m
-                updateTimingLabels()
-                updateSaveButtonState()
-            }
-        }
-
-        btnChangeWeekendStartTime.setOnClickListener {
-            showTimePicker(selectedWeekendStartHour, selectedWeekendStartMinute, getString(R.string.guardian_weekend_curfew_start_label)) { h, m ->
-                selectedWeekendStartHour = h
-                selectedWeekendStartMinute = m
-                updateTimingLabels()
-                updateSaveButtonState()
-            }
-        }
-
-        btnChangeWeekendEndTime.setOnClickListener {
-            showTimePicker(selectedWeekendEndHour, selectedWeekendEndMinute, getString(R.string.guardian_weekend_curfew_end_label)) { h, m ->
-                selectedWeekendEndHour = h
-                selectedWeekendEndMinute = m
-                updateTimingLabels()
-                updateSaveButtonState()
-            }
-        }
-
-        btnSelectCurfewApps.setOnClickListener {
-            if (supportFragmentManager.findFragmentByTag(CurfewAppPickerBottomSheet.TAG) != null) return@setOnClickListener
-            val sheet = CurfewAppPickerBottomSheet.newInstance(
-                isRemote = isRemote,
-                wardId = wardId,
-                initialWhitelist = selectedCurfewWhitelist,
-                initialVpnBypass = selectedCurfewVpnBypass,
-                blacklist = initialPolicy.customBlacklistPackages
-            )
-            sheet.setOnConfirmedListener { newWhitelist, newVpnBypass ->
-                selectedCurfewWhitelist = newWhitelist
-                selectedCurfewVpnBypass = newVpnBypass
-                updateAllowedAppsLabel()
-                updateSaveButtonState()
-            }
-            sheet.show(supportFragmentManager, CurfewAppPickerBottomSheet.TAG)
-        }
-
-        btnSaveCurfewChanges.setOnClickListener {
-            saveChanges()
-        }
-    }
-
-    private fun updateAllowedAppsLabel() {
-        val allowedCount = selectedCurfewWhitelist.size
-        val netCount = selectedCurfewVpnBypass.count { selectedCurfewWhitelist.contains(it) }
-        tvCurfewAllowedAppsCount.text = when {
-            allowedCount == 0 -> getString(R.string.curfew_allowed_apps_none)
-            netCount > 0 -> getString(R.string.curfew_allowed_apps_count_with_net_format, allowedCount, netCount)
-            else -> getString(R.string.curfew_allowed_apps_count_format, allowedCount)
-        }
-    }
-
-    private fun showTimePicker(hour: Int, minute: Int, title: String, onTimeSelected: (Int, Int) -> Unit) {
-        val is24Hour = android.text.format.DateFormat.is24HourFormat(this)
-        val picker = MaterialTimePicker.Builder()
-            .setTimeFormat(if (is24Hour) TimeFormat.CLOCK_24H else TimeFormat.CLOCK_12H)
-            .setHour(hour)
-            .setMinute(minute)
-            .setTitleText(title)
-            .build()
-
-        picker.addOnPositiveButtonClickListener {
-            onTimeSelected(picker.hour, picker.minute)
-        }
-        picker.show(supportFragmentManager, "time_picker_${title.hashCode()}")
-    }
-
-    private fun updateTimingLabels() {
-        val is24Hour = android.text.format.DateFormat.is24HourFormat(this)
-        val cal = Calendar.getInstance()
-
-        fun format(h: Int, m: Int): String {
-            return if (is24Hour) {
-                String.format(Locale.US, "%02d:%02d", h, m)
-            } else {
-                cal.set(Calendar.HOUR_OF_DAY, h)
-                cal.set(Calendar.MINUTE, m)
-                SimpleDateFormat("hh:mm a", Locale.getDefault()).format(cal.time)
-            }
-        }
-
-        btnChangeStartTime.text = format(selectedStartHour, selectedStartMinute)
-        btnChangeEndTime.text = format(selectedEndHour, selectedEndMinute)
-        btnChangeWeekendStartTime.text = format(selectedWeekendStartHour, selectedWeekendStartMinute)
-        btnChangeWeekendEndTime.text = format(selectedWeekendEndHour, selectedWeekendEndMinute)
-    }
-
-    private fun hasUnsavedChanges(): Boolean {
-        return isCurfewEnabled != initialPolicy.isCurfewEnabled ||
-                selectedStartHour != initialPolicy.curfewStartHour ||
-                selectedStartMinute != initialPolicy.curfewStartMinute ||
-                selectedEndHour != initialPolicy.curfewEndHour ||
-                selectedEndMinute != initialPolicy.curfewEndMinute ||
-                isWeekendCurfewEnabled != initialPolicy.isWeekendCurfewEnabled ||
-                selectedWeekendStartHour != initialPolicy.weekendCurfewStartHour ||
-                selectedWeekendStartMinute != initialPolicy.weekendCurfewStartMinute ||
-                selectedWeekendEndHour != initialPolicy.weekendCurfewEndHour ||
-                selectedWeekendEndMinute != initialPolicy.weekendCurfewEndMinute ||
-                isCurfewInternetKillEnabled != initialPolicy.isVpnBlackholeEnabled ||
-                selectedCurfewWhitelist != initialPolicy.customCurfewWhitelistPackages ||
-                selectedCurfewVpnBypass != initialPolicy.curfewVpnBypassPackages
-    }
+    private fun hasUnsavedChanges(): Boolean = viewBinder.hasUnsavedChanges(initialPolicy)
 
     private fun updateSaveButtonState() {
         val dirty = hasUnsavedChanges()
-        btnSaveCurfewChanges.isEnabled = dirty && !isSaving
-        btnSaveCurfewChanges.alpha = if (dirty && !isSaving) 1.0f else 0.5f
-        backPressedCallback.isEnabled = dirty
+        viewBinder.updateSaveButton(dirty = dirty, isSaving = isSaving)
+        backPressedCallback.isEnabled = dirty || isSaving
     }
 
     private fun saveChanges() {
         if (isSaving || !hasUnsavedChanges()) return
+
+        if (viewBinder.isCurfewEnabled &&
+            viewBinder.selectedStartHour == viewBinder.selectedEndHour &&
+            viewBinder.selectedStartMinute == viewBinder.selectedEndMinute
+        ) {
+            Toast.makeText(applicationContext, R.string.toast_curfew_invalid_same_start_end, Toast.LENGTH_LONG).show()
+            return
+        }
+        if (viewBinder.isCurfewEnabled &&
+            viewBinder.isWeekendCurfewEnabled &&
+            viewBinder.selectedWeekendStartHour == viewBinder.selectedWeekendEndHour &&
+            viewBinder.selectedWeekendStartMinute == viewBinder.selectedWeekendEndMinute
+        ) {
+            Toast.makeText(applicationContext, R.string.toast_curfew_invalid_same_start_end, Toast.LENGTH_LONG).show()
+            return
+        }
+
+        if (shouldConfirmImmediateCurfewActivation()) {
+            if (isFinishing || isDestroyed || immediateConfirmDialog?.isShowing == true) return
+            showImmediateCurfewConfirmationDialog()
+            return
+        }
+
+        performSaveChanges()
+    }
+
+    /**
+     * Returns true when saving local curfew settings will immediately engage restrictions
+     * because the current time is inside the selected schedule window and curfew was not active.
+     */
+    private fun shouldConfirmImmediateCurfewActivation(): Boolean {
+        if (isRemote || !viewBinder.isCurfewEnabled || !ProtectionEngine.isDeviceOwner(this)) return false
+        val targetWindowActive = CurfewEnforcer.isScheduleWindowActive(
+            calendar = CurfewConfig.getCurfewCalendar(this),
+            startHour = viewBinder.selectedStartHour,
+            startMinute = viewBinder.selectedStartMinute,
+            endHour = viewBinder.selectedEndHour,
+            endMinute = viewBinder.selectedEndMinute,
+            isWeekendCurfewEnabled = viewBinder.isWeekendCurfewEnabled,
+            weekendStartHour = viewBinder.selectedWeekendStartHour,
+            weekendStartMinute = viewBinder.selectedWeekendStartMinute,
+            weekendEndHour = viewBinder.selectedWeekendEndHour,
+            weekendEndMinute = viewBinder.selectedWeekendEndMinute
+        )
+        return shouldPromptImmediateCurfewConfirmation(
+            isRemote = isRemote,
+            targetCurfewEnabled = viewBinder.isCurfewEnabled,
+            initialCurfewEnabled = initialPolicy.isCurfewEnabled,
+            isCurrentlyCurfewActive = CurfewEnforcer.isCurfewActive(this),
+            isDeviceOwner = true,
+            isTargetScheduleActiveNow = targetWindowActive
+        )
+    }
+
+    private fun showImmediateCurfewConfirmationDialog() {
+        if (isFinishing || isDestroyed) return
+        immediateConfirmDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_curfew_immediate_title)
+            .setMessage(R.string.dialog_curfew_immediate_msg)
+            .setPositiveButton(R.string.btn_curfew_enable_now) { dialog, _ ->
+                dialog.dismiss()
+                performSaveChanges()
+            }
+            .setNegativeButton(R.string.dialog_btn_cancel, null)
+            .setOnDismissListener {
+                immediateConfirmDialog = null
+            }
+            .show()
+    }
+
+    private fun performSaveChanges() {
+        if (isSaving || !hasUnsavedChanges()) return
+        if (isRemote && wardId.isBlank()) {
+            Log.e(TAG, "Refusing remote policy push: wardId is blank")
+            Toast.makeText(applicationContext, R.string.toast_guardian_policy_save_failed, Toast.LENGTH_LONG).show()
+            return
+        }
+
         isSaving = true
         updateSaveButtonState()
 
-        val updatedPolicy = initialPolicy.copy(
-            isCurfewEnabled = isCurfewEnabled,
-            curfewStartHour = selectedStartHour,
-            curfewStartMinute = selectedStartMinute,
-            curfewEndHour = selectedEndHour,
-            curfewEndMinute = selectedEndMinute,
-            isWeekendCurfewEnabled = isWeekendCurfewEnabled,
-            weekendCurfewStartHour = selectedWeekendStartHour,
-            weekendCurfewStartMinute = selectedWeekendStartMinute,
-            weekendCurfewEndHour = selectedWeekendEndHour,
-            weekendCurfewEndMinute = selectedWeekendEndMinute,
-            isVpnBlackholeEnabled = isCurfewInternetKillEnabled,
-            customCurfewWhitelistPackages = selectedCurfewWhitelist,
-            curfewVpnBypassPackages = selectedCurfewVpnBypass
-        )
-
+        val updatedPolicy = viewBinder.buildUpdatedPolicy(initialPolicy)
         val app = applicationContext
         val policyRepo = PolicyRepository.getInstance(app)
 
-        lifecycleScope.launch(Dispatchers.IO) {
+        lifecycleScope.launch {
             try {
-                val success = if (isRemote && wardId.isNotBlank()) {
-                    policyRepo.pushPolicyToWard(wardId, updatedPolicy)
-                } else {
-                    val saved = policyRepo.saveAndEnforceSelfPolicy(updatedPolicy)
-                    if (saved) {
-                        CurfewScheduler.scheduleNextAlarms(app)
-                        CurfewEnforcer.syncBlockState(app)
-                        withContext(Dispatchers.Main) {
-                            ProtectionEngine.applyAllAsync(app)
+                val success = withContext(Dispatchers.IO + NonCancellable) {
+                    if (isRemote) {
+                        policyRepo.pushPolicyToWard(wardId, updatedPolicy)
+                    } else {
+                        val saved = policyRepo.saveAndEnforceSelfPolicy(updatedPolicy)
+                        if (saved) {
+                            CurfewScheduler.scheduleNextAlarms(app)
+                            CurfewEnforcer.syncBlockState(app)
+                            withContext(Dispatchers.Main + NonCancellable) {
+                                ProtectionEngine.applyAllAsync(app)
+                            }
                         }
+                        saved
                     }
-                    saved
                 }
 
-                withContext(Dispatchers.Main) {
-                    isSaving = false
-                    if (success) {
-                        Toast.makeText(this@CurfewSettingsActivity, R.string.toast_self_policy_saved, Toast.LENGTH_SHORT).show()
-                        val resultIntent = Intent().apply {
-                            putExtra(EXTRA_UPDATED_POLICY_JSON, updatedPolicy.toJson())
-                        }
-                        setResult(Activity.RESULT_OK, resultIntent)
-                        backPressedCallback.isEnabled = false
-                        finish()
-                    } else {
-                        updateSaveButtonState()
-                        Toast.makeText(this@CurfewSettingsActivity, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
+                if (isFinishing || isDestroyed) return@launch
+                isSaving = false
+                if (success) {
+                    val resultPolicy = if (isRemote) updatedPolicy else policyRepo.getCurrentPolicy()
+                    val successRes = if (isRemote) R.string.toast_guardian_policy_saved else R.string.toast_self_policy_saved
+                    Toast.makeText(applicationContext, successRes, Toast.LENGTH_SHORT).show()
+                    val resultIntent = Intent().apply {
+                        putExtra(EXTRA_UPDATED_POLICY_JSON, resultPolicy.toJson())
                     }
+                    setResult(Activity.RESULT_OK, resultIntent)
+                    backPressedCallback.isEnabled = false
+                    finish()
+                } else {
+                    updateSaveButtonState()
+                    val failRes = if (isRemote) R.string.toast_guardian_policy_save_failed else R.string.toast_self_policy_save_failed
+                    Toast.makeText(applicationContext, failRes, Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                android.util.Log.e("CurfewSettings", "Error saving curfew settings", e)
-                withContext(Dispatchers.Main) {
-                    isSaving = false
-                    updateSaveButtonState()
-                    Toast.makeText(this@CurfewSettingsActivity, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
-                }
+                Log.e(TAG, "Error saving curfew settings", e)
+                if (isFinishing || isDestroyed) return@launch
+                isSaving = false
+                updateSaveButtonState()
+                val failRes = if (isRemote) R.string.toast_guardian_policy_save_failed else R.string.toast_self_policy_save_failed
+                Toast.makeText(applicationContext, failRes, Toast.LENGTH_LONG).show()
             }
         }
     }
 
     private fun showDiscardConfirmationDialog() {
-        MaterialAlertDialogBuilder(this)
+        if (isFinishing || isDestroyed || discardConfirmDialog?.isShowing == true) return
+        discardConfirmDialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_unsaved_changes_title)
             .setMessage(R.string.dialog_unsaved_changes_msg)
             .setNegativeButton(R.string.btn_keep_editing) { dialog, _ ->
@@ -413,13 +312,35 @@ class CurfewSettingsActivity : AppCompatActivity() {
                 backPressedCallback.isEnabled = false
                 finish()
             }
+            .setOnDismissListener {
+                discardConfirmDialog = null
+            }
             .show()
     }
 
     companion object {
+        private const val TAG = "CurfewSettings"
         const val EXTRA_IS_REMOTE = "extra_is_remote"
         const val EXTRA_WARD_ID = "extra_ward_id"
         const val EXTRA_POLICY_JSON = "extra_policy_json"
         const val EXTRA_UPDATED_POLICY_JSON = "extra_updated_policy_json"
+
+        /**
+         * Returns true when saving local curfew settings will immediately engage restrictions
+         * inside the active window (either newly enabled or newly covering the current hour).
+         */
+        internal fun shouldPromptImmediateCurfewConfirmation(
+            isRemote: Boolean,
+            targetCurfewEnabled: Boolean,
+            initialCurfewEnabled: Boolean,
+            isCurrentlyCurfewActive: Boolean,
+            isDeviceOwner: Boolean,
+            isTargetScheduleActiveNow: Boolean
+        ): Boolean =
+            !isRemote &&
+                targetCurfewEnabled &&
+                (!initialCurfewEnabled || !isCurrentlyCurfewActive) &&
+                isDeviceOwner &&
+                isTargetScheduleActiveNow
     }
 }

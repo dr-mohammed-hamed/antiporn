@@ -151,7 +151,11 @@ class AccountabilityFragment : Fragment() {
         // 5. Approvals Hub Badge
         if (state.pendingApprovalsCount > 0) {
             binding.tvApprovalsBadge.visibility = View.VISIBLE
-            binding.tvApprovalsBadge.text = if (state.pendingApprovalsCount > 99) "99+" else state.pendingApprovalsCount.toString()
+            binding.tvApprovalsBadge.text = if (state.pendingApprovalsCount > 99) {
+                getString(R.string.badge_count_overflow)
+            } else {
+                state.pendingApprovalsCount.toString()
+            }
         } else {
             binding.tvApprovalsBadge.visibility = View.GONE
         }
@@ -427,7 +431,8 @@ class AccountabilityFragment : Fragment() {
                 text = getString(R.string.btn_cancel_breakout)
                 textSize = 12f
                 cornerRadius = (10 * density).toInt()
-                layoutParams = LinearLayout.LayoutParams(0, (38 * density).toInt(), 1f)
+                minHeight = (48 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 setOnClickListener {
                     val now = SystemClock.elapsedRealtime()
                     if (now - lastCancelBreakoutClickTime < 1000L) return@setOnClickListener
@@ -441,8 +446,9 @@ class AccountabilityFragment : Fragment() {
                 text = getString(R.string.btn_complete_breakout)
                 textSize = 12f
                 cornerRadius = (10 * density).toInt()
+                minHeight = (48 * density).toInt()
                 visibility = if (remainingMs <= 0L) View.VISIBLE else View.GONE
-                layoutParams = LinearLayout.LayoutParams(0, (38 * density).toInt(), 1f).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                     marginStart = (8 * density).toInt()
                 }
                 setOnClickListener {
@@ -463,12 +469,13 @@ class AccountabilityFragment : Fragment() {
                 text = getString(R.string.btn_request_unlink)
                 textSize = 12f
                 cornerRadius = (10 * density).toInt()
+                minHeight = (48 * density).toInt()
                 setIconResource(R.drawable.ic_lock)
                 iconSize = (16 * density).toInt()
                 iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
-                    (38 * density).toInt()
+                    LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
                     topMargin = (12 * density).toInt()
                 }
@@ -534,7 +541,7 @@ class AccountabilityFragment : Fragment() {
         val nameRow = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
-            minimumHeight = (44 * density).toInt()
+            minimumHeight = (48 * density).toInt()
             val typedValue = TypedValue()
             ctx.theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
             setBackgroundResource(typedValue.resourceId)
@@ -576,7 +583,7 @@ class AccountabilityFragment : Fragment() {
         val codeView = TextView(ctx).apply {
             text = getString(R.string.partner_pairing_code_label, partner.pairingCode)
             textSize = 12f
-            setTextColor(MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOutline, Color.GRAY))
+            setTextColor(MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, Color.GRAY))
             setPadding(0, (2 * density).toInt(), 0, 0)
         }
         container.addView(codeView)
@@ -603,7 +610,7 @@ class AccountabilityFragment : Fragment() {
                 } else {
                     val days = (diff / (24 * 3600 * 1000L)).toInt().coerceAtLeast(1)
                     statusPill.text = getString(R.string.status_offline_days, days)
-                    statusPill.setTextColor(MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOutline, Color.GRAY))
+                    statusPill.setTextColor(MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant, Color.GRAY))
                 }
             } else {
                 statusPill.text = getString(R.string.guardian_status_active)
@@ -620,6 +627,7 @@ class AccountabilityFragment : Fragment() {
             text = getString(R.string.btn_manage_ward)
             textSize = 12f
             cornerRadius = (8 * density).toInt()
+            minHeight = (48 * density).toInt()
             setOnClickListener {
                 val now = SystemClock.elapsedRealtime()
                 if (now - lastManageClickTime < 800L) return@setOnClickListener
@@ -636,6 +644,7 @@ class AccountabilityFragment : Fragment() {
         val deleteBtn = MaterialButton(ctx, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
             text = getString(R.string.btn_delete_partner)
             textSize = 12f
+            minHeight = (48 * density).toInt()
             setTextColor(ContextCompat.getColor(ctx, R.color.status_orange))
         }
         deleteBtn.setOnClickListener {

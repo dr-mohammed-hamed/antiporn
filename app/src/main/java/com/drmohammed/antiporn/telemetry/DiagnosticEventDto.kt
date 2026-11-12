@@ -36,11 +36,11 @@ data class DiagnosticEventDto(
      * Returns a compact Markdown table row representation.
      */
     fun toMarkdownTableRow(): String {
-        val statusEmoji = if (isSuccess) "✅ OK" else "❌ FAIL"
+        val statusBadge = if (isSuccess) "[OK]" else "[FAIL]"
         val cleanTag = tag.replace("|", "/").replace("`", "'").replace("\n", " ")
         val cleanAction = actionName.replace("|", "/").replace("`", "'").replace("\n", " ")
         val errorText = errorDetails?.replace("|", "/")?.replace("`", "'")?.replace("\n", " ") ?: "-"
         val metadataText = contextMetadata?.replace("|", "/")?.replace("`", "'")?.replace("\n", " ") ?: "-"
-        return "| `${formattedTime()}` | `$cleanTag` | `$cleanAction` | `${executionTimeMs}ms` | $statusEmoji | $errorText | $metadataText |"
+        return "| `${formattedTime()}` | `$cleanTag` | `$cleanAction` | `${executionTimeMs}ms` | $statusBadge | $errorText | $metadataText |"
     }
 }

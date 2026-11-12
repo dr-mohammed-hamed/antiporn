@@ -7,7 +7,8 @@ package com.drmohammed.antiporn.core.policy
 data class AppRule(
     val pattern: String,
     val classification: AppClassification,
-    val description: String = ""
+    val description: String = "",
+    val highRiskCategory: String? = null
 ) {
     val isWildcard: Boolean = pattern.contains("*") || pattern.contains("?")
 

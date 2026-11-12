@@ -23,7 +23,8 @@ data class SntpResult(
     val timeMs: Long,
     val elapsedRealtimeMs: Long,
     val roundTripLatencyMs: Long,
-    val source: String
+    val source: String,
+    val isQuorumVerified: Boolean = false
 )
 
 /**
@@ -71,8 +72,11 @@ object SntpClient {
     /** Default HTTP fallback timeout in milliseconds. */
     const val TIMEOUT_HTTP_MS: Int = 4000
 
-    /** Maximum allowed future drift for HTTP date fallback (30 days). */
+    /** Maximum allowed future drift without multi-server quorum (30 days). */
     const val MAX_HTTP_FUTURE_DRIFT_MS: Long = 30L * 24 * 3600 * 1000L
+
+    /** Maximum disagreement allowed between two independent time servers to form a large-advance quorum. */
+    const val QUORUM_TOLERANCE_MS: Long = 5L * 60 * 1000L
 
     /** Minimum plausible epoch boundary (2024-01-01 00:00:00 UTC) to reject corrupted packets. */
     const val MIN_PLAUSIBLE_EPOCH_MS: Long = 1704067200000L
@@ -106,16 +110,81 @@ object SntpClient {
      * @return [SntpResult] if successful, or null if all network sources fail.
      */
     fun requestTime(timeoutMs: Int = TIMEOUT_UDP_MS): SntpResult? {
+        val largeAdvanceCandidates = mutableListOf<SntpResult>()
+
         for (server in NTP_SERVERS) {
-            val result = queryUdpServer(server, timeoutMs)
-            if (result != null) {
-                Log.i(TAG, "SNTP query succeeded from $server: timeMs=${result.timeMs}, latency=${result.roundTripLatencyMs}ms")
-                return result
+            val result = queryUdpServer(server, timeoutMs) ?: continue
+            val evaluated = evaluateCandidate(result, largeAdvanceCandidates)
+            if (evaluated != null) {
+                Log.i(TAG, "SNTP query succeeded from ${evaluated.source}: timeMs=${evaluated.timeMs}, latency=${evaluated.roundTripLatencyMs}ms")
+                return evaluated
             }
         }
 
-        Log.w(TAG, "All UDP NTP servers failed or blocked. Attempting HTTP Date fallback...")
-        return queryHttpDateFallback(TIMEOUT_HTTP_MS)
+        Log.w(TAG, "UDP NTP servers did not yield a single valid/quorum timestamp. Attempting HTTP Date fallback...")
+        for (urlString in HTTP_FALLBACK_URLS) {
+            val result = queryHttpEndpoint(urlString, TIMEOUT_HTTP_MS) ?: continue
+            val evaluated = evaluateCandidate(result, largeAdvanceCandidates)
+            if (evaluated != null) {
+                Log.i(TAG, "HTTP Date fallback succeeded from ${evaluated.source}: timeMs=${evaluated.timeMs}, latency=${evaluated.roundTripLatencyMs}ms")
+                return evaluated
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * Checks whether a candidate timestamp requires multi-server quorum because it jumps
+     * beyond [MAX_HTTP_FUTURE_DRIFT_MS] from [TrustedTimeProvider.getLastKnownTrueTime].
+     * Never permanently locks out legitimate offline advances >30 days once two independent
+     * sources agree within [QUORUM_TOLERANCE_MS].
+     */
+    private fun evaluateCandidate(
+        candidate: SntpResult,
+        largeAdvanceCandidates: MutableList<SntpResult>
+    ): SntpResult? {
+        if (!TrustedTimeProvider.hasEverSynced()) return candidate
+        val lastKnown = TrustedTimeProvider.getLastKnownTrueTime()
+        if (lastKnown <= 0L || candidate.timeMs <= lastKnown + MAX_HTTP_FUTURE_DRIFT_MS) {
+            return candidate
+        }
+
+        val matching = largeAdvanceCandidates.firstOrNull { prev ->
+            prev.source != candidate.source &&
+                kotlin.math.abs(
+                    (candidate.timeMs - candidate.elapsedRealtimeMs) -
+                        (prev.timeMs - prev.elapsedRealtimeMs)
+                ) <= QUORUM_TOLERANCE_MS
+        }
+        if (matching != null) {
+            Log.i(
+                TAG,
+                "Large forward time advance verified by multi-server quorum: " +
+                    "${matching.source} & ${candidate.source}"
+            )
+            return candidate.copy(
+                source = "${candidate.source} [quorum:${matching.source}]",
+                isQuorumVerified = true
+            )
+        }
+
+        Log.w(
+            TAG,
+            "Candidate from ${candidate.source} jumps >30 days beyond lastKnown=$lastKnown; awaiting quorum confirmation"
+        )
+        largeAdvanceCandidates.add(candidate)
+        return null
+    }
+
+    private fun isBeforeVerifiedFloor(candidateTimeMs: Long, sourceLabel: String): Boolean {
+        if (!TrustedTimeProvider.hasEverSynced()) return false
+        val lastKnown = TrustedTimeProvider.getLastKnownTrueTime()
+        if (lastKnown > 0L && candidateTimeMs < lastKnown) {
+            Log.w(TAG, "Rejecting time from $sourceLabel: $candidateTimeMs is earlier than lastKnown $lastKnown")
+            return true
+        }
+        return false
     }
 
     /**
@@ -208,16 +277,8 @@ object SntpClient {
                 return null
             }
 
-            val lastKnown = TrustedTimeProvider.getLastKnownTrueTime()
-            if (lastKnown > 0L) {
-                if (ntpTime < lastKnown) {
-                    Log.w(TAG, "Rejecting NTP time from $host: $ntpTime is earlier than lastKnown $lastKnown")
-                    return null
-                }
-                if (ntpTime > lastKnown + MAX_HTTP_FUTURE_DRIFT_MS) {
-                    Log.w(TAG, "Rejecting NTP time from $host: $ntpTime is too far in future (> 30 days beyond $lastKnown)")
-                    return null
-                }
+            if (isBeforeVerifiedFloor(ntpTime, host)) {
+                return null
             }
 
             SntpResult(
@@ -243,75 +304,77 @@ object SntpClient {
      * Used when UDP port 123 is blocked by network filters, local VPN, or firewall.
      */
     fun queryHttpDateFallback(timeoutMs: Int = TIMEOUT_HTTP_MS): SntpResult? {
+        val largeAdvanceCandidates = mutableListOf<SntpResult>()
         for (urlString in HTTP_FALLBACK_URLS) {
-            var connection: HttpURLConnection? = null
-            try {
-                val url = URL(urlString)
-                val requestTicks = SystemClock.elapsedRealtime()
-                connection = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "HEAD"
-                    connectTimeout = timeoutMs
-                    readTimeout = timeoutMs
-                    instanceFollowRedirects = false
-                    useCaches = false
-                }
-                connection.connect()
-                val responseTicks = SystemClock.elapsedRealtime()
-                val latency = responseTicks - requestTicks
+            val result = queryHttpEndpoint(urlString, timeoutMs) ?: continue
+            val evaluated = evaluateCandidate(result, largeAdvanceCandidates)
+            if (evaluated != null) {
+                Log.i(TAG, "HTTP Date fallback succeeded from ${evaluated.source}: estimatedTrueTime=${evaluated.timeMs}, latency=${evaluated.roundTripLatencyMs}ms")
+                return evaluated
+            }
+        }
+        return null
+    }
 
-                val responseCode = connection.responseCode
-                if (responseCode !in 200..299) {
-                    Log.w(TAG, "Rejecting HTTP Date from $urlString: invalid response code $responseCode (captive portal / redirect / error)")
-                    continue
-                }
+    private fun queryHttpEndpoint(urlString: String, timeoutMs: Int): SntpResult? {
+        var connection: HttpURLConnection? = null
+        try {
+            val url = URL(urlString)
+            val requestTicks = SystemClock.elapsedRealtime()
+            connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "HEAD"
+                connectTimeout = timeoutMs
+                readTimeout = timeoutMs
+                instanceFollowRedirects = false
+                useCaches = false
+            }
+            connection.connect()
+            val responseTicks = SystemClock.elapsedRealtime()
+            val latency = responseTicks - requestTicks
 
-                val dateHeader = connection.getHeaderField("Date")
-                val parsedHeaderMs: Long? = if (!dateHeader.isNullOrBlank()) {
-                    try {
-                        HTTP_DATE_FORMAT.get()?.parse(dateHeader)?.time
-                    } catch (pe: Exception) {
-                        Log.w(TAG, "Failed parsing Date header: $dateHeader from $urlString", pe)
-                        null
-                    }
-                } else {
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) {
+                Log.w(TAG, "Rejecting HTTP Date from $urlString: invalid response code $responseCode (captive portal / redirect / error)")
+                return null
+            }
+
+            val dateHeader = connection.getHeaderField("Date")
+            val parsedHeaderMs: Long? = if (!dateHeader.isNullOrBlank()) {
+                try {
+                    HTTP_DATE_FORMAT.get()?.parse(dateHeader)?.time
+                } catch (pe: Exception) {
+                    Log.w(TAG, "Failed parsing Date header: $dateHeader from $urlString", pe)
                     null
                 }
+            } else {
+                null
+            }
 
-                // Fall back to connection.date if header string parse was unsuccessful
-                val headerTimeMs = parsedHeaderMs ?: connection.date.takeIf { it > 0L }
-                if (headerTimeMs != null && headerTimeMs > 0L) {
-                    val estimatedTrueTime = headerTimeMs + (latency / 2)
-                    if (estimatedTrueTime < MIN_PLAUSIBLE_EPOCH_MS) {
-                        Log.w(TAG, "Rejecting HTTP Date from $urlString: estimated timestamp $estimatedTrueTime is before 2024 boundary")
-                        continue
-                    }
-                    val lastKnown = TrustedTimeProvider.getLastKnownTrueTime()
-                    if (lastKnown > 0L) {
-                        if (estimatedTrueTime < lastKnown) {
-                            Log.w(TAG, "Rejecting HTTP Date from $urlString: estimated timestamp $estimatedTrueTime is earlier than lastKnown $lastKnown")
-                            continue
-                        }
-                        if (estimatedTrueTime > lastKnown + MAX_HTTP_FUTURE_DRIFT_MS) {
-                            Log.w(TAG, "Rejecting HTTP Date from $urlString: estimated timestamp $estimatedTrueTime is too far in future (> 30 days beyond $lastKnown)")
-                            continue
-                        }
-                    }
-                    Log.i(TAG, "HTTP Date fallback succeeded from $urlString: estimatedTrueTime=$estimatedTrueTime, latency=${latency}ms")
-                    return SntpResult(
-                        timeMs = estimatedTrueTime,
-                        elapsedRealtimeMs = responseTicks,
-                        roundTripLatencyMs = latency,
-                        source = "HTTP: ${url.host}"
-                    )
+            // Fall back to connection.date if header string parse was unsuccessful
+            val headerTimeMs = parsedHeaderMs ?: connection.date.takeIf { it > 0L }
+            if (headerTimeMs != null && headerTimeMs > 0L) {
+                val estimatedTrueTime = headerTimeMs + (latency / 2)
+                if (estimatedTrueTime < MIN_PLAUSIBLE_EPOCH_MS) {
+                    Log.w(TAG, "Rejecting HTTP Date from $urlString: estimated timestamp $estimatedTrueTime is before 2024 boundary")
+                    return null
                 }
+                if (isBeforeVerifiedFloor(estimatedTrueTime, urlString)) {
+                    return null
+                }
+                return SntpResult(
+                    timeMs = estimatedTrueTime,
+                    elapsedRealtimeMs = responseTicks,
+                    roundTripLatencyMs = latency,
+                    source = "HTTP: ${url.host}"
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "HTTP Date query failed for $urlString: ${e.message}")
+        } finally {
+            try {
+                connection?.disconnect()
             } catch (e: Exception) {
-                Log.w(TAG, "HTTP Date query failed for $urlString: ${e.message}")
-            } finally {
-                try {
-                    connection?.disconnect()
-                } catch (e: Exception) {
-                    Log.w(TAG, "Error disconnecting HTTP connection", e)
-                }
+                Log.w(TAG, "Error disconnecting HTTP connection", e)
             }
         }
         return null

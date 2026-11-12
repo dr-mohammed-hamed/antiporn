@@ -22,11 +22,11 @@
 
     <string name="status_no_device_owner_title">صلاحية Device Owner غير مفعلة</string>
 
-    <string name="status_no_device_owner_desc">يحتاج التطبيق لصلاحية مسؤل الجهاز المالك لتثبيت الـ DNS وحظر الـ VPN وقفل المتصفحات على مستوى النظام.</string>
+    <string name="status_no_device_owner_desc">يحتاج التطبيق لصلاحية مسؤول الجهاز المالك لتثبيت الـ DNS وحظر الـ VPN وقفل المتصفحات على مستوى النظام.</string>
 
     <string name="section_details_title">تفاصيل دروع الحماية</string>
 
-    <string name="card_device_owner_title">صلاحية مسؤل الجهاز (Device Owner)</string>
+    <string name="card_device_owner_title">صلاحية مسؤول الجهاز (Device Owner)</string>
 
     <string name="card_device_owner_active">مفعلة وتتحكم بالنظام بالكامل</string>
 
@@ -167,11 +167,13 @@
     <!-- Night Curfew Strings -->
     <string name="card_curfew_title">حظر النوم الآلي المجدول (Night Curfew)</string>
 
-    <string name="card_curfew_active_desc">حظر النوم نشط حالياً (8:00 م - 7:00 ص) - تطبيقات التشتيت معلقة</string>
+    <string name="card_curfew_active_desc">حظر النوم نشط حالياً - تطبيقات التشتيت معلقة</string>
 
-    <string name="card_curfew_active_desc_test">حظر النوم نشط حالياً (8:00 م - 7:00 ص) - تطبيقات التشتيت معلقة (تجريبي)</string>
+    <string name="card_curfew_active_desc_test">حظر النوم نشط حالياً - تطبيقات التشتيت معلقة (تجريبي)</string>
 
-    <string name="card_curfew_scheduled_desc">مجدول يومياً (8:00 م - 7:00 ص) - جميع التطبيقات المسموحة نشطة</string>
+    <string name="card_curfew_scheduled_desc">مجدول تلقائياً - جميع التطبيقات المسموحة نشطة</string>
+
+    <string name="card_curfew_off_optional_desc">مطفأ اختيارياً — يبدأ فقط عند تفعيله</string>
 
     <string name="card_curfew_inactive_desc">غير مفعل (يتطلب صلاحية Device Owner)</string>
 
@@ -181,7 +183,9 @@
 
     <string name="shield_curfew_active_applied">تم تفعيل حظر النوم الليلي وتعليق التطبيقات الترفيهية</string>
 
-    <string name="shield_curfew_scheduled_applied">تمت جدولة حظر النوم بنجاح (8:00 م - 7:00 ص)</string>
+    <string name="shield_curfew_scheduled_applied">تمت جدولة حظر النوم بنجاح</string>
+
+    <string name="shield_curfew_disabled_applied">الحظر الليلي مطفأ حالياً (اختياري)</string>
 
     <string name="btn_test_curfew_on">اختبار قفل النوم الآن</string>
 
@@ -193,7 +197,7 @@
 
     <string name="btn_curfew_night_locked">الحظر الليلي نشط تلقائياً</string>
 
-    <string name="card_curfew_night_locked_hint">الحظر الليلي قيد التشغيل المجدول (8:00 م - 7:00 ص) ولا يمكن إيقافه أثناء ساعات النوم</string>
+    <string name="card_curfew_night_locked_hint">الحظر الليلي قيد التشغيل المجدول ولا يمكن إيقافه أثناء ساعات الحظر</string>
 
     <string name="curfew_play_store_blocked">متجر Google Play مغلق أثناء حظر التجول الليلي لحماية وقتك!</string>
 
@@ -232,12 +236,12 @@
 
     <string name="curfew_vpn_notification_title">الحظر الليلي نشط: تم عزل الإنترنت</string>
 
-    <string name="curfew_vpn_notification_desc">تم قطع اتصال الإنترنت بالكامل حتى 07:00 ص. المكالمات ورسائل SMS تعمل بشكل طبيعي.</string>
+    <string name="curfew_vpn_notification_desc">تم قطع اتصال الإنترنت بالكامل. المكالمات ورسائل SMS تعمل بشكل طبيعي.</string>
 
     <string name="dns_vpn_notification_title">درع الفلترة والحماية الرقمية نشط</string>
     <string name="dns_vpn_notification_desc">فلترة حماية شبكة DNS المحلية وحظر المحتوى الإباحي والإعلانات تعمل في الخلفية</string>
 
-    <string name="curfew_vpn_session_name">AntiPorn Curfew Blackhole</string>
+    <string name="curfew_vpn_session_name">عزل شبكة الحظر الليلي (حِصْن)</string>
     <string name="curfew_vpn_dns_filter_session">فلترة حماية شبكة DNS المحلية</string>
 
     <!-- Unified Protection & Curfew Notification Strings -->
@@ -261,11 +265,11 @@
     <string name="notif_nap_ended_desc_curfew_still_active">انتهت القيلولة، لكن الحظر لا يزال نشطاً على جهازك.</string>
 
     <string name="notif_curfew_active_title">الحظر الليلي نشط: تم عزل الإنترنت</string>
-    <string name="notif_curfew_active_desc_format">تم عزل الإنترنت والتطبيقات حتى %1$02d:%2$02d ص. المكالمات وSMS تعمل بشكل طبيعي.</string>
+    <string name="notif_curfew_active_desc_format">تم عزل الإنترنت والتطبيقات حتى %1$s. المكالمات وSMS تعمل بشكل طبيعي.</string>
 
     <string name="notif_apps_suspended_title">تطبيقات التشتت معطلة مؤقتاً</string>
     <string name="notif_apps_suspended_nap_desc">وضع القيلولة نشط: التطبيقات معطلة مؤقتاً لحفظ وقتك.</string>
-    <string name="notif_apps_suspended_curfew_desc_format">الحظر الليلي نشط: التطبيقات معطلة حتى %1$02d:%2$02d ص لحفظ وقتك.</string>
+    <string name="notif_apps_suspended_curfew_desc_format">الحظر الليلي نشط: التطبيقات معطلة حتى %1$s لحفظ وقتك.</string>
 
     <string name="notif_approval_granted_title">تمت الموافقة على التطبيق</string>
     <string name="notif_approval_granted_desc">وافق المشرف %1$s على تشغيل تطبيق %2$s.</string>
@@ -279,7 +283,7 @@
 
     <string name="card_ai_shield_idle_desc">الفحص متوقف حالياً. اضغط للتشغيل والتجربة الميدانية</string>
 
-    <string name="card_ai_shield_subtext">فحص محلي 100% بنموذج YOLO11n لحفظ العورات مع اهتزاز وتنبيه فوري</string>
+    <string name="card_ai_shield_subtext" formatted="false">فحص محلي 100% بنموذج YOLO11n لحفظ العورات مع اهتزاز وتنبيه فوري</string>
 
     <string name="ai_model_active_format">الموديل: %1$s</string>
 
@@ -844,7 +848,7 @@
     <string name="shield_active_dns_title">درع AntiPorn DNS النشط</string>
     <string name="shield_active_dns_desc">خادم DNS مشفر (%1$s) مفروض ومقفل لمنع المواقع الإباحية.</string>
     <string name="shield_active_curfew_title">درع الحصن الليلي</string>
-    <string name="shield_active_curfew_desc">مفعل لحظر تطبيقات الترفيه وعزل الإنترنت في ساعات النوم (20:00 - 07:00).</string>
+    <string name="shield_active_curfew_desc">مفعل لحظر تطبيقات الترفيه وعزل الإنترنت في ساعات الحظر الليلي المجدولة.</string>
     <string name="shield_active_browser_title">درع قفل التصفح المتخفي والبحث الآمن</string>
     <string name="shield_active_browser_desc">معطل تماماً على جميع المتصفحات مع فرض Google SafeSearch الصارم.</string>
     <string name="shield_active_time_title">درع منع تغيير الوقت والتلاعب</string>
@@ -879,6 +883,8 @@
     <string name="self_control_security_switches_desc">التحكم في التصفح الخفي وقفل التثبيت والقطع اللحظي للإنترنت</string>
     <string name="toast_self_policy_saved">تم تطبيق وحفظ سياسات الحماية بنجاح</string>
     <string name="toast_self_policy_save_failed">تعذر حفظ السياسات، يرجى إعادة المحاولة</string>
+    <string name="toast_guardian_policy_saved">تم إرسال وحفظ سياسات المشرف بنجاح</string>
+    <string name="toast_guardian_policy_save_failed">تعذر إرسال سياسات المشرف، يرجى إعادة المحاولة</string>
     <string name="gate_open_title">الوصول المباشر</string>
     <string name="gate_access_denied">تم رفض الوصول إلى لوحة التحكم</string>
     <string name="gate_access_denied_by_guardian">تم إيقاف التحكم الذاتي بواسطة المشرف. جميع الدروع مدارة عن بُعد.</string>
@@ -967,7 +973,7 @@
     <string name="browser_filter_card_desc">تحديد المواقع المسموحة أو المحظورة في المتصفحات المدعومة عبر Device Owner</string>
     <string name="browser_filter_scope_title">نطاق وقوة التصفية</string>
     <string name="browser_filter_scope_browser_only">تصفية بسيطة على المتصفحات (الوضع الخفيف - بدون VPN)</string>
-    <string name="browser_filter_scope_browser_only_desc">يتم حظر المواقع المحددة داخل متصفح Chrome والمتصفحات المتوافقة فقط، مع استمرار عمل Private DNS عالي السرعة على الهاتف بنسبة 100% بدون تشغيل نفق VPN وبدون أي استهلاك زائد للبطارية.</string>
+    <string name="browser_filter_scope_browser_only_desc" formatted="false">يتم حظر المواقع المحددة داخل متصفح Chrome والمتصفحات المتوافقة فقط، مع استمرار عمل Private DNS عالي السرعة على الهاتف بنسبة 100% بدون تشغيل نفق VPN وبدون أي استهلاك زائد للبطارية.</string>
     <string name="browser_filter_scope_full_system">تصفية قوية فائقة لكل الهاتف (النظام الكامل - Local VPN)</string>
     <string name="browser_filter_scope_full_system_desc">تفعيل نفق الحماية المحلي (Local VPN Split-Tunnel) على مدار الساعة لفحص وتصفية كل استعلام DNS يخرج من الهاتف بالكامل (تطبيقات، ألعاب، متصفحات، تليجرام ويب) مع الفلتر المحلي الصارم.</string>
     <string name="browser_filter_btn_manage">إدارة مواقع المتصفح</string>
@@ -1040,6 +1046,7 @@
     <string name="filter_chip_time">التوقيت</string>
     <string name="filter_chip_dpm">أوامر النظام</string>
     <string name="filter_chip_pairing">الاقتران والربط</string>
+    <string name="filter_chip_network">الشبكة</string>
     <string name="menu_clear_logs">مسح السجلات</string>
     <string name="dialog_clear_logs_title">تأكيد مسح السجلات</string>
     <string name="dialog_clear_logs_msg">هل أنت متأكد من رغبتك في مسح كافة سجلات الصندوق الأسود من الهاتف؟ لا يمكن التراجع عن هذا الإجراء.</string>
@@ -1198,6 +1205,9 @@
     <string name="curfew_picker_opt_net">نت</string>
     <string name="curfew_picker_btn_confirm">تأكيد الاختيار</string>
     <string name="curfew_picker_btn_confirm_count">تأكيد الاختيار (%1$d)</string>
+    <string name="dialog_curfew_immediate_title">تفعيل الحظر الليلي الآن؟</string>
+    <string name="dialog_curfew_immediate_msg">الوقت الحالي يقع ضمن فترة الحظر الليلي التي اخترتها. عند التأكيد، سيبدأ الحظر فوراً بتعليق التطبيقات غير المسموحة وعزل الإنترنت (إذا كان مفعّلاً) حتى نهاية الفترة المحددة.</string>
+    <string name="btn_curfew_enable_now">تفعيل وتطبيق الآن</string>
 
     <!-- Web & Network Sub-Screen -->
     <string name="web_filter_title">المواقع والشبكة</string>
@@ -1248,4 +1258,12 @@
     <string name="waqfa_engine_status_dormant_clickable">المحرك غير نشط • اضغط للتفعيل</string>
     <string name="waqfa_engine_status_instant_toast">محرك الوصول اللحظي (0ms) نشط ويعمل بأعلى كفاءة</string>
     <string name="waqfa_engine_status_remote_toast">حالة محرك وقفة تعتمد على صلاحيات جهاز الابن الخاضع للإشراف</string>
+
+    <!-- Audit Hardening & Resilience Additions -->
+    <string name="qr_emergency_trusted_time_required">يلزم التحقق من التوقيت المعتمد قبل بدء مهلة فتح الطوارئ. اتصل بالإنترنت وحاول مرة أخرى.</string>
+    <string name="card_instant_kill_pending">تم تفعيل قطع الإنترنت الفوري، لكن عزل الـ VPN يحتاج لتأكيد التطبيق.</string>
+    <string name="error_evaluating_protection">تعذر فحص حالة الحماية</string>
+    <string name="badge_count_overflow">99+</string>
+    <string name="toast_curfew_invalid_same_start_end">لا يمكن أن يتطابق وقت بداية الحظر مع وقت نهايته.</string>
+    <string name="shield_dns_local_filter_needs_sync">مرشح الـ DNS المحلي نشط، لكن إعدادات DNS الخاص أو القيود تحتاج للمزامنة.</string>
 </resources>

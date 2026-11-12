@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.text.format.DateFormat
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -16,12 +17,14 @@ import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
+import com.drmohammed.antiporn.curfew.CurfewScheduleExt
 import com.drmohammed.antiporn.curfew.NapController
 import com.drmohammed.antiporn.notification.manager.AppNotificationManager
 import com.drmohammed.antiporn.notification.model.NotificationActionType
 import com.drmohammed.antiporn.notification.model.NotificationCategory
 import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import java.util.Calendar
+import java.util.TimeZone
 
 /**
  * Unified Central Coordinator for all Curfew, Nap, and Guardian Lockdown notifications.
@@ -55,13 +58,31 @@ object ProtectionNotificationCoordinator {
 
     fun getActiveCurfewEndHourAndMinute(context: Context): Pair<Int, Int> {
         val cal = CurfewConfig.getCurfewCalendar(context)
-        val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-        val isWeekendCurfew = CurfewConfig.isWeekendCurfewEnabled(context)
-        return if (isWeekendCurfew && (dayOfWeek == Calendar.FRIDAY || dayOfWeek == Calendar.SATURDAY)) {
-            Pair(CurfewConfig.getWeekendCurfewEndHour(context), CurfewConfig.getWeekendCurfewEndMinute(context))
-        } else {
-            Pair(CurfewConfig.getCurfewEndHour(context), CurfewConfig.getCurfewEndMinute(context))
+        return CurfewScheduleExt.resolveActiveCurfewEnd(
+            calendar = cal,
+            startHour = CurfewConfig.getCurfewStartHour(context),
+            startMinute = CurfewConfig.getCurfewStartMinute(context),
+            endHour = CurfewConfig.getCurfewEndHour(context),
+            endMinute = CurfewConfig.getCurfewEndMinute(context),
+            isWeekendCurfewEnabled = CurfewConfig.isWeekendCurfewEnabled(context),
+            weekendStartHour = CurfewConfig.getWeekendCurfewStartHour(context),
+            weekendStartMinute = CurfewConfig.getWeekendCurfewStartMinute(context),
+            weekendEndHour = CurfewConfig.getWeekendCurfewEndHour(context),
+            weekendEndMinute = CurfewConfig.getWeekendCurfewEndMinute(context)
+        )
+    }
+
+    private fun formatTimeOfDay(context: Context, hour: Int, minute: Int): String {
+        val tz = TimeZone.getTimeZone(CurfewConfig.getTargetTimeZoneId(context))
+        val cal = Calendar.getInstance(tz).apply {
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }
+        return DateFormat.getTimeFormat(context).apply {
+            timeZone = tz
+        }.format(cal.time)
     }
 
     fun resolveCurrentState(context: Context): ProtectionState {
@@ -157,7 +178,8 @@ object ProtectionNotificationCoordinator {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     builder.setChronometerCountDown(true)
                 }
-                builder.setWhen(state.endWallMs)
+                val napRemainingMs = NapController.remainingMs(context).takeIf { it > 0L } ?: state.remainingMs
+                builder.setWhen(System.currentTimeMillis() + napRemainingMs)
                 builder.setShowWhen(true)
 
                 val extendIntent = Intent(context, NapNotificationReceiver::class.java).apply {
@@ -177,7 +199,8 @@ object ProtectionNotificationCoordinator {
             }
             is ProtectionState.CurfewActive -> {
                 val title = context.getString(R.string.notif_curfew_active_title)
-                val desc = context.getString(R.string.notif_curfew_active_desc_format, state.endHour, state.endMinute)
+                val formattedEnd = formatTimeOfDay(context, state.endHour, state.endMinute)
+                val desc = context.getString(R.string.notif_curfew_active_desc_format, formattedEnd)
                 builder.setContentTitle(title)
                     .setContentText(desc)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(desc))
@@ -189,7 +212,8 @@ object ProtectionNotificationCoordinator {
                 val desc = if (state.isNap) {
                     context.getString(R.string.notif_apps_suspended_nap_desc)
                 } else {
-                    context.getString(R.string.notif_apps_suspended_curfew_desc_format, state.endHour, state.endMinute)
+                    val formattedEnd = formatTimeOfDay(context, state.endHour, state.endMinute)
+                    context.getString(R.string.notif_apps_suspended_curfew_desc_format, formattedEnd)
                 }
                 builder.setContentTitle(title)
                     .setContentText(desc)
@@ -202,7 +226,7 @@ object ProtectionNotificationCoordinator {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         builder.setChronometerCountDown(true)
                     }
-                    builder.setWhen(state.endWallMs)
+                    builder.setWhen(System.currentTimeMillis() + NapController.remainingMs(context))
                     builder.setShowWhen(true)
 
                     val extendIntent = Intent(context, NapNotificationReceiver::class.java).apply {
@@ -241,14 +265,15 @@ object ProtectionNotificationCoordinator {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
         if (state is ProtectionState.Inactive) {
-            if (!CurfewBlackholeVpnService.isRunning) {
+            if (!CurfewBlackholeVpnService.isServiceOrTunnelActive()) {
                 try {
                     notificationManager.cancel(NOTIFICATION_ID_PROTECTION)
                 } catch (e: Exception) {
                     Log.w(TAG, "Error cancelling protection notification", e)
                 }
+                return
             }
-            return
+            // Fall through to replace any stale Curfew/Nap notification with daytime DNS filtering status
         }
 
         if (canPostNotification(context)) {

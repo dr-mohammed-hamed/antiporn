@@ -17,6 +17,13 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object AppPolicyRegistry {
 
+    const val CATEGORY_TELEGRAM = "Telegram"
+    const val CATEGORY_OPEN_SOCIAL = "Open Social Network"
+    const val CATEGORY_PROXY_BROWSER = "Proxy Browser"
+    const val CATEGORY_RANDOM_CHAT = "Random Chat App"
+    const val CATEGORY_TIKTOK = "TikTok"
+    const val CATEGORY_LOCAL_ADB = "Local ADB Exploit"
+
     val RULES: List<AppRule> = listOf(
         // =========================================================================
         // 1. ABSOLUTE IMMUNITY (NEVER SUSPEND, NEVER UNINSTALL)
@@ -48,73 +55,73 @@ object AppPolicyRegistry {
         // =========================================================================
         // 4. PERMANENT BLACKLIST: TELEGRAM CLIENTS & FORKS
         // =========================================================================
-        AppRule("org.telegram.messenger", AppClassification.PERMANENT_BLACKLIST, "Telegram Official"),
-        AppRule("org.telegram.messenger.web", AppClassification.PERMANENT_BLACKLIST, "Telegram Web APK"),
-        AppRule("org.telegram.messenger.beta", AppClassification.PERMANENT_BLACKLIST, "Telegram Beta"),
-        AppRule("org.telegram.plus", AppClassification.PERMANENT_BLACKLIST, "Plus Messenger"),
-        AppRule("nekox.messenger", AppClassification.PERMANENT_BLACKLIST, "NekoX"),
-        AppRule("org.thunderdog.challegram", AppClassification.PERMANENT_BLACKLIST, "Telegram X"),
-        AppRule("com.iMe.android", AppClassification.PERMANENT_BLACKLIST, "iMe Messenger"),
-        AppRule("org.aka.messenger", AppClassification.PERMANENT_BLACKLIST, "Turrit / Aka"),
-        AppRule("com.turrit.telegram", AppClassification.PERMANENT_BLACKLIST, "Turrit"),
-        AppRule("org.vidogram.messenger", AppClassification.PERMANENT_BLACKLIST, "Vidogram"),
-        AppRule("org.telegram.BNavigation", AppClassification.PERMANENT_BLACKLIST, "Telegram BNavigation"),
+        AppRule("org.telegram.messenger", AppClassification.PERMANENT_BLACKLIST, "Telegram Official", CATEGORY_TELEGRAM),
+        AppRule("org.telegram.messenger.web", AppClassification.PERMANENT_BLACKLIST, "Telegram Web APK", CATEGORY_TELEGRAM),
+        AppRule("org.telegram.messenger.beta", AppClassification.PERMANENT_BLACKLIST, "Telegram Beta", CATEGORY_TELEGRAM),
+        AppRule("org.telegram.plus", AppClassification.PERMANENT_BLACKLIST, "Plus Messenger", CATEGORY_TELEGRAM),
+        AppRule("nekox.messenger", AppClassification.PERMANENT_BLACKLIST, "NekoX", CATEGORY_TELEGRAM),
+        AppRule("org.thunderdog.challegram", AppClassification.PERMANENT_BLACKLIST, "Telegram X", CATEGORY_TELEGRAM),
+        AppRule("com.iMe.android", AppClassification.PERMANENT_BLACKLIST, "iMe Messenger", CATEGORY_TELEGRAM),
+        AppRule("org.aka.messenger", AppClassification.PERMANENT_BLACKLIST, "Turrit / Aka", CATEGORY_TELEGRAM),
+        AppRule("com.turrit.telegram", AppClassification.PERMANENT_BLACKLIST, "Turrit", CATEGORY_TELEGRAM),
+        AppRule("org.vidogram.messenger", AppClassification.PERMANENT_BLACKLIST, "Vidogram", CATEGORY_TELEGRAM),
+        AppRule("org.telegram.BNavigation", AppClassification.PERMANENT_BLACKLIST, "Telegram BNavigation", CATEGORY_TELEGRAM),
 
         // =========================================================================
         // 5. PERMANENT BLACKLIST: OPEN SOCIAL NETWORKS (Reddit, Twitter, Tumblr, VK)
         // =========================================================================
-        AppRule("com.reddit.frontpage", AppClassification.PERMANENT_BLACKLIST, "Reddit Official"),
-        AppRule("com.rubenmayayo.reddit", AppClassification.PERMANENT_BLACKLIST, "Boost for Reddit"),
-        AppRule("com.laurencedawson.reddit_sync", AppClassification.PERMANENT_BLACKLIST, "Sync for Reddit"),
-        AppRule("ml.docilealligator.infinityforreddit", AppClassification.PERMANENT_BLACKLIST, "Infinity for Reddit"),
-        AppRule("free.reddit.news", AppClassification.PERMANENT_BLACKLIST, "Relay for Reddit"),
-        AppRule("com.andrewshu.android.reddit", AppClassification.PERMANENT_BLACKLIST, "RIF is fun"),
-        AppRule("com.twitter.android", AppClassification.PERMANENT_BLACKLIST, "Twitter / X"),
-        AppRule("com.twitter.android.lite", AppClassification.PERMANENT_BLACKLIST, "Twitter / X Lite"),
-        AppRule("com.tumblr", AppClassification.PERMANENT_BLACKLIST, "Tumblr"),
-        AppRule("com.vkontakte.android", AppClassification.PERMANENT_BLACKLIST, "VK Official"),
-        AppRule("com.vk.im", AppClassification.PERMANENT_BLACKLIST, "VK Me Messenger"),
+        AppRule("com.reddit.frontpage", AppClassification.PERMANENT_BLACKLIST, "Reddit Official", CATEGORY_OPEN_SOCIAL),
+        AppRule("com.rubenmayayo.reddit", AppClassification.PERMANENT_BLACKLIST, "Boost for Reddit", CATEGORY_OPEN_SOCIAL),
+        AppRule("com.laurencedawson.reddit_sync", AppClassification.PERMANENT_BLACKLIST, "Sync for Reddit", CATEGORY_OPEN_SOCIAL),
+        AppRule("ml.docilealligator.infinityforreddit", AppClassification.PERMANENT_BLACKLIST, "Infinity for Reddit", CATEGORY_OPEN_SOCIAL),
+        AppRule("free.reddit.news", AppClassification.PERMANENT_BLACKLIST, "Relay for Reddit", CATEGORY_OPEN_SOCIAL),
+        AppRule("com.andrewshu.android.reddit", AppClassification.PERMANENT_BLACKLIST, "RIF is fun", CATEGORY_OPEN_SOCIAL),
+        AppRule("com.twitter.android", AppClassification.PERMANENT_BLACKLIST, "Twitter / X", CATEGORY_OPEN_SOCIAL),
+        AppRule("com.twitter.android.lite", AppClassification.PERMANENT_BLACKLIST, "Twitter / X Lite", CATEGORY_OPEN_SOCIAL),
+        AppRule("com.tumblr", AppClassification.PERMANENT_BLACKLIST, "Tumblr", CATEGORY_OPEN_SOCIAL),
+        AppRule("com.vkontakte.android", AppClassification.PERMANENT_BLACKLIST, "VK Official", CATEGORY_OPEN_SOCIAL),
+        AppRule("com.vk.im", AppClassification.PERMANENT_BLACKLIST, "VK Me Messenger", CATEGORY_OPEN_SOCIAL),
 
         // =========================================================================
         // 6. PERMANENT BLACKLIST: PROXY & BYPASS BROWSERS
         // =========================================================================
-        AppRule("org.mozilla.firefox", AppClassification.PERMANENT_BLACKLIST, "Firefox Browser"),
-        AppRule("org.mozilla.firefox_beta", AppClassification.PERMANENT_BLACKLIST, "Firefox Beta"),
-        AppRule("org.mozilla.fenix", AppClassification.PERMANENT_BLACKLIST, "Firefox Fenix"),
-        AppRule("org.torproject.torbrowser", AppClassification.PERMANENT_BLACKLIST, "Tor Browser"),
-        AppRule("com.duckduckgo.mobile.android", AppClassification.PERMANENT_BLACKLIST, "DuckDuckGo Browser"),
-        AppRule("com.cloudmosa.puffinFree", AppClassification.PERMANENT_BLACKLIST, "Puffin Free Browser"),
-        AppRule("com.cloudmosa.puffin", AppClassification.PERMANENT_BLACKLIST, "Puffin Browser"),
-        AppRule("com.kiwibrowser.browser", AppClassification.PERMANENT_BLACKLIST, "Kiwi Browser"),
-        AppRule("com.opera.touch", AppClassification.PERMANENT_BLACKLIST, "Opera Touch"),
-        AppRule("com.opera.browser", AppClassification.PERMANENT_BLACKLIST, "Opera Browser with Free VPN"),
-        AppRule("com.alohamobile.browser", AppClassification.PERMANENT_BLACKLIST, "Aloha Browser"),
-        AppRule("com.alohamobile.browser.lite", AppClassification.PERMANENT_BLACKLIST, "Aloha Lite Browser"),
-        AppRule("com.UCMobile.intl", AppClassification.PERMANENT_BLACKLIST, "UC Browser International"),
-        AppRule("com.uc.browser.en", AppClassification.PERMANENT_BLACKLIST, "UC Browser English"),
+        AppRule("org.mozilla.firefox", AppClassification.PERMANENT_BLACKLIST, "Firefox Browser", CATEGORY_PROXY_BROWSER),
+        AppRule("org.mozilla.firefox_beta", AppClassification.PERMANENT_BLACKLIST, "Firefox Beta", CATEGORY_PROXY_BROWSER),
+        AppRule("org.mozilla.fenix", AppClassification.PERMANENT_BLACKLIST, "Firefox Fenix", CATEGORY_PROXY_BROWSER),
+        AppRule("org.torproject.torbrowser", AppClassification.PERMANENT_BLACKLIST, "Tor Browser", CATEGORY_PROXY_BROWSER),
+        AppRule("com.duckduckgo.mobile.android", AppClassification.PERMANENT_BLACKLIST, "DuckDuckGo Browser", CATEGORY_PROXY_BROWSER),
+        AppRule("com.cloudmosa.puffinFree", AppClassification.PERMANENT_BLACKLIST, "Puffin Free Browser", CATEGORY_PROXY_BROWSER),
+        AppRule("com.cloudmosa.puffin", AppClassification.PERMANENT_BLACKLIST, "Puffin Browser", CATEGORY_PROXY_BROWSER),
+        AppRule("com.kiwibrowser.browser", AppClassification.PERMANENT_BLACKLIST, "Kiwi Browser", CATEGORY_PROXY_BROWSER),
+        AppRule("com.opera.touch", AppClassification.PERMANENT_BLACKLIST, "Opera Touch", CATEGORY_PROXY_BROWSER),
+        AppRule("com.opera.browser", AppClassification.PERMANENT_BLACKLIST, "Opera Browser with Free VPN", CATEGORY_PROXY_BROWSER),
+        AppRule("com.alohamobile.browser", AppClassification.PERMANENT_BLACKLIST, "Aloha Browser", CATEGORY_PROXY_BROWSER),
+        AppRule("com.alohamobile.browser.lite", AppClassification.PERMANENT_BLACKLIST, "Aloha Lite Browser", CATEGORY_PROXY_BROWSER),
+        AppRule("com.UCMobile.intl", AppClassification.PERMANENT_BLACKLIST, "UC Browser International", CATEGORY_PROXY_BROWSER),
+        AppRule("com.uc.browser.en", AppClassification.PERMANENT_BLACKLIST, "UC Browser English", CATEGORY_PROXY_BROWSER),
 
         // =========================================================================
         // 7. PERMANENT BLACKLIST: RANDOM & ANONYMOUS CHAT APPS
         // =========================================================================
-        AppRule("chat.ometv", AppClassification.PERMANENT_BLACKLIST, "OmeTV"),
-        AppRule("com.monkey.cool", AppClassification.PERMANENT_BLACKLIST, "Monkey Cool"),
-        AppRule("com.chatous.chatous", AppClassification.PERMANENT_BLACKLIST, "Chatous"),
-        AppRule("com.kik.android", AppClassification.PERMANENT_BLACKLIST, "Kik Messenger"),
-        AppRule("com.camfrog.android.phone", AppClassification.PERMANENT_BLACKLIST, "Camfrog"),
-        AppRule("com.connected2.me", AppClassification.PERMANENT_BLACKLIST, "Connected2.me"),
-        AppRule("com.azar.live", AppClassification.PERMANENT_BLACKLIST, "Azar"),
-        AppRule("com.livu.live", AppClassification.PERMANENT_BLACKLIST, "LivU"),
+        AppRule("chat.ometv", AppClassification.PERMANENT_BLACKLIST, "OmeTV", CATEGORY_RANDOM_CHAT),
+        AppRule("com.monkey.cool", AppClassification.PERMANENT_BLACKLIST, "Monkey Cool", CATEGORY_RANDOM_CHAT),
+        AppRule("com.chatous.chatous", AppClassification.PERMANENT_BLACKLIST, "Chatous", CATEGORY_RANDOM_CHAT),
+        AppRule("com.kik.android", AppClassification.PERMANENT_BLACKLIST, "Kik Messenger", CATEGORY_RANDOM_CHAT),
+        AppRule("com.camfrog.android.phone", AppClassification.PERMANENT_BLACKLIST, "Camfrog", CATEGORY_RANDOM_CHAT),
+        AppRule("com.connected2.me", AppClassification.PERMANENT_BLACKLIST, "Connected2.me", CATEGORY_RANDOM_CHAT),
+        AppRule("com.azar.live", AppClassification.PERMANENT_BLACKLIST, "Azar", CATEGORY_RANDOM_CHAT),
+        AppRule("com.livu.live", AppClassification.PERMANENT_BLACKLIST, "LivU", CATEGORY_RANDOM_CHAT),
 
         // =========================================================================
         // 8. PERMANENT BLACKLIST: TIKTOK VARIANTS & CLIENTS
         // =========================================================================
-        AppRule("com.zhiliaoapp.musically", AppClassification.PERMANENT_BLACKLIST, "TikTok Global"),
-        AppRule("com.zhiliaoapp.musically.go", AppClassification.PERMANENT_BLACKLIST, "TikTok Lite"),
-        AppRule("com.ss.android.ugc.trill", AppClassification.PERMANENT_BLACKLIST, "TikTok Asia"),
-        AppRule("com.ss.android.ugc.aweme", AppClassification.PERMANENT_BLACKLIST, "Douyin TikTok China"),
-        AppRule("com.ss.android.ugc.aweme.lite", AppClassification.PERMANENT_BLACKLIST, "Douyin Lite"),
-        AppRule("com.ss.android.ugc.aweme.mobile", AppClassification.PERMANENT_BLACKLIST, "Douyin Mobile"),
-        AppRule("com.zhiliao.musically", AppClassification.PERMANENT_BLACKLIST, "Musical.ly Legacy"),
+        AppRule("com.zhiliaoapp.musically", AppClassification.PERMANENT_BLACKLIST, "TikTok Global", CATEGORY_TIKTOK),
+        AppRule("com.zhiliaoapp.musically.go", AppClassification.PERMANENT_BLACKLIST, "TikTok Lite", CATEGORY_TIKTOK),
+        AppRule("com.ss.android.ugc.trill", AppClassification.PERMANENT_BLACKLIST, "TikTok Asia", CATEGORY_TIKTOK),
+        AppRule("com.ss.android.ugc.aweme", AppClassification.PERMANENT_BLACKLIST, "Douyin TikTok China", CATEGORY_TIKTOK),
+        AppRule("com.ss.android.ugc.aweme.lite", AppClassification.PERMANENT_BLACKLIST, "Douyin Lite", CATEGORY_TIKTOK),
+        AppRule("com.ss.android.ugc.aweme.mobile", AppClassification.PERMANENT_BLACKLIST, "Douyin Mobile", CATEGORY_TIKTOK),
+        AppRule("com.zhiliao.musically", AppClassification.PERMANENT_BLACKLIST, "Musical.ly Legacy", CATEGORY_TIKTOK),
 
         // =========================================================================
         // 9. RESTRICTED CHROMIUM BROWSERS (InPrivate disabled, SafeSearch locked)
@@ -149,13 +156,13 @@ object AppPolicyRegistry {
         // =========================================================================
         // 12. PERMANENT BLACKLIST: LOCAL ADB & SHELL EXPLOIT TOOLS
         // =========================================================================
-        AppRule("com.draco.ladb", AppClassification.PERMANENT_BLACKLIST, "LADB Local ADB Shell"),
-        AppRule("in.sunilpaulmathew.ashell", AppClassification.PERMANENT_BLACKLIST, "aShell Local ADB"),
-        AppRule("in.sunilpaulmathew.ashell.you", AppClassification.PERMANENT_BLACKLIST, "aShell You"),
-        AppRule("com.termux", AppClassification.PERMANENT_BLACKLIST, "Termux Terminal"),
-        AppRule("com.termux.api", AppClassification.PERMANENT_BLACKLIST, "Termux API"),
-        AppRule("io.github.muntashirakon.AppManager", AppClassification.PERMANENT_BLACKLIST, "App Manager"),
-        AppRule("me.piebridge.brevent", AppClassification.PERMANENT_BLACKLIST, "Brevent ADB Server"),
+        AppRule("com.draco.ladb", AppClassification.PERMANENT_BLACKLIST, "LADB Local ADB Shell", CATEGORY_LOCAL_ADB),
+        AppRule("in.sunilpaulmathew.ashell", AppClassification.PERMANENT_BLACKLIST, "aShell Local ADB", CATEGORY_LOCAL_ADB),
+        AppRule("in.sunilpaulmathew.ashell.you", AppClassification.PERMANENT_BLACKLIST, "aShell You", CATEGORY_LOCAL_ADB),
+        AppRule("com.termux", AppClassification.PERMANENT_BLACKLIST, "Termux Terminal", CATEGORY_LOCAL_ADB),
+        AppRule("com.termux.api", AppClassification.PERMANENT_BLACKLIST, "Termux API", CATEGORY_LOCAL_ADB),
+        AppRule("io.github.muntashirakon.AppManager", AppClassification.PERMANENT_BLACKLIST, "App Manager", CATEGORY_LOCAL_ADB),
+        AppRule("me.piebridge.brevent", AppClassification.PERMANENT_BLACKLIST, "Brevent ADB Server", CATEGORY_LOCAL_ADB),
 
         // =========================================================================
         // 13. CURFEW EXEMPT: CLEAN MEDIA PLAYERS & ALTERNATIVE YOUTUBE (NewPipe & Forks)

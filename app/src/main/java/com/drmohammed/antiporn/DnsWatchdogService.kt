@@ -23,7 +23,6 @@ import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.CurfewConfig
 import com.drmohammed.antiporn.curfew.CurfewEnforcer
 import com.drmohammed.antiporn.services.NetworkWatchdog
-import com.drmohammed.antiporn.shields.AppSuspensionShield
 import com.drmohammed.antiporn.shields.DnsShield
 import com.drmohammed.antiporn.core.model.ShieldStatus
 import com.drmohammed.antiporn.notification.manager.AppNotificationManager
@@ -31,13 +30,15 @@ import com.drmohammed.antiporn.notification.model.NotificationActionType
 import com.drmohammed.antiporn.notification.model.NotificationCategory
 import com.drmohammed.antiporn.notification.registry.NotificationRegistry
 import com.drmohammed.antiporn.telemetry.BlackBoxRecorder
-import com.drmohammed.antiporn.ui.shields.ActiveShieldsEvaluator
 import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class DnsWatchdogService : Service() {
@@ -80,7 +81,9 @@ class DnsWatchdogService : Service() {
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val protectionCheckChannel = Channel<Unit>(Channel.CONFLATED)
     private val isSyncingApprovals = AtomicBoolean(false)
+    private val needsApprovalResync = AtomicBoolean(false)
 
     private val debounceHandler = Handler(Looper.getMainLooper())
     private val checkRunnable = Runnable {
@@ -88,8 +91,7 @@ class DnsWatchdogService : Service() {
     }
 
     private val screenDebounceRunnable = Runnable {
-        Log.i(TAG, "Layer 2 - Screen event debounced check: enforcing blacklist and verifying shields")
-        AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
+        Log.i(TAG, "Layer 2 - Screen event debounced check: reconciling Zero-Trust and verifying shields")
         com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncZeroTrustBaselineAndReconcileAsync()
         checkAndEnforceProtection()
     }
@@ -99,8 +101,7 @@ class DnsWatchdogService : Service() {
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
-            Log.d(TAG, "Layer 3 - Periodic heartbeat (15m): cleaning stray apps & verifying shields")
-            AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
+            Log.d(TAG, "Layer 3 - Periodic heartbeat (15m): verifying shields")
             checkAndEnforceProtection()
             TrustedTimeProvider.syncNowAsync(applicationContext)
 
@@ -157,7 +158,7 @@ class DnsWatchdogService : Service() {
                 Intent.ACTION_PACKAGE_REMOVED -> {
                     val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
                     if (isReplacing) {
-                        Log.i(TAG, "⏩ [DYNAMIC_WATCHDOG_RECEIVER] Package $packageName is being replaced/updated (EXTRA_REPLACING=true). Ignoring temporary removal.")
+                        Log.i(TAG, "[DYNAMIC_WATCHDOG_RECEIVER] Package $packageName is being replaced/updated (EXTRA_REPLACING=true). Ignoring temporary removal.")
                         return
                     }
                     PackageChangeHandler.handlePackageRemoved(
@@ -192,13 +193,21 @@ class DnsWatchdogService : Service() {
         isRunning = true
         Log.i(TAG, "DnsWatchdogService created")
         startForegroundNotification()
+        serviceScope.launch {
+            for (trigger in protectionCheckChannel) {
+                try {
+                    checkAndEnforceProtectionInternal()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error during serialized protection enforcement check", e)
+                }
+            }
+        }
         registerDnsObserver()
         registerNetworkWatchdog()
         registerPackageReceiver()
         registerScreenReceiver()
         startHeartbeat()
         checkAndEnforceProtection()
-        AppSuspensionShield.enforceBlacklistFastAsync(applicationContext)
         com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncZeroTrustBaselineAndReconcileAsync()
         com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher.syncWatcherStateAsync(applicationContext)
         com.drmohammed.antiporn.waqfa.engine.WaqfaForegroundWatcher.getInstance(applicationContext).start()
@@ -218,6 +227,7 @@ class DnsWatchdogService : Service() {
         super.onDestroy()
         isRunning = false
         Log.w(TAG, "DnsWatchdogService destroyed")
+        networkWatchdog.unregister()
         stopHeartbeat()
         debounceHandler.removeCallbacks(checkRunnable)
         debounceHandler.removeCallbacks(screenDebounceRunnable)
@@ -225,7 +235,7 @@ class DnsWatchdogService : Service() {
         unregisterPackageReceiver()
         unregisterScreenReceiver()
         com.drmohammed.antiporn.waqfa.engine.WaqfaForegroundWatcher.getInstance(applicationContext).stop()
-        networkWatchdog.unregister()
+        protectionCheckChannel.close()
         serviceScope.cancel()
         // Service cleanup complete
     }
@@ -250,7 +260,7 @@ class DnsWatchdogService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(channelTitle)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_shield_dns)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
@@ -311,18 +321,28 @@ class DnsWatchdogService : Service() {
             debounceHandler.postDelayed(checkRunnable, 1000L)
             TrustedTimeProvider.syncNowAsync(applicationContext)
 
+            needsApprovalResync.set(true)
             if (isSyncingApprovals.compareAndSet(false, true)) {
                 serviceScope.launch {
-                    try {
-                        com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncPendingApprovalsToCloud()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed syncing pending approvals on network recovery: ${e.message}")
-                    } finally {
-                        isSyncingApprovals.set(false)
+                    while (isActive) {
+                        try {
+                            while (isActive && needsApprovalResync.getAndSet(false)) {
+                                com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncPendingApprovalsToCloud()
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed syncing pending approvals on network recovery: ${e.message}")
+                        } finally {
+                            isSyncingApprovals.set(false)
+                        }
+                        if (!isActive || !(needsApprovalResync.get() && isSyncingApprovals.compareAndSet(false, true))) {
+                            break
+                        }
                     }
                 }
             } else {
-                Log.d(TAG, "Approval cloud sync already in progress, skipping duplicate trigger (network flapping guard)")
+                Log.d(TAG, "Approval cloud sync already in progress; marked pending resync trigger")
             }
         }
     }
@@ -396,7 +416,12 @@ class DnsWatchdogService : Service() {
     }
 
     private fun checkAndEnforceProtection() {
-        if (!ProtectionEngine.isDeviceOwner(this)) {
+        protectionCheckChannel.trySend(Unit)
+    }
+
+    private fun checkAndEnforceProtectionInternal() {
+        val appContext = applicationContext ?: this
+        if (!ProtectionEngine.isDeviceOwner(appContext)) {
             Log.d(TAG, "Not Device Owner, skipping watchdog enforcement")
             return
         }
@@ -404,7 +429,7 @@ class DnsWatchdogService : Service() {
         val desyncReasons = mutableListOf<String>()
 
         // 1. Surgical inspection of all registered security shields
-        val shieldStatuses = ProtectionEngine.evaluateSystemStatus(this)
+        val shieldStatuses = ProtectionEngine.evaluateSystemStatus(appContext)
         for ((shieldId, status) in shieldStatuses) {
             when (status) {
                 is ShieldStatus.Active -> { /* In fully active and enforced state */ }
@@ -423,9 +448,12 @@ class DnsWatchdogService : Service() {
 
         // 2. Direct Settings.Global verification for Private DNS (aware of 24/7 VPN & DoT fallback)
         try {
-            val mode = Settings.Global.getString(contentResolver, "private_dns_mode")
-            val specifier = Settings.Global.getString(contentResolver, "private_dns_specifier")
-            val isVpnActive = com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.isRunning
+            val mode = Settings.Global.getString(appContext.contentResolver, "private_dns_mode")
+            val specifier = Settings.Global.getString(appContext.contentResolver, "private_dns_specifier")
+            val isVpnActive = com.drmohammed.antiporn.curfew.CurfewVpnDnsBridge.isVpnConsentGranted(appContext) &&
+                com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.isRunning &&
+                com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.evaluateRequiredMode(appContext) !=
+                com.drmohammed.antiporn.curfew.CurfewBlackholeVpnService.VpnMode.IDLE
             if (isVpnActive) {
                 // When 24/7 VPN is active, Private DNS is set to opportunistic (or off) with empty specifier to use local TUN UDP 53
                 val isAppropriate = mode == "opportunistic" || mode == "off" || mode == null
@@ -436,10 +464,9 @@ class DnsWatchdogService : Service() {
                     desyncReasons.add("[DNS_GLOBAL: $reason]")
                 }
             } else {
-                val expectedHost = DnsShield.getEffectiveDnsHost(this)
+                val expectedHost = DnsShield.getEffectiveDnsHost(appContext)
                 val isHostMatching = specifier?.equals(expectedHost, ignoreCase = true) == true
-                val isAdultFiltering = specifier != null && ActiveShieldsEvaluator.isHostAdultFiltering(specifier)
-                if (mode != "hostname" || (!isHostMatching && !isAdultFiltering)) {
+                if (mode != "hostname" || !isHostMatching) {
                     val reason = "Settings.Global DNS mismatch (mode=$mode, specifier=$specifier, expected=$expectedHost)"
                     Log.w(TAG, reason)
                     desyncReasons.add("[DNS_GLOBAL: $reason]")
@@ -451,7 +478,7 @@ class DnsWatchdogService : Service() {
 
         // 3. Verify Target Timezone and Network Auto Time directly (only if time lock is active in policy)
         val isTimeLocked = try {
-            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(this)
+            com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(appContext)
                 .getCurrentPolicy().isDateTimeLocked
         } catch (e: Exception) {
             Log.w(TAG, "Failed reading dateTimeLocked policy", e)
@@ -460,11 +487,11 @@ class DnsWatchdogService : Service() {
 
         if (isTimeLocked) {
             try {
-                val targetTzId = CurfewConfig.getTargetTimeZoneId(this)
+                val targetTzId = CurfewConfig.getTargetTimeZoneId(appContext)
                 val targetTz = TimeZone.getTimeZone(targetTzId)
                 TimeZone.setDefault(null)
                 val currentTz = TimeZone.getDefault()
-                val trustedTime = TrustedTimeProvider.currentTimeMillis(this)
+                val trustedTime = TrustedTimeProvider.currentTimeMillis(appContext)
                 val isTargetTz = currentTz.id == targetTzId || currentTz.hasSameRules(targetTz) ||
                     currentTz.getOffset(trustedTime) == targetTz.getOffset(trustedTime)
                 if (!isTargetTz) {
@@ -474,7 +501,7 @@ class DnsWatchdogService : Service() {
                 }
 
                 // Check auto-time (network clock synchronization)
-                val autoTime = Settings.Global.getInt(contentResolver, Settings.Global.AUTO_TIME, 1)
+                val autoTime = Settings.Global.getInt(appContext.contentResolver, Settings.Global.AUTO_TIME, 1)
                 if (autoTime != 1) {
                     val autoTimeReason = "Auto time disabled (autoTime=$autoTime)"
                     Log.w(TAG, autoTimeReason)
@@ -486,9 +513,9 @@ class DnsWatchdogService : Service() {
         }
 
         // Live self-healing curfew/nap block synchronization during active periods
-        if (CurfewEnforcer.isEffectiveBlockActive(this)) {
+        if (CurfewEnforcer.isEffectiveBlockActive(appContext)) {
             try {
-                CurfewEnforcer.syncBlockStateAsync(this)
+                CurfewEnforcer.syncBlockStateAsync(appContext)
             } catch (e: Exception) {
                 Log.e(TAG, "Error synchronizing block state in watchdog", e)
             }
@@ -501,7 +528,7 @@ class DnsWatchdogService : Service() {
 
             // Forensic recording into Black Box Flight Recorder
             BlackBoxRecorder.record(
-                context = applicationContext,
+                context = appContext,
                 tag = BlackBoxRecorder.TAG_SHIELD,
                 actionName = "WATCHDOG_TAMPER_DETECTED",
                 isSuccess = false,
@@ -509,7 +536,7 @@ class DnsWatchdogService : Service() {
                 metadata = "failedCount=${desyncReasons.size}"
             )
 
-            ProtectionEngine.applyAllAsync(applicationContext)
+            ProtectionEngine.applyAllAsync(appContext)
 
             // Only post user-facing tamper alert notification if actual DNS or Time tampering is detected
             val isDirectTamper = desyncReasons.any {
@@ -519,10 +546,10 @@ class DnsWatchdogService : Service() {
             }
             if (isDirectTamper) {
                 try {
-                    AppNotificationManager.getInstance(applicationContext).postEventNotification(
+                    AppNotificationManager.getInstance(appContext).postEventNotification(
                         category = NotificationCategory.SHIELDS,
-                        title = getString(R.string.notif_tamper_alert_title),
-                        message = getString(R.string.notif_tamper_alert_msg),
+                        title = appContext.getString(R.string.notif_tamper_alert_title),
+                        message = appContext.getString(R.string.notif_tamper_alert_msg),
                         dedupKey = "tamper_alert_enforce",
                         cooldownMs = 15 * 60 * 1000L,
                         actionType = NotificationActionType.NONE,
@@ -536,6 +563,6 @@ class DnsWatchdogService : Service() {
                 }
             }
         }
-        com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(applicationContext).syncZeroTrustBaselineAndReconcileAsync()
+        com.drmohammed.antiporn.data.repository.ApprovalRepository.getInstance(appContext).syncZeroTrustBaselineAndReconcileAsync()
     }
 }

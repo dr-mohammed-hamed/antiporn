@@ -3,6 +3,8 @@ package com.drmohammed.antiporn.data
 import com.drmohammed.antiporn.core.model.DevicePolicyBundle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -15,7 +17,7 @@ class DevicePolicyBundleTest {
         assertEquals(0, policy.curfewStartMinute)
         assertEquals(7, policy.curfewEndHour)
         assertEquals(0, policy.curfewEndMinute)
-        assertTrue(policy.isCurfewEnabled)
+        assertFalse(policy.isCurfewEnabled)
         assertFalse(policy.isInstantInternetKillEnabled)
         assertFalse(policy.isWeekendCurfewEnabled)
         assertEquals(20, policy.weekendCurfewStartHour)
@@ -364,5 +366,56 @@ class DevicePolicyBundleTest {
         assertEquals(original.curfewEndMinute, deserialized.curfewEndMinute)
         assertEquals(original.version, deserialized.version)
         assertEquals(original.isCurfewEnabled, deserialized.isCurfewEnabled)
+    }
+
+    @Test
+    fun testDefaultPolicySerializationRoundTrip_preservesCurfewDisabled() {
+        val defaults = DevicePolicyBundle.defaultPolicy()
+        assertFalse(defaults.isCurfewEnabled)
+
+        val json = defaults.toJson()
+        val parsedJsonObj = org.json.JSONObject(json)
+        assertTrue(parsedJsonObj.has("isCurfewEnabled"))
+        assertFalse(parsedJsonObj.getBoolean("isCurfewEnabled"))
+        assertFalse(DevicePolicyBundle.fromJson(json).isCurfewEnabled)
+
+        val map = defaults.toMap()
+        assertTrue(map.containsKey("isCurfewEnabled"))
+        assertEquals(false, map["isCurfewEnabled"])
+        assertFalse(DevicePolicyBundle.fromMap(map).isCurfewEnabled)
+    }
+
+    @Test
+    fun testLegacyPayloadWithoutCurfewEnabled_preservesCurfewEnabledTrue() {
+        val legacyJson = """{"version": 1}"""
+        assertTrue(DevicePolicyBundle.fromJson(legacyJson).isCurfewEnabled)
+
+        val legacyMap = mapOf<String, Any?>("version" to 1L)
+        assertTrue(DevicePolicyBundle.fromMap(legacyMap).isCurfewEnabled)
+    }
+
+    @Test
+    fun testMalformedJson_fallsBackToDefaultPolicyWithCurfewDisabled() {
+        val fallback = DevicePolicyBundle.fromJson("{not valid json")
+        val defaults = DevicePolicyBundle.defaultPolicy()
+        assertFalse(fallback.isCurfewEnabled)
+        assertTrue(fallback.isVpnBlackholeEnabled)
+        assertEquals(defaults.curfewStartHour, fallback.curfewStartHour)
+        assertEquals(defaults.curfewEndHour, fallback.curfewEndHour)
+        assertEquals(defaults.dnsHost, fallback.dnsHost)
+        assertEquals(defaults.customCurfewWhitelistPackages, fallback.customCurfewWhitelistPackages)
+    }
+
+    @Test
+    fun testUpdatedAtDefaultIsZeroAndFromJsonOrNullDistinguishesCorruption() {
+        val constructed = DevicePolicyBundle()
+        assertEquals(0L, constructed.updatedAt)
+
+        val partialJson = DevicePolicyBundle.fromJson("""{"version": 1}""")
+        assertEquals(0L, partialJson.updatedAt)
+
+        assertNull(DevicePolicyBundle.fromJsonOrNull("{corrupted"))
+        assertNull(DevicePolicyBundle.fromJsonOrNull(""))
+        assertNotNull(DevicePolicyBundle.fromJsonOrNull(constructed.toJson()))
     }
 }

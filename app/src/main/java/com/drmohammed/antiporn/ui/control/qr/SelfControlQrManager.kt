@@ -4,13 +4,23 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.os.Build
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import android.util.Log
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
+import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.EnumMap
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 
 /**
  * Manager handling QR-Code lock settings, cryptographically secure token generation,
@@ -22,38 +32,56 @@ class SelfControlQrManager internal constructor(
     private val timeProvider: () -> Long = {
         try {
             TrustedTimeProvider.currentTimeMillis()
-        } catch (_: Throwable) {
-            System.currentTimeMillis()
+        } catch (e: Throwable) {
+            Log.e(TAG, "TrustedTimeProvider unavailable", e)
+            0L
         }
     },
     private val trustProvider: () -> Boolean = {
         try {
             TrustedTimeProvider.isTrusted()
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.e(TAG, "TrustedTimeProvider trust status check failed", e)
             false
         }
-    }
+    },
+    private val encryptToken: (String) -> String? = { it },
+    private val decryptToken: (String) -> String? = { it }
 ) {
 
     private constructor(context: Context) : this(
-        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        (context.applicationContext ?: context).getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
         {
             try {
-                TrustedTimeProvider.currentTimeMillis(context.applicationContext)
-            } catch (_: Throwable) {
-                System.currentTimeMillis()
+                TrustedTimeProvider.currentTimeMillis(context.applicationContext ?: context)
+            } catch (e: Throwable) {
+                Log.e(TAG, "TrustedTimeProvider unavailable", e)
+                0L
             }
         },
         {
             try {
+                val appContext = context.applicationContext ?: context
+                TrustedTimeProvider.initialize(appContext)
                 TrustedTimeProvider.isTrusted()
-            } catch (_: Throwable) {
+            } catch (e: Throwable) {
+                Log.e(TAG, "TrustedTimeProvider trust status check failed", e)
                 false
             }
-        }
+        },
+        { token -> encryptWithKeystore(token) },
+        { stored -> decryptWithKeystore(stored) }
     )
 
     companion object {
+        private const val TAG = "AntiPorn_QrManager"
+        private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
+        private const val KEYSTORE_ALIAS = "hisn_self_control_qr_token_v1"
+        private const val ENCRYPTED_TOKEN_PREFIX = "enc:v1:"
+        private const val AES_GCM_TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val GCM_TAG_LENGTH_BITS = 128
+        private val keystoreLock = Any()
+
         const val PREFS_NAME = "self_control_qr_prefs"
         const val KEY_QR_LOCK_ENABLED = "qr_lock_enabled"
         const val KEY_SAVED_TOKEN = "saved_token"
@@ -70,6 +98,58 @@ class SelfControlQrManager internal constructor(
         fun getInstance(context: Context): SelfControlQrManager {
             return instance ?: synchronized(this) {
                 instance ?: SelfControlQrManager(context.applicationContext).also { instance = it }
+            }
+        }
+
+        private fun getOrCreateSecretKey(): SecretKey? {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
+            val keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER).apply { load(null) }
+            (keyStore.getKey(KEYSTORE_ALIAS, null) as? SecretKey)?.let { return it }
+            val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_PROVIDER)
+            val spec = KeyGenParameterSpec.Builder(
+                KEYSTORE_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .build()
+            keyGenerator.init(spec)
+            return keyGenerator.generateKey()
+        }
+
+        private fun encryptWithKeystore(plaintext: String): String? = synchronized(keystoreLock) {
+            try {
+                val secretKey = getOrCreateSecretKey() ?: return null
+                val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
+                cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+                val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
+                val ivB64 = Base64.encodeToString(cipher.iv, Base64.NO_WRAP)
+                val ctB64 = Base64.encodeToString(ciphertext, Base64.NO_WRAP)
+                "$ENCRYPTED_TOKEN_PREFIX$ivB64:$ctB64"
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed encrypting QR lock token via AndroidKeyStore", e)
+                null
+            }
+        }
+
+        private fun decryptWithKeystore(stored: String): String? = synchronized(keystoreLock) {
+            try {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
+                if (!stored.startsWith(ENCRYPTED_TOKEN_PREFIX)) return null
+                val payload = stored.removePrefix(ENCRYPTED_TOKEN_PREFIX)
+                val parts = payload.split(':')
+                if (parts.size != 2) return null
+                val iv = Base64.decode(parts[0], Base64.NO_WRAP)
+                val ciphertext = Base64.decode(parts[1], Base64.NO_WRAP)
+                val keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER).apply { load(null) }
+                val secretKey = keyStore.getKey(KEYSTORE_ALIAS, null) as? SecretKey ?: return null
+                val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
+                cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+                String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed decrypting QR lock token via AndroidKeyStore", e)
+                null
             }
         }
     }
@@ -89,10 +169,24 @@ class SelfControlQrManager internal constructor(
     }
 
     /**
-     * Retrieves the plaintext token (available during generation / dev phase).
+     * Retrieves the decrypted token when encrypted via KeyStore (migrating legacy plaintext if needed).
      */
     fun getSavedToken(): String? {
-        return prefs.getString(KEY_SAVED_TOKEN, null)
+        val raw = prefs.getString(KEY_SAVED_TOKEN, null) ?: return null
+        if (raw.startsWith(ENCRYPTED_TOKEN_PREFIX)) {
+            return decryptToken(raw)
+        }
+        val encrypted = encryptToken(raw)
+        val tokenHash = prefs.getString(KEY_SAVED_TOKEN_HASH, null)
+            ?.takeIf { it.isNotBlank() }
+            ?: computeSha256(raw)
+        if (!encrypted.isNullOrBlank() && encrypted != raw) {
+            prefs.edit()
+                .putString(KEY_SAVED_TOKEN, encrypted)
+                .putString(KEY_SAVED_TOKEN_HASH, tokenHash)
+                .apply()
+        }
+        return raw
     }
 
     /**
@@ -106,12 +200,13 @@ class SelfControlQrManager internal constructor(
      * Checks if a valid token or token hash is stored.
      */
     fun hasToken(): Boolean {
-        return !getSavedToken().isNullOrBlank() || !getSavedTokenHash().isNullOrBlank()
+        return !getSavedTokenHash().isNullOrBlank() || !getSavedToken().isNullOrBlank()
     }
 
     /**
      * Generates a cryptographically secure random token, computes its SHA-256 hash,
-     * stores both token and hash in preferences, and returns the raw token.
+     * stores encrypted token (when KeyStore is available) and SHA-256 hash in preferences,
+     * and returns the raw token.
      */
     fun generateAndSaveNewToken(): String {
         val randomBytes = ByteArray(32)
@@ -119,10 +214,14 @@ class SelfControlQrManager internal constructor(
         val token = randomBytes.joinToString("") { "%02x".format(it) }
         val tokenHash = computeSha256(token)
 
-        prefs.edit()
-            .putString(KEY_SAVED_TOKEN, token)
-            .putString(KEY_SAVED_TOKEN_HASH, tokenHash)
-            .apply()
+        val encryptedToken = encryptToken(token)
+        val editor = prefs.edit().putString(KEY_SAVED_TOKEN_HASH, tokenHash)
+        if (!encryptedToken.isNullOrBlank()) {
+            editor.putString(KEY_SAVED_TOKEN, encryptedToken)
+        } else {
+            editor.remove(KEY_SAVED_TOKEN)
+        }
+        editor.apply()
 
         return token
     }
@@ -217,15 +316,24 @@ class SelfControlQrManager internal constructor(
      * Returns configured delay duration in hours.
      */
     fun getEmergencyDelayHours(): Int {
-        return prefs.getInt(KEY_EMERGENCY_DELAY_HOURS, DEFAULT_EMERGENCY_DELAY_HOURS)
+        return prefs.getInt(KEY_EMERGENCY_DELAY_HOURS, DEFAULT_EMERGENCY_DELAY_HOURS).coerceAtLeast(1)
     }
 
     /**
      * Initiates an emergency unlock request by recording the current trusted timestamp.
+     * Fails closed (returns false) if network-verified trusted time is unavailable.
      */
-    fun requestEmergencyDelay() {
-        val now = getCurrentTimeMs()
+    fun requestEmergencyDelay(): Boolean {
+        if (!trustProvider()) {
+            safeLogWarn("Rejecting emergency delay request: trusted network time unavailable")
+            return false
+        }
+        val now = getCurrentTimeMsOrNull() ?: run {
+            safeLogWarn("Rejecting emergency delay request: current trusted time unavailable")
+            return false
+        }
         prefs.edit().putLong(KEY_EMERGENCY_DELAY_REQUESTED_AT, now).apply()
+        return true
     }
 
     /**
@@ -258,8 +366,9 @@ class SelfControlQrManager internal constructor(
         if (requestedAt <= 0L) return 0L
 
         val durationMs = getEmergencyDelayHours().toLong() * 3600L * 1000L
+        if (!trustProvider()) return durationMs
+        val now = getCurrentTimeMsOrNull() ?: return durationMs
         val targetTimeMs = requestedAt + durationMs
-        val now = getCurrentTimeMs()
         val remaining = targetTimeMs - now
 
         return if (remaining > 0L) remaining else 0L
@@ -272,8 +381,9 @@ class SelfControlQrManager internal constructor(
         val requestedAt = getEmergencyDelayRequestedAt()
         if (requestedAt <= 0L) return false
 
-        // Strict Anti-Tamper: Emergency delay expiration cannot be validated in offline degraded mode
+        // Strict Anti-Tamper: Emergency delay expiration cannot be validated without trusted time
         if (!trustProvider()) return false
+        if (getCurrentTimeMsOrNull() == null) return false
 
         return getEmergencyDelayRemainingMs() <= 0L
     }
@@ -285,15 +395,28 @@ class SelfControlQrManager internal constructor(
         prefs.edit().clear().apply()
     }
 
-    private fun getCurrentTimeMs(): Long {
+    private fun getCurrentTimeMsOrNull(): Long? {
         return try {
-            timeProvider()
-        } catch (_: Throwable) {
-            try {
-                TrustedTimeProvider.currentTimeMillis()
-            } catch (_: Throwable) {
-                System.currentTimeMillis()
-            }
+            timeProvider().takeIf { it > 0L }
+        } catch (e: Throwable) {
+            safeLogError("Injected timeProvider failed", e)
+            null
+        }
+    }
+
+    private fun safeLogWarn(message: String) {
+        try {
+            Log.w(TAG, message)
+        } catch (e: RuntimeException) {
+            if (e.message?.contains("not mocked") != true) throw e
+        }
+    }
+
+    private fun safeLogError(message: String, throwable: Throwable) {
+        try {
+            Log.e(TAG, message, throwable)
+        } catch (e: RuntimeException) {
+            if (e.message?.contains("not mocked") != true) throw e
         }
     }
 

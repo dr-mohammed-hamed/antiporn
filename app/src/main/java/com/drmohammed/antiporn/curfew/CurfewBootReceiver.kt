@@ -75,13 +75,8 @@ class CurfewBootReceiver : BroadcastReceiver() {
 
         private fun rescheduleNapIfNeeded(appContext: Context) {
             try {
-                if (NapController.isNapActive(appContext)) {
-                    val napEndWall = NapController.getEndWall(appContext)
-                    if (napEndWall > TrustedTimeProvider.currentTimeMillis(appContext)) {
-                        CurfewScheduler.scheduleNapEndAlarm(appContext, napEndWall)
-                    } else {
-                        CurfewScheduler.cancelNapEndAlarm(appContext)
-                    }
+                if (NapController.isNapActive(appContext) && NapController.remainingMs(appContext) > 0L) {
+                    CurfewScheduler.scheduleNapEndAlarm(appContext, NapController.getEndWall(appContext))
                 } else {
                     CurfewScheduler.cancelNapEndAlarm(appContext)
                 }

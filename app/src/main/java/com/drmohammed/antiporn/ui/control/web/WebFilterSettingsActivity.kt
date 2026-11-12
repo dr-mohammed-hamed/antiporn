@@ -90,6 +90,7 @@ class WebFilterSettingsActivity : AppCompatActivity() {
     private lateinit var btnSaveWebFilterChanges: MaterialButton
 
     private var isSaving = false
+    private var activeDialog: androidx.appcompat.app.AlertDialog? = null
 
     private val backPressedCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
@@ -118,19 +119,79 @@ class WebFilterSettingsActivity : AppCompatActivity() {
             return
         }
 
-        initialPolicy = if (isRemote && !policyJson.isNullOrBlank()) {
-            DevicePolicyBundle.fromJson(policyJson)
+        if (isRemote) {
+            if (wardId.isBlank() || policyJson.isNullOrBlank()) {
+                android.util.Log.e("WebFilterSettings", "Refusing remote launch: missing wardId or EXTRA_POLICY_JSON")
+                Toast.makeText(applicationContext, R.string.toast_guardian_policy_save_failed, Toast.LENGTH_LONG).show()
+                finish()
+                return
+            }
+            val parsed = DevicePolicyBundle.fromJsonOrNull(policyJson)
+            if (parsed == null) {
+                android.util.Log.e("WebFilterSettings", "Refusing remote launch: invalid EXTRA_POLICY_JSON")
+                Toast.makeText(applicationContext, R.string.toast_guardian_policy_save_failed, Toast.LENGTH_LONG).show()
+                finish()
+                return
+            }
+            initialPolicy = parsed
         } else {
-            PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+            initialPolicy = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
         }
 
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
         initViews()
         bindInitialPolicy()
+        savedInstanceState?.let { restoreDraftState(it) }
         setupListeners()
         updateTabUi()
         updateSaveButtonState()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_DNS_HOST, currentDnsHost)
+        outState.putBoolean(STATE_INCOGNITO_BLOCKED, isIncognitoBlocked)
+        outState.putBoolean(STATE_TELEGRAM_WEB_BLOCKED, isTelegramWebBlocked)
+        outState.putBoolean(STATE_YOUTUBE_RESTRICTED, isYouTubeRestricted)
+        outState.putBoolean(STATE_FULL_SYSTEM_FILTERING, isFullSystemFiltering)
+        outState.putBoolean(STATE_WHITELIST_ONLY, isWhitelistOnlyMode)
+        outState.putStringArrayList(STATE_BLOCKED_URLS, ArrayList(blockedUrls))
+        outState.putStringArrayList(STATE_ALLOWED_URLS, ArrayList(allowedUrls))
+        outState.putInt(STATE_CURRENT_TAB, currentTab.ordinal)
+    }
+
+    private fun restoreDraftState(state: Bundle) {
+        currentDnsHost = state.getString(STATE_DNS_HOST, currentDnsHost)
+        isIncognitoBlocked = state.getBoolean(STATE_INCOGNITO_BLOCKED, isIncognitoBlocked)
+        isTelegramWebBlocked = state.getBoolean(STATE_TELEGRAM_WEB_BLOCKED, isTelegramWebBlocked)
+        isYouTubeRestricted = state.getBoolean(STATE_YOUTUBE_RESTRICTED, isYouTubeRestricted)
+        isFullSystemFiltering = state.getBoolean(STATE_FULL_SYSTEM_FILTERING, isFullSystemFiltering)
+        isWhitelistOnlyMode = state.getBoolean(STATE_WHITELIST_ONLY, isWhitelistOnlyMode)
+        state.getStringArrayList(STATE_BLOCKED_URLS)?.let {
+            blockedUrls.clear()
+            blockedUrls.addAll(it)
+        }
+        state.getStringArrayList(STATE_ALLOWED_URLS)?.let {
+            allowedUrls.clear()
+            allowedUrls.addAll(it)
+        }
+        val tabOrd = state.getInt(STATE_CURRENT_TAB, currentTab.ordinal)
+        currentTab = UrlTab.entries.getOrElse(tabOrd) { UrlTab.BLOCKED }
+
+        isProgrammaticDnsChange = true
+        etDnsHost.setText(currentDnsHost)
+        isProgrammaticDnsChange = false
+        updateTableSelection(currentDnsHost)
+
+        switchBlockIncognito.isChecked = isIncognitoBlocked
+        switchBlockTelegramWeb.isChecked = isTelegramWebBlocked
+        switchYouTubeRestricted.isChecked = isYouTubeRestricted
+        switchFullSystemFilter.isChecked = isFullSystemFiltering
+        switchWhitelistOnly.isChecked = isWhitelistOnlyMode
+        toggleGroupUrlType.check(
+            if (currentTab == UrlTab.ALLOWED) R.id.btnTabAllowed else R.id.btnTabBlocked
+        )
     }
 
     override fun onResume() {
@@ -381,6 +442,13 @@ class WebFilterSettingsActivity : AppCompatActivity() {
             }
         }
 
+        dialog.setOnDismissListener {
+            if (activeDialog === dialog) {
+                activeDialog = null
+            }
+        }
+        activeDialog?.dismiss()
+        activeDialog = dialog
         dialog.show()
     }
 
@@ -426,7 +494,7 @@ class WebFilterSettingsActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(targetSize, targetSize)
                 setPadding(pad, pad, pad, pad)
                 setBackgroundResource(android.R.drawable.list_selector_background)
-                setColorFilter(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutline))
+                setColorFilter(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant))
                 contentDescription = getString(R.string.browser_filter_item_delete_cd)
                 setOnClickListener {
                     currentList.remove(url)
@@ -465,33 +533,62 @@ class WebFilterSettingsActivity : AppCompatActivity() {
 
         // Guard against locking out connectivity when Whitelist Only is selected without allowed domains
         if (isWhitelistOnlyMode && allowedUrls.isEmpty()) {
-            MaterialAlertDialogBuilder(this)
+            activeDialog?.dismiss()
+            activeDialog = MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.dialog_empty_whitelist_title)
                 .setMessage(R.string.dialog_empty_whitelist_desc)
                 .setPositiveButton(android.R.string.ok, null)
+                .setOnDismissListener { activeDialog = null }
                 .show()
             return
         }
 
+        val dnsToSave = currentDnsHost.trim().ifBlank { DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST }
+        if (!dnsToSave.matches(DNS_HOST_REGEX)) {
+            tilDnsHost.error = getString(R.string.error_invalid_dns_host)
+            etDnsHost.requestFocus()
+            return
+        }
+        tilDnsHost.error = null
+
         isSaving = true
         updateSaveButtonState()
-
-        val dnsToSave = currentDnsHost.ifBlank { DevicePolicyBundle.CLOUDFLARE_FAMILY_DNS_HOST }
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val validationResult = DnsFilteringValidator.validateDnsHost(dnsToSave)
-                if (validationResult is DnsFilteringValidator.ValidationResult.UnfilteredPorn) {
+                val probeFailure: Pair<String?, String>? = when (validationResult) {
+                    is DnsFilteringValidator.ValidationResult.Valid -> null
+                    is DnsFilteringValidator.ValidationResult.UnfilteredPorn ->
+                        getString(R.string.dns_probe_error_not_blocking) to getString(
+                            R.string.dns_probe_error_not_blocking_detail,
+                            validationResult.domain,
+                            validationResult.resolvedIp
+                        )
+                    is DnsFilteringValidator.ValidationResult.Unreachable ->
+                        getString(R.string.error_invalid_dns_host) to getString(
+                            R.string.dns_probe_error_unreachable_detail,
+                            validationResult.reason
+                        )
+                    is DnsFilteringValidator.ValidationResult.ResolverBroken ->
+                        getString(R.string.error_invalid_dns_host) to getString(
+                            R.string.dns_probe_error_broken_detail,
+                            validationResult.reason
+                        )
+                }
+                if (probeFailure != null) {
                     withContext(Dispatchers.Main) {
                         if (isFinishing || isDestroyed) return@withContext
                         isSaving = false
                         updateSaveButtonState()
-                        tilDnsHost.error = getString(R.string.dns_probe_error_not_blocking)
+                        tilDnsHost.error = probeFailure.first
                         etDnsHost.requestFocus()
-                        MaterialAlertDialogBuilder(this@WebFilterSettingsActivity)
+                        activeDialog?.dismiss()
+                        activeDialog = MaterialAlertDialogBuilder(this@WebFilterSettingsActivity)
                             .setTitle(R.string.dns_probe_dialog_failed_title)
-                            .setMessage(getString(R.string.dns_probe_error_not_blocking_detail, validationResult.domain, validationResult.resolvedIp))
+                            .setMessage(probeFailure.second)
                             .setPositiveButton(android.R.string.ok, null)
+                            .setOnDismissListener { activeDialog = null }
                             .show()
                     }
                     return@launch
@@ -518,8 +615,13 @@ class WebFilterSettingsActivity : AppCompatActivity() {
                 val app = applicationContext
                 val policyRepo = PolicyRepository.getInstance(app)
 
-                val success = if (isRemote && wardId.isNotBlank()) {
-                    policyRepo.pushPolicyToWard(wardId, updatedPolicy)
+                val success = if (isRemote) {
+                    if (wardId.isBlank()) {
+                        android.util.Log.e("WebFilterSettings", "Refusing remote push: wardId is blank")
+                        false
+                    } else {
+                        policyRepo.pushPolicyToWard(wardId, updatedPolicy)
+                    }
                 } else {
                     val saved = policyRepo.saveAndEnforceSelfPolicy(updatedPolicy)
                     if (saved) {
@@ -536,7 +638,8 @@ class WebFilterSettingsActivity : AppCompatActivity() {
                     if (isFinishing || isDestroyed) return@withContext
                     isSaving = false
                     if (success) {
-                        Toast.makeText(this@WebFilterSettingsActivity, R.string.toast_self_policy_saved, Toast.LENGTH_SHORT).show()
+                        val successRes = if (isRemote) R.string.toast_guardian_policy_saved else R.string.toast_self_policy_saved
+                        Toast.makeText(applicationContext, successRes, Toast.LENGTH_SHORT).show()
                         val resultIntent = Intent().apply {
                             putExtra(EXTRA_UPDATED_POLICY_JSON, updatedPolicy.toJson())
                         }
@@ -545,7 +648,8 @@ class WebFilterSettingsActivity : AppCompatActivity() {
                         finish()
                     } else {
                         updateSaveButtonState()
-                        Toast.makeText(this@WebFilterSettingsActivity, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
+                        val failRes = if (isRemote) R.string.toast_guardian_policy_save_failed else R.string.toast_self_policy_save_failed
+                        Toast.makeText(applicationContext, failRes, Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
@@ -555,14 +659,16 @@ class WebFilterSettingsActivity : AppCompatActivity() {
                     if (isFinishing || isDestroyed) return@withContext
                     isSaving = false
                     updateSaveButtonState()
-                    Toast.makeText(this@WebFilterSettingsActivity, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
+                    val failRes = if (isRemote) R.string.toast_guardian_policy_save_failed else R.string.toast_self_policy_save_failed
+                    Toast.makeText(applicationContext, failRes, Toast.LENGTH_LONG).show()
                 }
             }
         }
     }
 
     private fun showDiscardConfirmationDialog() {
-        MaterialAlertDialogBuilder(this)
+        activeDialog?.dismiss()
+        activeDialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_unsaved_changes_title)
             .setMessage(R.string.dialog_unsaved_changes_msg)
             .setNegativeButton(R.string.btn_keep_editing) { dialog, _ ->
@@ -573,7 +679,14 @@ class WebFilterSettingsActivity : AppCompatActivity() {
                 backPressedCallback.isEnabled = false
                 finish()
             }
+            .setOnDismissListener { activeDialog = null }
             .show()
+    }
+
+    override fun onDestroy() {
+        activeDialog?.dismiss()
+        activeDialog = null
+        super.onDestroy()
     }
 
     companion object {
@@ -581,5 +694,16 @@ class WebFilterSettingsActivity : AppCompatActivity() {
         const val EXTRA_WARD_ID = "extra_ward_id"
         const val EXTRA_POLICY_JSON = "extra_policy_json"
         const val EXTRA_UPDATED_POLICY_JSON = "extra_updated_policy_json"
+
+        private val DNS_HOST_REGEX = Regex("^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+        private const val STATE_DNS_HOST = "state_dns_host"
+        private const val STATE_INCOGNITO_BLOCKED = "state_incognito_blocked"
+        private const val STATE_TELEGRAM_WEB_BLOCKED = "state_telegram_web_blocked"
+        private const val STATE_YOUTUBE_RESTRICTED = "state_youtube_restricted"
+        private const val STATE_FULL_SYSTEM_FILTERING = "state_full_system_filtering"
+        private const val STATE_WHITELIST_ONLY = "state_whitelist_only"
+        private const val STATE_BLOCKED_URLS = "state_blocked_urls"
+        private const val STATE_ALLOWED_URLS = "state_allowed_urls"
+        private const val STATE_CURRENT_TAB = "state_current_tab"
     }
 }

@@ -257,10 +257,10 @@ class GuardianControlViewModel(
                             version = updated.version
                         )
                     }
-                    _events.emit(GuardianControlEvent.ShowToastRes(R.string.toast_self_policy_saved))
+                    _events.emit(GuardianControlEvent.ShowToastRes(R.string.toast_guardian_policy_saved))
                 } else {
                     _uiState.update { it.copy(isSelfControlAllowed = !allowed) }
-                    _events.emit(GuardianControlEvent.ShowToastRes(R.string.toast_self_policy_save_failed))
+                    _events.emit(GuardianControlEvent.ShowToastRes(R.string.toast_guardian_policy_save_failed))
                 }
             }
         }

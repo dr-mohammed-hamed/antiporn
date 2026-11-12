@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.drmohammed.antiporn.R
@@ -49,12 +50,6 @@ class CurfewAppPickerBottomSheet : BottomSheetDialogFragment() {
     private val filteredApps = mutableListOf<CurfewAppItem>()
     private lateinit var adapter: CurfewAppPickerAdapter
 
-    private var onConfirmedListener: ((whitelist: Set<String>, vpnBypass: Set<String>) -> Unit)? = null
-
-    fun setOnConfirmedListener(listener: (whitelist: Set<String>, vpnBypass: Set<String>) -> Unit) {
-        this.onConfirmedListener = listener
-    }
-
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -70,7 +65,6 @@ class CurfewAppPickerBottomSheet : BottomSheetDialogFragment() {
         val isRemote = arguments?.getBoolean(ARG_IS_REMOTE) ?: false
 
         adapter = CurfewAppPickerAdapter(
-            items = filteredApps,
             isLocalMode = !isRemote,
             onRunToggled = { item, isChecked ->
                 item.isRunAllowed = isChecked
@@ -95,6 +89,7 @@ class CurfewAppPickerBottomSheet : BottomSheetDialogFragment() {
                 }
             }
         )
+        adapter.submitItems(filteredApps)
 
         binding.rvApps.layoutManager = LinearLayoutManager(requireContext())
         binding.rvApps.adapter = adapter
@@ -141,6 +136,12 @@ class CurfewAppPickerBottomSheet : BottomSheetDialogFragment() {
                         )
                     )
                 }
+            } else if (wardId.isBlank()) {
+                Log.w(TAG, "Refusing remote curfew app load: blank wardId")
+                withContext(Dispatchers.Main) {
+                    if (isAdded) dismissAllowingStateLoss()
+                }
+                return@launch
             } else {
                 // Remote Mode (Guardian inspecting Ward)
                 val firestore = FirebaseFirestore.getInstance()
@@ -240,7 +241,7 @@ class CurfewAppPickerBottomSheet : BottomSheetDialogFragment() {
                 it.appName.lowercase().contains(q) || it.packageName.lowercase().contains(q)
             })
         }
-        adapter.notifyDataSetChanged()
+        adapter.submitItems(filteredApps.toList())
     }
 
     private fun updateConfirmButton() {
@@ -261,7 +262,6 @@ class CurfewAppPickerBottomSheet : BottomSheetDialogFragment() {
             putStringArrayList(RESULT_VPN_BYPASS, ArrayList(newVpnBypass))
         }
         parentFragmentManager.setFragmentResult(REQUEST_KEY, resultBundle)
-        onConfirmedListener?.invoke(newWhitelist, newVpnBypass)
         dismiss()
     }
 
@@ -302,11 +302,28 @@ class CurfewAppPickerBottomSheet : BottomSheetDialogFragment() {
     }
 
     class CurfewAppPickerAdapter(
-        private val items: List<CurfewAppItem>,
         private val isLocalMode: Boolean,
         private val onRunToggled: (CurfewAppItem, Boolean) -> Unit,
         private val onNetToggled: (CurfewAppItem, Boolean) -> Unit
     ) : RecyclerView.Adapter<CurfewAppPickerAdapter.ViewHolder>() {
+
+        private val items: MutableList<CurfewAppItem> = mutableListOf()
+
+        fun submitItems(newItems: List<CurfewAppItem>) {
+            val oldItems = items.toList()
+            val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                override fun getOldListSize(): Int = oldItems.size
+                override fun getNewListSize(): Int = newItems.size
+                override fun areItemsTheSame(oldPos: Int, newPos: Int): Boolean =
+                    oldItems[oldPos].packageName == newItems[newPos].packageName
+                override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean =
+                    oldItems[oldPos].packageName == newItems[newPos].packageName &&
+                        oldItems[oldPos].appName == newItems[newPos].appName
+            })
+            items.clear()
+            items.addAll(newItems)
+            diffResult.dispatchUpdatesTo(this)
+        }
 
         class ViewHolder(val binding: ItemCurfewAppPickerBinding) : RecyclerView.ViewHolder(binding.root)
 

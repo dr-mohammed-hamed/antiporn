@@ -44,79 +44,174 @@ class TrustedTimeTest {
 
     @Test
     fun testOfflineReboot_morningWakeup_advancesByWallDelta() {
-        // Simulate phone shut down at night (23:30)
+        val (inMemoryPrefs, fakeCtx) = createInMemoryPrefsContext()
         val shutdownTrueTime = 1_700_000_000_000L
         val shutdownWallTime = 1_700_000_000_000L
         val sleepDurationMs = 7 * 3600 * 1000L // 7 hours overnight sleep
 
-        // User wakes up at 06:30 morning, turns on phone in airplane mode
-        val wakeupWallTime = shutdownWallTime + sleepDurationMs
-        fakeWall = wakeupWallTime
-        fakeElapsed = 30_000L // 30 seconds since boot
+        inMemoryPrefs.edit()
+            .putBoolean(TrustedTimeProvider.KEY_HAS_EVER_SYNCED, true)
+            .putLong(TrustedTimeProvider.KEY_LAST_KNOWN_TRUE_TIME, shutdownTrueTime)
+            .putLong(TrustedTimeProvider.KEY_LAST_ELAPSED, 200_000L)
+            .putLong(TrustedTimeProvider.KEY_LAST_SAVED_WALL_TIME, shutdownWallTime)
+            .commit()
 
-        val wallDelta = fakeWall - shutdownWallTime
-        val clampedDelta = minOf(wallDelta, TrustedTimeProvider.MAX_OFFLINE_ADVANCE_MS)
-        val expectedWakeupTrueTime = shutdownTrueTime + clampedDelta
+        TrustedTimeProvider.resetForTesting()
 
-        // Establish offline degraded anchor as ensureInitialized would
-        TrustedTimeProvider.setAnchorForTesting(expectedWakeupTrueTime, fakeElapsed, isStrictlyTrusted = false)
+        // User wakes up 7 hours later after reboot (elapsed reset to 30_000L) in airplane mode
+        fakeWall = shutdownWallTime + sleepDurationMs
+        fakeElapsed = 30_000L
+
+        TrustedTimeProvider.initialize(fakeCtx)
 
         assertFalse("Offline reboot must not be strictly trusted (blocks breakout bypass)", TrustedTimeProvider.isTrusted())
         assertTrue("Offline reboot must be marked degraded", TrustedTimeProvider.isDegradedOffline())
 
         // Time computed 1 minute after wakeup
         fakeElapsed += 60_000L
-        val computed = TrustedTimeProvider.currentTimeMillis()
+        val computed = TrustedTimeProvider.currentTimeMillis(fakeCtx)
 
         assertEquals(
             "Morning wakeup offline must have advanced by 7 hours sleep + 1 minute uptime",
-            expectedWakeupTrueTime + 60_000L,
+            shutdownTrueTime + sleepDurationMs + 60_000L,
             computed
         )
     }
 
     @Test
     fun testOfflineReboot_clockRollback_antiRollbackEnforced() {
-        // Attacker rolled wall clock backward while phone was shut down
+        val (inMemoryPrefs, fakeCtx) = createInMemoryPrefsContext()
         val lastKnownTrue = 1_700_000_000_000L
         val lastSavedWall = 1_700_000_000_000L
-        val manipulatedWall = lastSavedWall - 3600_000L // 1 hour backward
 
-        fakeWall = manipulatedWall
+        inMemoryPrefs.edit()
+            .putBoolean(TrustedTimeProvider.KEY_HAS_EVER_SYNCED, true)
+            .putLong(TrustedTimeProvider.KEY_LAST_KNOWN_TRUE_TIME, lastKnownTrue)
+            .putLong(TrustedTimeProvider.KEY_LAST_ELAPSED, 200_000L)
+            .putLong(TrustedTimeProvider.KEY_LAST_SAVED_WALL_TIME, lastSavedWall)
+            .commit()
+
+        TrustedTimeProvider.resetForTesting()
+
+        // Attacker rolled wall clock backward 1 hour while device was shut down
+        fakeWall = lastSavedWall - 3600_000L
         fakeElapsed = 15_000L
 
-        val wallDelta = fakeWall - lastSavedWall // negative
-        val effectiveTime = if (wallDelta > 0L) {
-            val clamped = minOf(wallDelta, TrustedTimeProvider.MAX_OFFLINE_ADVANCE_MS)
-            lastKnownTrue + clamped
-        } else {
-            lastKnownTrue // Strict Anti-Rollback
-        }
-
-        TrustedTimeProvider.setAnchorForTesting(effectiveTime, fakeElapsed, isStrictlyTrusted = false)
-
-        val computed = TrustedTimeProvider.currentTimeMillis()
+        val computed = TrustedTimeProvider.currentTimeMillis(fakeCtx)
         assertTrue("Time must never roll back below lastKnownTrue: computed=$computed", computed >= lastKnownTrue)
         assertEquals(lastKnownTrue, computed)
     }
 
-    @Test
-    fun testOfflineReboot_exceeds48Hours_clampedTo48h() {
-        val lastKnownTrue = 1_700_000_000_000L
-        val lastSavedWall = 1_700_000_000_000L
-        val longOffWall = lastSavedWall + (72 * 3600 * 1000L) // 72 hours later
+    private fun createInMemoryPrefsContext(): Pair<android.content.SharedPreferences, android.content.Context> {
+        val prefsMap = mutableMapOf<String, Any?>()
+        val inMemoryPrefs = object : android.content.SharedPreferences {
+            override fun getAll(): MutableMap<String, *> = prefsMap.toMutableMap()
+            override fun getString(key: String?, defValue: String?): String? = prefsMap[key] as? String ?: defValue
+            @Suppress("UNCHECKED_CAST")
+            override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
+                (prefsMap[key] as? Set<String>)?.toMutableSet() ?: defValues
+            override fun getInt(key: String?, defValue: Int): Int = prefsMap[key] as? Int ?: defValue
+            override fun getLong(key: String?, defValue: Long): Long = prefsMap[key] as? Long ?: defValue
+            override fun getFloat(key: String?, defValue: Float): Float = prefsMap[key] as? Float ?: defValue
+            override fun getBoolean(key: String?, defValue: Boolean): Boolean = prefsMap[key] as? Boolean ?: defValue
+            override fun contains(key: String?): Boolean = prefsMap.containsKey(key)
+            override fun edit(): android.content.SharedPreferences.Editor = object : android.content.SharedPreferences.Editor {
+                private val pending = mutableMapOf<String, Any?>()
+                private val removed = mutableSetOf<String>()
+                private var cleared = false
+                override fun putString(key: String?, value: String?): android.content.SharedPreferences.Editor {
+                    if (key != null) { removed.remove(key); pending[key] = value }
+                    return this
+                }
+                override fun putStringSet(key: String?, values: MutableSet<String>?): android.content.SharedPreferences.Editor {
+                    if (key != null) { removed.remove(key); pending[key] = values?.toSet() }
+                    return this
+                }
+                override fun putInt(key: String?, value: Int): android.content.SharedPreferences.Editor {
+                    if (key != null) { removed.remove(key); pending[key] = value }
+                    return this
+                }
+                override fun putLong(key: String?, value: Long): android.content.SharedPreferences.Editor {
+                    if (key != null) { removed.remove(key); pending[key] = value }
+                    return this
+                }
+                override fun putFloat(key: String?, value: Float): android.content.SharedPreferences.Editor {
+                    if (key != null) { removed.remove(key); pending[key] = value }
+                    return this
+                }
+                override fun putBoolean(key: String?, value: Boolean): android.content.SharedPreferences.Editor {
+                    if (key != null) { removed.remove(key); pending[key] = value }
+                    return this
+                }
+                override fun remove(key: String?): android.content.SharedPreferences.Editor {
+                    if (key != null) { pending.remove(key); removed.add(key) }
+                    return this
+                }
+                override fun clear(): android.content.SharedPreferences.Editor {
+                    cleared = true; pending.clear(); removed.clear()
+                    return this
+                }
+                override fun commit(): Boolean { apply(); return true }
+                override fun apply() {
+                    if (cleared) prefsMap.clear()
+                    removed.forEach { prefsMap.remove(it) }
+                    prefsMap.putAll(pending)
+                }
+            }
+            override fun registerOnSharedPreferenceChangeListener(listener: android.content.SharedPreferences.OnSharedPreferenceChangeListener?) {}
+            override fun unregisterOnSharedPreferenceChangeListener(listener: android.content.SharedPreferences.OnSharedPreferenceChangeListener?) {}
+        }
+        val fakeCtx = object : android.content.ContextWrapper(null) {
+            override fun getApplicationContext(): android.content.Context = this
+            override fun getSharedPreferences(name: String?, mode: Int): android.content.SharedPreferences = inMemoryPrefs
+        }
+        return inMemoryPrefs to fakeCtx
+    }
 
-        fakeWall = longOffWall
+    @Test
+    fun testPreSyncPoisonedWallClock_doesNotSetHasEverSyncedOrLastKnown() {
+        val (inMemoryPrefs, fakeCtx) = createInMemoryPrefsContext()
+
+        TrustedTimeProvider.resetForTesting()
+        fakeWall = 1_900_000_000_000L // Poisoned far-future untrusted wall clock
         fakeElapsed = 10_000L
 
-        val wallDelta = fakeWall - lastSavedWall
-        val clampedDelta = minOf(wallDelta, TrustedTimeProvider.MAX_OFFLINE_ADVANCE_MS)
-        val expectedTime = lastKnownTrue + clampedDelta
+        TrustedTimeProvider.currentTimeMillis(fakeCtx)
+        fakeElapsed = 80_000L // Exceed DEBOUNCE_PERSIST_MS
+        TrustedTimeProvider.currentTimeMillis(fakeCtx)
+        TrustedTimeProvider.persistOnShutdown(fakeCtx)
+
+        assertFalse("Pre-sync poisoned wall clock must not mark hasEverSynced", TrustedTimeProvider.hasEverSynced())
+        assertFalse("Pre-sync state must remain untrusted", TrustedTimeProvider.isTrusted())
+        assertEquals(0L, TrustedTimeProvider.getLastKnownTrueTime())
+        assertEquals(0L, inMemoryPrefs.getLong(TrustedTimeProvider.KEY_LAST_KNOWN_TRUE_TIME, 0L))
+        assertFalse(inMemoryPrefs.getBoolean(TrustedTimeProvider.KEY_HAS_EVER_SYNCED, false))
+    }
+
+    @Test
+    fun testOfflineReboot_exceeds48Hours_clampedTo48h() {
+        val (inMemoryPrefs, fakeCtx) = createInMemoryPrefsContext()
+        val lastKnownTrue = 1_700_000_000_000L
+        val lastSavedWall = 1_700_000_000_000L
+
+        inMemoryPrefs.edit()
+            .putBoolean(TrustedTimeProvider.KEY_HAS_EVER_SYNCED, true)
+            .putLong(TrustedTimeProvider.KEY_LAST_KNOWN_TRUE_TIME, lastKnownTrue)
+            .putLong(TrustedTimeProvider.KEY_LAST_ELAPSED, 200_000L)
+            .putLong(TrustedTimeProvider.KEY_LAST_SAVED_WALL_TIME, lastSavedWall)
+            .commit()
+
+        TrustedTimeProvider.resetForTesting()
+
+        fakeWall = lastSavedWall + (72L * 3600L * 1000L) // 72 hours later
+        fakeElapsed = 10_000L
+
+        val computed = TrustedTimeProvider.currentTimeMillis(fakeCtx)
 
         assertEquals(
             "Delta exceeding 48h must be clamped to 48 hours",
-            lastKnownTrue + (48 * 3600 * 1000L),
-            expectedTime
+            lastKnownTrue + (48L * 3600L * 1000L),
+            computed
         )
     }
 
@@ -138,23 +233,29 @@ class TrustedTimeTest {
 
     @Test
     fun testDriftCorrectionListener_triggersAboveThreshold() {
+        val (_, fakeCtx) = createInMemoryPrefsContext()
         var observedDriftMs = 0L
         TrustedTimeProvider.onTimeDriftCorrected = { drift ->
             observedDriftMs = drift
         }
 
-        // Initial anchor
-        TrustedTimeProvider.setAnchorForTesting(1_700_000_000_000L, 50_000L, isStrictlyTrusted = false)
+        // Initialize cold boot untrusted wall anchor at elapsed=50_000L
+        fakeElapsed = 50_000L
+        fakeWall = 1_700_000_000_000L
+        TrustedTimeProvider.initialize(fakeCtx)
 
-        // NTP corrects with a 5-minute jump
+        // Real syncNow() corrects with a 5-minute jump -> must invoke production drift listener
         val newNtpTime = 1_700_000_300_000L // +300s (5 minutes)
-        val oldComputed = TrustedTimeProvider.currentTimeMillis()
-        val drift = kotlin.math.abs(newNtpTime - oldComputed)
-
-        if (drift >= TrustedTimeProvider.DRIFT_CORRECTION_THRESHOLD_MS) {
-            TrustedTimeProvider.onTimeDriftCorrected?.invoke(drift)
+        fakeWall = newNtpTime
+        TrustedTimeProvider.sntpRequester = {
+            SntpResult(
+                timeMs = newNtpTime,
+                elapsedRealtimeMs = fakeElapsed,
+                roundTripLatencyMs = 20L,
+                source = "SNTP: test"
+            )
         }
-
+        assertTrue(TrustedTimeProvider.syncNow(fakeCtx, force = true))
         assertEquals(300_000L, observedDriftMs)
     }
 
@@ -246,5 +347,154 @@ class TrustedTimeTest {
         executor.shutdown()
         assertTrue(executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS))
         assertEquals("Monotonicity violated under concurrency", 0, failures.get())
+    }
+
+    @Test
+    fun testOfflineReboot_wallDeltaDoesNotPoisonLastKnownTrueTime() {
+        val (inMemoryPrefs, fakeCtx) = createInMemoryPrefsContext()
+        val verifiedSyncTime = 1_710_000_000_000L
+
+        inMemoryPrefs.edit()
+            .putBoolean(TrustedTimeProvider.KEY_HAS_EVER_SYNCED, true)
+            .putLong(TrustedTimeProvider.KEY_LAST_KNOWN_TRUE_TIME, verifiedSyncTime)
+            .putLong(TrustedTimeProvider.KEY_LAST_ELAPSED, 100_000L)
+            .putLong(TrustedTimeProvider.KEY_LAST_SAVED_WALL_TIME, verifiedSyncTime)
+            .commit()
+
+        TrustedTimeProvider.resetForTesting()
+
+        // Simulate offline reboot (elapsed rolled back below lastSavedElapsed) + 72h wall-clock advance
+        fakeElapsed = 5_000L
+        fakeWall = verifiedSyncTime + (72L * 3600L * 1000L)
+
+        val computed = TrustedTimeProvider.currentTimeMillis(fakeCtx)
+        assertTrue(TrustedTimeProvider.hasEverSynced())
+        assertFalse("Offline reboot anchor must remain untrusted", TrustedTimeProvider.isTrusted())
+        assertTrue(TrustedTimeProvider.isDegradedOffline())
+        assertEquals(
+            "Offline anchor must clamp wall-clock delta to MAX_OFFLINE_ADVANCE_MS",
+            verifiedSyncTime + TrustedTimeProvider.MAX_OFFLINE_ADVANCE_MS,
+            computed
+        )
+        assertEquals(
+            "Unverified offline wallDelta must NOT poison lastKnownTrueTimeMs",
+            verifiedSyncTime,
+            TrustedTimeProvider.getLastKnownTrueTime()
+        )
+
+        // Advance elapsed past debounce threshold and persist on shutdown
+        fakeElapsed = 80_000L
+        TrustedTimeProvider.currentTimeMillis(fakeCtx)
+        TrustedTimeProvider.persistOnShutdown(fakeCtx)
+
+        assertEquals(
+            "Debounced/shutdown persist while degraded offline must preserve last verified true time",
+            verifiedSyncTime,
+            TrustedTimeProvider.getLastKnownTrueTime()
+        )
+        assertEquals(
+            verifiedSyncTime,
+            inMemoryPrefs.getLong(TrustedTimeProvider.KEY_LAST_KNOWN_TRUE_TIME, 0L)
+        )
+    }
+
+    @Test
+    fun testSyncNow_enforcesAntiRollback_andAllowsQuorumLargeForwardAdvance() {
+        val (inMemoryPrefs, fakeCtx) = createInMemoryPrefsContext()
+        val initialSyncTime = 1_720_000_000_000L
+        fakeElapsed = 50_000L
+        fakeWall = initialSyncTime
+
+        TrustedTimeProvider.resetForTesting()
+        TrustedTimeProvider.sntpRequester = {
+            SntpResult(
+                timeMs = initialSyncTime,
+                elapsedRealtimeMs = fakeElapsed,
+                roundTripLatencyMs = 20L,
+                source = "SNTP: test1"
+            )
+        }
+        assertTrue(TrustedTimeProvider.syncNow(fakeCtx, force = true))
+        assertEquals(initialSyncTime, TrustedTimeProvider.currentTimeMillis(fakeCtx))
+        assertTrue(TrustedTimeProvider.isTrusted())
+
+        // Rollback attempt from compromised source must be rejected
+        fakeElapsed = 60_000L
+        TrustedTimeProvider.sntpRequester = {
+            SntpResult(
+                timeMs = initialSyncTime - 120_000L,
+                elapsedRealtimeMs = fakeElapsed,
+                roundTripLatencyMs = 15L,
+                source = "SNTP: rogue"
+            )
+        }
+        assertFalse(TrustedTimeProvider.syncNow(fakeCtx, force = true))
+
+        // Unverified >30-day jump from a single source must be rejected
+        val futureTime = initialSyncTime + (45L * 24L * 3600L * 1000L)
+        TrustedTimeProvider.sntpRequester = {
+            SntpResult(
+                timeMs = futureTime,
+                elapsedRealtimeMs = fakeElapsed,
+                roundTripLatencyMs = 15L,
+                source = "SNTP: unverified",
+                isQuorumVerified = false
+            )
+        }
+        assertFalse(TrustedTimeProvider.syncNow(fakeCtx, force = true))
+
+        // Quorum-verified >30-day advance (genuine long offline recovery) must succeed
+        TrustedTimeProvider.sntpRequester = {
+            SntpResult(
+                timeMs = futureTime,
+                elapsedRealtimeMs = fakeElapsed,
+                roundTripLatencyMs = 25L,
+                source = "SNTP: quorum",
+                isQuorumVerified = true
+            )
+        }
+        assertTrue(TrustedTimeProvider.syncNow(fakeCtx, force = true))
+        assertEquals(futureTime, TrustedTimeProvider.currentTimeMillis(fakeCtx))
+        assertEquals(futureTime, inMemoryPrefs.getLong(TrustedTimeProvider.KEY_LAST_KNOWN_TRUE_TIME, 0L))
+    }
+
+    @Test
+    fun testConsecutiveOfflineReboots_preservesWallBaselineAndMonotonicFloor() {
+        val (inMemoryPrefs, fakeCtx) = createInMemoryPrefsContext()
+        val syncTime = 1_720_000_000_000L
+        fakeElapsed = 100_000L
+        fakeWall = syncTime
+
+        TrustedTimeProvider.resetForTesting()
+        TrustedTimeProvider.sntpRequester = {
+            SntpResult(
+                timeMs = syncTime,
+                elapsedRealtimeMs = fakeElapsed,
+                roundTripLatencyMs = 20L,
+                source = "SNTP: test"
+            )
+        }
+        assertTrue(TrustedTimeProvider.syncNow(fakeCtx, force = true))
+
+        // Offline reboot #1: +6h sleep, run for 1h offline, then shut down
+        TrustedTimeProvider.resetForTesting()
+        fakeWall = syncTime + (6L * 3600L * 1000L)
+        fakeElapsed = 10_000L
+        assertEquals(syncTime + (6L * 3600L * 1000L), TrustedTimeProvider.currentTimeMillis(fakeCtx))
+        fakeElapsed += 3600L * 1000L
+        TrustedTimeProvider.persistOnShutdown(fakeCtx)
+
+        // Wall baseline must remain anchored to last strictly trusted sync
+        assertEquals(syncTime, inMemoryPrefs.getLong(TrustedTimeProvider.KEY_LAST_SAVED_WALL_TIME, 0L))
+
+        // Offline reboot #2: wall rolled backwards — offline floor prevents regression below reboot #1 shutdown
+        TrustedTimeProvider.resetForTesting()
+        fakeWall = syncTime - 3600_000L
+        fakeElapsed = 5_000L
+        val reboot2Time = TrustedTimeProvider.currentTimeMillis(fakeCtx)
+        assertTrue(
+            "Reboot #2 must not regress below reboot #1 monotonic shutdown floor",
+            reboot2Time >= syncTime + (7L * 3600L * 1000L)
+        )
     }
 }

@@ -60,6 +60,7 @@ class OtherSettingsActivity : AppCompatActivity() {
     private var isSaving = false
     private var isProgrammaticUpdate = false
     private var lastAutoDetectClickTime = 0L
+    private var activeDialog: androidx.appcompat.app.AlertDialog? = null
 
     private val backPressedCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
@@ -88,18 +89,52 @@ class OtherSettingsActivity : AppCompatActivity() {
             return
         }
 
-        initialPolicy = if (isRemote && !policyJson.isNullOrBlank()) {
-            DevicePolicyBundle.fromJson(policyJson)
+        if (isRemote) {
+            if (wardId.isBlank() || policyJson.isNullOrBlank()) {
+                android.util.Log.e("OtherSettings", "Refusing remote launch: missing wardId or EXTRA_POLICY_JSON")
+                Toast.makeText(applicationContext, R.string.toast_guardian_policy_save_failed, Toast.LENGTH_LONG).show()
+                finish()
+                return
+            }
+            val parsed = DevicePolicyBundle.fromJsonOrNull(policyJson)
+            if (parsed == null) {
+                android.util.Log.e("OtherSettings", "Refusing remote launch: invalid EXTRA_POLICY_JSON")
+                Toast.makeText(applicationContext, R.string.toast_guardian_policy_save_failed, Toast.LENGTH_LONG).show()
+                finish()
+                return
+            }
+            initialPolicy = parsed
         } else {
-            PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
+            initialPolicy = PolicyRepository.getInstance(applicationContext).getCurrentPolicy()
         }
 
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
         initViews()
         bindInitialPolicy()
+        savedInstanceState?.let { restoreDraftState(it) }
         setupListeners()
         updateSaveButtonState()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_DATE_TIME_LOCKED, isDateTimeLocked)
+        outState.putString(STATE_TIMEZONE_ID, selectedTimeZoneId)
+        outState.putBoolean(STATE_TOTAL_INTERNET_KILL, isTotalInternetKillEnabled)
+    }
+
+    private fun restoreDraftState(state: Bundle) {
+        isProgrammaticUpdate = true
+        isDateTimeLocked = state.getBoolean(STATE_DATE_TIME_LOCKED, isDateTimeLocked)
+        selectedTimeZoneId = state.getString(STATE_TIMEZONE_ID, selectedTimeZoneId)
+            .ifBlank { CurfewConfig.DEFAULT_TIMEZONE_ID }
+        isTotalInternetKillEnabled = state.getBoolean(STATE_TOTAL_INTERNET_KILL, isTotalInternetKillEnabled)
+
+        switchLockDateTime.isChecked = isDateTimeLocked
+        switchTotalInternetKill.isChecked = isTotalInternetKillEnabled
+        updateTimezoneViews()
+        isProgrammaticUpdate = false
     }
 
     override fun onResume() {
@@ -129,12 +164,14 @@ class OtherSettingsActivity : AppCompatActivity() {
         }
 
         switchLockDateTime = findViewById(R.id.switchLockDateTime)
+        switchLockDateTime.isSaveEnabled = false
         tvTimezoneBadge = findViewById(R.id.tvTimezoneBadge)
         tilTimezonePicker = findViewById(R.id.tilTimezonePicker)
         actvTimezonePicker = findViewById(R.id.actvTimezonePicker)
         btnAutoDetectTimezone = findViewById(R.id.btnAutoDetectTimezone)
         btnResetToMakkah = findViewById(R.id.btnResetToMakkah)
         switchTotalInternetKill = findViewById(R.id.switchTotalInternetKill)
+        switchTotalInternetKill.isSaveEnabled = false
         btnSaveOtherSettingsChanges = findViewById(R.id.btnSaveOtherSettingsChanges)
 
         val timezoneOptions = IslamicTimeZoneRegistry.getAllOptions()
@@ -195,7 +232,8 @@ class OtherSettingsActivity : AppCompatActivity() {
             if (isProgrammaticUpdate) return@setOnCheckedChangeListener
             if (isChecked) {
                 // High severity warning confirmation
-                MaterialAlertDialogBuilder(this)
+                activeDialog?.dismiss()
+                activeDialog = MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.dialog_total_internet_kill_title)
                     .setMessage(R.string.dialog_total_internet_kill_message)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
@@ -214,6 +252,9 @@ class OtherSettingsActivity : AppCompatActivity() {
                         switchTotalInternetKill.isChecked = false
                         isTotalInternetKillEnabled = false
                         isProgrammaticUpdate = false
+                    }
+                    .setOnDismissListener {
+                        activeDialog = null
                     }
                     .show()
             } else {
@@ -263,8 +304,13 @@ class OtherSettingsActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val success = if (isRemote && wardId.isNotBlank()) {
-                    policyRepo.pushPolicyToWard(wardId, updatedPolicy)
+                val success = if (isRemote) {
+                    if (wardId.isBlank()) {
+                        android.util.Log.e("OtherSettings", "Refusing remote push: wardId is blank")
+                        false
+                    } else {
+                        policyRepo.pushPolicyToWard(wardId, updatedPolicy)
+                    }
                 } else {
                     val saved = policyRepo.saveAndEnforceSelfPolicy(updatedPolicy)
                     if (saved) {
@@ -278,9 +324,11 @@ class OtherSettingsActivity : AppCompatActivity() {
                 }
 
                 withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
                     isSaving = false
                     if (success) {
-                        Toast.makeText(this@OtherSettingsActivity, R.string.toast_self_policy_saved, Toast.LENGTH_SHORT).show()
+                        val successRes = if (isRemote) R.string.toast_guardian_policy_saved else R.string.toast_self_policy_saved
+                        Toast.makeText(applicationContext, successRes, Toast.LENGTH_SHORT).show()
                         val resultIntent = Intent().apply {
                             putExtra(EXTRA_UPDATED_POLICY_JSON, updatedPolicy.toJson())
                         }
@@ -289,23 +337,27 @@ class OtherSettingsActivity : AppCompatActivity() {
                         finish()
                     } else {
                         updateSaveButtonState()
-                        Toast.makeText(this@OtherSettingsActivity, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
+                        val failRes = if (isRemote) R.string.toast_guardian_policy_save_failed else R.string.toast_self_policy_save_failed
+                        Toast.makeText(applicationContext, failRes, Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.e("OtherSettings", "Error saving other settings", e)
                 withContext(Dispatchers.Main) {
+                    if (isFinishing || isDestroyed) return@withContext
                     isSaving = false
                     updateSaveButtonState()
-                    Toast.makeText(this@OtherSettingsActivity, R.string.toast_self_policy_save_failed, Toast.LENGTH_LONG).show()
+                    val failRes = if (isRemote) R.string.toast_guardian_policy_save_failed else R.string.toast_self_policy_save_failed
+                    Toast.makeText(applicationContext, failRes, Toast.LENGTH_LONG).show()
                 }
             }
         }
     }
 
     private fun showDiscardConfirmationDialog() {
-        MaterialAlertDialogBuilder(this)
+        activeDialog?.dismiss()
+        activeDialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.dialog_unsaved_changes_title)
             .setMessage(R.string.dialog_unsaved_changes_msg)
             .setNegativeButton(R.string.btn_keep_editing) { dialog, _ ->
@@ -316,7 +368,16 @@ class OtherSettingsActivity : AppCompatActivity() {
                 backPressedCallback.isEnabled = false
                 finish()
             }
+            .setOnDismissListener {
+                activeDialog = null
+            }
             .show()
+    }
+
+    override fun onDestroy() {
+        activeDialog?.dismiss()
+        activeDialog = null
+        super.onDestroy()
     }
 
     companion object {
@@ -324,5 +385,9 @@ class OtherSettingsActivity : AppCompatActivity() {
         const val EXTRA_WARD_ID = "extra_ward_id"
         const val EXTRA_POLICY_JSON = "extra_policy_json"
         const val EXTRA_UPDATED_POLICY_JSON = "extra_updated_policy_json"
+
+        private const val STATE_DATE_TIME_LOCKED = "state_date_time_locked"
+        private const val STATE_TIMEZONE_ID = "state_timezone_id"
+        private const val STATE_TOTAL_INTERNET_KILL = "state_total_internet_kill"
     }
 }

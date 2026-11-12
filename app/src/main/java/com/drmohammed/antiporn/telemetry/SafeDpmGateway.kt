@@ -89,8 +89,14 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
         recordSuccess: Boolean,
         action: (dpm: DevicePolicyManager, admin: ComponentName) -> T
     ): DpmExecutionResult<T> {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            Log.w(TAG, "[WARN] SafeDpmGateway.executeBlocking called on Main Thread for action [$actionName]. Consider migrating to suspend execute()!")
+        val isMainThread = try {
+            Looper.myLooper() == Looper.getMainLooper()
+        } catch (e: RuntimeException) {
+            if (e.message?.contains("not mocked") != true) throw e
+            false
+        }
+        if (isMainThread) {
+            safeLog(Log.WARN, "[WARN] SafeDpmGateway.executeBlocking called on Main Thread for action [$actionName]. Consider migrating to suspend execute()!")
         }
         return executeInternal(context, tag, actionName, metadata, requireDeviceOwner, recordSuccess, action)
     }
@@ -147,7 +153,7 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
         // 1. Pre-Flight: Check DPM service availability
         if (dpm == null) {
             val msg = "DevicePolicyManager system service is unavailable"
-            Log.e(TAG, "Pre-flight failed for [$actionName]: $msg")
+            safeLog(Log.ERROR, "Pre-flight failed for [$actionName]: $msg")
             recordTelemetry(appContext, tag, actionName, 0L, false, msg, metadata)
             return DpmExecutionResult.Failure(
                 errorType = DpmErrorType.DPM_SERVICE_UNAVAILABLE,
@@ -307,7 +313,18 @@ object SafeDpmGateway : SafeDpmPackageBridge, SafeDpmPolicyBridge {
                 metadata = contextMetadata
             )
         } catch (e: Exception) {
-            Log.w(TAG, "Failed recording telemetry in SafeDpmGateway", e)
+            safeLog(Log.WARN, "Failed recording telemetry in SafeDpmGateway", e)
+        }
+    }
+
+    private fun safeLog(priority: Int, message: String, throwable: Throwable? = null) {
+        try {
+            when (priority) {
+                Log.WARN -> Log.w(TAG, message, throwable)
+                else -> Log.e(TAG, message, throwable)
+            }
+        } catch (e: RuntimeException) {
+            if (e.message?.contains("not mocked") != true) throw e
         }
     }
 }

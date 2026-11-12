@@ -220,10 +220,58 @@ class SelfControlQrManagerTest {
             timeProvider = { currentTime },
             trustProvider = { false }
         )
-        untrustedManager.requestEmergencyDelay()
+        assertFalse(untrustedManager.requestEmergencyDelay())
+        assertEquals(0L, untrustedManager.getEmergencyDelayRequestedAt())
         currentTime += 30L * 3600L * 1000L // 30 hours elapsed
         assertEquals(0L, untrustedManager.getEmergencyDelayRemainingMs())
         // Anti-tamper: Must return false because time is untrusted (offline clock spoof)
         assertFalse(untrustedManager.isEmergencyDelayActiveAndElapsed())
+    }
+
+    @Test
+    fun testEmergencyDelayHours_nonPositiveValues_clampedToAtLeastOne() {
+        val manager = SelfControlQrManager(
+            fakePrefs,
+            timeProvider = { currentTime },
+            trustProvider = { true }
+        )
+        fakePrefs.edit().putInt(SelfControlQrManager.KEY_EMERGENCY_DELAY_HOURS, 0).apply()
+        assertEquals(1, manager.getEmergencyDelayHours())
+
+        fakePrefs.edit().putInt(SelfControlQrManager.KEY_EMERGENCY_DELAY_HOURS, -5).apply()
+        assertEquals(1, manager.getEmergencyDelayHours())
+
+        manager.setEmergencyDelayEnabled(true, 0)
+        assertEquals(1, manager.getEmergencyDelayHours())
+    }
+
+    @Test
+    fun testEmergencyDelay_onlineRequestThenOfflineThenElapsedExpiry() {
+        var trusted = true
+        val offlineCapableManager = SelfControlQrManager(
+            fakePrefs,
+            timeProvider = { currentTime },
+            trustProvider = { trusted }
+        )
+        offlineCapableManager.setEmergencyDelayEnabled(true, 2)
+
+        assertTrue("Online emergency request must succeed", offlineCapableManager.requestEmergencyDelay())
+        assertTrue(offlineCapableManager.isEmergencyDelayRequested())
+
+        // Device goes offline while 3 hours elapse (> 2h delay)
+        trusted = false
+        currentTime += 3 * 3600L * 1000L
+        assertFalse(
+            "Emergency delay expiry must fail closed while trusted time is unavailable",
+            offlineCapableManager.isEmergencyDelayActiveAndElapsed()
+        )
+
+        // Device regains trusted sync
+        trusted = true
+        assertEquals(0L, offlineCapableManager.getEmergencyDelayRemainingMs())
+        assertTrue(
+            "Emergency delay must report elapsed once trusted time returns and delay has passed",
+            offlineCapableManager.isEmergencyDelayActiveAndElapsed()
+        )
     }
 }
