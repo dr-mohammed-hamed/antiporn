@@ -1,11 +1,11 @@
 {
-  "versionCode": 19,
-  "versionName": "1.80",
+  "versionCode": 20,
+  "versionName": "1.81",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://pub-e568dc85c0ec4f2fb3d1b90e310b4310.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 35480056,
+  "fileSizeBytes": 35529208,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.80 (كود البناء 19): الإصدار الرسمي الأول كبرنامج مفتوح المصدر بالكامل. يتضمن تطبيق معيار Zero-Trust الصارم وإصلاح تعليق DPM، وتوفير منتقي التطبيقات المسموحة في حظر التجوال (Curfew) بحفظ ذرّي فوري، واستقرار فائق لمنظومة «وَقْفَة» لاعتراض التطبيقات المقيدة في 0ms دون استنزاف للبطارية.",
-  "releaseDate": "2026-11-11"
+  "releaseNotes": "إصدار 1.81 (كود البناء 20): تحصين أمني شامل ضد التلاعب بالوقت عبر التحقق الجماعي من الخوادم، وتشفير رمز قفل QR عبر AndroidKeyStore، وتأمين فك الارتباط الطارئ، وتحسين استقرار درع الـ VPN والمزامنة السحابية والقيلولة وواجهة المستخدم.",
+  "releaseDate": "2026-11-12"
 }
