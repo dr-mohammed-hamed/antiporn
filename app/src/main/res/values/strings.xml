@@ -1162,6 +1162,25 @@
     <string name="waqfa_unit_minutes">دقائق</string>
     <string name="waqfa_quick_durations_title">خيارات المدد السريعة (بالدقائق)</string>
     <string name="waqfa_quick_durations_desc">أزرار المدد الافتراضية المعروضة للمستخدم أثناء الاعتراض</string>
+    <string name="waqfa_switch_allow_open_session">السماح بالوقت المفتوح</string>
+    <string name="waqfa_switch_allow_open_session_desc">إتاحة خيار الدخول للجلسة دون تحديد مؤقت زمني أو طرد قسري</string>
+    <string name="waqfa_switch_allow_custom_duration">السماح بالوقت اليدوي في وقفة</string>
+    <string name="waqfa_switch_allow_custom_duration_desc">إتاحة كتابة عدد دقائق مخصص في شاشة اعتراض وقفة</string>
+    <string name="waqfa_btn_add_duration">إضافة مدة</string>
+    <string name="waqfa_dialog_add_duration_title">إضافة مدة سريعة جديدة</string>
+    <string name="waqfa_dialog_add_duration_hint">المدة بالدقائق (1 - 180)</string>
+    <string name="waqfa_dialog_custom_duration_title">تحديد وقت مخصص</string>
+    <string name="waqfa_dialog_custom_duration_hint">أدخل المدة بالدقائق (1 - 180)</string>
+    <string name="waqfa_chip_custom">مخصص</string>
+    <string name="waqfa_chip_custom_format">مخصص (%1$d د)</string>
+    <string name="waqfa_chip_open">وقت مفتوح</string>
+    <string name="waqfa_notif_open_session_title">جلسة «وَقْفَة» مفتوحة: %1$s</string>
+    <string name="waqfa_notif_open_session_msg">الوقت المنقضي:</string>
+    <string name="waqfa_error_min_one_duration">يجب الإبقاء على مدة سريعة واحدة على الأقل</string>
+    <string name="waqfa_error_invalid_duration">يرجى إدخال مدة صحيحة بين 1 و 180 دقيقة</string>
+    <string name="waqfa_btn_cancel">إلغاء</string>
+    <string name="waqfa_btn_add">إضافة</string>
+    <string name="waqfa_btn_set">تأكيد</string>
     <string name="waqfa_btn_save_settings">حفظ وتطبيق إعدادات وَقْفَة</string>
     <string name="waqfa_settings_saved_toast">تم حفظ وتطبيق إعدادات وَقْفَة بنجاح</string>
     <string name="waqfa_settings_save_failed_toast">تعذر حفظ الإعدادات، يرجى إعادة المحاولة</string>
@@ -1179,6 +1198,16 @@
     <string name="waqfa_btn_confirm_selection_count">تأكيد الاختيار (%1$d تطبيق محدد)</string>
 
     <!-- Waqfa Notifications -->
+    <string name="waqfa_ongoing_channel_name">عداد جلسات وقفة النشطة</string>
+    <string name="waqfa_ongoing_channel_desc">إشعار مستمر يعرض الوقت المتبقي لجلسة التطبيق الخاضع لنظام وقفة بالوقت الفعلي</string>
+    <string name="waqfa_notif_ongoing_title">جلسة «وَقْفَة» نشطة: %1$s</string>
+    <string name="waqfa_notif_ongoing_msg">الوقت المتبقي للجلسة:</string>
+    <string name="waqfa_notif_btn_early_exit">إنهاء الجلسة الآن</string>
+    <string name="waqfa_notif_warning_title">شارفت جلسة «وَقْفَة» على الانتهاء</string>
+    <string name="waqfa_notif_warning_msg">تبقى دقيقة واحدة فقط لتطبيق %1$s. احفظ ما تعمل عليه الآن.</string>
+    <string name="waqfa_notif_btn_extend_2m">تمديد طارئ (+2 دقيقة)</string>
+    <string name="waqfa_toast_extended_success">تم تمديد الجلسة دقيقتين إضافيتين لإنقاذ عملك</string>
+    <string name="waqfa_toast_already_extended">تم استخدام التمديد الاستثنائي مسبقاً لهذه الجلسة</string>
     <string name="waqfa_notif_cooldown_started_title">تم تجميد التطبيق مؤقتاً</string>
     <string name="waqfa_notif_cooldown_started_msg">تم تجميد تطبيق %1$s لمدة %2$d دقائق للتهدئة واستعادة التركيز.</string>
     <string name="waqfa_notif_cooldown_ended_title">فك تجميد التطبيق</string>

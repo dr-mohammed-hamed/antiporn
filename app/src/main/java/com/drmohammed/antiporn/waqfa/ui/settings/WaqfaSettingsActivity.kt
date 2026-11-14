@@ -29,6 +29,7 @@ class WaqfaSettingsActivity : AppCompatActivity() {
     private lateinit var binding: ActivityWaqfaSettingsBinding
     private val viewModel: WaqfaSettingsViewModel by viewModel()
     private var isBindingUi = false
+    private var lastRenderedDurationsSignature: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -123,6 +124,20 @@ class WaqfaSettingsActivity : AppCompatActivity() {
             if (isBindingUi) return@doAfterTextChanged
             val mins = it?.toString()?.toIntOrNull() ?: 3
             viewModel.setCooldownMinutes(mins)
+        }
+
+        binding.swAllowCustomDuration.setOnCheckedChangeListener { _, isChecked ->
+            if (isBindingUi) return@setOnCheckedChangeListener
+            viewModel.setAllowCustomDuration(isChecked)
+        }
+
+        binding.swAllowOpenSession.setOnCheckedChangeListener { _, isChecked ->
+            if (isBindingUi) return@setOnCheckedChangeListener
+            viewModel.setAllowOpenSession(isChecked)
+        }
+
+        binding.btnAddDuration.setOnClickListener {
+            showAddDurationDialog()
         }
 
         binding.btnSaveWaqfaSettings.setOnClickListener {
@@ -225,6 +240,20 @@ class WaqfaSettingsActivity : AppCompatActivity() {
                 binding.etCooldownMinutes.setText(cooldownStr)
             }
 
+            if (binding.swAllowCustomDuration.isChecked != config.allowCustomDuration) {
+                binding.swAllowCustomDuration.isChecked = config.allowCustomDuration
+            }
+
+            if (binding.swAllowOpenSession.isChecked != config.allowOpenSession) {
+                binding.swAllowOpenSession.isChecked = config.allowOpenSession
+            }
+
+            val durationsSig = config.quickDurationsMinutes.joinToString(",")
+            if (durationsSig != lastRenderedDurationsSignature) {
+                lastRenderedDurationsSignature = durationsSig
+                renderQuickDurationChips(config.quickDurationsMinutes)
+            }
+
             binding.btnSaveWaqfaSettings.isEnabled = !state.isLoading
 
             if (state.showPermissionDialog) {
@@ -234,6 +263,57 @@ class WaqfaSettingsActivity : AppCompatActivity() {
         } finally {
             isBindingUi = false
         }
+    }
+
+    private fun renderQuickDurationChips(durations: List<Int>) {
+        binding.cgQuickDurations.removeAllViews()
+        val surfaceContainer = MaterialColors.getColor(binding.root, com.google.android.material.R.attr.colorSurfaceContainerHigh)
+        val defaultBorder = MaterialColors.getColor(binding.root, com.google.android.material.R.attr.colorOutlineVariant)
+        val onSurfaceColor = MaterialColors.getColor(binding.root, com.google.android.material.R.attr.colorOnSurface)
+
+        for (duration in durations) {
+            val chip = com.google.android.material.chip.Chip(this).apply {
+                id = View.generateViewId()
+                text = getString(R.string.waqfa_minutes_format, duration)
+                isCloseIconVisible = true
+                isCheckable = false
+                setTextColor(onSurfaceColor)
+                chipBackgroundColor = android.content.res.ColorStateList.valueOf(surfaceContainer)
+                chipStrokeColor = android.content.res.ColorStateList.valueOf(defaultBorder)
+                chipStrokeWidth = 1f
+                setOnCloseIconClickListener {
+                    val success = viewModel.removeQuickDuration(duration)
+                    if (!success) {
+                        Toast.makeText(this@WaqfaSettingsActivity, getString(R.string.waqfa_error_min_one_duration), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            binding.cgQuickDurations.addView(chip)
+        }
+    }
+
+    private fun showAddDurationDialog() {
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            hint = getString(R.string.waqfa_dialog_add_duration_hint)
+        }
+        val container = android.widget.FrameLayout(this).apply {
+            setPadding(64, 24, 64, 16)
+            addView(input)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.waqfa_dialog_add_duration_title)
+            .setView(container)
+            .setPositiveButton(R.string.waqfa_btn_add) { _, _ ->
+                val mins = input.text?.toString()?.toIntOrNull()
+                if (mins != null && mins in 1..180) {
+                    viewModel.addQuickDuration(mins)
+                } else {
+                    Toast.makeText(this, getString(R.string.waqfa_error_invalid_duration), Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(R.string.waqfa_btn_cancel, null)
+            .show()
     }
 
     private fun showPermissionGuidanceDialog() {

@@ -21,6 +21,8 @@ class WaqfaConfigTest {
         assertFalse(config.isReasonRequired)
         assertEquals(WaqfaTimeoutReactionType.EXIT_ONLY, config.timeoutReactionType)
         assertEquals(3, config.cooldownMinutes)
+        assertFalse(config.allowOpenSession)
+        assertTrue(config.allowCustomDuration)
     }
 
     @Test
@@ -31,7 +33,9 @@ class WaqfaConfigTest {
             quickDurationsMinutes = listOf(5, 15, 45),
             isReasonRequired = true,
             timeoutReactionType = WaqfaTimeoutReactionType.EXIT_AND_FREEZE,
-            cooldownMinutes = 5
+            cooldownMinutes = 5,
+            allowOpenSession = true,
+            allowCustomDuration = false
         )
 
         val map = original.toMap()
@@ -43,6 +47,8 @@ class WaqfaConfigTest {
         assertEquals(original.isReasonRequired, restored.isReasonRequired)
         assertEquals(original.timeoutReactionType, restored.timeoutReactionType)
         assertEquals(original.cooldownMinutes, restored.cooldownMinutes)
+        assertEquals(original.allowOpenSession, restored.allowOpenSession)
+        assertEquals(original.allowCustomDuration, restored.allowCustomDuration)
     }
 
     @Test
@@ -53,7 +59,9 @@ class WaqfaConfigTest {
             quickDurationsMinutes = listOf(10, 20),
             isReasonRequired = true,
             timeoutReactionType = WaqfaTimeoutReactionType.NOTIFY_ONLY,
-            cooldownMinutes = 2
+            cooldownMinutes = 2,
+            allowOpenSession = true,
+            allowCustomDuration = true
         )
 
         val json = original.toJson()
@@ -65,6 +73,8 @@ class WaqfaConfigTest {
         assertEquals(original.isReasonRequired, restored.isReasonRequired)
         assertEquals(original.timeoutReactionType, restored.timeoutReactionType)
         assertEquals(original.cooldownMinutes, restored.cooldownMinutes)
+        assertEquals(original.allowOpenSession, restored.allowOpenSession)
+        assertEquals(original.allowCustomDuration, restored.allowCustomDuration)
     }
 
     @Test

@@ -136,10 +136,20 @@ class AppNotificationManager(
             enableVibration(true)
         }
 
+        // 8. Waqfa Ongoing Countdown Channel (LOW)
+        val channelWaqfa = NotificationChannel(
+            NotificationRegistry.CHANNEL_ID_WAQFA_ONGOING,
+            appContext.getString(R.string.waqfa_ongoing_channel_name),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = appContext.getString(R.string.waqfa_ongoing_channel_desc)
+            setShowBadge(false)
+        }
+
         manager.createNotificationChannels(
-            listOf(channelWatchdog, channelVpn, channelAi, channelOta, channelEvents, channelPairing, channelCritical)
+            listOf(channelWatchdog, channelVpn, channelAi, channelOta, channelEvents, channelPairing, channelCritical, channelWaqfa)
         )
-        Log.i(TAG, "All 7 NotificationChannels created/verified centrally via NotificationRegistry")
+        Log.i(TAG, "All 8 NotificationChannels created/verified centrally via NotificationRegistry")
     }
 
     /**

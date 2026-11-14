@@ -1,7 +1,8 @@
 package com.drmohammed.antiporn.waqfa.engine
 
 import android.content.Context
-import android.util.Log
+import android.content.Intent
+import android.content.pm.PackageManager
 import timber.log.Timber
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.curfew.CurfewAppResolver
@@ -42,23 +43,28 @@ class WaqfaSessionManager(
         try {
             cachedConfig = PolicyRepository.getInstance(context).getCurrentPolicy().waqfaConfig
         } catch (e: Exception) {
-            Log.w(TAG, "Failed reading initial policy for Waqfa, using defaults", e)
+            Timber.tag(TAG).w(e, "Failed reading initial policy for Waqfa, using defaults")
         }
         // استعادة أي جلسة سارية غير منتهية من قاعدة البيانات عند إعادة إقلاع العملية
         try {
             val now = TrustedTimeProvider.currentTimeMillis(context)
             repository.getAllActiveSessionsBlocking().firstOrNull { !it.isExpired(now) }?.let { restored ->
                 activeSession = restored
-                Log.i(TAG, "Restored active Waqfa session from DB for ${restored.packageName}")
+                WaqfaNotificationHelper.postOngoingSessionNotification(context, restored)
+                if (!restored.isOpenSession) {
+                    WaqfaAlarmScheduler.scheduleSessionTimeoutAlarm(context, restored)
+                    WaqfaAlarmScheduler.schedulePreTimeoutWarningAlarm(context, restored)
+                }
+                Timber.tag(TAG).i("Restored active Waqfa session from DB for %s (isOpen=%b)", restored.packageName, restored.isOpenSession)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed restoring initial active Waqfa session from DB", e)
+            Timber.tag(TAG).w(e, "Failed restoring initial active Waqfa session from DB")
         }
     }
 
     fun updateConfig(config: WaqfaConfig) {
         cachedConfig = config
-        Log.i(TAG, "WaqfaConfig updated: isEnabled=${config.isEnabled}, targets=${config.targetPackages.size}")
+        Timber.tag(TAG).i("WaqfaConfig updated: isEnabled=%b, targets=%d", config.isEnabled, config.targetPackages.size)
         try {
             WaqfaForegroundWatcher.getInstance(context).notifyConfigChanged()
         } catch (e: Exception) {
@@ -112,20 +118,41 @@ class WaqfaSessionManager(
         // 2. تحديث الجلسة في الذاكرة
         activeSession = newSession
 
-        // 3. جدولة منبه انتهاء الوقت الدقيق
-        WaqfaAlarmScheduler.scheduleSessionTimeoutAlarm(context, newSession)
+        // 3. جدولة المنبهات فقط إذا لم تكن الجلسة مفتوحة
+        if (!newSession.isOpenSession) {
+            WaqfaAlarmScheduler.scheduleSessionTimeoutAlarm(context, newSession)
+            WaqfaAlarmScheduler.schedulePreTimeoutWarningAlarm(context, newSession)
+        }
 
-        Log.i(TAG, "Active session registered for $packageName (${newSession.durationMinutes}m)")
+        // 4. إطلاق إشعار العداد الحي (تصاعدي للمفتوحة أو تنازلي للمحددة)
+        WaqfaNotificationHelper.postOngoingSessionNotification(context, newSession)
+
+        Timber.tag(TAG).i("Active session registered for %s (%dm)", packageName, newSession.durationMinutes)
         newSession
+    }
+
+    private fun isHomeLauncher(packageName: String): Boolean {
+        return try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val homeInfo = context.packageManager.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            homeInfo?.activityInfo?.packageName == packageName
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**
      * يُستدعى فور رصد تغير التطبيق النشط في الواجهة.
-     * يُلغي الجلسة فوراً إذا غادر المستخدم التطبيق إلى الشاشة الرئيسية أو تطبيق آخر بعد فترة سماح (Debounce).
+     * يُلغي الجلسة إذا غادر المستخدم التطبيق إلى الشاشة الرئيسية (مهلة 10 ثوانٍ) أو تطبيق آخر (مهلة 2.5 ثانية).
      */
     fun onForegroundPackageChanged(newForegroundPackage: String) {
         if (newForegroundPackage.isBlank()) return
-        if (newForegroundPackage == context.packageName || CurfewAppResolver.isSystemCriticalOrImmune(context, newForegroundPackage)) {
+        if (newForegroundPackage == context.packageName) return
+
+        val isLauncher = isHomeLauncher(newForegroundPackage)
+
+        // إذا كان التطبيق نظامياً أو محصناً (مثل المكالمات الهاتفية) وليس المشغل، لا نقاطع الجلسة
+        if (!isLauncher && CurfewAppResolver.isSystemCriticalOrImmune(context, newForegroundPackage)) {
             return
         }
 
@@ -145,17 +172,24 @@ class WaqfaSessionManager(
                     return@withLock
                 }
 
-                // عند الانتقال لتطبيق آخر غير محمي، ننتظر مهلة سماح 2500ms لمنع الإغلاق في التبديل السريع
+                // عند الانتقال للشاشة الرئيسية نمنح مهلة 10 ثوانٍ، وعند الانتقال لتطبيق آخر 2500ms
+                val graceDelayMs = if (isLauncher) 10_000L else 2500L
                 exitGraceJob?.cancel()
                 val sessionToTerminate = current
                 exitGraceJob = managerScope.launch {
-                    delay(2500L)
+                    delay(graceDelayMs)
                     mutex.withLock {
                         val stillActive = activeSession
                         if (stillActive != null && stillActive.id == sessionToTerminate.id) {
-                            Log.i(TAG, "User exited ${stillActive.packageName} -> switched to $newForegroundPackage. Grace period elapsed. Terminating Waqfa session.")
-                            repository.endSession(stillActive.id, WaqfaSession.ACTION_USER_EARLY_EXIT)
+                            Timber.tag(TAG).i("User exited %s -> switched to %s (isLauncher=%b). Grace period (%d ms) elapsed. Terminating Waqfa session.", stillActive.packageName, newForegroundPackage, isLauncher, graceDelayMs)
+                            
+                            // إلغاء الإشعارات والمنبهات
+                            WaqfaNotificationHelper.cancelOngoingSessionNotification(context)
+                            WaqfaNotificationHelper.cancelPreTimeoutWarningNotification(context)
                             WaqfaAlarmScheduler.cancelSessionTimeoutAlarm(context, stillActive.packageName)
+                            WaqfaAlarmScheduler.cancelPreTimeoutWarningAlarm(context, stillActive.packageName)
+
+                            repository.endSession(stillActive.id, WaqfaSession.ACTION_USER_EARLY_EXIT)
                             activeSession = null
                         }
                     }
@@ -179,9 +213,19 @@ class WaqfaSessionManager(
         }
 
         if (targetSession == null) {
-            Log.d(TAG, "No active session found for timeout on $packageName")
+            Timber.tag(TAG).d("No active session found for timeout on %s", packageName)
             return@withLock
         }
+
+        if (targetSession.isOpenSession) {
+            Timber.tag(TAG).d("Active session for %s is an open session. Spurious timeout ignored.", packageName)
+            return@withLock
+        }
+
+        // إلغاء الإشعارات والمنبه التحذيري
+        WaqfaNotificationHelper.cancelOngoingSessionNotification(context)
+        WaqfaNotificationHelper.cancelPreTimeoutWarningNotification(context)
+        WaqfaAlarmScheduler.cancelPreTimeoutWarningAlarm(context, packageName)
 
         val config = cachedConfig
         val reactionType = config.timeoutReactionType
@@ -199,13 +243,68 @@ class WaqfaSessionManager(
     }
 
     suspend fun cancelActiveSession(endAction: String = WaqfaSession.ACTION_USER_EARLY_EXIT) = mutex.withLock {
+        Timber.tag(TAG).i("Cancelling active session with action: %s", endAction)
         exitGraceJob?.cancel()
         exitGraceJob = null
 
         val current = activeSession ?: return@withLock
-        repository.endSession(current.id, endAction)
+        WaqfaNotificationHelper.cancelOngoingSessionNotification(context)
+        WaqfaNotificationHelper.cancelPreTimeoutWarningNotification(context)
         WaqfaAlarmScheduler.cancelSessionTimeoutAlarm(context, current.packageName)
+        WaqfaAlarmScheduler.cancelPreTimeoutWarningAlarm(context, current.packageName)
+        repository.endSession(current.id, endAction)
         activeSession = null
+    }
+
+    /**
+     * تمديد الجلسة النشطة استثنائياً (+2 دقيقة) لمرة واحدة فقط لإنقاذ العمل والرسائل غير المحفوظة.
+     */
+    suspend fun extendActiveSession(extraMinutes: Int = 2): Boolean = mutex.withLock {
+        val current = activeSession ?: return@withLock false
+        if (current.isOpenSession) {
+            Timber.tag(TAG).d("Session for %s is an open session. Extension not applicable.", current.packageName)
+            return@withLock false
+        }
+        if (current.isExtended) {
+            Timber.tag(TAG).w("Active session for %s is already extended. Refusing.", current.packageName)
+            return@withLock false
+        }
+        val nowTrusted = TrustedTimeProvider.currentTimeMillis(context)
+        if (current.isExpired(nowTrusted)) {
+            Timber.tag(TAG).w("Active session for %s has already expired. Cannot extend.", current.packageName)
+            return@withLock false
+        }
+
+        val newPlannedEnd = current.plannedEndAtTrustedMs + (extraMinutes * 60_000L)
+        val newDuration = current.durationMinutes + extraMinutes
+        val updated = current.copy(
+            plannedEndAtTrustedMs = newPlannedEnd,
+            durationMinutes = newDuration,
+            isExtended = true
+        )
+
+        // Persist to database first before committing in-memory state
+        try {
+            repository.updateSessionPlannedEnd(updated.id, newPlannedEnd, newDuration)
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed updating planned end in DB for session #${updated.id}")
+            return@withLock false
+        }
+
+        activeSession = updated
+
+        // إلغاء تنبيه ما قبل النهاية فور التمديد
+        WaqfaNotificationHelper.cancelPreTimeoutWarningNotification(context)
+
+        // إعادة جدولة المنبهات للتوقيت الجديد
+        WaqfaAlarmScheduler.scheduleSessionTimeoutAlarm(context, updated)
+        WaqfaAlarmScheduler.schedulePreTimeoutWarningAlarm(context, updated)
+
+        // تحديث إشعار العداد التنازلي التفاعلي بالوقت الجديد
+        WaqfaNotificationHelper.postOngoingSessionNotification(context, updated)
+
+        Timber.tag(TAG).i("Extended active session for %s by %d min until wallMs=%d", updated.packageName, extraMinutes, newPlannedEnd)
+        true
     }
 
     companion object {

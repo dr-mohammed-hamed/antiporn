@@ -994,4 +994,37 @@
     <string name="badge_count_overflow">99+</string>
     <string name="toast_curfew_invalid_same_start_end">Curfew start and end times cannot be identical.</string>
     <string name="shield_dns_local_filter_needs_sync">Local DNS filter is active, but Private DNS or restrictions need synchronization.</string>
+
+    <!-- Waqfa Notifications -->
+    <string name="waqfa_ongoing_channel_name">Active Waqfa Sessions Timer</string>
+    <string name="waqfa_ongoing_channel_desc">Ongoing real-time notification showing remaining session time for apps managed under Waqfa</string>
+    <string name="waqfa_notif_ongoing_title">Active Waqfa Session: %1$s</string>
+    <string name="waqfa_notif_ongoing_msg">Remaining session time:</string>
+    <string name="waqfa_notif_btn_early_exit">End Session Now</string>
+    <string name="waqfa_notif_warning_title">Waqfa Session Ending Soon</string>
+    <string name="waqfa_notif_warning_msg">1 minute remaining for %1$s. Save your progress now.</string>
+    <string name="waqfa_notif_btn_extend_2m">Extend (+2 mins)</string>
+    <string name="waqfa_toast_extended_success">Session extended by 2 minutes to save your work</string>
+    <string name="waqfa_toast_already_extended">Emergency extension has already been used for this session</string>
+
+    <!-- Waqfa Flexibility & Open Session Strings -->
+    <string name="waqfa_switch_allow_open_session">Allow Open Session</string>
+    <string name="waqfa_switch_allow_open_session_desc">Allow entering a session without a forced timeout or ejection</string>
+    <string name="waqfa_switch_allow_custom_duration">Allow Custom Manual Time</string>
+    <string name="waqfa_switch_allow_custom_duration_desc">Allow typing a custom duration in the Waqfa gate screen</string>
+    <string name="waqfa_btn_add_duration">Add Duration</string>
+    <string name="waqfa_dialog_add_duration_title">Add New Quick Duration</string>
+    <string name="waqfa_dialog_add_duration_hint">Duration in minutes (1 - 180)</string>
+    <string name="waqfa_dialog_custom_duration_title">Set Custom Duration</string>
+    <string name="waqfa_dialog_custom_duration_hint">Enter duration in minutes (1 - 180)</string>
+    <string name="waqfa_chip_custom">Custom</string>
+    <string name="waqfa_chip_custom_format">Custom (%1$d m)</string>
+    <string name="waqfa_chip_open">Open Session</string>
+    <string name="waqfa_notif_open_session_title">Open Waqfa Session: %1$s</string>
+    <string name="waqfa_notif_open_session_msg">Elapsed time:</string>
+    <string name="waqfa_error_min_one_duration">At least one quick duration must be kept</string>
+    <string name="waqfa_error_invalid_duration">Please enter a valid duration between 1 and 180 minutes</string>
+    <string name="waqfa_btn_cancel">Cancel</string>
+    <string name="waqfa_btn_add">Add</string>
+    <string name="waqfa_btn_set">Confirm</string>
 </resources>

@@ -1,7 +1,7 @@
 package com.drmohammed.antiporn.waqfa.data
 
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
 import com.drmohammed.antiporn.waqfa.model.WaqfaIntentType
@@ -29,7 +29,7 @@ class WaqfaRepository(
         durationMinutes: Int
     ): WaqfaSession = withContext(Dispatchers.IO) {
         val nowTrusted = TrustedTimeProvider.currentTimeMillis(context)
-        val plannedEnd = nowTrusted + (durationMinutes * 60_000L)
+        val plannedEnd = if (durationMinutes <= 0) 0L else nowTrusted + (durationMinutes * 60_000L)
 
         val session = WaqfaSession(
             sessionId = UUID.randomUUID().toString(),
@@ -50,7 +50,7 @@ class WaqfaRepository(
             closeAction = WaqfaSession.ACTION_USER_EARLY_EXIT,
             newSession = WaqfaSessionEntity.fromDomain(session)
         )
-        Log.i(TAG, "Started new Waqfa session #$rowId for $packageName ($durationMinutes min, ${intentType.name})")
+        Timber.tag(TAG).i("Started new Waqfa session #%d for %s (%d min, %s)", rowId, packageName, durationMinutes, intentType.name)
         session.copy(id = rowId)
     }
 
@@ -60,7 +60,16 @@ class WaqfaRepository(
     ): Unit = withContext(Dispatchers.IO) {
         val nowTrusted = TrustedTimeProvider.currentTimeMillis(context)
         waqfaDao.markSessionCompleted(sessionId, nowTrusted, endAction)
-        Log.i(TAG, "Ended Waqfa session #$sessionId with action: $endAction")
+        Timber.tag(TAG).i("Ended Waqfa session #%d with action: %s", sessionId, endAction)
+    }
+
+    suspend fun updateSessionPlannedEnd(
+        sessionId: Long,
+        newPlannedEndMs: Long,
+        newDurationMinutes: Int
+    ): Unit = withContext(Dispatchers.IO) {
+        waqfaDao.updatePlannedEnd(sessionId, newPlannedEndMs, newDurationMinutes)
+        Timber.tag(TAG).i("Updated planned end for Waqfa session #%d to %d (%d min)", sessionId, newPlannedEndMs, newDurationMinutes)
     }
 
     suspend fun endActiveSessionForPackage(
@@ -69,7 +78,7 @@ class WaqfaRepository(
     ): Unit = withContext(Dispatchers.IO) {
         val nowTrusted = TrustedTimeProvider.currentTimeMillis(context)
         waqfaDao.markActiveSessionsCompletedForPackage(packageName, nowTrusted, endAction)
-        Log.i(TAG, "Ended active Waqfa sessions for $packageName with action: $endAction")
+        Timber.tag(TAG).i("Ended active Waqfa sessions for %s with action: %s", packageName, endAction)
     }
 
     suspend fun getActiveSession(packageName: String): WaqfaSession? = withContext(Dispatchers.IO) {

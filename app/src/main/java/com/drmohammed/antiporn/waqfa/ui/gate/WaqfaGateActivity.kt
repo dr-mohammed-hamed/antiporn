@@ -122,6 +122,8 @@ class WaqfaGateActivity : AppCompatActivity() {
         }
     }
 
+    private var lastRenderedDurationSignature = ""
+
     private fun renderUi(state: WaqfaGateUiState) {
         // 1. تلوين أزرار النية وفقاً لمعايير Material 3 الدلالية والوضع الفاتح/الداكن
         val primaryColor = MaterialColors.getColor(binding.root, androidx.appcompat.R.attr.colorPrimary)
@@ -161,41 +163,160 @@ class WaqfaGateActivity : AppCompatActivity() {
         // 2. تحديث خطأ حقل السبب
         binding.tilReason.error = state.reasonError
 
-        // 3. بناء شرائح المدد السريعة إذا لم تكن مبنية
-        if (binding.cgDurations.childCount == 0 && state.availableDurations.isNotEmpty()) {
-            for (duration in state.availableDurations) {
-                val chip = Chip(this).apply {
-                    id = View.generateViewId()
-                    text = getString(R.string.waqfa_minutes_format, duration)
-                    isCheckable = true
-                    isChecked = (duration == state.selectedDurationMinutes)
-                    setTextColor(
-                        ColorStateList(
-                            arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                            intArrayOf(onPrimaryContainer, onSurfaceColor)
-                        )
-                    )
-                    chipBackgroundColor = ColorStateList(
-                        arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                        intArrayOf(primaryContainer, surfaceContainer)
-                    )
-                    chipStrokeColor = ColorStateList(
-                        arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                        intArrayOf(primaryColor, defaultBorder)
-                    )
-                    chipStrokeWidth = 2f
-                    setOnCheckedChangeListener { _, isChecked ->
-                        if (isChecked) {
-                            viewModel.setDurationMinutes(duration)
-                        }
-                    }
-                }
-                binding.cgDurations.addView(chip)
-            }
+        // 3. بناء وتحديث شرائح المدد السريعة والمخصصة والمفتوحة بكفاءة
+        val durationSignature = "${state.availableDurations.joinToString(",")}_${state.allowCustomDuration}_${state.allowOpenSession}_${state.selectedDurationMinutes}_${state.isOpenSession}_${state.customDurationMinutes}"
+        if (durationSignature != lastRenderedDurationSignature) {
+            lastRenderedDurationSignature = durationSignature
+            renderDurationChips(state, primaryColor, primaryContainer, onPrimaryContainer, surfaceContainer, defaultBorder, onSurfaceColor)
         }
 
         // 4. حالة زر المتابعة
         binding.btnStartSession.isEnabled = !state.isSubmitting
+    }
+
+    private fun renderDurationChips(
+        state: WaqfaGateUiState,
+        primaryColor: Int,
+        primaryContainer: Int,
+        onPrimaryContainer: Int,
+        surfaceContainer: Int,
+        defaultBorder: Int,
+        onSurfaceColor: Int
+    ) {
+        binding.cgDurations.isSingleSelection = true
+        binding.cgDurations.removeAllViews()
+
+        // 1. الشرائح السريعة المحددة في الإعدادات
+        for (duration in state.availableDurations) {
+            val chip = Chip(this).apply {
+                id = View.generateViewId()
+                text = getString(R.string.waqfa_minutes_format, duration)
+                isCheckable = true
+                isChecked = (!state.isOpenSession && state.customDurationMinutes == null && duration == state.selectedDurationMinutes)
+                setTextColor(
+                    ColorStateList(
+                        arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                        intArrayOf(onPrimaryContainer, onSurfaceColor)
+                    )
+                )
+                chipBackgroundColor = ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(primaryContainer, surfaceContainer)
+                )
+                chipStrokeColor = ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(primaryColor, defaultBorder)
+                )
+                chipStrokeWidth = 2f
+                setOnClickListener {
+                    viewModel.setDurationMinutes(duration)
+                }
+            }
+            binding.cgDurations.addView(chip)
+        }
+
+        // 2. شريحة الوقت المخصص اليدوي (إذا كان مسموحاً)
+        if (state.allowCustomDuration) {
+            val customText = if (state.customDurationMinutes != null) {
+                getString(R.string.waqfa_chip_custom_format, state.customDurationMinutes)
+            } else {
+                getString(R.string.waqfa_chip_custom)
+            }
+            val chip = Chip(this).apply {
+                id = View.generateViewId()
+                text = customText
+                isCheckable = (state.customDurationMinutes != null)
+                isChecked = (state.customDurationMinutes != null && !state.isOpenSession)
+                setTextColor(
+                    ColorStateList(
+                        arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                        intArrayOf(onPrimaryContainer, onSurfaceColor)
+                    )
+                )
+                chipBackgroundColor = ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(primaryContainer, surfaceContainer)
+                )
+                chipStrokeColor = ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(primaryColor, defaultBorder)
+                )
+                chipStrokeWidth = 2f
+                setOnClickListener {
+                    showCustomDurationDialog()
+                }
+            }
+            binding.cgDurations.addView(chip)
+        }
+
+        // 3. شريحة الوقت المفتوح (إذا كان مسموحاً)
+        if (state.allowOpenSession) {
+            val chip = Chip(this).apply {
+                id = View.generateViewId()
+                text = getString(R.string.waqfa_chip_open)
+                isCheckable = true
+                isChecked = state.isOpenSession
+                setTextColor(
+                    ColorStateList(
+                        arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                        intArrayOf(onPrimaryContainer, onSurfaceColor)
+                    )
+                )
+                chipBackgroundColor = ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(primaryContainer, surfaceContainer)
+                )
+                chipStrokeColor = ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(primaryColor, defaultBorder)
+                )
+                chipStrokeWidth = 2f
+                setOnClickListener {
+                    viewModel.setOpenSession()
+                }
+            }
+            binding.cgDurations.addView(chip)
+        }
+    }
+
+    private fun showCustomDurationDialog() {
+        val currentMins = viewModel.uiState.value.customDurationMinutes
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            hint = getString(R.string.waqfa_dialog_custom_duration_hint)
+            if (currentMins != null) {
+                setText(currentMins.toString())
+                setSelection(text.length)
+            }
+        }
+        val container = android.widget.FrameLayout(this).apply {
+            setPadding(64, 24, 64, 16)
+            addView(input)
+        }
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.waqfa_dialog_custom_duration_title)
+            .setView(container)
+            .setPositiveButton(R.string.waqfa_btn_set) { _, _ ->
+                val mins = input.text?.toString()?.toIntOrNull()
+                if (mins != null && mins in 1..180) {
+                    viewModel.setCustomDuration(mins)
+                } else {
+                    android.widget.Toast.makeText(this, getString(R.string.waqfa_error_invalid_duration), android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(R.string.waqfa_btn_cancel) { _, _ ->
+                if (viewModel.uiState.value.customDurationMinutes == null) {
+                    lastRenderedDurationSignature = ""
+                    renderUi(viewModel.uiState.value)
+                }
+            }
+            .setOnCancelListener {
+                if (viewModel.uiState.value.customDurationMinutes == null) {
+                    lastRenderedDurationSignature = ""
+                    renderUi(viewModel.uiState.value)
+                }
+            }
+            .show()
     }
 
     companion object {

@@ -127,6 +127,36 @@ class WaqfaSettingsViewModel(
         _uiState.update { it.copy(config = it.config.copy(cooldownMinutes = valid)) }
     }
 
+    fun setAllowOpenSession(allow: Boolean) {
+        _uiState.update { it.copy(config = it.config.copy(allowOpenSession = allow)) }
+    }
+
+    fun setAllowCustomDuration(allow: Boolean) {
+        _uiState.update { it.copy(config = it.config.copy(allowCustomDuration = allow)) }
+    }
+
+    fun addQuickDuration(minutes: Int) {
+        val valid = minutes.coerceIn(1, 180)
+        val currentList = _uiState.value.config.quickDurationsMinutes.toMutableList()
+        if (!currentList.contains(valid)) {
+            currentList.add(valid)
+            currentList.sort()
+            _uiState.update { it.copy(config = it.config.copy(quickDurationsMinutes = currentList)) }
+        }
+    }
+
+    fun removeQuickDuration(minutes: Int): Boolean {
+        val currentList = _uiState.value.config.quickDurationsMinutes.toMutableList()
+        if (currentList.size <= 1) {
+            return false // Cannot remove the last remaining duration
+        }
+        val removed = currentList.remove(minutes)
+        if (removed) {
+            _uiState.update { it.copy(config = it.config.copy(quickDurationsMinutes = currentList)) }
+        }
+        return removed
+    }
+
     fun saveSettings(onComplete: (Boolean, DevicePolicyBundle?) -> Unit) {
         if (_uiState.value.isLoading) return
         val state = _uiState.value

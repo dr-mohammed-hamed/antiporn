@@ -350,35 +350,115 @@
                         android:id="@+id/cgQuickDurations"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp">
+                        android:layout_marginTop="10dp" />
 
-                        <com.google.android.material.chip.Chip
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAddDuration"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/waqfa_btn_add_duration"
+                        android:textSize="12sp"
+                        app:icon="@android:drawable/ic_input_add"
+                        app:iconSize="16dp"
+                        app:cornerRadius="8dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 6. Allow Custom Duration Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="10"
+                            android:text="@string/waqfa_switch_allow_custom_duration"
                             android:textColor="?attr/colorOnSurface"
-                            app:chipBackgroundColor="?attr/colorSurfaceContainerHigh"
-                            app:chipStrokeColor="?attr/colorOutlineVariant"
-                            app:chipStrokeWidth="1dp" />
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
 
-                        <com.google.android.material.chip.Chip
+                        <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="15"
-                            android:textColor="?attr/colorOnSurface"
-                            app:chipBackgroundColor="?attr/colorSurfaceContainerHigh"
-                            app:chipStrokeColor="?attr/colorOutlineVariant"
-                            app:chipStrokeWidth="1dp" />
+                            android:layout_marginTop="4dp"
+                            android:text="@string/waqfa_switch_allow_custom_duration_desc"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="12sp" />
+                    </LinearLayout>
 
-                        <com.google.android.material.chip.Chip
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swAllowCustomDuration"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 7. Allow Open Session Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="30"
+                            android:text="@string/waqfa_switch_allow_open_session"
                             android:textColor="?attr/colorOnSurface"
-                            app:chipBackgroundColor="?attr/colorSurfaceContainerHigh"
-                            app:chipStrokeColor="?attr/colorOutlineVariant"
-                            app:chipStrokeWidth="1dp" />
-                    </com.google.android.material.chip.ChipGroup>
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/waqfa_switch_allow_open_session_desc"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swAllowOpenSession"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

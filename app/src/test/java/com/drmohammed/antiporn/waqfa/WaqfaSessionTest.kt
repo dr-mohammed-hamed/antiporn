@@ -94,4 +94,90 @@ class WaqfaSessionTest {
         assertTrue(frozen.isExpired(endWall))
         assertEquals(0L, frozen.remainingMs(endWall))
     }
+
+    @Test
+    fun `test WaqfaSession isExtended flag and extension calculation`() {
+        val startMs = 5_000_000L
+        val originalEnd = startMs + 10 * 60_000L
+
+        val initial = WaqfaSession(
+            id = 10L,
+            sessionId = "uuid-ext-test",
+            packageName = "com.instagram.android",
+            appName = "Instagram",
+            intentType = WaqfaIntentType.PURPOSEFUL,
+            reasonOrFeeling = "Checking messages",
+            durationMinutes = 10,
+            startedAtTrustedMs = startMs,
+            plannedEndAtTrustedMs = originalEnd,
+            isActive = true,
+            isExtended = false
+        )
+
+        assertFalse(initial.isExtended)
+
+        // Perform emergency extension (+2 min)
+        val extended = initial.copy(
+            plannedEndAtTrustedMs = initial.plannedEndAtTrustedMs + (2 * 60_000L),
+            durationMinutes = initial.durationMinutes + 2,
+            isExtended = true
+        )
+
+        assertTrue(extended.isExtended)
+        assertEquals(12, extended.durationMinutes)
+        assertEquals(originalEnd + 2 * 60_000L, extended.plannedEndAtTrustedMs)
+        assertEquals(2 * 60_000L, extended.remainingMs(originalEnd))
+    }
+
+    @Test
+    fun `test WaqfaSession isOpenSession behavior and expiration`() {
+        val startMs = 10_000_000L
+        val openSession = WaqfaSession(
+            id = 20L,
+            sessionId = "uuid-open-session",
+            packageName = "com.google.android.youtube",
+            appName = "YouTube",
+            intentType = WaqfaIntentType.PURPOSEFUL,
+            reasonOrFeeling = "Learning math",
+            durationMinutes = 0,
+            startedAtTrustedMs = startMs,
+            plannedEndAtTrustedMs = 0L,
+            isActive = true
+        )
+
+        assertTrue(openSession.isOpenSession)
+        assertFalse(openSession.isExpired(startMs + 100 * 60_000L))
+        assertEquals(0L, openSession.remainingMs(startMs + 50 * 60_000L))
+    }
+
+    @Test
+    fun `test WaqfaSession negative or zero duration is treated as open session`() {
+        val sessionZero = WaqfaSession(
+            sessionId = "uuid-0",
+            packageName = "com.pkg",
+            appName = "App",
+            intentType = WaqfaIntentType.PURPOSEFUL,
+            reasonOrFeeling = null,
+            durationMinutes = 0,
+            startedAtTrustedMs = 1_000_000L,
+            plannedEndAtTrustedMs = 0L
+        )
+        val sessionNegative = WaqfaSession(
+            sessionId = "uuid-neg",
+            packageName = "com.pkg",
+            appName = "App",
+            intentType = WaqfaIntentType.PURPOSEFUL,
+            reasonOrFeeling = null,
+            durationMinutes = -1,
+            startedAtTrustedMs = 1_000_000L,
+            plannedEndAtTrustedMs = 0L
+        )
+
+        assertTrue(sessionZero.isOpenSession)
+        assertTrue(sessionNegative.isOpenSession)
+        assertFalse(sessionZero.isExpired(Long.MAX_VALUE))
+        assertFalse(sessionNegative.isExpired(Long.MAX_VALUE))
+        assertEquals(0L, sessionZero.remainingMs(2_000_000L))
+        assertEquals(0L, sessionNegative.remainingMs(2_000_000L))
+    }
 }

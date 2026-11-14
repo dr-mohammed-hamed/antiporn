@@ -13,7 +13,9 @@ data class WaqfaConfig(
     val quickDurationsMinutes: List<Int> = DEFAULT_DURATIONS,
     val isReasonRequired: Boolean = false,
     val timeoutReactionType: WaqfaTimeoutReactionType = WaqfaTimeoutReactionType.EXIT_ONLY,
-    val cooldownMinutes: Int = DEFAULT_COOLDOWN_MINUTES
+    val cooldownMinutes: Int = DEFAULT_COOLDOWN_MINUTES,
+    val allowOpenSession: Boolean = false,
+    val allowCustomDuration: Boolean = true
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "isEnabled" to isEnabled,
@@ -21,7 +23,9 @@ data class WaqfaConfig(
         "quickDurationsMinutes" to quickDurationsMinutes,
         "isReasonRequired" to isReasonRequired,
         "timeoutReactionType" to timeoutReactionType.name,
-        "cooldownMinutes" to cooldownMinutes
+        "cooldownMinutes" to cooldownMinutes,
+        "allowOpenSession" to allowOpenSession,
+        "allowCustomDuration" to allowCustomDuration
     )
 
     fun toJson(): JSONObject = JSONObject().apply {
@@ -31,6 +35,8 @@ data class WaqfaConfig(
         put("isReasonRequired", isReasonRequired)
         put("timeoutReactionType", timeoutReactionType.name)
         put("cooldownMinutes", cooldownMinutes)
+        put("allowOpenSession", allowOpenSession)
+        put("allowCustomDuration", allowCustomDuration)
     }
 
     companion object {
@@ -61,7 +67,9 @@ data class WaqfaConfig(
                 quickDurationsMinutes = if (durations.isEmpty()) DEFAULT_DURATIONS else durations,
                 isReasonRequired = typedMap["isReasonRequired"] as? Boolean ?: false,
                 timeoutReactionType = reaction,
-                cooldownMinutes = cooldown
+                cooldownMinutes = cooldown,
+                allowOpenSession = typedMap["allowOpenSession"] as? Boolean ?: false,
+                allowCustomDuration = typedMap["allowCustomDuration"] as? Boolean ?: true
             )
         }
 
@@ -95,7 +103,9 @@ data class WaqfaConfig(
                 quickDurationsMinutes = if (durations.isEmpty()) DEFAULT_DURATIONS else durations,
                 isReasonRequired = json.optBoolean("isReasonRequired", false),
                 timeoutReactionType = reaction,
-                cooldownMinutes = cooldown
+                cooldownMinutes = cooldown,
+                allowOpenSession = json.optBoolean("allowOpenSession", false),
+                allowCustomDuration = json.optBoolean("allowCustomDuration", true)
             )
         }
     }

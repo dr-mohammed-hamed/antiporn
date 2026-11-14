@@ -1,7 +1,7 @@
 package com.drmohammed.antiporn.waqfa.ui.gate
 
 import android.app.Application
-import android.util.Log
+import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.drmohammed.antiporn.data.repository.PolicyRepository
@@ -24,7 +24,11 @@ data class WaqfaGateUiState(
     val isReasonRequired: Boolean = false,
     val reasonError: String? = null,
     val isSubmitting: Boolean = false,
-    val isSessionStarted: Boolean = false
+    val isSessionStarted: Boolean = false,
+    val allowOpenSession: Boolean = false,
+    val allowCustomDuration: Boolean = true,
+    val isOpenSession: Boolean = false,
+    val customDurationMinutes: Int? = null
 )
 
 class WaqfaGateViewModel(
@@ -40,7 +44,7 @@ class WaqfaGateViewModel(
         val config = try {
             policyRepository.getCurrentPolicy().waqfaConfig
         } catch (e: Exception) {
-            Log.w(TAG, "Failed reading policy for gate, falling back to cached config", e)
+            Timber.tag(TAG).w(e, "Failed reading policy for gate, falling back to cached config")
             sessionManager.getConfig()
         }
 
@@ -58,7 +62,11 @@ class WaqfaGateViewModel(
                 appName = appName,
                 availableDurations = durations,
                 selectedDurationMinutes = defaultDuration,
-                isReasonRequired = config.isReasonRequired
+                isReasonRequired = config.isReasonRequired,
+                allowOpenSession = config.allowOpenSession,
+                allowCustomDuration = config.allowCustomDuration,
+                isOpenSession = false,
+                customDurationMinutes = null
             )
         }
     }
@@ -77,7 +85,32 @@ class WaqfaGateViewModel(
     }
 
     fun setDurationMinutes(minutes: Int) {
-        _uiState.update { it.copy(selectedDurationMinutes = minutes) }
+        _uiState.update {
+            it.copy(
+                selectedDurationMinutes = minutes,
+                isOpenSession = false
+            )
+        }
+    }
+
+    fun setOpenSession() {
+        _uiState.update {
+            it.copy(
+                selectedDurationMinutes = 0,
+                isOpenSession = true
+            )
+        }
+    }
+
+    fun setCustomDuration(minutes: Int) {
+        val valid = minutes.coerceIn(1, 180)
+        _uiState.update {
+            it.copy(
+                selectedDurationMinutes = valid,
+                customDurationMinutes = valid,
+                isOpenSession = false
+            )
+        }
     }
 
     fun submitSession(onSuccess: () -> Unit) {
@@ -104,7 +137,7 @@ class WaqfaGateViewModel(
                 _uiState.update { it.copy(isSubmitting = false, isSessionStarted = true) }
                 onSuccess()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed starting Waqfa session for ${state.packageName}", e)
+                Timber.tag(TAG).e(e, "Failed starting Waqfa session for %s", state.packageName)
                 _uiState.update { it.copy(isSubmitting = false) }
             }
         }

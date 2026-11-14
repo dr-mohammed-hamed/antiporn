@@ -51,6 +51,9 @@ interface WaqfaDao {
     @Query("UPDATE waqfa_sessions SET is_active = 0, actual_end_at_trusted_ms = :actualEndMs, end_action_applied = :action WHERE is_active = 1")
     suspend fun markAllActiveSessionsCompleted(actualEndMs: Long, action: String)
 
+    @Query("UPDATE waqfa_sessions SET planned_end_at_trusted_ms = :newPlannedEndMs, duration_minutes = :newDurationMinutes WHERE id = :id AND is_active = 1")
+    suspend fun updatePlannedEnd(id: Long, newPlannedEndMs: Long, newDurationMinutes: Int)
+
     @Transaction
     suspend fun replaceActiveSessionAtomic(
         packageName: String,

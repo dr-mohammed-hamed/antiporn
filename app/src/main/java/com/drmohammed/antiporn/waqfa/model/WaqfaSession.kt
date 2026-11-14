@@ -15,11 +15,14 @@ data class WaqfaSession(
     val plannedEndAtTrustedMs: Long,
     val actualEndAtTrustedMs: Long? = null,
     val endActionApplied: String? = null,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val isExtended: Boolean = false
 ) {
-    fun isExpired(currentTimeMs: Long): Boolean = currentTimeMs >= plannedEndAtTrustedMs
+    val isOpenSession: Boolean get() = durationMinutes <= 0
 
-    fun remainingMs(currentTimeMs: Long): Long = maxOf(0L, plannedEndAtTrustedMs - currentTimeMs)
+    fun isExpired(currentTimeMs: Long): Boolean = if (isOpenSession) false else currentTimeMs >= plannedEndAtTrustedMs
+
+    fun remainingMs(currentTimeMs: Long): Long = if (isOpenSession) 0L else maxOf(0L, plannedEndAtTrustedMs - currentTimeMs)
 
     companion object {
         const val ACTION_EXIT_ONLY = "EXIT_ONLY"

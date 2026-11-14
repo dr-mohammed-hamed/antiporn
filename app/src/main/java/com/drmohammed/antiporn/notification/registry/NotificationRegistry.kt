@@ -34,6 +34,9 @@ object NotificationRegistry {
     /** High-priority interactive channel for wireless ADB pairing and DO provisioning. */
     const val CHANNEL_ID_PAIRING = "anti_porn_pairing_channel"
 
+    /** Low-priority persistent live countdown channel for active Waqfa sessions. */
+    const val CHANNEL_ID_WAQFA_ONGOING = "antiporn_waqfa_ongoing"
+
     // ==========================================
     // Foreground Service Notification Identifiers (Unique per service)
     // ==========================================
@@ -92,5 +95,11 @@ object NotificationRegistry {
 
     /** OTA update completion or failure notification ID. */
     const val EVENT_OTA_FAILED_ID = 4002
+
+    /** Ongoing live Waqfa session countdown notification ID. */
+    const val NOTIF_WAQFA_ONGOING_ID = 6001
+
+    /** Pre-timeout 60-second warning notification ID. */
+    const val NOTIF_WAQFA_WARNING_ID = 6002
 
 }
