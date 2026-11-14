@@ -350,4 +350,159 @@ class KltOpticalFlowTrackerTest {
         assertFalse(solver.trackPointLK(dummyLuma, dummyLuma, 100, 100, 50f, 50f, Float.NaN, 0f, outDelta))
         assertFalse(solver.trackPointLK(dummyLuma, dummyLuma, 100, 100, 50f, 50f, 0f, Float.NaN, outDelta))
     }
+
+    @Test
+    fun testSpatialMerge_fullBodyCrossTile() {
+        // Two boxes split across tiles with vertical overlap/touching
+        val boxTop = TrackedModestyBox.createRectF(0.30f, 0.10f, 0.70f, 0.45f)
+        val boxBottom = TrackedModestyBox.createRectF(0.31f, 0.44f, 0.69f, 0.85f)
+
+        val merged = KltMathHelper.mergeBoxesSpatially(listOf(boxTop, boxBottom), 0.05f)
+        assertEquals("Should merge into a single unified full-body box", 1, merged.size)
+        val unified = merged[0]
+        assertEquals(0.30f, unified.left, 0.01f)
+        assertEquals(0.10f, unified.top, 0.01f)
+        assertEquals(0.70f, unified.right, 0.01f)
+        assertEquals(0.85f, unified.bottom, 0.01f)
+    }
+
+    @Test
+    fun testContainmentAwarePruning_preservesFullBodyTrackOnPartialTile() {
+        // Initialize an active track covering y = 0.10 to 0.85 (75% screen height)
+        val fullBody = TrackedModestyBox.createRectF(0.3f, 0.10f, 0.7f, 0.85f)
+        tracker.initOrUpdateAnchors(listOf(fullBody), 1000, 2000, 1000L)
+
+        val initialTracks = tracker.getActiveTracks()
+        assertEquals(1, initialTracks.size)
+        val trackId = initialTracks[0].id
+
+        // Slicing check: Top tile covering y = 0.0 to 0.40 (only covers ~40% of the track)
+        val topTileRect = TrackedModestyBox.createRectF(0f, 0f, 1f, 0.40f)
+        // Top tile detects nothing (empty list)
+        tracker.updateAnchorsCrossTile(
+            detections = emptyList(),
+            tileNormRect = topTileRect,
+            frameWidth = 1000,
+            frameHeight = 2000,
+            timestampMs = 1200L
+        )
+
+        // Track MUST NOT be pruned because tileCoverage < 80%
+        val tracksAfterTopTile = tracker.getActiveTracks()
+        assertEquals("Track should still be active and preserved!", 1, tracksAfterTopTile.size)
+        assertEquals(trackId, tracksAfterTopTile[0].id)
+        assertEquals("Age frames should NOT have increased because coverage < 80%", 0, tracksAfterTopTile[0].ageFrames)
+    }
+
+    private fun createSyntheticScrollingRgbaBuffer(
+        width: Int,
+        height: Int,
+        scrollOffsetY: Int
+    ): ByteBuffer {
+        val buffer = ByteBuffer.allocateDirect(width * height * 4)
+        for (y in 0 until height) {
+            val effY = y - scrollOffsetY
+            for (x in 0 until width) {
+                // Low spatial frequency pattern to prevent periodic phase wrap-around
+                val v = 128.0 + 45.0 * kotlin.math.sin(x * 0.01) + 50.0 * kotlin.math.cos(effY * 0.008)
+                val intensity = v.roundToInt().coerceIn(0, 255)
+                buffer.put(intensity.toByte())
+                buffer.put(intensity.toByte())
+                buffer.put(intensity.toByte())
+                buffer.put(255.toByte())
+            }
+        }
+        buffer.rewind()
+        return buffer
+    }
+
+    @Test
+    fun testFlingTracking_fiveLevelPyramidCapturesLargeDisplacement() {
+        val width = 416
+        val height = 924
+        val startY = 200
+        val displacementY = 80 // 80 px/frame rapid fling
+
+        val prevBuffer = createSyntheticScrollingRgbaBuffer(width, height, scrollOffsetY = 0)
+        val currBuffer = createSyntheticScrollingRgbaBuffer(width, height, scrollOffsetY = displacementY)
+
+        // Initialize anchor at previous position
+        val initialBox = TrackedModestyBox.createRectF(
+            160f / width,
+            startY.toFloat() / height,
+            240f / width,
+            (startY + 80).toFloat() / height
+        )
+        tracker.initOrUpdateAnchors(listOf(initialBox), width, height, 1000L)
+
+        // Run update on frame 1 (establishes prev luma pyramid)
+        val plane1 = prevBuffer.duplicate()
+        tracker.update(plane1, width, height, width * 4, 4, 1016L)
+
+        // Run update on frame 2 (with 80px shift)
+        val plane2 = currBuffer.duplicate()
+        val tracked = tracker.update(plane2, width, height, width * 4, 4, 1032L)
+
+        assertEquals(1, tracked.size)
+        val box = tracked[0]
+        val measuredDeltaY = box.rawBoundingBox.top - startY
+
+        // 5-level pyramid captures large displacements accurately (> 85% of actual 80px)
+        assertTrue(
+            "Measured displacement should capture large fling (expected ~80px, got $measuredDeltaY px)",
+            measuredDeltaY >= 68f
+        )
+    }
+
+    @Test
+    fun testMixedMotion_topVideoStatic_bottomCommentsScroll() {
+        val width = 416
+        val height = 924
+
+        fun createMixedMotionBuffer(scrollOffsetY: Int): ByteBuffer {
+            val buffer = ByteBuffer.allocateDirect(width * height * 4)
+            for (y in 0 until height) {
+                val isBottomHalf = y >= 500
+                val effY = if (isBottomHalf) y - scrollOffsetY else y
+                for (x in 0 until width) {
+                    val v = 128.0 + 45.0 * kotlin.math.sin(x * 0.05) + 45.0 * kotlin.math.cos(effY * 0.05)
+                    val intensity = v.roundToInt().coerceIn(0, 255)
+                    buffer.put(intensity.toByte())
+                    buffer.put(intensity.toByte())
+                    buffer.put(intensity.toByte())
+                    buffer.put(255.toByte())
+                }
+            }
+            buffer.rewind()
+            return buffer
+        }
+
+        val prevBuffer = createMixedMotionBuffer(scrollOffsetY = 0)
+        val currBuffer = createMixedMotionBuffer(scrollOffsetY = 30)
+
+        // Box anchored in the top half (video area) at y = 150..250
+        val topVideoBox = TrackedModestyBox.createRectF(
+            150f / width,
+            150f / height,
+            250f / width,
+            250f / height
+        )
+        tracker.initOrUpdateAnchors(listOf(topVideoBox), width, height, 1000L)
+
+        // Frame 1
+        tracker.update(prevBuffer.duplicate(), width, height, width * 4, 4, 1016L)
+
+        // Frame 2 (where bottom comments scrolled 30px, but top video is static)
+        val tracked = tracker.update(currBuffer.duplicate(), width, height, width * 4, 4, 1032L)
+
+        assertEquals(1, tracked.size)
+        val box = tracked[0]
+        val topBoxShiftY = kotlin.math.abs(box.rawBoundingBox.top - 150f)
+
+        // Local Neighborhood Flow guarantees top box does NOT get dragged by bottom comments
+        assertTrue(
+            "Top video box should remain static despite bottom comments scrolling (got shift: $topBoxShiftY px)",
+            topBoxShiftY <= 1.5f
+        )
+    }
 }

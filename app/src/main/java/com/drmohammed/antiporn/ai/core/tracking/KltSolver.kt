@@ -13,58 +13,74 @@ internal class KltSolver(
     private val convergenceEpsilon: Float,
     private val numPyramidLevels: Int
 ) {
-    private val scratchL1Delta = FloatArray(2)
+    private val scratchLevelDelta = FloatArray(2)
 
     /**
-     * تتبع نقطة محددة عبر هرم Lucas-Kanade ثنائي الطبقات (Level 1 Coarse -> Level 0 Fine).
+     * تتبع نقطة محددة عبر هرم Lucas-Kanade متعدد الطبقات (حتى 5 طبقات L4 -> L3 -> L2 -> L1 -> L0)
+     * للتعامل بكفاءة تامة مع قفزات التمرير السريعة (حتى 80 إلى 150 بكسل لكل إطار).
      */
-    fun trackPointPyramidal(
-        prevLuma: ByteArray,
-        currLuma: ByteArray,
-        prevLumaL1: ByteArray,
-        currLumaL1: ByteArray,
+    fun trackPointPyramidalMulti(
+        prevPyramid: Array<ByteArray>,
+        currPyramid: Array<ByteArray>,
         ptX: Float,
         ptY: Float,
         width: Int,
         height: Int,
-        outDelta: FloatArray
+        outDelta: FloatArray,
+        activeLevels: Int = minOf(numPyramidLevels, prevPyramid.size)
     ): Boolean {
-        var initVx = 0f
-        var initVy = 0f
+        var vx = 0f
+        var vy = 0f
+        val levels = activeLevels.coerceIn(1, 5)
 
-        if (numPyramidLevels >= 2) {
-            val w1 = width shr 1
-            val h1 = height shr 1
-            val ptX1 = ptX * 0.5f
-            val ptY1 = ptY * 0.5f
+        for (lvl in (levels - 1) downTo 1) {
+            val scale = 1f / (1 shl lvl)
+            val lvlW = width shr lvl
+            val lvlH = height shr lvl
+            val coarseRadius = when {
+                lvl >= 4 -> 2 // في المستوى الرابع والأعلى (26x57)، نصف قطر 2 يضمن عدم رفض نقاط الأطراف
+                lvl == 3 -> maxOf(windowRadius, 3)
+                else -> windowRadius
+            }
+            val coarseIter = if (lvl >= 3) maxOf(maxIterations, 8) else maxIterations
+            val coarseRes = if (lvl >= 3) maxResidual * 1.5f else maxResidual
 
-            val l1Success = trackPointLK(
-                prevImg = prevLumaL1,
-                currImg = currLumaL1,
-                imgWidth = w1,
-                imgHeight = h1,
-                ptX = ptX1,
-                ptY = ptY1,
-                initVx = 0f,
-                initVy = 0f,
-                outDelta = scratchL1Delta
+            if (lvlW < (coarseRadius * 2 + 4) || lvlH < (coarseRadius * 2 + 4)) continue
+
+            val px = ptX * scale
+            val py = ptY * scale
+
+            val success = trackPointLK(
+                prevImg = prevPyramid[lvl],
+                currImg = currPyramid[lvl],
+                imgWidth = lvlW,
+                imgHeight = lvlH,
+                ptX = px,
+                ptY = py,
+                initVx = vx,
+                initVy = vy,
+                outDelta = scratchLevelDelta,
+                customRadius = coarseRadius,
+                customMaxIter = coarseIter,
+                customMaxResidual = coarseRes
             )
 
-            if (l1Success) {
-                initVx = scratchL1Delta[0] * 2.0f
-                initVy = scratchL1Delta[1] * 2.0f
+            if (success) {
+                vx = scratchLevelDelta[0] * 2.0f
+                vy = scratchLevelDelta[1] * 2.0f
             }
+            // في حال فشل طبقة معينة، لا نصفر vx/vy بل نحتفظ بآخر تقدير متاح أو ننتقل للمستوى الأدنى
         }
 
         return trackPointLK(
-            prevImg = prevLuma,
-            currImg = currLuma,
+            prevImg = prevPyramid[0],
+            currImg = currPyramid[0],
             imgWidth = width,
             imgHeight = height,
             ptX = ptX,
             ptY = ptY,
-            initVx = initVx,
-            initVy = initVy,
+            initVx = vx,
+            initVy = vy,
             outDelta = outDelta
         )
     }
@@ -81,13 +97,16 @@ internal class KltSolver(
         ptY: Float,
         initVx: Float,
         initVy: Float,
-        outDelta: FloatArray
+        outDelta: FloatArray,
+        customRadius: Int = windowRadius,
+        customMaxIter: Int = maxIterations,
+        customMaxResidual: Float = maxResidual
     ): Boolean {
         if (ptX.isNaN() || ptY.isNaN() || initVx.isNaN() || initVy.isNaN()) {
             return false
         }
 
-        val r = windowRadius
+        val r = customRadius
         val minBorder = (r + 1).toFloat()
         val maxBorderX = (imgWidth - r - 2).toFloat()
         val maxBorderY = (imgHeight - r - 2).toFloat()
@@ -135,7 +154,7 @@ internal class KltSolver(
         var vy = initVy
         var iter = 0
 
-        while (iter < maxIterations) {
+        while (iter < customMaxIter) {
             val curX = ptX + vx
             val curY = ptY + vy
 
@@ -216,7 +235,7 @@ internal class KltSolver(
         }
 
         val meanResidual = totalResidual / windowArea.toFloat()
-        if (meanResidual.isNaN() || meanResidual > maxResidual) {
+        if (meanResidual.isNaN() || meanResidual > customMaxResidual) {
             return false
         }
 

@@ -2,7 +2,12 @@ package com.drmohammed.antiporn.accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Rect
+import android.os.Build
+import android.view.Display
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import com.drmohammed.antiporn.accessibility.bus.ForegroundAppEventBus
 import com.drmohammed.antiporn.accessibility.filter.TransientWindowEventFilter
 import com.drmohammed.antiporn.accessibility.hook.AccessibilityHookRegistry
@@ -27,6 +32,7 @@ class HisnAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         eventBus.setAccessibilityActive(true)
         Timber.tag(TAG).i("HisnAccessibilityService connected to Android Framework (Instant 0ms Engine Active)")
         com.drmohammed.antiporn.telemetry.BlackBoxRecorder.recordA11y(
@@ -76,6 +82,9 @@ class HisnAccessibilityService : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         Timber.tag(TAG).w("HisnAccessibilityService unbinding from system")
+        if (instance === this) {
+            instance = null
+        }
         if (::eventBus.isInitialized) {
             eventBus.setAccessibilityActive(false)
         }
@@ -90,6 +99,9 @@ class HisnAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         Timber.tag(TAG).i("HisnAccessibilityService destroyed")
+        if (instance === this) {
+            instance = null
+        }
         if (::eventBus.isInitialized) {
             eventBus.setAccessibilityActive(false)
         }
@@ -100,7 +112,72 @@ class HisnAccessibilityService : AccessibilityService() {
         )
     }
 
+    /**
+     * هل التقاط الشباك النظيف بدون طبقة التعتيم مدعوم في النظام الحالي.
+     * متاح حصرياً على أندرويد 14+ (API 34+) لأن takeScreenshot في أندرويد 11-13 تلتقط التعتيم أيضاً.
+     */
+    fun isCleanWindowCaptureSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+
+    /**
+     * أخذ لقطة شاشة نظيفة 100% للنافذة التفاعلية بدون طبقة التعتيم (TYPE_ACCESSIBILITY_OVERLAY).
+     * متاح على نظام أندرويد 14+ (API 34+) عبر takeScreenshotOfWindow مع استخراج حدود الشباك بدقة.
+     */
+    fun captureCleanWindowBitmap(onResult: (Bitmap?, Rect) -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val interactiveWindow = try {
+                windows.firstOrNull { it.isFocused || it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+            } catch (e: Exception) {
+                null
+            }
+
+            if (interactiveWindow != null) {
+                val windowBounds = Rect()
+                try {
+                    interactiveWindow.getBoundsInScreen(windowBounds)
+                } catch (e: Exception) {
+                    Timber.tag(TAG).w("Error getting window bounds: ${e.message}")
+                }
+
+                try {
+                    takeScreenshotOfWindow(
+                        interactiveWindow.id,
+                        mainExecutor,
+                        object : TakeScreenshotCallback {
+                            override fun onSuccess(screenshotResult: ScreenshotResult) {
+                                val hwBuffer = screenshotResult.hardwareBuffer
+                                val colorSpace = screenshotResult.colorSpace
+                                val bitmap = try {
+                                    Bitmap.wrapHardwareBuffer(hwBuffer, colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
+                                } catch (e: Exception) {
+                                    null
+                                } finally {
+                                    try { hwBuffer.close() } catch (_: Exception) {}
+                                }
+                                onResult(bitmap, windowBounds)
+                            }
+
+                            override fun onFailure(errorCode: Int) {
+                                Timber.tag(TAG).d("takeScreenshotOfWindow failed (code: $errorCode), fallback to projection")
+                                onResult(null, windowBounds)
+                            }
+                        }
+                    )
+                    return
+                } catch (e: Exception) {
+                    Timber.tag(TAG).w("Error invoking takeScreenshotOfWindow: ${e.message}")
+                }
+            }
+        }
+
+        // على الأنظمة الأقدم من أندرويد 14، لا يوجد التقاط نافذة معزول بدون حجب ذاتي
+        onResult(null, Rect())
+    }
+
     companion object {
         private const val TAG = "AntiPorn_A11yService"
+
+        @Volatile
+        var instance: HisnAccessibilityService? = null
+            private set
     }
 }

@@ -73,4 +73,94 @@ internal object KltMathHelper {
             outRect.bottom = b
         }
     }
+
+    fun calculateIntersectionArea(a: RectF, b: RectF): Float {
+        val interLeft = maxOf(a.left, b.left)
+        val interTop = maxOf(a.top, b.top)
+        val interRight = minOf(a.right, b.right)
+        val interBottom = minOf(a.bottom, b.bottom)
+        if (interRight <= interLeft || interBottom <= interTop) return 0f
+        return (interRight - interLeft) * (interBottom - interTop)
+    }
+
+    fun calculateArea(r: RectF): Float {
+        val w = maxOf(0f, r.right - r.left)
+        val h = maxOf(0f, r.bottom - r.top)
+        return w * h
+    }
+
+    /**
+     * التحقق مما إذا كان صندوقان مؤهلين للدمج المكاني (Cross-Tile Spatial Merge):
+     * 1. تداخل أفقي >= 50% من عرض الصندوق الأصغر.
+     * 2. تلامس أو تداخل رأسي، أو وجود فجوة رأسية لا تتجاوز maxGapNorm (افتراضياً 40px / frameHeight).
+     * 3. أو احتواء أحد الصندوقين للآخر بنسبة >= 70%.
+     */
+    fun canMergeSpatially(a: RectF, b: RectF, maxGapNorm: Float): Boolean {
+        val wA = maxOf(0.001f, a.right - a.left)
+        val wB = maxOf(0.001f, b.right - b.left)
+        val minW = minOf(wA, wB)
+
+        val interX = maxOf(0f, minOf(a.right, b.right) - maxOf(a.left, b.left))
+        val horizOverlapRatio = interX / minW
+
+        val areaA = calculateArea(a)
+        val areaB = calculateArea(b)
+        val interArea = calculateIntersectionArea(a, b)
+        val minArea = minOf(areaA, areaB)
+        if (minArea > 0f && (interArea / minArea) >= 0.70f) {
+            return true
+        }
+
+        if (horizOverlapRatio >= 0.50f) {
+            val verticalGap = if (a.bottom <= b.top) {
+                b.top - a.bottom
+            } else if (b.bottom <= a.top) {
+                a.top - b.bottom
+            } else {
+                0f
+            }
+            if (verticalGap <= maxGapNorm) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    /**
+     * تنفيذ الدمج المكاني التكراري لقائمة صناديق لتوحيد أجزاء الجسم الممتدة عبر الشرائح.
+     */
+    fun mergeBoxesSpatially(boxes: List<RectF>, maxGapNorm: Float): List<RectF> {
+        if (boxes.size <= 1) return boxes
+        val result = ArrayList<RectF>(boxes.size)
+        for (b in boxes) {
+            val copy = TrackedModestyBox.createRectF(b.left, b.top, b.right, b.bottom)
+            result.add(copy)
+        }
+
+        var mergedAny = true
+        while (mergedAny) {
+            mergedAny = false
+            var i = 0
+            while (i < result.size) {
+                var j = i + 1
+                while (j < result.size) {
+                    val boxA = result[i]
+                    val boxB = result[j]
+                    if (canMergeSpatially(boxA, boxB, maxGapNorm)) {
+                        boxA.left = minOf(boxA.left, boxB.left)
+                        boxA.top = minOf(boxA.top, boxB.top)
+                        boxA.right = maxOf(boxA.right, boxB.right)
+                        boxA.bottom = maxOf(boxA.bottom, boxB.bottom)
+                        result.removeAt(j)
+                        mergedAny = true
+                    } else {
+                        j++
+                    }
+                }
+                i++
+            }
+        }
+        return result
+    }
 }

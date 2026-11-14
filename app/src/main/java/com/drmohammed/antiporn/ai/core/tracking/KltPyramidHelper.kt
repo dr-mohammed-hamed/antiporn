@@ -52,32 +52,32 @@ internal object KltPyramidHelper {
     }
 
     /**
-     * بناء الطبقة الهرمية الأولى (Level 1) بتصغير الإضاءة بمقدار 2x عبر أخذ متوسط كتل 2x2.
+     * بناء طبقة هرمية بتصغير الإضاءة بمقدار 2x عبر أخذ متوسط كتل 2x2.
      */
-    fun buildPyramidLevel1(
-        currLuma: ByteArray,
-        currLumaL1: ByteArray,
-        width: Int,
-        height: Int
+    fun buildPyramidLevel(
+        srcLuma: ByteArray,
+        dstLuma: ByteArray,
+        srcWidth: Int,
+        srcHeight: Int
     ) {
-        val w1 = width shr 1
-        val h1 = height shr 1
+        val dstWidth = srcWidth shr 1
+        val dstHeight = srcHeight shr 1
 
-        for (y1 in 0 until h1) {
-            val y0 = y1 shl 1
-            val row0 = y0 * width
-            val row1 = (y0 + 1) * width
-            val outRow = y1 * w1
+        for (dy in 0 until dstHeight) {
+            val sy0 = dy shl 1
+            val row0 = sy0 * srcWidth
+            val row1 = (sy0 + 1) * srcWidth
+            val outRow = dy * dstWidth
 
-            for (x1 in 0 until w1) {
-                val x0 = x1 shl 1
-                val p00 = currLuma[row0 + x0].toInt() and 0xFF
-                val p01 = currLuma[row0 + x0 + 1].toInt() and 0xFF
-                val p10 = currLuma[row1 + x0].toInt() and 0xFF
-                val p11 = currLuma[row1 + x0 + 1].toInt() and 0xFF
+            for (dx in 0 until dstWidth) {
+                val sx0 = dx shl 1
+                val p00 = srcLuma[row0 + sx0].toInt() and 0xFF
+                val p01 = srcLuma[row0 + sx0 + 1].toInt() and 0xFF
+                val p10 = srcLuma[row1 + sx0].toInt() and 0xFF
+                val p11 = srcLuma[row1 + sx0 + 1].toInt() and 0xFF
 
                 val avg = (p00 + p01 + p10 + p11 + 2) ushr 2
-                currLumaL1[outRow + x1] = avg.toByte()
+                dstLuma[outRow + dx] = avg.toByte()
             }
         }
     }

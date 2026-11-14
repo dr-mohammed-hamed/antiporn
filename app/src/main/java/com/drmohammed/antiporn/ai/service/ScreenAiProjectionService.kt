@@ -66,21 +66,17 @@ class ScreenAiProjectionService : Service() {
         var lastConfidence: Float = 0f
             private set
 
-        val currentFps: Float
-            get() = activeStreamManager?.currentFps ?: 0f
+        @Volatile
+        var currentFps: Float = 0f
+            internal set
 
         @Volatile
         var modelName: String = "Halalify v2 + NudeNet v3"
             private set
 
-        val initError: String
-            get() = activeInferenceCoordinator?.initError.orEmpty()
-
         @Volatile
-        private var activeStreamManager: ScreenFrameStreamManager? = null
-
-        @Volatile
-        private var activeInferenceCoordinator: AiInferenceCoordinator? = null
+        var initError: String = ""
+            internal set
     }
 
     override fun onCreate() {
@@ -96,23 +92,28 @@ class ScreenAiProjectionService : Service() {
                 lastConfidence = confidence
             }
         )
-        activeInferenceCoordinator = inferenceCoordinator
 
         streamManager = ScreenFrameStreamManager(
             context = applicationContext,
             onFrameAcquired = { image, width, height ->
+                currentFps = streamManager.currentFps
                 inferenceCoordinator.processFrame(image, width, height)
             },
             onStaticFrameDetected = {
+                currentFps = streamManager.currentFps
                 inferenceCoordinator.onStaticScreen()
             },
             onHardSceneCutDetected = {
                 inferenceCoordinator.onHardSceneCut()
+            },
+            onSceneChangeRatio = { ratio ->
+                inferenceCoordinator.setGeneralChangeRatio(ratio)
             }
         )
-        activeStreamManager = streamManager
 
-        inferenceCoordinator.initialize()
+        inferenceCoordinator.initialize {
+            initError = inferenceCoordinator.initError
+        }
         createNotificationChannel()
     }
 
@@ -290,9 +291,6 @@ class ScreenAiProjectionService : Service() {
 
         streamManager.stop()
         inferenceCoordinator.stop()
-
-        activeStreamManager = null
-        activeInferenceCoordinator = null
 
         try {
             projectionCallback?.let { mediaProjection?.unregisterCallback(it) }

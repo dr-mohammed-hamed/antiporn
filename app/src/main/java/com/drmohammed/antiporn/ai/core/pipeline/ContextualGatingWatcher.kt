@@ -3,6 +3,7 @@ package com.drmohammed.antiporn.ai.core.pipeline
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Process
@@ -195,7 +196,7 @@ class ContextualGatingWatcher(
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             @Suppress("DEPRECATION")
-            val isForeground = event.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
+            val isForeground = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) ||
                 event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND
             if (isForeground) {
                 latestEventPackage = event.packageName ?: ""

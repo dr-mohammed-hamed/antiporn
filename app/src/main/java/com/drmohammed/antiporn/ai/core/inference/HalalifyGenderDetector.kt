@@ -34,7 +34,7 @@ class HalalifyGenderDetector(
     val modelAssetPath: String = DEFAULT_MODEL_ASSET,
     val confidenceThreshold: Float = DEFAULT_CONFIDENCE_THRESHOLD,
     val iouThreshold: Float = DEFAULT_IOU_THRESHOLD,
-    private val numThreads: Int = 2
+    private val numThreads: Int = 4
 ) : AutoCloseable {
 
     constructor(context: Context) : this() {
@@ -144,6 +144,7 @@ class HalalifyGenderDetector(
                 val options = Interpreter.Options().apply {
                     setNumThreads(numThreads)
                     setUseNNAPI(false)
+                    setUseXNNPACK(true)
                 }
                 val interp = Interpreter(modelBuffer, options)
                 this.interpreter = interp

@@ -150,7 +150,8 @@ class RemoteAppManagerViewModel(
                     initialCurfewVpnBypass = policy.curfewVpnBypassPackages.toSet(),
                     initialProtectedApps = policy.protectedAppPackages.toSet(),
                     initialLockNewInstalls = policy.lockNewInstallsUntilApproved,
-                    isScreenAiEnabledGlobally = ScreenAiProjectionService.isRunning,
+                    isScreenAiEnabledGlobally = true,
+                    isScreenAiServiceRunning = ScreenAiProjectionService.isRunning,
                     allApps = sortedList,
                     displayedApps = filtered
                 )
@@ -221,6 +222,7 @@ class RemoteAppManagerViewModel(
                 initialProtectedApps = policy.protectedAppPackages.toSet(),
                 initialLockNewInstalls = policy.lockNewInstallsUntilApproved,
                 isScreenAiEnabledGlobally = true,
+                isScreenAiServiceRunning = ScreenAiProjectionService.isRunning,
                 allApps = sortedList,
                 displayedApps = filtered
             )

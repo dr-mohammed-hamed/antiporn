@@ -50,6 +50,10 @@ class ScreenBlurOverlayManager(
 
     private val lock = Any()
     private val activeRegions = mutableListOf<RectF>()
+    private val preallocatedMapped = ArrayList<RectF>(32)
+
+    private var activeWm: WindowManager? = null
+    private var currentAttachedType: Int = 0
 
     private val wmInstance: WindowManager? by lazy {
         windowManager ?: (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)
@@ -82,6 +86,11 @@ class ScreenBlurOverlayManager(
     var isPendingClear: Boolean = false
         private set
 
+    @Volatile
+    var isKltTrackingActive: Boolean = false
+
+    var onRegionsCleared: (() -> Unit)? = null
+
     private val clearRunnable = Runnable {
         if (isStaticLatch) {
             // أثناء القفل الثابت للمشهد الساكن، لا نسمح بإلغاء التعتيم
@@ -92,6 +101,7 @@ class ScreenBlurOverlayManager(
             activeRegions.clear()
         }
         overlayView?.clearRegions()
+        onRegionsCleared?.invoke()
     }
 
     companion object {
@@ -137,13 +147,22 @@ class ScreenBlurOverlayManager(
             targetWidth: Int,
             targetHeight: Int,
             sourceWidth: Int = 320,
-            sourceHeight: Int = 320
+            sourceHeight: Int = 320,
+            outRect: RectF = RectF()
         ): RectF {
-            val result = RectF()
+            val result = outRect
             if (targetWidth <= 0 || targetHeight <= 0) {
+                result.left = 0f
+                result.top = 0f
+                result.right = 0f
+                result.bottom = 0f
                 return result
             }
             if (!box.left.isFinite() || !box.top.isFinite() || !box.right.isFinite() || !box.bottom.isFinite()) {
+                result.left = 0f
+                result.top = 0f
+                result.right = 0f
+                result.bottom = 0f
                 return result
             }
 
@@ -256,7 +275,7 @@ class ScreenBlurOverlayManager(
     }
 
     /**
-     * تحديث صناديق التعتيم بعد تحويلها لأبعاد الشاشة المحددة.
+     * تحديث صناديق التعتيم بعد تحويلها لأبعاد الشاشة المحددة (Zero-Allocation Hot Path).
      */
     fun updateRegionsMapped(
         rawRegions: List<RectF>,
@@ -266,8 +285,16 @@ class ScreenBlurOverlayManager(
         sourceHeight: Int = 320
     ) {
         if (isClosed) return
-        val mapped = rawRegions.map { mapBoundingBox(it, targetWidth, targetHeight, sourceWidth, sourceHeight) }
-        updateRegions(mapped)
+        synchronized(lock) {
+            while (preallocatedMapped.size < rawRegions.size) {
+                preallocatedMapped.add(RectF())
+            }
+            for (i in rawRegions.indices) {
+                mapBoundingBox(rawRegions[i], targetWidth, targetHeight, sourceWidth, sourceHeight, preallocatedMapped[i])
+            }
+            val mappedSublist = preallocatedMapped.subList(0, rawRegions.size)
+            updateRegions(mappedSublist)
+        }
     }
 
     @MainThread
@@ -281,7 +308,10 @@ class ScreenBlurOverlayManager(
         }
 
         if (validRegions.isEmpty()) {
-            // قائمة فارغة (مثل حركة طفيفة أو خلو الإطار من الأهداف):
+            if (isStaticLatch && isKltTrackingActive) {
+                // أثناء القفل الثباتي مع تتبع KLT النشط لا نمسح الصناديق لتجنب الوميض
+                return
+            }
             // فك القفل الثباتي وجدولة مؤقت الإزالة (persistenceMs) لمنع تعليق المربع (Ghost Box)
             isStaticLatch = false
             synchronized(lock) {
@@ -297,52 +327,69 @@ class ScreenBlurOverlayManager(
         }
 
         // إعادة ضبط القفل الثباتي وحالة الإزالة المعلقة عند استلام تحديث جديد حتى تتمكن آلية التثبيت من إدارته
-        isStaticLatch = false
+        if (!isKltTrackingActive) {
+            isStaticLatch = false
+        }
         isPendingClear = false
 
-        val smoothedRegions = ArrayList<RectF>(validRegions.size)
+        val processedRegions = ArrayList<RectF>(validRegions.size)
 
         synchronized(lock) {
-            for (newBox in validRegions) {
-                var bestMatch: RectF? = null
-                var bestIou = 0.25f // عتبة مطابقة الصناديق عبر الإطارات
-
-                for (prevBox in activeRegions) {
-                    val iou = calculateRectIoU(prevBox, newBox)
-                    if (iou > bestIou) {
-                        bestIou = iou
-                        bestMatch = prevBox
-                    }
-                }
-
-                if (bestMatch != null) {
-                    // التنعيم الحركي (Exponential Moving Average): 40% إطار جديد و 60% تاريخي
-                    // لإلغاء القفزات اللحظية والاهتزاز الناتج عن تقلبات شبكة YOLO
-                    val alpha = 0.40f
-                    val smoothed = RectF()
-                    smoothed.left = bestMatch.left + alpha * (newBox.left - bestMatch.left)
-                    smoothed.top = bestMatch.top + alpha * (newBox.top - bestMatch.top)
-                    smoothed.right = bestMatch.right + alpha * (newBox.right - bestMatch.right)
-                    smoothed.bottom = bestMatch.bottom + alpha * (newBox.bottom - bestMatch.bottom)
-                    smoothedRegions.add(smoothed)
-                } else {
-                    // صندوق جديد أو انتقال مكاني كبير: استجابة فورية 100% دون أي تأخير
+            if (isKltTrackingActive) {
+                // رسم مباشر دقيق 100% دون تأخير EMA مزدوج لمنع تأخر المربع خلف حركة KLT السريعة
+                for (newBox in validRegions) {
                     val copy = RectF()
                     copy.left = newBox.left
                     copy.top = newBox.top
                     copy.right = newBox.right
                     copy.bottom = newBox.bottom
-                    smoothedRegions.add(copy)
+                    processedRegions.add(copy)
+                }
+            } else {
+                for (newBox in validRegions) {
+                    var bestMatch: RectF? = null
+                    var bestIou = 0.25f // عتبة مطابقة الصناديق عبر الإطارات
+
+                    for (prevBox in activeRegions) {
+                        val iou = calculateRectIoU(prevBox, newBox)
+                        if (iou > bestIou) {
+                            bestIou = iou
+                            bestMatch = prevBox
+                        }
+                    }
+
+                    if (bestMatch != null) {
+                        // التنعيم الحركي (Exponential Moving Average): 40% إطار جديد و 60% تاريخي
+                        // لإلغاء القفزات اللحظية والاهتزاز الناتج عن تقلبات شبكة YOLO
+                        val alpha = 0.40f
+                        val smoothed = RectF()
+                        smoothed.left = bestMatch.left + alpha * (newBox.left - bestMatch.left)
+                        smoothed.top = bestMatch.top + alpha * (newBox.top - bestMatch.top)
+                        smoothed.right = bestMatch.right + alpha * (newBox.right - bestMatch.right)
+                        smoothed.bottom = bestMatch.bottom + alpha * (newBox.bottom - bestMatch.bottom)
+                        processedRegions.add(smoothed)
+                    } else {
+                        // صندوق جديد أو انتقال مكاني كبير: استجابة فورية 100% دون أي تأخير
+                        val copy = RectF()
+                        copy.left = newBox.left
+                        copy.top = newBox.top
+                        copy.right = newBox.right
+                        copy.bottom = newBox.bottom
+                        processedRegions.add(copy)
+                    }
                 }
             }
 
             activeRegions.clear()
-            activeRegions.addAll(smoothedRegions)
+            activeRegions.addAll(processedRegions)
         }
 
-        // إعادة ضبط مؤقت الثبات لمنع التقطيع
+        // إلغاء مؤقت المسح طالما توجد مناطق تظليل نشطة معروضة
         overlayScheduler.removeCallbacks(clearRunnable)
-        overlayScheduler.postDelayed(clearRunnable, persistenceMs)
+        isPendingClear = false
+        if (!isKltTrackingActive) {
+            overlayScheduler.postDelayed(clearRunnable, persistenceMs)
+        }
 
         // التأكد من ربط الـ Overlay بالـ WindowManager إذا كانت الصلاحية متوفرة
         if (!isAttached) {
@@ -390,6 +437,7 @@ class ScreenBlurOverlayManager(
         postToMainThread {
             overlayScheduler.removeCallbacks(clearRunnable)
             overlayView?.clearRegions()
+            onRegionsCleared?.invoke()
         }
     }
 
@@ -421,15 +469,11 @@ class ScreenBlurOverlayManager(
             return checker(context)
         }
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (Settings.canDrawOverlays(context)) {
-                    true
-                } else {
-                    tryAutoGrantDeviceOwner(context)
-                    Settings.canDrawOverlays(context)
-                }
-            } else {
+            if (Settings.canDrawOverlays(context)) {
                 true
+            } else {
+                tryAutoGrantDeviceOwner(context)
+                Settings.canDrawOverlays(context)
             }
         } catch (e: Exception) {
             logE(TAG, "Error checking Settings.canDrawOverlays", e)
@@ -455,14 +499,16 @@ class ScreenBlurOverlayManager(
     /**
      * إنشاء معلمات النافذة القياسية LayoutParams
      */
-    fun createLayoutParams(): WindowManager.LayoutParams {
-        val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    fun createLayoutParams(
+        windowType: Int = if (com.drmohammed.antiporn.accessibility.HisnAccessibilityService.instance != null) {
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         } else {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
         }
-
+    ): WindowManager.LayoutParams {
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -494,32 +540,54 @@ class ScreenBlurOverlayManager(
 
     /**
      * ربط الـ View بالـ WindowManager بأمان.
+     * يدعم TYPE_ACCESSIBILITY_OVERLAY عبر سياق HisnAccessibilityService عندما تكون متصلة.
      */
     @MainThread
     fun attachOverlay(): Boolean {
         if (isClosed) return false
-        if (isAttached) return true
 
-        if (!canDrawOverlays(context)) {
-            logW(TAG, "Cannot attach overlay: Settings.canDrawOverlays is false")
+        val a11y = com.drmohammed.antiporn.accessibility.HisnAccessibilityService.instance
+        val desiredType = if (a11y != null) {
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+        }
+
+        if (isAttached) {
+            if (currentAttachedType == desiredType) {
+                return true
+            }
+            detachOverlay()
+        }
+
+        if (a11y == null && !canDrawOverlays(context)) {
+            logW(TAG, "Cannot attach overlay: Settings.canDrawOverlays is false and A11y not connected")
             return false
         }
 
-        val wm = wmInstance ?: run {
+        val targetContext = a11y ?: context
+        val wm = (targetContext.getSystemService(Context.WINDOW_SERVICE) as? WindowManager) ?: wmInstance ?: run {
             logE(TAG, "Cannot attach overlay: WindowManager not available")
             return false
         }
 
         return try {
-            val view = overlayView ?: BlurOverlayView(context).also { overlayView = it }
-            val params = createLayoutParams()
+            val view = overlayView ?: BlurOverlayView(targetContext).also { overlayView = it }
+            val params = createLayoutParams(desiredType)
             wm.addView(view, params)
+            activeWm = wm
+            currentAttachedType = desiredType
             isAttached = true
-            logI(TAG, "ScreenBlurOverlay attached successfully with TYPE_APPLICATION_OVERLAY")
+            logI(TAG, "ScreenBlurOverlay attached successfully with type: $desiredType (A11yActive=${a11y != null})")
             true
         } catch (e: Exception) {
             logE(TAG, "Failed to attach overlay view to WindowManager", e)
             isAttached = false
+            activeWm = null
+            currentAttachedType = 0
             false
         }
     }
@@ -534,7 +602,7 @@ class ScreenBlurOverlayManager(
 
         try {
             overlayView?.let { view ->
-                wmInstance?.removeView(view)
+                (activeWm ?: wmInstance)?.removeView(view)
             }
         } catch (e: IllegalArgumentException) {
             logW(TAG, "Overlay view was not attached to WindowManager during detach", e)
@@ -543,6 +611,8 @@ class ScreenBlurOverlayManager(
         } finally {
             isAttached = false
             overlayView = null
+            activeWm = null
+            currentAttachedType = 0
         }
     }
 
@@ -649,14 +719,19 @@ class BlurOverlayView(context: Context) : View(context) {
     }
 
     fun updateRegions(newRegions: List<RectF>) {
-        regions.clear()
-        for (r in newRegions) {
-            val copy = RectF()
-            copy.left = r.left
-            copy.top = r.top
-            copy.right = r.right
-            copy.bottom = r.bottom
-            regions.add(copy)
+        while (regions.size < newRegions.size) {
+            regions.add(RectF())
+        }
+        while (regions.size > newRegions.size) {
+            regions.removeAt(regions.size - 1)
+        }
+        for (i in newRegions.indices) {
+            val src = newRegions[i]
+            val dst = regions[i]
+            dst.left = src.left
+            dst.top = src.top
+            dst.right = src.right
+            dst.bottom = src.bottom
         }
         try {
             invalidate()

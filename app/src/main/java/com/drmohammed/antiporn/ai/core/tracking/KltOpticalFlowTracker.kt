@@ -43,21 +43,43 @@ class KltOpticalFlowTracker(
         numPyramidLevels = numPyramidLevels
     )
 
-    // مصفوفات الإضاءة (Luma Buffers) المحجوزة مسبقاً للطبقة الكاملة والطبقة المصغرة
-    private var prevLuma: ByteArray = ByteArray(0)
-    private var currLuma: ByteArray = ByteArray(0)
-    private var prevLumaL1: ByteArray = ByteArray(0)
-    private var currLumaL1: ByteArray = ByteArray(0)
+    // مصفوفات الإضاءة المحجوزة مسبقاً للهرم البصري رباعي الطبقات (L0..L3) Zero-Allocation
+    private val prevPyramid = Array(MAX_PYRAMID_LEVELS) { ByteArray(0) }
+    private val currPyramid = Array(MAX_PYRAMID_LEVELS) { ByteArray(0) }
 
-    private var allocatedLumaCapacity: Int = 0
-    private var allocatedL1Capacity: Int = 0
+    private val prevLuma: ByteArray get() = prevPyramid[0]
+    private val currLuma: ByteArray get() = currPyramid[0]
+    private val prevLumaL1: ByteArray get() = prevPyramid[1]
+    private val currLumaL1: ByteArray get() = currPyramid[1]
+
+    private val allocatedCapacities = IntArray(MAX_PYRAMID_LEVELS)
     private var lastFrameWidth: Int = 0
     private var lastFrameHeight: Int = 0
     private var hasPrevFrame: Boolean = false
 
+    @Volatile
+    var lastGlobalDeltaX: Float = 0f
+        private set
+
+    @Volatile
+    var lastGlobalDeltaY: Float = 0f
+        private set
+
     // قائمة المسارات النشطة
     private val activeTracks = ArrayList<TrackedModestyBox>(MAX_TRACKS)
     private var nextTrackId: Int = 1
+
+    // مصفوفات الخدش المؤقتة لتتبع الخلفية والحركة العامة والمحلية (Local Neighborhood Flow)
+    private val scratchBgPointsX = FloatArray(MAX_BG_POINTS)
+    private val scratchBgPointsY = FloatArray(MAX_BG_POINTS)
+    private val scratchBgDeltasX = FloatArray(MAX_BG_POINTS)
+    private val scratchBgDeltasY = FloatArray(MAX_BG_POINTS)
+    private val scratchLocalDeltasX = FloatArray(MAX_BG_POINTS)
+    private val scratchLocalDeltasY = FloatArray(MAX_BG_POINTS)
+    private val reusablePaddedList = ArrayList<RectF>(MAX_TRACKS)
+
+    @Volatile
+    var lastGeneralChangeRatio: Float = 0f
 
     // مصفوفات الخدش المؤقتة للنقاط لتفادي أي Garbage Collection (Zero-Allocation)
     private val scratchPrevPointsX = FloatArray(MAX_POINTS_PER_BOX)
@@ -86,10 +108,15 @@ class KltOpticalFlowTracker(
         const val DEFAULT_MIN_INLIERS = 4
         const val DEFAULT_ANCHOR_IOU_THRESHOLD = 0.30f
         const val DEFAULT_ANCHOR_SMOOTHING_ALPHA = 0.75f
-        const val DEFAULT_MAX_TTL_MS = 1200L
+        const val DEFAULT_MAX_TTL_MS = 2500L
         const val DEFAULT_SCALE_MIN_CLAMP = 0.95f
         const val DEFAULT_SCALE_MAX_CLAMP = 1.05f
-        const val DEFAULT_PYRAMID_LEVELS = 2
+        const val DEFAULT_PYRAMID_LEVELS = 5
+        const val MAX_PYRAMID_LEVELS = 5
+
+        const val BG_GRID_X = 8
+        const val BG_GRID_Y = 8
+        const val MAX_BG_POINTS = BG_GRID_X * BG_GRID_Y
 
         const val GRID_SIDE = 5
         const val MAX_POINTS_PER_BOX = GRID_SIDE * GRID_SIDE // 25 نقطة
@@ -142,16 +169,25 @@ class KltOpticalFlowTracker(
     }
 
     /**
-     * إرجاع صناديق الحياء النشطة مع نسبة توسيع الأمان كقائمة متزامنة وآمنة (Atomic Read).
+     * إرجاع صناديق الحياء النشطة مع نسبة توسيع الأمان كقائمة متزامنة وآمنة (Zero-Allocation Atomic Read).
      */
     @Synchronized
-    fun getPaddedBoxes(paddingRatio: Float = TrackedModestyBox.DEFAULT_SAFETY_PADDING_RATIO): List<RectF> {
+    fun getPaddedBoxes(
+        paddingRatio: Float = TrackedModestyBox.DEFAULT_SAFETY_PADDING_RATIO,
+        outList: MutableList<RectF>? = null
+    ): List<RectF> {
         if (activeTracks.isEmpty()) return emptyList()
-        val paddedList = ArrayList<RectF>(activeTracks.size)
-        for (i in activeTracks.indices) {
-            paddedList.add(activeTracks[i].withSafetyPadding(paddingRatio))
+        val target = outList ?: reusablePaddedList
+        while (target.size < activeTracks.size) {
+            target.add(RectF())
         }
-        return paddedList
+        while (target.size > activeTracks.size) {
+            target.removeAt(target.size - 1)
+        }
+        for (i in activeTracks.indices) {
+            activeTracks[i].withSafetyPadding(paddingRatio, target[i])
+        }
+        return target
     }
 
     /**
@@ -223,6 +259,27 @@ class KltOpticalFlowTracker(
     }
 
     /**
+     * تحديث الإرساء المكاني عبر الشرائح (Cross-Tile Spatial Merge) وقفل الذاكرة ضد الصناديق الزومبي.
+     */
+    @Synchronized
+    fun updateAnchorsCrossTile(
+        detections: List<RectF>,
+        tileNormRect: RectF,
+        frameWidth: Int,
+        frameHeight: Int,
+        timestampMs: Long
+    ) {
+        initOrUpdateAnchorsInternal(
+            detections = detections,
+            isFemaleList = null,
+            frameWidth = frameWidth,
+            frameHeight = frameHeight,
+            timestampMs = timestampMs,
+            targetTileRect = tileNormRect
+        )
+    }
+
+    /**
      * المنطق الجوهري لربط وإرساء المسارات بالكشوفات (Anchor Association & Smoothing).
      */
     private fun initOrUpdateAnchorsInternal(
@@ -230,17 +287,19 @@ class KltOpticalFlowTracker(
         isFemaleList: List<Boolean>?,
         frameWidth: Int,
         frameHeight: Int,
-        timestampMs: Long
+        timestampMs: Long,
+        targetTileRect: RectF? = null
     ) {
         val safeWidth = if (frameWidth > 0) frameWidth else 1
         val safeHeight = if (frameHeight > 0) frameHeight else 1
 
-        val numDetections = minOf(detections.size, MAX_TRACKS)
+        // 1. تحويل جميع الكشوفات الواردة إلى إحداثيات موحدة [0..1] مع تطبيق الدمج المكاني
+        val mergedDetections = KltMathHelper.mergeBoxesSpatially(detections, maxGapNorm = 40f / safeHeight)
+        val numDetections = minOf(mergedDetections.size, MAX_TRACKS)
         val numTracks = minOf(activeTracks.size, MAX_TRACKS)
 
-        // 1. تحويل جميع الكشوفات الواردة إلى إحداثيات موحدة [0..1]
         for (j in 0 until numDetections) {
-            val d = detections[j]
+            val d = mergedDetections[j]
             KltMathHelper.normalizeRect(d, safeWidth, safeHeight, scratchNormalizedDetections[j])
             matchedDetectionFlags[j] = false
         }
@@ -326,8 +385,84 @@ class KltOpticalFlowTracker(
             }
         }
 
-        // 4. حذف المسارات القديمة التي تجاوزت مدة البقاء المسموحة (TTL)
+        // دمج المسارات النشطة مكانياً لتوحيد أجزاء الجسم المنفصلة
+        mergeActiveTracksSpatially(safeHeight)
+
+        // 4. مكافحة الصناديق الزومبي واعية الاحتواء (Containment-Aware Anti-Zombie Latch):
+        // لا نحسب غياب الصندوق إلا إذا كانت الشريحة المفحوصة تغطي 80% أو أكثر من مساحته
+        if (targetTileRect != null) {
+            for (i in 0 until numTracks) {
+                if (!matchedTrackFlags[i]) {
+                    val track = activeTracks[i]
+                    val interArea = KltMathHelper.calculateIntersectionArea(track.boundingBox, targetTileRect)
+                    val trackArea = KltMathHelper.calculateArea(track.boundingBox)
+                    val coverage = if (trackArea > 0f) interArea / trackArea else 0f
+
+                    if (coverage >= 0.80f) {
+                        val ringChange = track.lastOuterRingChangeRatio
+                        if (ringChange < 0.20f) {
+                            // سكون تام للمحيط الخارجي (صورة ثابتة): تمديد الصلاحية لمنع وميض الـ 2.5s
+                            track.lastAnchorTimestampMs = timestampMs
+                            track.ageFrames = 0
+                        } else if (ringChange >= 0.40f && lastGeneralChangeRatio >= 0.45f) {
+                            // تغير بنيوي شامل للمشهد: إسقاط سريع لتفادي الزومبي
+                            track.ageFrames += 2
+                        } else if (ringChange >= 0.20f) {
+                            // حركة فيديو اعتيادية: زيادة تدريجية ناعمة مع مهلة 8 نبضات (~1.6 ثانية)
+                            track.ageFrames += 1
+                        }
+
+                        if (track.ageFrames >= 8) {
+                            track.confidence = 0f
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. حذف المسارات القديمة التي تجاوزت مدة البقاء المسموحة (TTL)
         pruneExpiredTracks(timestampMs)
+    }
+
+    private fun mergeActiveTracksSpatially(safeHeight: Int) {
+        if (activeTracks.size <= 1) return
+        val maxGapNorm = 40f / safeHeight
+        var mergedAny = true
+        while (mergedAny) {
+            mergedAny = false
+            var i = 0
+            while (i < activeTracks.size) {
+                var j = i + 1
+                while (j < activeTracks.size) {
+                    val a = activeTracks[i]
+                    val b = activeTracks[j]
+                    if (KltMathHelper.canMergeSpatially(a.boundingBox, b.boundingBox, maxGapNorm)) {
+                        val newL = minOf(a.boundingBox.left, b.boundingBox.left)
+                        val newT = minOf(a.boundingBox.top, b.boundingBox.top)
+                        val newR = maxOf(a.boundingBox.right, b.boundingBox.right)
+                        val newB = maxOf(a.boundingBox.bottom, b.boundingBox.bottom)
+                        TrackedModestyBox.setRect(a.boundingBox, newL, newT, newR, newB)
+                        val fw = if (lastFrameWidth > 0) lastFrameWidth else 1
+                        val fh = if (lastFrameHeight > 0) lastFrameHeight else 1
+                        TrackedModestyBox.setRect(
+                            a.rawBoundingBox,
+                            newL * fw,
+                            newT * fh,
+                            newR * fw,
+                            newB * fh
+                        )
+                        a.confidence = maxOf(a.confidence, b.confidence)
+                        a.validInliers = maxOf(a.validInliers, b.validInliers)
+                        a.ageFrames = minOf(a.ageFrames, b.ageFrames)
+                        activeTracks.removeAt(j)
+                        mergedAny = true
+                    } else {
+                        j++
+                    }
+                }
+                i++
+            }
+        }
     }
 
     /**
@@ -351,12 +486,14 @@ class KltOpticalFlowTracker(
         pruneExpiredTracks(timestampMs)
         ensureBuffers(width, height)
 
-        // استخراج الإضاءة (Luma) إلى currLuma دون تخصيص ذاكرة
-        KltPyramidHelper.extractLuma(rawBuffer, width, height, rowStride, pixelStride, currLuma)
-
-        // بناء الطبقة المصغرة للهرم البصري (Level 1)
-        if (numPyramidLevels >= 2) {
-            KltPyramidHelper.buildPyramidLevel1(currLuma, currLumaL1, width, height)
+        // 1. استخراج الإضاءة (Luma) إلى currPyramid[0] وبناء الهرم الرباعي L0..L3 دون تخصيص ذاكرة
+        KltPyramidHelper.extractLuma(rawBuffer, width, height, rowStride, pixelStride, currPyramid[0])
+        var curW = width
+        var curH = height
+        for (lvl in 1 until numPyramidLevels) {
+            KltPyramidHelper.buildPyramidLevel(currPyramid[lvl - 1], currPyramid[lvl], curW, curH)
+            curW = (curW shr 1).coerceAtLeast(1)
+            curH = (curH shr 1).coerceAtLeast(1)
         }
 
         // إذا كان هذا الإطار الأول أو تغيرت أبعاد الشاشة
@@ -375,26 +512,156 @@ class KltOpticalFlowTracker(
             hasPrevFrame = true
             lastFrameWidth = width
             lastFrameHeight = height
+            lastGlobalDeltaX = 0f
+            lastGlobalDeltaY = 0f
             return activeTracks
         }
 
         if (activeTracks.isEmpty()) {
             swapLumaBuffers()
+            lastGlobalDeltaX = 0f
+            lastGlobalDeltaY = 0f
             return activeTracks
         }
 
-        // معالجة كل صندوق متتبع عبر التدفق البصري Lucas-Kanade
+        // 2. تتبع حركة الخلفية والتمرير العام (Background Motion Flow Vector dx, dy)
+        // استبعاد هوامش النظام الثابتة (أعلى 10% لشريط الحالة وأسفل 10% لشريط التنقل)
+        var bgValidCount = 0
+        val topUiMargin = height * 0.10f
+        val bottomUiMargin = height * 0.90f
+        val leftUiMargin = width * 0.05f
+        val rightUiMargin = width * 0.95f
+
+        val stepX = (rightUiMargin - leftUiMargin) / (BG_GRID_X + 1)
+        val stepY = (bottomUiMargin - topUiMargin) / (BG_GRID_Y + 1)
+
+        for (gy in 1..BG_GRID_Y) {
+            val py = topUiMargin + gy * stepY
+            for (gx in 1..BG_GRID_X) {
+                val px = leftUiMargin + gx * stepX
+
+                // استبعاد أي نقطة تقع داخل أو بجوار صناديق التعتيم النشطة
+                var insideBox = false
+                for (t in activeTracks) {
+                    val box = t.rawBoundingBox
+                    if (px >= (box.left - 4f) && px <= (box.right + 4f) &&
+                        py >= (box.top - 4f) && py <= (box.bottom + 4f)
+                    ) {
+                        insideBox = true
+                        break
+                    }
+                }
+                if (insideBox) continue
+
+                val tracked = solver.trackPointPyramidalMulti(
+                    prevPyramid = prevPyramid,
+                    currPyramid = currPyramid,
+                    ptX = px,
+                    ptY = py,
+                    width = width,
+                    height = height,
+                    outDelta = scratchL0Delta,
+                    activeLevels = numPyramidLevels
+                )
+                if (tracked) {
+                    scratchBgPointsX[bgValidCount] = px
+                    scratchBgPointsY[bgValidCount] = py
+                    scratchBgDeltasX[bgValidCount] = scratchL0Delta[0]
+                    scratchBgDeltasY[bgValidCount] = scratchL0Delta[1]
+                    bgValidCount++
+                }
+            }
+        }
+
+        var globalDx = 0f
+        var globalDy = 0f
+        if (bgValidCount >= 4) {
+            KltMathHelper.insertionSortFloats(scratchBgDeltasX, bgValidCount)
+            KltMathHelper.insertionSortFloats(scratchBgDeltasY, bgValidCount)
+            val rawDx = scratchBgDeltasX[bgValidCount / 2]
+            val rawDy = scratchBgDeltasY[bgValidCount / 2]
+
+            // Deadband filter: إذا كانت الحركة أقل من 0.5 بكسل نعتبرها سكوناً تاماً لمنع الزحف
+            if (kotlin.math.abs(rawDx) >= 0.5f) globalDx = rawDx
+            if (kotlin.math.abs(rawDy) >= 0.5f) globalDy = rawDy
+        }
+
+        lastGlobalDeltaX = globalDx
+        lastGlobalDeltaY = globalDy
+        val hasGlobalScroll = globalDx != 0f || globalDy != 0f
+
+        // 3. تحديث كل صندوق: التدفق البصري للجوار المحلي (Local Neighborhood Flow) + التتبع الموضعي للنقاط غير المحجوبة
         for (trackIdx in activeTracks.indices) {
             val track = activeTracks[trackIdx]
             val rawBox = track.rawBoundingBox
 
+            // حساب التغير في الحزام المحيط خارج الصندوق لتغذية منطق مكافحة الزومبي والتعتيم الذاتي
+            track.lastOuterRingChangeRatio = calculateOuterRingChangeRatio(rawBox, prevLuma, currLuma, width, height)
+
+            // تجميع نقاط الخلفية الواقعة في الجوار المحلي للصندوق (نطاق رأسي ±25% من ارتفاع الشاشة)
+            val trackCenterY = (rawBox.top + rawBox.bottom) * 0.5f
+            var localBgCount = 0
+            val localBandY = height * 0.25f
+
+            for (k in 0 until bgValidCount) {
+                val py = scratchBgPointsY[k]
+                if (kotlin.math.abs(py - trackCenterY) <= localBandY) {
+                    scratchLocalDeltasX[localBgCount] = scratchBgDeltasX[k]
+                    scratchLocalDeltasY[localBgCount] = scratchBgDeltasY[k]
+                    localBgCount++
+                }
+            }
+
+            val trackDx: Float
+            val trackDy: Float
+            if (localBgCount >= 3) {
+                KltMathHelper.insertionSortFloats(scratchLocalDeltasX, localBgCount)
+                KltMathHelper.insertionSortFloats(scratchLocalDeltasY, localBgCount)
+                val rawLocDx = scratchLocalDeltasX[localBgCount / 2]
+                val rawLocDy = scratchLocalDeltasY[localBgCount / 2]
+                trackDx = if (kotlin.math.abs(rawLocDx) >= 0.5f) rawLocDx else 0f
+                trackDy = if (kotlin.math.abs(rawLocDy) >= 0.5f) rawLocDy else 0f
+            } else {
+                // عزل الجوار المحلي: عند نقص نقاط المحيط، لا نسقط في حركة التمرير العامة للشاشة (مثل التعليقات)
+                trackDx = 0f
+                trackDy = 0f
+            }
+
+            val hasTrackMotion = trackDx != 0f || trackDy != 0f
+
+            // إذا تحرك الجوار المحلي للصندوق، يتحرك الصندوق معه فوراً وبسلاسة
+            if (hasTrackMotion) {
+                val newL = rawBox.left + trackDx
+                val newT = rawBox.top + trackDy
+                val newR = rawBox.right + trackDx
+                val newB = rawBox.bottom + trackDy
+
+                // إذا خرج الصندوق بالكامل من حدود الشاشة، يُحذف فوراً
+                if (newB <= 0f || newT >= height.toFloat() || newR <= 0f || newL >= width.toFloat()) {
+                    track.confidence = 0f
+                    track.validInliers = 0
+                    continue
+                }
+
+                TrackedModestyBox.setRect(rawBox, newL, newT, newR, newB)
+                TrackedModestyBox.setRect(
+                    track.boundingBox,
+                    newL / width,
+                    newT / height,
+                    newR / width,
+                    newB / height
+                )
+                track.confidence = 1.0f
+                track.ageFrames = 0
+                continue
+            }
+
+            // الشاشة ساكنة دون تمرير عام: فحص حركة الهدف الموضعي إن وُجد
             val boxW = rawBox.right - rawBox.left
             val boxH = rawBox.bottom - rawBox.top
 
             if (boxW < 8f || boxH < 8f) {
                 track.ageFrames++
-                track.validInliers = 0
-                track.confidence = (track.confidence * 0.85f).coerceAtLeast(0f)
                 continue
             }
 
@@ -421,16 +688,15 @@ class KltOpticalFlowTracker(
                 val px = scratchPrevPointsX[i]
                 val py = scratchPrevPointsY[i]
 
-                val success = solver.trackPointPyramidal(
-                    prevLuma = prevLuma,
-                    currLuma = currLuma,
-                    prevLumaL1 = prevLumaL1,
-                    currLumaL1 = currLumaL1,
+                val success = solver.trackPointPyramidalMulti(
+                    prevPyramid = prevPyramid,
+                    currPyramid = currPyramid,
                     ptX = px,
                     ptY = py,
                     width = width,
                     height = height,
-                    outDelta = scratchL0Delta
+                    outDelta = scratchL0Delta,
+                    activeLevels = numPyramidLevels
                 )
 
                 if (success) {
@@ -515,8 +781,8 @@ class KltOpticalFlowTracker(
                 track.confidence = (validInlierCount.toFloat() / MAX_POINTS_PER_BOX.toFloat()).coerceIn(0f, 1f)
                 track.ageFrames++
             } else {
+                // النقاط داخل المربع محجوبة بالتعتيم: الاحتفاظ التام بموقع الصندوق دون إسقاط الثقة
                 track.validInliers = validInlierCount
-                track.confidence = (track.confidence * 0.70f).coerceAtLeast(0f)
                 track.ageFrames++
             }
         }
@@ -531,30 +797,25 @@ class KltOpticalFlowTracker(
     }
 
     private fun swapLumaBuffers() {
-        val tmp0 = prevLuma
-        prevLuma = currLuma
-        currLuma = tmp0
-
-        val tmp1 = prevLumaL1
-        prevLumaL1 = currLumaL1
-        currLumaL1 = tmp1
+        for (lvl in 0 until numPyramidLevels) {
+            val tmp = prevPyramid[lvl]
+            prevPyramid[lvl] = currPyramid[lvl]
+            currPyramid[lvl] = tmp
+        }
     }
 
     private fun ensureBuffers(width: Int, height: Int) {
-        val sizeL0 = width * height
-        if (sizeL0 > allocatedLumaCapacity) {
-            prevLuma = ByteArray(sizeL0)
-            currLuma = ByteArray(sizeL0)
-            allocatedLumaCapacity = sizeL0
-        }
-
-        val w1 = width shr 1
-        val h1 = height shr 1
-        val sizeL1 = w1 * h1
-        if (sizeL1 > allocatedL1Capacity) {
-            prevLumaL1 = ByteArray(sizeL1)
-            currLumaL1 = ByteArray(sizeL1)
-            allocatedL1Capacity = sizeL1
+        var w = width
+        var h = height
+        for (lvl in 0 until numPyramidLevels) {
+            val size = w * h
+            if (size > allocatedCapacities[lvl]) {
+                prevPyramid[lvl] = ByteArray(size)
+                currPyramid[lvl] = ByteArray(size)
+                allocatedCapacities[lvl] = size
+            }
+            w = (w shr 1).coerceAtLeast(1)
+            h = (h shr 1).coerceAtLeast(1)
         }
     }
 
@@ -579,7 +840,7 @@ class KltOpticalFlowTracker(
         var writeIdx = 0
         for (readIdx in 0 until activeTracks.size) {
             val track = activeTracks[readIdx]
-            val keep = track.confidence >= 0.05f || track.ageFrames <= 15
+            val keep = track.confidence > 0.01f
             if (keep) {
                 if (writeIdx != readIdx) {
                     activeTracks[writeIdx] = track
@@ -590,5 +851,53 @@ class KltOpticalFlowTracker(
         while (activeTracks.size > writeIdx) {
             activeTracks.removeAt(activeTracks.size - 1)
         }
+    }
+
+    /**
+     * حساب نسبة تغير الإضاءة في حزام محيط خارجي (Outer Context Ring) بعرض 16px خارج حدود الصندوق.
+     * يستبعد النقاط المعتمة داخل الصندوق ويرصد بدقة هل تغير المشهد المحيط بالهدف أم لا.
+     */
+    private fun calculateOuterRingChangeRatio(
+        rawBox: RectF,
+        prevLuma: ByteArray,
+        currLuma: ByteArray,
+        width: Int,
+        height: Int
+    ): Float {
+        if (prevLuma.isEmpty() || currLuma.isEmpty() || width <= 0 || height <= 0) return 0f
+        val ringThickness = 16
+        val l = (rawBox.left - ringThickness).toInt().coerceIn(0, width - 1)
+        val t = (rawBox.top - ringThickness).toInt().coerceIn(0, height - 1)
+        val r = (rawBox.right + ringThickness).toInt().coerceIn(0, width - 1)
+        val b = (rawBox.bottom + ringThickness).toInt().coerceIn(0, height - 1)
+
+        val boxL = rawBox.left.toInt()
+        val boxT = rawBox.top.toInt()
+        val boxR = rawBox.right.toInt()
+        val boxB = rawBox.bottom.toInt()
+
+        var changedCount = 0
+        var sampleCount = 0
+        val step = 4
+
+        for (y in t..b step step) {
+            val rowOffset = y * width
+            for (x in l..r step step) {
+                // استبعاد أي نقطة تقع داخل مساحة التعتيم
+                if (x in boxL..boxR && y in boxT..boxB) continue
+
+                val idx = rowOffset + x
+                if (idx < prevLuma.size && idx < currLuma.size) {
+                    val p = prevLuma[idx].toInt() and 0xFF
+                    val c = currLuma[idx].toInt() and 0xFF
+                    if (kotlin.math.abs(p - c) > 20) {
+                        changedCount++
+                    }
+                    sampleCount++
+                }
+            }
+        }
+
+        return if (sampleCount > 0) changedCount.toFloat() / sampleCount.toFloat() else 0f
     }
 }

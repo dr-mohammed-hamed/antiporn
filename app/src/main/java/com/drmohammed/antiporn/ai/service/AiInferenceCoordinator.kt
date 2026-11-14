@@ -2,23 +2,22 @@ package com.drmohammed.antiporn.ai.service
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Rect
+import android.graphics.RectF
 import android.media.Image
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
 import android.os.SystemClock
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.util.Log
-import android.widget.Toast
-import com.drmohammed.antiporn.R
+import com.drmohammed.antiporn.accessibility.HisnAccessibilityService
 import com.drmohammed.antiporn.ai.core.inference.HalalifyGenderDetector
 import com.drmohammed.antiporn.ai.core.inference.NudeNetDetector
-import com.drmohammed.antiporn.ai.core.model.NudeNetResult
 import com.drmohammed.antiporn.ai.core.pipeline.ContextualGatingWatcher
+import com.drmohammed.antiporn.ai.core.tracking.KltMathHelper
 import com.drmohammed.antiporn.ai.core.tracking.KltOpticalFlowTracker
+import com.drmohammed.antiporn.ai.core.tracking.TrackedModestyBox
 import com.drmohammed.antiporn.ai.overlay.ScreenBlurOverlayManager
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -47,14 +46,29 @@ class AiInferenceCoordinator(
 
     private val isHalalifyInferring = AtomicBoolean(false)
     private var lastAnchorCheckTimeMs: Long = 0L
+    private var lastA11yScreenshotAttemptMs: Long = 0L
 
     private var inferenceBitmap: Bitmap? = null
     private var scratchPixels: IntArray? = null
     private var scratchRowBytes: ByteArray? = null
 
-    private var lastAlertTimeMs: Long = 0L
+    @Volatile
+    private var sceneGenerationId: Long = 0L
+
+    @Volatile
+    private var accumulatedScrollDx: Float = 0f
+
+    @Volatile
+    private var accumulatedScrollDy: Float = 0f
+
+    private var tileStepIndex: Int = 0
+    private var tileBitmap: Bitmap? = null
+    private var scratchTilePixels: IntArray? = null
+
     private var lastDiagnosticLogMs: Long = 0L
     private var lastHalalifyIdleLogMs: Long = 0L
+
+    private val lastDrawnPixelBoxes = ArrayList<RectF>(32)
 
     @Volatile
     var initError: String = ""
@@ -63,6 +77,12 @@ class AiInferenceCoordinator(
     @Volatile
     var isRunning: Boolean = false
         private set
+
+    fun setGeneralChangeRatio(ratio: Float) {
+        if (::kltTracker.isInitialized) {
+            kltTracker.lastGeneralChangeRatio = ratio
+        }
+    }
 
     fun initialize(onInitialized: (Boolean) -> Unit = {}) {
         val infThread = HandlerThread("AiInferenceWorker", android.os.Process.THREAD_PRIORITY_BACKGROUND)
@@ -74,7 +94,12 @@ class AiInferenceCoordinator(
         kltTracker = KltOpticalFlowTracker()
         halalifyDetector = HalalifyGenderDetector(context)
         nudeNetDetector = NudeNetDetector()
-        blurOverlayManager = ScreenBlurOverlayManager(context)
+        blurOverlayManager = ScreenBlurOverlayManager(context).apply {
+            isKltTrackingActive = true
+            onRegionsCleared = {
+                lastDrawnPixelBoxes.clear()
+            }
+        }
 
         contextualWatcher = ContextualGatingWatcher(
             context,
@@ -88,14 +113,15 @@ class AiInferenceCoordinator(
         contextualWatcher.start()
 
         handler.post {
-            val nudeOk = nudeNetDetector.initialize(context)
-            if (!nudeOk) {
-                initError = "NudeNet initialization failed"
-                Log.e(TAG, "NudeNetDetector initialization failed")
+            val halalifyOk = halalifyDetector.isInitialized
+            val nudeOk = if (ENABLE_NUDENET) nudeNetDetector.initialize(context) else true
+            if (!halalifyOk || !nudeOk) {
+                initError = if (!halalifyOk) "Halalify initialization failed" else "NudeNet initialization failed"
+                Log.e(TAG, "AI initialization failed: $initError")
                 mainHandler.post { onInitialized(false) }
             } else {
                 initError = ""
-                Log.i(TAG, "AI detectors ready")
+                Log.i(TAG, "Halalify ready (NudeNet enabled=$ENABLE_NUDENET)")
                 mainHandler.post { onInitialized(true) }
             }
         }
@@ -142,75 +168,294 @@ class AiInferenceCoordinator(
                 pixelStride = pixelStride,
                 timestampMs = now
             )
+            accumulatedScrollDx += kltTracker.lastGlobalDeltaX
+            accumulatedScrollDy += kltTracker.lastGlobalDeltaY
+
             if (trackedBoxes.isNotEmpty()) {
                 val (screenWidth, screenHeight) = getPhysicalScreenSize()
                 val paddedBoxes = kltTracker.getPaddedBoxes()
-                blurOverlayManager.updateRegionsMapped(
-                    rawRegions = paddedBoxes,
-                    targetWidth = screenWidth,
-                    targetHeight = screenHeight,
-                    sourceWidth = 1,
-                    sourceHeight = 1
-                )
+                val overlayNeedsRedraw = !blurOverlayManager.hasActiveRegions || hasBoxesChangedSignificantly(paddedBoxes, screenWidth, screenHeight)
+                if (overlayNeedsRedraw) {
+                    blurOverlayManager.updateRegionsMapped(
+                        rawRegions = paddedBoxes,
+                        targetWidth = screenWidth,
+                        targetHeight = screenHeight,
+                        sourceWidth = 1,
+                        sourceHeight = 1
+                    )
+                }
+            } else {
+                lastDrawnPixelBoxes.clear()
+                blurOverlayManager.updateRegions(emptyList())
             }
         }
 
-        // 2. Async Anchor Path: Halalify + NudeNet (4-5 FPS)
+        // 2. Async Anchor Path: Clean A11y Screenshot OR 4-Stage Rotation (FullFrame + 3 Slices) (4-5 FPS)
         val shouldTriggerAnchor = !isHalalifyInferring.get() &&
                 ((now - lastAnchorCheckTimeMs >= ANCHOR_INTERVAL_MS) || (::kltTracker.isInitialized && !kltTracker.hasActiveTracks()))
 
         if (shouldTriggerAnchor && isHalalifyInferring.compareAndSet(false, true)) {
-            val bitmap = copyFrameToInferenceBitmap(image)
-            if (bitmap != null) {
+            val a11y = HisnAccessibilityService.instance
+            val canTryA11y = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) &&
+                    (a11y != null) &&
+                    (now - lastA11yScreenshotAttemptMs >= 350L)
+
+            if (canTryA11y) {
+                lastA11yScreenshotAttemptMs = now
                 val captureTimestamp = now
+                val captureGen = sceneGenerationId
+                val startScrollX = accumulatedScrollDx
+                val startScrollY = accumulatedScrollDy
+
+                a11y?.captureCleanWindowBitmap { cleanBitmap, windowBounds ->
+                    if (cleanBitmap != null && isRunning && captureGen == sceneGenerationId) {
+                        val posted = inferenceHandler?.post {
+                            try {
+                                runHalalifyOnCleanBitmap(
+                                    cleanBitmap = cleanBitmap,
+                                    windowBounds = windowBounds,
+                                    captureGen = captureGen,
+                                    captureTimestamp = captureTimestamp,
+                                    startScrollX = startScrollX,
+                                    startScrollY = startScrollY,
+                                    frameWidth = width,
+                                    frameHeight = height
+                                )
+                            } finally {
+                                try { cleanBitmap.recycle() } catch (_: Exception) {}
+                                lastAnchorCheckTimeMs = SystemClock.elapsedRealtime()
+                                isHalalifyInferring.set(false)
+                            }
+                        } ?: false
+                        if (!posted) {
+                            try { cleanBitmap.recycle() } catch (_: Exception) {}
+                            isHalalifyInferring.set(false)
+                        }
+                    } else {
+                        // Clean bitmap recycled if skipped/generation mismatch; allow next frame to check MediaProjection
+                        try { cleanBitmap?.recycle() } catch (_: Exception) {}
+                        isHalalifyInferring.set(false)
+                    }
+                }
+            } else {
+                dispatchMediaProjectionAnchor(image, width, height, now)
+            }
+        }
+    }
+
+    private fun runHalalifyOnCleanBitmap(
+        cleanBitmap: Bitmap,
+        windowBounds: Rect,
+        captureGen: Long,
+        captureTimestamp: Long,
+        startScrollX: Float,
+        startScrollY: Float,
+        frameWidth: Int,
+        frameHeight: Int
+    ) {
+        if (!isRunning || captureGen != sceneGenerationId) return
+        val startHalalify = SystemClock.elapsedRealtime()
+        val detections = halalifyDetector.detect(cleanBitmap)
+        val halalifyLatency = SystemClock.elapsedRealtime() - startHalalify
+        val femaleDetections = detections.filter { it.isFemale }
+
+        if (captureGen != sceneGenerationId) return
+
+        val dtX = accumulatedScrollDx - startScrollX
+        val dtY = accumulatedScrollDy - startScrollY
+
+        val (physicalW, physicalH) = getPhysicalScreenSize()
+        val scaleX = frameWidth.toFloat() / physicalW.toFloat().coerceAtLeast(1f)
+        val scaleY = frameHeight.toFloat() / physicalH.toFloat().coerceAtLeast(1f)
+
+        val scaledWinLeft = windowBounds.left * scaleX
+        val scaledWinTop = windowBounds.top * scaleY
+        val scaledWinWidth = (windowBounds.right - windowBounds.left) * scaleX
+        val scaledWinHeight = (windowBounds.bottom - windowBounds.top) * scaleY
+
+        val mappedFullBoxes = femaleDetections.map { det ->
+            val pxL = scaledWinLeft + (det.boundingBox.left * scaledWinWidth) + dtX
+            val pxT = scaledWinTop + (det.boundingBox.top * scaledWinHeight) + dtY
+            val pxR = scaledWinLeft + (det.boundingBox.right * scaledWinWidth) + dtX
+            val pxB = scaledWinTop + (det.boundingBox.bottom * scaledWinHeight) + dtY
+
+            val normL = (pxL / frameWidth).coerceIn(0f, 1f)
+            val normT = (pxT / frameHeight).coerceIn(0f, 1f)
+            val normR = (pxR / frameWidth).coerceIn(normL + 0.001f, 1f)
+            val normB = (pxB / frameHeight).coerceIn(normT + 0.001f, 1f)
+            TrackedModestyBox.createRectF(normL, normT, normR, normB)
+        }
+
+        val mergedBoxes = KltMathHelper.mergeBoxesSpatially(mappedFullBoxes, 40f / frameHeight)
+
+        val winNormL = (scaledWinLeft / frameWidth).coerceIn(0f, 1f)
+        val winNormT = (scaledWinTop / frameHeight).coerceIn(0f, 1f)
+        val winNormR = ((scaledWinLeft + scaledWinWidth) / frameWidth).coerceIn(winNormL + 0.001f, 1f)
+        val winNormB = ((scaledWinTop + scaledWinHeight) / frameHeight).coerceIn(winNormT + 0.001f, 1f)
+        val tileNormRect = TrackedModestyBox.createRectF(winNormL, winNormT, winNormR, winNormB)
+
+        if (::kltTracker.isInitialized) {
+            kltTracker.updateAnchorsCrossTile(
+                detections = mergedBoxes,
+                tileNormRect = tileNormRect,
+                frameWidth = frameWidth,
+                frameHeight = frameHeight,
+                timestampMs = captureTimestamp
+            )
+        }
+
+        renderOverlayAfterAnchor(halalifyLatency)
+    }
+
+    private fun dispatchMediaProjectionAnchor(
+        image: Image,
+        width: Int,
+        height: Int,
+        now: Long
+    ) {
+        val isPortrait = height >= width
+        val stageIdx = (tileStepIndex++) % 4
+
+        if (stageIdx == 0) {
+            // Stage 0: FullFrame Letterboxed
+            val fullBitmapInstance = copyFrameToInferenceBitmap(image)
+            if (fullBitmapInstance != null) {
+                val captureTimestamp = now
+                val captureGen = sceneGenerationId
+                val startScrollX = accumulatedScrollDx
+                val startScrollY = accumulatedScrollDy
+
                 inferenceHandler?.post {
                     try {
-                        if (!isRunning) return@post
+                        if (!isRunning || captureGen != sceneGenerationId) return@post
                         val startHalalify = SystemClock.elapsedRealtime()
-                        val detections = halalifyDetector.detect(bitmap)
+                        val detections = halalifyDetector.detect(fullBitmapInstance)
                         val halalifyLatency = SystemClock.elapsedRealtime() - startHalalify
                         val femaleDetections = detections.filter { it.isFemale }
 
+                        if (captureGen != sceneGenerationId) return@post
+
+                        val dtX = accumulatedScrollDx - startScrollX
+                        val dtY = accumulatedScrollDy - startScrollY
+
+                        val mappedFullBoxes = femaleDetections.map { det ->
+                            val pxL = det.boundingBox.left * width + dtX
+                            val pxT = det.boundingBox.top * height + dtY
+                            val pxR = det.boundingBox.right * width + dtX
+                            val pxB = det.boundingBox.bottom * height + dtY
+
+                            val normL = (pxL / width).coerceIn(0f, 1f)
+                            val normT = (pxT / height).coerceIn(0f, 1f)
+                            val normR = (pxR / width).coerceIn(normL + 0.001f, 1f)
+                            val normB = (pxB / height).coerceIn(normT + 0.001f, 1f)
+                            TrackedModestyBox.createRectF(normL, normT, normR, normB)
+                        }
+
+                        val mergedBoxes = KltMathHelper.mergeBoxesSpatially(mappedFullBoxes, 40f / height)
+                        val tileNormRect = TrackedModestyBox.createRectF(0f, 0f, 1f, 1f)
+
                         if (::kltTracker.isInitialized) {
-                            kltTracker.initOrUpdateAnchorsFromHalalify(
-                                detections = femaleDetections,
+                            kltTracker.updateAnchorsCrossTile(
+                                detections = mergedBoxes,
+                                tileNormRect = tileNormRect,
                                 frameWidth = width,
                                 frameHeight = height,
                                 timestampMs = captureTimestamp
                             )
                         }
 
-                        if (femaleDetections.isNotEmpty()) {
-                            val paddedBoxes = if (::kltTracker.isInitialized) {
-                                val tracks = kltTracker.getPaddedBoxes()
-                                if (tracks.isNotEmpty()) tracks else femaleDetections.map { it.boundingBox }
-                            } else {
-                                femaleDetections.map { it.boundingBox }
-                            }
-                            val (screenWidth, screenHeight) = getPhysicalScreenSize()
-                            blurOverlayManager.updateRegionsMapped(
-                                rawRegions = paddedBoxes,
-                                targetWidth = screenWidth,
-                                targetHeight = screenHeight,
-                                sourceWidth = 1,
-                                sourceHeight = 1
-                            )
-
-                            if (::nudeNetDetector.isInitialized) {
-                                val nudeResult = nudeNetDetector.detect(bitmap)
-                                handleNudeNetResult(nudeResult)
-                            }
-                        } else if (::kltTracker.isInitialized && !kltTracker.hasActiveTracks()) {
-                            blurOverlayManager.updateRegions(emptyList())
-                            val nowMs = SystemClock.elapsedRealtime()
-                            if (nowMs - lastHalalifyIdleLogMs >= 2000L) {
-                                lastHalalifyIdleLogMs = nowMs
-                                val rawConfPercent = (halalifyDetector.lastMaxRawFemaleConfidence * 100).toInt()
-                                Log.i(TAG, "[Halalify Shield] Idle | Max Raw Conf: $rawConfPercent% | Latency: ${halalifyLatency}ms")
-                            }
-                        }
+                        renderOverlayAfterAnchor(halalifyLatency)
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error in AI inference", e)
+                        Log.e(TAG, "Error in FullFrame AI inference", e)
+                    } finally {
+                        lastAnchorCheckTimeMs = SystemClock.elapsedRealtime()
+                        isHalalifyInferring.set(false)
+                    }
+                }
+            } else {
+                isHalalifyInferring.set(false)
+            }
+        } else {
+            // Stages 1, 2, 3: Slices (Top, Mid, Bottom / Left, Center, Right)
+            val sliceIdx = stageIdx - 1
+            val tileW = 416.coerceAtMost(width)
+            val tileH = 416.coerceAtMost(height)
+
+            val tileOffsetX: Int
+            val tileOffsetY: Int
+            if (isPortrait) {
+                tileOffsetX = 0
+                val maxOffsetY = (height - tileH).coerceAtLeast(0)
+                tileOffsetY = when (sliceIdx) {
+                    0 -> 0 // Top
+                    1 -> maxOffsetY / 2 // Middle
+                    else -> maxOffsetY // Bottom
+                }
+            } else {
+                tileOffsetY = 0
+                val maxOffsetX = (width - tileW).coerceAtLeast(0)
+                tileOffsetX = when (sliceIdx) {
+                    0 -> 0 // Left
+                    1 -> maxOffsetX / 2 // Center
+                    else -> maxOffsetX // Right
+                }
+            }
+
+            val tileBitmapInstance = copyTileToBitmap(image, tileOffsetX, tileOffsetY, tileW, tileH)
+            if (tileBitmapInstance != null) {
+                val captureTimestamp = now
+                val captureGen = sceneGenerationId
+                val startScrollX = accumulatedScrollDx
+                val startScrollY = accumulatedScrollDy
+
+                inferenceHandler?.post {
+                    try {
+                        if (!isRunning || captureGen != sceneGenerationId) return@post
+                        val startHalalify = SystemClock.elapsedRealtime()
+                        val detections = halalifyDetector.detect(tileBitmapInstance)
+                        val halalifyLatency = SystemClock.elapsedRealtime() - startHalalify
+                        val femaleDetections = detections.filter { it.isFemale }
+
+                        if (captureGen != sceneGenerationId) return@post
+
+                        val dtX = accumulatedScrollDx - startScrollX
+                        val dtY = accumulatedScrollDy - startScrollY
+
+                        val mappedFullBoxes = femaleDetections.map { det ->
+                            val pxL = det.boundingBox.left * tileW + tileOffsetX + dtX
+                            val pxT = det.boundingBox.top * tileH + tileOffsetY + dtY
+                            val pxR = det.boundingBox.right * tileW + tileOffsetX + dtX
+                            val pxB = det.boundingBox.bottom * tileH + tileOffsetY + dtY
+
+                            val normL = (pxL / width).coerceIn(0f, 1f)
+                            val normT = (pxT / height).coerceIn(0f, 1f)
+                            val normR = (pxR / width).coerceIn(normL + 0.001f, 1f)
+                            val normB = (pxB / height).coerceIn(normT + 0.001f, 1f)
+                            TrackedModestyBox.createRectF(normL, normT, normR, normB)
+                        }
+
+                        val mergedBoxes = KltMathHelper.mergeBoxesSpatially(mappedFullBoxes, 40f / height)
+
+                        val tileNormRect = TrackedModestyBox.createRectF(
+                            tileOffsetX.toFloat() / width,
+                            tileOffsetY.toFloat() / height,
+                            (tileOffsetX + tileW).toFloat() / width,
+                            (tileOffsetY + tileH).toFloat() / height
+                        )
+
+                        if (::kltTracker.isInitialized) {
+                            kltTracker.updateAnchorsCrossTile(
+                                detections = mergedBoxes,
+                                tileNormRect = tileNormRect,
+                                frameWidth = width,
+                                frameHeight = height,
+                                timestampMs = captureTimestamp
+                            )
+                        }
+
+                        renderOverlayAfterAnchor(halalifyLatency)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error in Tile AI inference", e)
                     } finally {
                         lastAnchorCheckTimeMs = SystemClock.elapsedRealtime()
                         isHalalifyInferring.set(false)
@@ -222,129 +467,165 @@ class AiInferenceCoordinator(
         }
     }
 
+    private fun renderOverlayAfterAnchor(halalifyLatency: Long) {
+        if (::kltTracker.isInitialized && kltTracker.hasActiveTracks()) {
+            val paddedBoxes = kltTracker.getPaddedBoxes()
+            val (screenWidth, screenHeight) = getPhysicalScreenSize()
+            val overlayNeedsRedraw = !blurOverlayManager.hasActiveRegions || hasBoxesChangedSignificantly(paddedBoxes, screenWidth, screenHeight)
+            if (overlayNeedsRedraw) {
+                blurOverlayManager.updateRegionsMapped(
+                    rawRegions = paddedBoxes,
+                    targetWidth = screenWidth,
+                    targetHeight = screenHeight,
+                    sourceWidth = 1,
+                    sourceHeight = 1
+                )
+            }
+        } else if (::kltTracker.isInitialized && !kltTracker.hasActiveTracks()) {
+            lastDrawnPixelBoxes.clear()
+            blurOverlayManager.updateRegions(emptyList())
+            val nowMs = SystemClock.elapsedRealtime()
+            if (nowMs - lastHalalifyIdleLogMs >= 2000L) {
+                lastHalalifyIdleLogMs = nowMs
+                val rawConfPercent = (halalifyDetector.lastMaxRawFemaleConfidence * 100).toInt()
+                Log.i(TAG, "[Halalify Shield] Idle | Max Raw Conf: $rawConfPercent% | Latency: ${halalifyLatency}ms")
+            }
+        }
+    }
+
+    private fun hasBoxesChangedSignificantly(
+        newBoxes: List<RectF>,
+        screenWidth: Int,
+        screenHeight: Int
+    ): Boolean {
+        if (newBoxes.size != lastDrawnPixelBoxes.size) {
+            updateLastDrawnPixelBoxes(newBoxes, screenWidth, screenHeight)
+            return true
+        }
+        val sw = screenWidth.toFloat()
+        val sh = screenHeight.toFloat()
+        for (i in newBoxes.indices) {
+            val nb = newBoxes[i]
+            val ob = lastDrawnPixelBoxes[i]
+            val nl = nb.left * sw
+            val nt = nb.top * sh
+            val nr = nb.right * sw
+            val nb_ = nb.bottom * sh
+
+            if (kotlin.math.abs(nl - ob.left) >= 1.0f ||
+                kotlin.math.abs(nt - ob.top) >= 1.0f ||
+                kotlin.math.abs(nr - ob.right) >= 1.0f ||
+                kotlin.math.abs(nb_ - ob.bottom) >= 1.0f) {
+                updateLastDrawnPixelBoxes(newBoxes, screenWidth, screenHeight)
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun updateLastDrawnPixelBoxes(
+        boxes: List<RectF>,
+        screenWidth: Int,
+        screenHeight: Int
+    ) {
+        val sw = screenWidth.toFloat()
+        val sh = screenHeight.toFloat()
+        while (lastDrawnPixelBoxes.size < boxes.size) {
+            lastDrawnPixelBoxes.add(RectF())
+        }
+        while (lastDrawnPixelBoxes.size > boxes.size) {
+            lastDrawnPixelBoxes.removeAt(lastDrawnPixelBoxes.size - 1)
+        }
+        for (i in boxes.indices) {
+            val src = boxes[i]
+            val dst = lastDrawnPixelBoxes[i]
+            dst.left = src.left * sw
+            dst.top = src.top * sh
+            dst.right = src.right * sw
+            dst.bottom = src.bottom * sh
+        }
+    }
+
     fun onStaticScreen() {
-        if (::blurOverlayManager.isInitialized && blurOverlayManager.hasActiveRegions && !blurOverlayManager.isPendingClear) {
+        if (::kltTracker.isInitialized && !kltTracker.hasActiveTracks()) {
+            accumulatedScrollDx = 0f
+            accumulatedScrollDy = 0f
+        }
+        if (::blurOverlayManager.isInitialized && blurOverlayManager.hasActiveRegions) {
             blurOverlayManager.retainActiveRegions()
         }
     }
 
     fun onHardSceneCut() {
+        sceneGenerationId++
+        accumulatedScrollDx = 0f
+        accumulatedScrollDy = 0f
+        lastDrawnPixelBoxes.clear()
         if (::kltTracker.isInitialized) {
             kltTracker.flush()
         }
-    }
-
-    private fun handleNudeNetResult(result: NudeNetResult) {
-        if (result.hasHardPorn) {
-            val topHard = result.detections
-                .filter { it.isHardPorn }
-                .maxByOrNull { it.confidence }
-            if (topHard != null) {
-                onDetectionUpdated(topHard.classType.labelAr, topHard.confidence)
-                triggerHardPornAlertThrottled(topHard.confidence)
-            }
-        } else if (result.hasSoftPorn) {
-            val topSoft = result.detections
-                .filter { it.isSoftPorn }
-                .maxByOrNull { it.confidence }
-            if (topSoft != null) {
-                onDetectionUpdated(topSoft.classType.labelAr, topSoft.confidence)
-                triggerSoftPornAlertThrottled(topSoft.classType.labelAr, topSoft.confidence)
-            }
+        if (::blurOverlayManager.isInitialized) {
+            blurOverlayManager.dismissFast()
         }
     }
 
-    private fun triggerHardPornAlertThrottled(confidence: Float) {
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastAlertTimeMs < ALERT_DEBOUNCE_MS) return
-        lastAlertTimeMs = now
+    private fun copyTileToBitmap(
+        image: Image,
+        offsetX: Int,
+        offsetY: Int,
+        tileWidth: Int,
+        tileHeight: Int
+    ): Bitmap? {
+        val plane = image.planes.firstOrNull() ?: return null
+        val buffer = plane.buffer
+        val pixelStride = plane.pixelStride
+        val rowStride = plane.rowStride
 
-        val confidencePercent = (confidence * 100).toInt()
-        val message = context.getString(R.string.ai_alert_hard_porn, confidencePercent)
-
-        triggerDoubleHapticPulse()
-        mainHandler.post {
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        var bitmap = tileBitmap
+        if (bitmap == null || bitmap.isRecycled || bitmap.width != tileWidth || bitmap.height != tileHeight) {
+            try { bitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical: ${e.message}") }
+            bitmap = Bitmap.createBitmap(tileWidth, tileHeight, Bitmap.Config.ARGB_8888)
+            tileBitmap = bitmap
         }
 
+        val requiredPixelCount = tileWidth * tileHeight
+        var pixels = scratchTilePixels
+        if (pixels == null || pixels.size != requiredPixelCount) {
+            pixels = IntArray(requiredPixelCount)
+            scratchTilePixels = pixels
+        }
+
+        val requiredRowBytes = (offsetX + tileWidth) * pixelStride
+        var rowBytes = scratchRowBytes
+        if (rowBytes == null || rowBytes.size < requiredRowBytes) {
+            rowBytes = ByteArray(requiredRowBytes.coerceAtLeast(rowStride))
+            scratchRowBytes = rowBytes
+        }
+
+        val savedPos = buffer.position()
         try {
-            com.drmohammed.antiporn.notification.manager.AppNotificationManager.getInstance(context).postEventNotification(
-                category = com.drmohammed.antiporn.notification.model.NotificationCategory.AI,
-                title = context.getString(R.string.ai_service_channel_name),
-                message = message,
-                dedupKey = "ai_porn_alert_hard",
-                cooldownMs = 15 * 60 * 1000L,
-                actionType = com.drmohammed.antiporn.notification.model.NotificationActionType.NONE,
-                postSystemNotification = false
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "Error recording hard porn alert in in-app notification center", e)
-        }
-    }
-
-    private fun triggerSoftPornAlertThrottled(label: String, confidence: Float) {
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastAlertTimeMs < ALERT_DEBOUNCE_MS) return
-        lastAlertTimeMs = now
-
-        val confidencePercent = (confidence * 100).toInt()
-        val message = context.getString(R.string.ai_alert_soft_porn, label, confidencePercent)
-
-        triggerHapticPulse()
-        mainHandler.post {
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun triggerDoubleHapticPulse() {
-        try {
-            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                vm?.defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-            } ?: return
-
-            if (!vibrator.hasVibrator()) return
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val timings = longArrayOf(0, 200, 100, 250)
-                if (vibrator.hasAmplitudeControl()) {
-                    val amplitudes = intArrayOf(0, 255, 0, 255)
-                    vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
-                } else {
-                    vibrator.vibrate(VibrationEffect.createWaveform(timings, -1))
+            for (ty in 0 until tileHeight) {
+                val fullY = offsetY + ty
+                buffer.position(fullY * rowStride)
+                buffer.get(rowBytes, 0, requiredRowBytes)
+                val outRowOffset = ty * tileWidth
+                for (tx in 0 until tileWidth) {
+                    val fullX = offsetX + tx
+                    val px = fullX * pixelStride
+                    val r = rowBytes[px].toInt() and 0xFF
+                    val g = rowBytes[px + 1].toInt() and 0xFF
+                    val b = rowBytes[px + 2].toInt() and 0xFF
+                    val a = if (pixelStride >= 4) (rowBytes[px + 3].toInt() and 0xFF) else 0xFF
+                    pixels[outRowOffset + tx] = (a shl 24) or (r shl 16) or (g shl 8) or b
                 }
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(longArrayOf(0, 200, 100, 250), -1)
             }
+            bitmap.setPixels(pixels, 0, tileWidth, 0, 0, tileWidth, tileHeight)
+            return bitmap
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to trigger double haptic pulse", e)
-        }
-    }
-
-    private fun triggerHapticPulse() {
-        try {
-            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                vm?.defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-            } ?: return
-
-            if (!vibrator.hasVibrator()) return
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(150L, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(150L)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to trigger haptic pulse", e)
+            Log.e(TAG, "Failed to copy tile to inference bitmap", e)
+            return null
+        } finally {
+            try { buffer.position(savedPos) } catch (e: Exception) { Log.d(TAG, "Non-critical: ${e.message}") }
         }
     }
 
@@ -435,8 +716,11 @@ class AiInferenceCoordinator(
                 try { if (::halalifyDetector.isInitialized) halalifyDetector.close() } catch (e: Exception) { Log.e(TAG, "Error closing halalify", e) }
                 try { if (::nudeNetDetector.isInitialized) nudeNetDetector.close() } catch (e: Exception) { Log.e(TAG, "Error closing nudeNet", e) }
                 try { inferenceBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical: ${e.message}") }
+                try { tileBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical: ${e.message}") }
                 inferenceBitmap = null
+                tileBitmap = null
                 scratchPixels = null
+                scratchTilePixels = null
                 scratchRowBytes = null
                 try { worker.quitSafely() } catch (e: Exception) { Log.d(TAG, "Non-critical: ${e.message}") }
             }
@@ -444,8 +728,11 @@ class AiInferenceCoordinator(
             try { if (::halalifyDetector.isInitialized) halalifyDetector.close() } catch (e: Exception) { Log.e(TAG, "Error closing halalify", e) }
             try { if (::nudeNetDetector.isInitialized) nudeNetDetector.close() } catch (e: Exception) { Log.e(TAG, "Error closing nudeNet", e) }
             try { inferenceBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical: ${e.message}") }
+            try { tileBitmap?.recycle() } catch (e: Exception) { Log.d(TAG, "Non-critical: ${e.message}") }
             inferenceBitmap = null
+            tileBitmap = null
             scratchPixels = null
+            scratchTilePixels = null
             scratchRowBytes = null
         }
     }
@@ -468,7 +755,7 @@ class AiInferenceCoordinator(
 
     companion object {
         private const val TAG = "AiInferenceCoord"
-        private const val ALERT_DEBOUNCE_MS = 5000L
+        private const val ENABLE_NUDENET = false
         const val ANCHOR_INTERVAL_MS = 200L
     }
 }
