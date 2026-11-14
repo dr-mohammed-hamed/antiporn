@@ -87,6 +87,16 @@ object OtaPackageInstaller {
             isCommitted = true
             session.close()
 
+            // PackageInstaller has staged the package internally; safely reclaim cache space
+            try {
+                if (apkFile.exists()) {
+                    val deleted = apkFile.delete()
+                    Log.d(TAG, "Post-commit APK cleanup: ${apkFile.name}, deleted=$deleted")
+                }
+            } catch (cleanupEx: Exception) {
+                Log.w(TAG, "Non-critical: Failed to delete staged APK file: ${apkFile.absolutePath}", cleanupEx)
+            }
+
             Log.i(TAG, "OTA PackageInstaller session $sessionId committed successfully for ${context.packageName}")
             Result.success(sessionId)
         } catch (e: Exception) {

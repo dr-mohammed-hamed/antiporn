@@ -45,7 +45,6 @@ class SelfControlApprovalsViewBinder(
     fun renderPendingApprovals(items: List<Pair<String, String>>) {
         layoutPendingApps.removeAllViews()
         if (items.isEmpty()) {
-            layoutPendingApps.addView(tvNoPendingApps)
             tvNoPendingApps.visibility = View.VISIBLE
             cardPendingApps?.visibility = View.GONE
             return

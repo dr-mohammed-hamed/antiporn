@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.File
 
 /**
@@ -45,6 +46,9 @@ class OtaRepository(private val appContext: Context) {
 
     @Volatile
     private var lastTargetVersionName: String? = null
+
+    @Volatile
+    private var activeDownloadVersionCode: Long? = null
 
     init {
         // Register receiver status callback for completed or failed installations
@@ -137,8 +141,12 @@ class OtaRepository(private val appContext: Context) {
         }
 
         lastTargetVersionName = info.versionName
+        activeDownloadVersionCode = info.versionCode
 
         try {
+            // Proactively purge obsolete APKs and transient files before starting download to prevent ENOSPC
+            purgeOtaCache(context)
+
             val otaCacheDir = File(context.cacheDir, "ota").apply {
                 if (!exists()) mkdirs()
             }
@@ -252,6 +260,7 @@ class OtaRepository(private val appContext: Context) {
             }
             Result.failure(e)
         } finally {
+            activeDownloadVersionCode = null
             downloadMutex.unlock()
         }
     }
@@ -289,6 +298,45 @@ class OtaRepository(private val appContext: Context) {
                 Log.e(TAG, "Error in checkForUpdatesAndAutoInstallAsync", e)
             }
         }
+    }
+
+    /**
+     * Purges Over-The-Air (OTA) APK binaries and transient download artifacts (.tmp)
+     * from the internal cache directory to prevent storage bloat and ENOSPC failures.
+     *
+     * @param context Application context.
+     * @param excludeVersionCode Optional versionCode to preserve if an update is actively downloading or being installed.
+     * @return Number of deleted files.
+     */
+    fun purgeOtaCache(context: Context, excludeVersionCode: Long? = null): Int {
+        var deletedCount = 0
+        try {
+            val otaCacheDir = File(context.cacheDir, "ota")
+            if (!otaCacheDir.exists() || !otaCacheDir.isDirectory) {
+                return 0
+            }
+            val targetExcludeCode = excludeVersionCode ?: activeDownloadVersionCode
+            val files = otaCacheDir.listFiles() ?: return 0
+            for (file in files) {
+                if (file.isFile && (file.extension.equals("apk", ignoreCase = true) || file.extension.equals("tmp", ignoreCase = true))) {
+                    if (targetExcludeCode != null && file.name.startsWith("antiporn_update_${targetExcludeCode}.apk", ignoreCase = true)) {
+                        continue
+                    }
+                    if (file.delete()) {
+                        deletedCount++
+                        Timber.tag(TAG).d("Purged OTA cache file: %s", file.name)
+                    } else {
+                        Timber.tag(TAG).w("Failed to delete OTA cache file: %s", file.name)
+                    }
+                }
+            }
+            if (deletedCount > 0) {
+                Timber.tag(TAG).i("OTA cache purge completed: removed %d obsolete package(s)", deletedCount)
+            }
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Error during OTA cache purge")
+        }
+        return deletedCount
     }
 
     companion object {

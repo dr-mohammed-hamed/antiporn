@@ -7,6 +7,7 @@ import com.drmohammed.antiporn.curfew.ZeroTrustForegroundWatcher
 import com.drmohammed.antiporn.data.local.db.HisnRoomDatabase
 import com.drmohammed.antiporn.data.repository.PolicyRepository
 import com.drmohammed.antiporn.di.appModule
+import com.drmohammed.antiporn.ota.repository.OtaRepository
 import com.drmohammed.antiporn.telemetry.GlobalCrashHandler
 import com.drmohammed.antiporn.work.CloudSyncWorker
 import com.drmohammed.antiporn.work.OtaUpdateWorker
@@ -119,9 +120,19 @@ class AntiPornApplication : Application(), Configuration.Provider {
         OtaUpdateWorker.schedule(this)
         CloudSyncWorker.schedule(this)
 
-        // Prune diagnostic events and in-app notifications in background (non-blocking)
+        // Prune diagnostic events, in-app notifications, and obsolete OTA APKs in background (non-blocking)
         applicationScope.launch {
             try {
+                // Purge obsolete OTA update APKs and temp downloads from cacheDir
+                try {
+                    val purgedCount = OtaRepository.getInstance(this@AntiPornApplication).purgeOtaCache(this@AntiPornApplication)
+                    if (purgedCount > 0) {
+                        Timber.i("Cleaned up $purgedCount obsolete OTA package(s) on application launch")
+                    }
+                } catch (e: Exception) {
+                    Timber.w(e, "Failed to purge OTA cache on application launch")
+                }
+
                 val db = HisnRoomDatabase.getInstance(this@AntiPornApplication)
                 val cutoff = TrustedTimeProvider.currentTimeMillis(this@AntiPornApplication) - (30L * 24 * 60 * 60 * 1000)
                 val pruned = db.diagnosticEventDao().pruneEventsOlderThan(cutoff)

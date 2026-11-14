@@ -1,12 +1,17 @@
 package com.drmohammed.antiporn.ota
 
+import android.content.Context
+import android.content.ContextWrapper
 import com.drmohammed.antiporn.ota.model.OtaUpdateState
 import com.drmohammed.antiporn.ota.model.OtaVersionInfo
 import com.drmohammed.antiporn.ota.notification.OtaNotificationManager
+import com.drmohammed.antiporn.ota.repository.OtaRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import java.io.File
 
 class OtaRepositoryAndNotificationTest {
@@ -77,5 +82,72 @@ class OtaRepositoryAndNotificationTest {
         assertTrue(info.isMandatoryFor(9L))
         assertFalse(info.isMandatoryFor(10L))
         assertFalse(info.isMandatoryFor(12L))
+    }
+
+    @get:Rule
+    val tempFolder = TemporaryFolder()
+
+    @Test
+    fun testPurgeOtaCache_cleansObsoleteApksAndTmpFiles() {
+        val cacheDir = tempFolder.newFolder("cache")
+        val otaDir = File(cacheDir, "ota").apply { mkdirs() }
+
+        val apk20 = File(otaDir, "antiporn_update_20.apk").apply { writeText("dummy apk 20") }
+        val apk21 = File(otaDir, "antiporn_update_21.apk").apply { writeText("dummy apk 21") }
+        val tmpFile = File(otaDir, "antiporn_update_22.apk.tmp").apply { writeText("dummy tmp") }
+        val notesFile = File(otaDir, "notes.txt").apply { writeText("keep me") }
+
+        val fakeContext = object : ContextWrapper(null) {
+            override fun getApplicationContext(): Context = this
+            override fun getCacheDir(): File = cacheDir
+        }
+
+        val otaRepo = OtaRepository(fakeContext)
+        val deletedCount = otaRepo.purgeOtaCache(fakeContext)
+
+        assertEquals(3, deletedCount)
+        assertFalse(apk20.exists())
+        assertFalse(apk21.exists())
+        assertFalse(tmpFile.exists())
+        assertTrue(notesFile.exists())
+    }
+
+    @Test
+    fun testPurgeOtaCache_withExcludeVersionCode_preservesTargetApk() {
+        val cacheDir = tempFolder.newFolder("cache_exclude")
+        val otaDir = File(cacheDir, "ota").apply { mkdirs() }
+
+        val apk20 = File(otaDir, "antiporn_update_20.apk").apply { writeText("dummy apk 20") }
+        val apk21 = File(otaDir, "antiporn_update_21.apk").apply { writeText("dummy apk 21") }
+        val tmp21 = File(otaDir, "antiporn_update_21.apk.tmp").apply { writeText("dummy tmp 21") }
+        val tmpFile = File(otaDir, "download.tmp").apply { writeText("dummy tmp") }
+
+        val fakeContext = object : ContextWrapper(null) {
+            override fun getApplicationContext(): Context = this
+            override fun getCacheDir(): File = cacheDir
+        }
+
+        val otaRepo = OtaRepository(fakeContext)
+        val deletedCount = otaRepo.purgeOtaCache(fakeContext, excludeVersionCode = 21L)
+
+        assertEquals(2, deletedCount)
+        assertFalse(apk20.exists())
+        assertTrue(apk21.exists())
+        assertTrue(tmp21.exists())
+        assertFalse(tmpFile.exists())
+    }
+
+    @Test
+    fun testPurgeOtaCache_whenOtaDirDoesNotExist_returnsZero() {
+        val emptyCacheDir = tempFolder.newFolder("empty_cache")
+        val fakeContext = object : ContextWrapper(null) {
+            override fun getApplicationContext(): Context = this
+            override fun getCacheDir(): File = emptyCacheDir
+        }
+
+        val otaRepo = OtaRepository(fakeContext)
+        val deletedCount = otaRepo.purgeOtaCache(fakeContext)
+
+        assertEquals(0, deletedCount)
     }
 }
