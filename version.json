@@ -1,11 +1,11 @@
 {
-  "versionCode": 20,
-  "versionName": "1.81",
+  "versionCode": 21,
+  "versionName": "1.82",
   "minSupportedVersion": 1,
   "apkFileName": "antiporn-release.apk",
   "downloadUrl": "https://pub-e568dc85c0ec4f2fb3d1b90e310b4310.r2.dev/antiporn-release.apk",
-  "fileSizeBytes": 35529208,
+  "fileSizeBytes": 35541496,
   "sha256CertificateChecksum": "Cxi7DKn3ddcJXYIuDNXdlKN84EuKu8Bf0L0SkSPCOMk",
-  "releaseNotes": "إصدار 1.81 (كود البناء 20): تحصين أمني شامل ضد التلاعب بالوقت عبر التحقق الجماعي من الخوادم، وتشفير رمز قفل QR عبر AndroidKeyStore، وتأمين فك الارتباط الطارئ، وتحسين استقرار درع الـ VPN والمزامنة السحابية والقيلولة وواجهة المستخدم.",
-  "releaseDate": "2026-11-12"
+  "releaseNotes": "إصدار 1.82 (كود البناء 21): ميزات جديدة لنظام 'وقفة' (جلسات مفتوحة ومدد مخصصة وإشعارات حية)، تحصين حاجز رمز الاستجابة السريعة QR ضد التلاعب، وتحديثات استقرار لدرع الذكاء الاصطناعي وتتبع الشاشة.",
+  "releaseDate": "2026-11-14"
 }
