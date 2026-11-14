@@ -1304,4 +1304,21 @@
     <string name="badge_count_overflow">99+</string>
     <string name="toast_curfew_invalid_same_start_end">لا يمكن أن يتطابق وقت بداية الحظر مع وقت نهايته.</string>
     <string name="shield_dns_local_filter_needs_sync">مرشح الـ DNS المحلي نشط، لكن إعدادات DNS الخاص أو القيود تحتاج للمزامنة.</string>
+
+    <!-- Auto-Freeze New Installs & High-Risk Custom Strings -->
+    <string name="dialog_freeze_new_installs_title">تأكيد تفعيل تجميد التطبيقات الجديدة</string>
+    <string name="dialog_freeze_new_installs_msg">عند تفعيل هذا الخيار، سيتم تجميد أي تطبيق جديد يتم تثبيته على الجهاز فوراً ولن يعمل حتى تتم الموافقة عليه يدوياً من إدارة التطبيقات.\n\nالتطبيقات شديدة الخطورة سيتم تمييزها بشارة حمراء.\n\nهل ترغب بالتفعيل؟</string>
+    <string name="btn_confirm_freeze_new_installs">تفعيل التجميد</string>
+    <string name="badge_high_risk_app">شديد الخطورة</string>
+    <string name="toast_high_risk_app_suspended">تم تجميد هذا التطبيق لاحتوائه على مخاطر عالية، وهو بانتظار موافقة المشرف</string>
+    <string name="notification_high_risk_app_frozen_title">تطبيق شديد الخطورة معلّق</string>
+    <string name="notification_high_risk_app_frozen_msg">تم تجميد %1$s لاحتوائه على مخاطر عالية، وهو بانتظار الموافقة في لوحة التحكم.</string>
+    <!-- Remote Self-Control QR Reset Additions -->
+    <string name="btn_reset_ward_qr_lock">إلغاء قفل الـ QR عن المكفول</string>
+    <string name="dialog_reset_ward_qr_title">إلغاء قفل الرقابة الذاتية</string>
+    <string name="dialog_reset_ward_qr_msg">هل أنت متأكد من إلغاء قفل الـ QR عن هاتف المكفول؟\n\nسيتم فك القفل فورياً وحذف التوكن الضائع بمجرد اتصال جهازه بالإنترنت، ليتمكن من الدخول لإعداداته وإنشاء رمز جديد متى شاء.</string>
+    <string name="toast_reset_ward_qr_success">تم إرسال أمر فك قفل الـ QR بنجاح</string>
+    <string name="toast_reset_ward_qr_failed">فشل إرسال أمر فك القفل، تحقق من اتصالك بالإنترنت</string>
+    <string name="notif_self_control_qr_reset_by_guardian_title">تم إلغاء قفل الرقابة الذاتية</string>
+    <string name="notif_self_control_qr_reset_by_guardian_msg">قام المشرف بإلغاء قفل الـ QR وحذف التوكن عن بُعد بنجاح.</string>
 </resources>

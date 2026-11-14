@@ -266,6 +266,41 @@ class GuardianControlViewModel(
         }
     }
 
+    fun resetWardSelfControlQr(onComplete: (Boolean) -> Unit) {
+        val state = _uiState.value
+        if (state.wardId.isBlank()) {
+            onComplete(false)
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = getApplication<android.app.Application>()
+            val now = com.drmohammed.antiporn.core.time.TrustedTimeProvider.currentTimeMillis(context)
+            val current = _uiState.value.currentPolicy
+            val updated = current.copy(
+                remoteSelfControlResetRequestedAt = now,
+                version = current.version + 1,
+                updatedAt = now
+            )
+            val success = policyRepository.pushPolicyToWard(state.wardId, updated)
+            withContext(Dispatchers.Main) {
+                if (success) {
+                    _uiState.update {
+                        it.copy(
+                            currentPolicy = updated,
+                            initialPolicySnapshot = updated.copy(),
+                            version = updated.version
+                        )
+                    }
+                    _events.emit(GuardianControlEvent.ShowToastRes(R.string.toast_reset_ward_qr_success))
+                } else {
+                    _events.emit(GuardianControlEvent.ShowToastRes(R.string.toast_reset_ward_qr_failed))
+                }
+                onComplete(success)
+            }
+        }
+    }
+
     fun toggleVpnBlackhole(enabled: Boolean) {
         _uiState.update { it.copy(isVpnBlackholeEnabled = enabled) }
     }

@@ -197,10 +197,10 @@ class CurfewHardeningTest {
             )
         )
 
-        // Automatic / unreviewed decisions must NEVER unlock high-risk apps
-        assertFalse(CurfewLifecycleHandler.isApprovalEligibleForRelease(highRiskPkg, isApproved = true, decidedBy = null))
-        assertFalse(CurfewLifecycleHandler.isApprovalEligibleForRelease(highRiskPkg, isApproved = true, decidedBy = "INITIAL_DEVICE_BASELINE"))
-        assertFalse(CurfewLifecycleHandler.isApprovalEligibleForRelease(highRiskPkg, isApproved = true, decidedBy = "AUTO_APPROVED_UNLOCKED"))
+        // Approved high-risk apps (including baseline/auto-approved) are eligible for daytime release unless custom-blacklisted
+        assertTrue(CurfewLifecycleHandler.isApprovalEligibleForRelease(highRiskPkg, isApproved = true, decidedBy = "guardian_uid_123"))
+        assertTrue(CurfewLifecycleHandler.isApprovalEligibleForRelease(highRiskPkg, isApproved = true, decidedBy = "INITIAL_DEVICE_BASELINE"))
+        assertTrue(CurfewLifecycleHandler.isApprovalEligibleForRelease(highRiskPkg, isApproved = true, decidedBy = "AUTO_APPROVED_UNLOCKED"))
         assertFalse(CurfewLifecycleHandler.isApprovalEligibleForRelease(highRiskPkg, isApproved = false, decidedBy = "guardian_uid_123"))
 
         // Non-high-risk approved apps remain eligible even with null decidedBy

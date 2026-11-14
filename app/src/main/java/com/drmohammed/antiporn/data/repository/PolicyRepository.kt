@@ -95,8 +95,9 @@ class PolicyRepository(
                     false
                 }
             }
-            @Suppress("UNUSED_VARIABLE")
-            val ignored = adopted
+            if (adopted) {
+                checkAndApplyRemoteSelfControlReset(reconciled)
+            }
         }
         // Observe local policy changes and trigger background sync
         startFirestoreSync()
@@ -429,6 +430,37 @@ class PolicyRepository(
             return
         }
         recordAndHandleSupervisionChange(bundle, previous)
+        checkAndApplyRemoteSelfControlReset(bundle)
+    }
+
+    private fun checkAndApplyRemoteSelfControlReset(policy: DevicePolicyBundle) {
+        val remoteResetAt = policy.remoteSelfControlResetRequestedAt ?: return
+        if (remoteResetAt <= 0L) return
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val lastProcessed = prefs.getLong(KEY_LAST_PROCESSED_REMOTE_RESET_AT, 0L)
+        if (remoteResetAt > lastProcessed) {
+            prefs.edit().putLong(KEY_LAST_PROCESSED_REMOTE_RESET_AT, remoteResetAt).apply()
+            Log.i(TAG, "[SelfControlDiag] Executing remote Self-Control QR reset requested at $remoteResetAt")
+            val qrManager = com.drmohammed.antiporn.ui.control.qr.SelfControlQrManager.getInstance(appContext)
+            qrManager.completeEmergencyUnlock()
+            try {
+                com.drmohammed.antiporn.notification.manager.AppNotificationManager.getInstance(appContext).postEventNotification(
+                    category = com.drmohammed.antiporn.notification.model.NotificationCategory.SYSTEM,
+                    title = appContext.getString(R.string.notif_self_control_qr_reset_by_guardian_title),
+                    message = appContext.getString(R.string.notif_self_control_qr_reset_by_guardian_msg),
+                    dedupKey = "qr_reset_$remoteResetAt",
+                    cooldownMs = 0L,
+                    actionType = com.drmohammed.antiporn.notification.model.NotificationActionType.NONE,
+                    actionPayload = null,
+                    systemNotificationId = com.drmohammed.antiporn.notification.registry.NotificationRegistry.EVENT_WARD_REQUEST_ID,
+                    channelId = com.drmohammed.antiporn.notification.registry.NotificationRegistry.CHANNEL_ID_PROTECTION_EVENTS,
+                    postSystemNotification = true,
+                    importance = 2
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed posting QR reset notification", e)
+            }
+        }
     }
 
     private fun recordAndHandleSupervisionChange(bundle: DevicePolicyBundle, previous: DevicePolicyBundle) {
@@ -691,6 +723,7 @@ class PolicyRepository(
         private const val TAG = "AntiPorn_PolicyRepo"
         const val PREFS_NAME = "hisn_policy_fast_cache"
         const val KEY_CACHED_POLICY_JSON = "cached_policy_json"
+        const val KEY_LAST_PROCESSED_REMOTE_RESET_AT = "last_processed_remote_reset_at"
 
         @Volatile
         private var instance: PolicyRepository? = null

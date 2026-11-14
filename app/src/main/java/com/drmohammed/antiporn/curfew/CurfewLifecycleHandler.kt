@@ -436,16 +436,13 @@ internal object CurfewLifecycleHandler {
         return policyState.approvedPackages.contains(pkg) || isImmune || isSystem
     }
 
+    @Suppress("UNUSED_PARAMETER")
     internal fun isApprovalEligibleForRelease(
         packageName: String,
         isApproved: Boolean,
         decidedBy: String?
     ): Boolean {
-        if (!isApproved) return false
-        if (!AppPolicyRegistry.isHighRisk(packageName)) return true
-        return decidedBy != null &&
-            decidedBy != "INITIAL_DEVICE_BASELINE" &&
-            decidedBy != "AUTO_APPROVED_UNLOCKED"
+        return isApproved
     }
 
     internal fun isHighRiskOrBlacklistedForRelease(
@@ -524,7 +521,7 @@ internal object CurfewLifecycleHandler {
             policyFailed = policyFailed,
             approvalsFailed = approvalsFailed,
             customBlacklist = currentPolicy?.customBlacklistPackages ?: emptySet(),
-            isZeroTrustActive = currentPolicy?.lockNewInstallsUntilApproved ?: true,
+            isZeroTrustActive = currentPolicy?.lockNewInstallsUntilApproved ?: false,
             approvedPackages = approvedPackages,
             unapprovedPackages = unapprovedPackages
         )

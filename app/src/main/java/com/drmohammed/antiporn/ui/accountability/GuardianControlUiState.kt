@@ -28,7 +28,7 @@ data class GuardianControlUiState(
     val isVpnBlackholeEnabled: Boolean = true,
     val isInstantInternetKillEnabled: Boolean = true,
     val isIncognitoBlocked: Boolean = true,
-    val lockNewInstallsUntilApproved: Boolean = true,
+    val lockNewInstallsUntilApproved: Boolean = false,
     val isDateTimeLocked: Boolean = true,
     val isYouTubeRestrictedModeEnabled: Boolean = false,
     val isTelegramWebBlocked: Boolean = true,

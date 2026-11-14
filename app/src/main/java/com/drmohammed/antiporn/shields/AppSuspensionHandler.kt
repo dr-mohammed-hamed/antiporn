@@ -175,12 +175,8 @@ internal object AppSuspensionHandler {
             .map { it.pattern }
             .forEach { pkg ->
                 val approval = approvedByPkg[pkg]
-                val explicitlyApproved = approval != null &&
-                    approval.isApproved &&
-                    approval.decidedBy != null &&
-                    approval.decidedBy != "INITIAL_DEVICE_BASELINE" &&
-                    approval.decidedBy != "AUTO_APPROVED_UNLOCKED"
-                if (!explicitlyApproved) {
+                val isApproved = approval != null && approval.isApproved
+                if (!isApproved) {
                     candidates.add(pkg)
                 }
             }
@@ -193,12 +189,18 @@ internal object AppSuspensionHandler {
     }
 
     fun handlePackageAdded(context: Context, packageName: String, shieldId: String) {
+        val appContext = context.applicationContext ?: context
+        val policy = com.drmohammed.antiporn.data.repository.PolicyRepository.getInstance(appContext).getCurrentPolicy()
+        val isCustomBlacklisted = policy.customBlacklistPackages.contains(packageName)
+        val isPermanentlyBlacklisted = AppSuspensionShield.isBlacklisted(packageName)
+        if (!policy.lockNewInstallsUntilApproved && !isCustomBlacklisted && !isPermanentlyBlacklisted) {
+            return
+        }
         if (AppSuspensionShield.isImmune(packageName) ||
             (!AppSuspensionShield.isBlacklisted(packageName) && !AppPolicyRegistry.isHighRisk(packageName))
         ) {
             return
         }
-        val appContext = context.applicationContext ?: context
         if (!SafeDpmGateway.isDeviceOwner(appContext)) {
             Log.w(TAG, "Cannot freeze $packageName: App is not Device/Profile Owner")
             return

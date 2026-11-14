@@ -71,7 +71,11 @@ class ApprovalRepository(
      * Operates completely offline in < 5ms without any network dependency.
      */
     @Synchronized
-    fun freezeAndSubmitApprovalLocal(packageName: String, showToast: Boolean = true): Boolean {
+    fun freezeAndSubmitApprovalLocal(
+        packageName: String,
+        showToast: Boolean = true,
+        isHighRisk: Boolean = false
+    ): Boolean {
         if (com.drmohammed.antiporn.curfew.CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)) {
             Log.i(TAG, "IRON GUARD: Package $packageName is critical system / launcher / dialer / keyboard / immune. Skipping freeze.")
             return false
@@ -94,10 +98,15 @@ class ApprovalRepository(
         }
 
         // 1. Instant 0ms suspension with Fail-Secure Fallback
+        val freezeMessage = if (isHighRisk) {
+            appContext.getString(R.string.toast_high_risk_app_suspended)
+        } else {
+            appContext.getString(R.string.toast_app_suspended_by_guardian)
+        }
         val suspended = com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackageSuspendedWithMessageBlocking(
             context = appContext,
             packageName = packageName,
-            message = appContext.getString(R.string.toast_app_suspended_by_guardian)
+            message = freezeMessage
         ).getOrNull() == true
 
         // Self-healing: Zero-Trust architecture requires unapproved apps to be visible & suspended, NEVER hidden.
@@ -113,7 +122,7 @@ class ApprovalRepository(
 
         val finalStatus = PendingApprovalEntity.STATUS_PENDING
         if (suspended) {
-            Log.w(TAG, "[FREEZE_SUCCESS] Instant 0ms freeze applied to package: $packageName (showToast=$showToast)")
+            Log.w(TAG, "[FREEZE_SUCCESS] Instant 0ms freeze applied to package: $packageName (showToast=$showToast, isHighRisk=$isHighRisk)")
         } else {
             Log.w(TAG, "[FREEZE_WARNING] Device suspension reported unconfirmed for $packageName; proceeding with Zero-Trust pending approval without hiding.")
         }
@@ -123,7 +132,11 @@ class ApprovalRepository(
             try {
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     try {
-                        val alertMsg = appContext.getString(R.string.toast_app_suspended_by_guardian)
+                        val alertMsg = if (isHighRisk) {
+                            appContext.getString(R.string.toast_high_risk_app_suspended)
+                        } else {
+                            appContext.getString(R.string.toast_app_suspended_by_guardian)
+                        }
                         android.widget.Toast.makeText(appContext, alertMsg, android.widget.Toast.LENGTH_LONG).show()
                     } catch (te: Exception) {
                         Log.w(TAG, "Failed showing toast alert: ${te.message}")
@@ -156,10 +169,20 @@ class ApprovalRepository(
 
         // 3.1 Post in-app and system notification regarding the frozen package
         try {
+            val notifTitle = if (isHighRisk) {
+                appContext.getString(R.string.notification_high_risk_app_frozen_title)
+            } else {
+                appContext.getString(R.string.toast_app_suspended_by_guardian)
+            }
+            val notifMessage = if (isHighRisk) {
+                appContext.getString(R.string.notification_high_risk_app_frozen_msg, appName)
+            } else {
+                appContext.getString(R.string.toast_app_suspended_by_guardian) + " ($appName)"
+            }
             AppNotificationManager.getInstance(appContext).postEventNotification(
                 category = NotificationCategory.APPROVALS,
-                title = appContext.getString(R.string.toast_app_suspended_by_guardian),
-                message = appContext.getString(R.string.toast_app_suspended_by_guardian) + " ($appName)",
+                title = notifTitle,
+                message = notifMessage,
                 dedupKey = "zero_trust_freeze_$packageName",
                 cooldownMs = 10 * 60 * 1000L,
                 actionType = NotificationActionType.OPEN_SELF_APPROVALS,
@@ -677,8 +700,8 @@ class ApprovalRepository(
         for (pkgInfo in installedPackages) {
             val pkg = pkgInfo.packageName ?: continue
             if (pkg == appContext.packageName) continue
-            // If it is high-risk (e.g. Telegram, Reddit, TikTok) or permanently blacklisted, do not approve into baseline!
-            if (AppSuspensionShield.isBlacklisted(pkg) || com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(pkg)) continue
+            // If it is permanently blacklisted, do not approve into baseline!
+            if (AppSuspensionShield.isBlacklisted(pkg)) continue
 
             val appInfo = pkgInfo.applicationInfo
             val appName = try {
@@ -793,25 +816,9 @@ class ApprovalRepository(
 
         val localApprovals = getLocalPendingApprovals()
 
-        // Universal Self-Healing: Any high-risk app that was auto-approved solely by INITIAL_DEVICE_BASELINE
-        // or AUTO_APPROVED_UNLOCKED (without explicit guardian action) must be revoked, converted to PENDING, and frozen.
-        val legacyAutoApprovedHighRisk = localApprovals.filter {
-            it.isApproved && com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(it.packageName) &&
-            (it.decidedBy == null || it.decidedBy == "INITIAL_DEVICE_BASELINE" || it.decidedBy == "AUTO_APPROVED_UNLOCKED")
-        }
-        for (legacyApp in legacyAutoApprovedHighRisk) {
-            Log.w(TAG, "Reverting legacy auto-adopted high-risk app ${legacyApp.packageName} to PENDING under Unified Zero-Trust!")
-            approvalDao.deletePendingApprovalBlocking(legacyApp.packageName)
-            freezeAndSubmitApprovalLocal(legacyApp.packageName, showToast = false)
-        }
-
-        val updatedLocalApprovals = getLocalPendingApprovals()
-        val approvedSet = updatedLocalApprovals.filter {
-            it.isApproved && (!com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(it.packageName) ||
-                (it.decidedBy != null && it.decidedBy != "INITIAL_DEVICE_BASELINE" && it.decidedBy != "AUTO_APPROVED_UNLOCKED"))
-        }.map { it.packageName }.toSet()
-        val pendingSet = updatedLocalApprovals.filter { it.isPending }.map { it.packageName }.toSet()
-        val rejectedSet = updatedLocalApprovals.filter { it.isRejected }.map { it.packageName }.toSet()
+        val approvedSet = localApprovals.filter { it.isApproved }.map { it.packageName }.toSet()
+        val pendingSet = localApprovals.filter { it.isPending }.map { it.packageName }.toSet()
+        val rejectedSet = localApprovals.filter { it.isRejected }.map { it.packageName }.toSet()
 
         var strayAppFrozen = false
         val doEnabledAt = getDeviceOwnerEnabledTimestamp()
@@ -882,10 +889,8 @@ class ApprovalRepository(
 
             // Auto-Adopt Pre-existing Apps: If the app was installed prior to or during Device Owner activation,
             // it is part of the user's pre-existing baseline. Auto-adopt it into approved baseline without freezing.
-            // High-risk apps (Telegram, Reddit, TikTok) are strictly EXCLUDED from auto-adoption and must be explicitly approved!
-            val isHighRisk = com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(pkg)
             val firstInstallTime = pkgInfo.firstInstallTime
-            val isPreExisting = !isHighRisk && doEnabledAt > 0L && firstInstallTime > 0L && firstInstallTime <= (doEnabledAt + DO_ACTIVATION_GRACE_PERIOD_MS)
+            val isPreExisting = doEnabledAt > 0L && firstInstallTime > 0L && firstInstallTime <= (doEnabledAt + DO_ACTIVATION_GRACE_PERIOD_MS)
             if (isPreExisting) {
                 Log.i(TAG, "🌱 [AUTO_ADOPT_PRE_EXISTING] Package '$pkg' was installed prior to Device Owner activation ($firstInstallTime <= $doEnabledAt). Auto-adopting into approved baseline.")
                 val appName = try {
@@ -929,25 +934,20 @@ class ApprovalRepository(
                 continue
             }
 
-            // High-risk enforcement: If an unapproved high-risk app is installed, ensure it is frozen
-            if (com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(pkg) && !approvedSet.contains(pkg)) {
-                val isSuspended = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(appContext, pkg).getOrNull() == true
-                if (!isSuspended) {
-                    Log.w(TAG, "🚨 [HIGH_RISK_ENFORCEMENT] Freezing unapproved active high-risk app '$pkg'!")
-                    freezeAndSubmitApprovalLocal(pkg, showToast = false)
-                    strayAppFrozen = true
-                    continue
-                }
-            }
-
             // If it's already recorded as pending, ensure suspension is enforced
             if (pendingSet.contains(pkg)) {
                 val isSuspended = com.drmohammed.antiporn.telemetry.SafeDpmGateway.isPackageSuspendedBlocking(appContext, pkg).getOrNull() == true
                 if (!isSuspended) {
+                    val isHighRisk = com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(pkg)
+                    val msg = if (isHighRisk) {
+                        appContext.getString(R.string.toast_high_risk_app_suspended)
+                    } else {
+                        appContext.getString(R.string.toast_app_suspended_by_guardian)
+                    }
                     com.drmohammed.antiporn.telemetry.SafeDpmGateway.setPackageSuspendedWithMessageBlocking(
                         appContext,
                         pkg,
-                        appContext.getString(R.string.toast_app_suspended_by_guardian)
+                        msg
                     )
                 }
                 continue
@@ -955,7 +955,8 @@ class ApprovalRepository(
 
             // Unapproved package detected that is NOT suspended/hidden! Enforce instant freeze!
             Log.w(TAG, "🚨 [RECONCILE_STRAY_APP] Found unapproved active package '$pkg' (escaped receiver). Freezing silently in background!")
-            if (freezeAndSubmitApprovalLocal(pkg, showToast = false)) {
+            val isHighRisk = com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(pkg)
+            if (freezeAndSubmitApprovalLocal(pkg, showToast = false, isHighRisk = isHighRisk)) {
                 strayAppFrozen = true
             }
         }

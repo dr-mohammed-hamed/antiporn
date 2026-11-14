@@ -55,6 +55,7 @@ class GuardianControlActivity : AppCompatActivity() {
     private lateinit var alertsViewBinder: GuardianAlertsViewBinder
 
     private lateinit var switchAllowSelfControl: MaterialSwitch
+    private lateinit var btnResetWardQrLock: MaterialButton
 
     private lateinit var layoutWardApprovalsSection: LinearLayout
     private lateinit var layoutPendingApps: LinearLayout
@@ -65,6 +66,7 @@ class GuardianControlActivity : AppCompatActivity() {
 
     private var lastEditNameClickTime = 0L
     private var lastTileClickTime = 0L
+    private var lastResetQrClickTime = 0L
     private var isBindingSwitch = false
 
     private val subScreenLauncher = registerForActivityResult(
@@ -152,6 +154,7 @@ class GuardianControlActivity : AppCompatActivity() {
         )
 
         switchAllowSelfControl = findViewById(R.id.switchAllowSelfControl)
+        btnResetWardQrLock = findViewById(R.id.btnResetWardQrLock)
         layoutWardApprovalsSection = findViewById(R.id.layoutWardApprovalsSection)
         layoutPendingApps = findViewById(R.id.layoutPendingApps)
         tvNoPendingApps = findViewById(R.id.tvNoPendingApps)
@@ -185,6 +188,13 @@ class GuardianControlActivity : AppCompatActivity() {
         switchAllowSelfControl.setOnCheckedChangeListener { _, isChecked ->
             if (isBindingSwitch) return@setOnCheckedChangeListener
             viewModel.updateSelfControlPermissionImmediately(isChecked)
+        }
+
+        btnResetWardQrLock.setOnClickListener {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastResetQrClickTime < 1000L) return@setOnClickListener
+            lastResetQrClickTime = now
+            showResetWardQrConfirmationDialog()
         }
 
         // --- 5 Distributed Navigation Tiles ---
@@ -345,6 +355,23 @@ class GuardianControlActivity : AppCompatActivity() {
                 val newName = input.text?.toString()?.trim() ?: ""
                 viewModel.renameWard(newName)
                 dialog.dismiss()
+            }
+            .setNegativeButton(R.string.dialog_btn_cancel, null)
+            .show()
+    }
+
+    private fun showResetWardQrConfirmationDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_reset_ward_qr_title)
+            .setMessage(R.string.dialog_reset_ward_qr_msg)
+            .setPositiveButton(R.string.btn_reset_ward_qr_lock) { dialog, _ ->
+                dialog.dismiss()
+                btnResetWardQrLock.isEnabled = false
+                viewModel.resetWardSelfControlQr {
+                    if (!isFinishing && !isDestroyed) {
+                        btnResetWardQrLock.isEnabled = true
+                    }
+                }
             }
             .setNegativeButton(R.string.dialog_btn_cancel, null)
             .show()

@@ -192,7 +192,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         })
 
         switchLockNewInstalls.setOnCheckedChangeListener { _, isChecked ->
-            viewModel.setLockNewInstalls(isChecked)
+            onLockNewInstallsSwitched(isChecked)
         }
         tvEmptyState.setOnClickListener { viewModel.loadData() }
         btnSaveAppManagerChanges.setOnClickListener { viewModel.saveChanges() }
@@ -237,7 +237,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         switchLockNewInstalls.setOnCheckedChangeListener(null)
         switchLockNewInstalls.isChecked = state.lockNewInstallsUntilApproved
         switchLockNewInstalls.setOnCheckedChangeListener { _, isChecked ->
-            viewModel.setLockNewInstalls(isChecked)
+            onLockNewInstallsSwitched(isChecked)
         }
 
         val pos = pendingChangedPosition
@@ -272,6 +272,36 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                 finish()
             }
         }
+    }
+
+    private fun onLockNewInstallsSwitched(isChecked: Boolean) {
+        if (isChecked) {
+            showFreezeNewInstallsConfirmationDialog()
+        } else {
+            viewModel.setLockNewInstalls(false)
+        }
+    }
+
+    private fun showFreezeNewInstallsConfirmationDialog() {
+        if (isFinishing || isDestroyed) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_freeze_new_installs_title)
+            .setMessage(R.string.dialog_freeze_new_installs_msg)
+            .setCancelable(false)
+            .setNegativeButton(android.R.string.cancel) { dialog, _ ->
+                dialog.dismiss()
+                switchLockNewInstalls.setOnCheckedChangeListener(null)
+                switchLockNewInstalls.isChecked = false
+                switchLockNewInstalls.setOnCheckedChangeListener { _, isChecked ->
+                    onLockNewInstallsSwitched(isChecked)
+                }
+                viewModel.setLockNewInstalls(false)
+            }
+            .setPositiveButton(R.string.btn_confirm_freeze_new_installs) { dialog, _ ->
+                dialog.dismiss()
+                viewModel.setLockNewInstalls(true)
+            }
+            .show()
     }
 
     private fun showDiscardConfirmationDialog() {
@@ -385,6 +415,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             val ivAppIcon: ImageView = view.findViewById(R.id.ivAppIcon)
             val tvAppName: TextView = view.findViewById(R.id.tvAppName)
             val tvPackageName: TextView = view.findViewById(R.id.tvPackageName)
+            val tvHighRiskBadge: TextView = view.findViewById(R.id.tvHighRiskBadge)
             val layoutPhysicalSuspensionAlert: View = view.findViewById(R.id.layoutPhysicalSuspensionAlert)
             val tvPhysicalStatus: TextView = view.findViewById(R.id.tvPhysicalStatus)
             val btnQuickUnsuspend: MaterialButton = view.findViewById(R.id.btnQuickUnsuspend)
@@ -421,6 +452,9 @@ class RemoteAppManagerActivity : AppCompatActivity() {
 
             holder.tvAppName.text = displayName
             holder.tvPackageName.text = pkg
+
+            val isHighRisk = com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(pkg)
+            holder.tvHighRiskBadge.visibility = if (isHighRisk) View.VISIBLE else View.GONE
 
             AppIconResolver.loadIcon(
                 imageView = holder.ivAppIcon,

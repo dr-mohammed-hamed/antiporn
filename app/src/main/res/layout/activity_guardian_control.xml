@@ -300,6 +300,20 @@
                             android:layout_height="wrap_content" />
                     </LinearLayout>
 
+                    <!-- Remote Reset Ward's QR Lock Button -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnResetWardQrLock"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/btn_reset_ward_qr_lock"
+                        android:textColor="@color/status_orange"
+                        app:strokeColor="@color/status_orange"
+                        app:icon="@drawable/ic_lock"
+                        app:iconTint="@color/status_orange"
+                        app:cornerRadius="10dp" />
+
                     <!-- Pending Approvals for this Ward (Appears if > 0) -->
                     <LinearLayout
                         android:id="@+id/layoutWardApprovalsSection"

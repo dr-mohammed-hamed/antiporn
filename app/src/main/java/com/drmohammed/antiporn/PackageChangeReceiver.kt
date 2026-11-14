@@ -69,25 +69,26 @@ object PackageChangeHandler {
                     val approvalRepo = ApprovalRepository.getInstance(appContext)
                     val isHighRisk = com.drmohammed.antiporn.core.policy.AppPolicyRegistry.isHighRisk(packageName)
                     val isAlreadyApproved = approvalRepo.getLocalPendingApprovals().any {
-                        it.packageName == packageName && it.isApproved &&
-                        (!isHighRisk || (it.decidedBy != null && it.decidedBy != "INITIAL_DEVICE_BASELINE" && it.decidedBy != "AUTO_APPROVED_UNLOCKED"))
+                        it.packageName == packageName && it.isApproved
                     }
                     val policy = PolicyRepository.getInstance(appContext).getCurrentPolicy()
-                    val shouldFreeze = (policy.lockNewInstallsUntilApproved || isHighRisk) && !isAlreadyApproved
+                    val isCustomBlacklisted = policy.customBlacklistPackages.contains(packageName)
+                    val isPermanentlyBlacklisted = AppSuspensionShield.isBlacklisted(packageName)
+                    val shouldFreeze = (policy.lockNewInstallsUntilApproved || isCustomBlacklisted || isPermanentlyBlacklisted) && !isAlreadyApproved
 
-                    Timber.tag(TAG).w("[ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isHighRisk=$isHighRisk | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved | shouldFreeze=$shouldFreeze")
+                    Timber.tag(TAG).w("[ZERO_TRUST_CHECK] Package: $packageName | lockNewInstalls=${policy.lockNewInstallsUntilApproved} | isHighRisk=$isHighRisk | isCustomBlacklisted=$isCustomBlacklisted | isPermanentlyBlacklisted=$isPermanentlyBlacklisted | isReplacing=$isReplacing | isAlreadyApproved=$isAlreadyApproved | shouldFreeze=$shouldFreeze")
 
                     if (shouldFreeze) {
                         val isImmune = CurfewAppResolver.isSystemCriticalOrImmune(appContext, packageName)
                         if (isImmune) {
                             Timber.tag(TAG).w("[IMMUNE_SKIP] Package $packageName is critical system component, launcher, dialer, or keyboard. Skipping freeze.")
                         } else {
-                            Timber.tag(TAG).w("[ZERO_TRUST_FREEZE] Strict Zero-Trust / High-Risk active: Freezing unapproved package $packageName (isReplacing=$isReplacing, isHighRisk=$isHighRisk) in 0ms and submitting approval ticket")
-                            val frozen = approvalRepo.freezeAndSubmitApprovalLocal(packageName)
+                            Timber.tag(TAG).w("[ZERO_TRUST_FREEZE] Zero-Trust active: Freezing unapproved package $packageName (isReplacing=$isReplacing, isHighRisk=$isHighRisk) in 0ms and submitting approval ticket")
+                            val frozen = approvalRepo.freezeAndSubmitApprovalLocal(packageName, isHighRisk = isHighRisk)
                             Timber.tag(TAG).w("[FREEZE_STATUS] Result of local freeze for $packageName: $frozen")
                         }
                     } else {
-                        if (!isAlreadyApproved) {
+                        if (!isAlreadyApproved && !isCustomBlacklisted && !isPermanentlyBlacklisted) {
                             val appName = try {
                                 val pm = appContext.packageManager
                                 val appInfo = pm.getApplicationInfo(packageName, 0)
@@ -95,7 +96,7 @@ object PackageChangeHandler {
                             } catch (e: Exception) {
                                 packageName
                             }
-                            Timber.tag(TAG).i("[AUTO_APPROVE] Recording auto-approval for non-high-risk app $packageName ($appName)")
+                            Timber.tag(TAG).i("[AUTO_APPROVE] Recording auto-approval for app $packageName ($appName)")
                             approvalRepo.recordApproval(packageName, appName, "AUTO_APPROVED_UNLOCKED")
                         }
                         Timber.tag(TAG).w("[CURFEW_EVAL] Package $packageName approved or not subject to Zero-Trust freeze (replacing=$isReplacing, approved=$isAlreadyApproved). Evaluating curfew status...")

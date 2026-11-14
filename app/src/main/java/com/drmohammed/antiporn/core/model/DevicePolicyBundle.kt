@@ -19,7 +19,7 @@ data class DevicePolicyBundle(
     val weekendCurfewEndHour: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_HOUR, val weekendCurfewEndMinute: Int = com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE,
     val isVpnBlackholeEnabled: Boolean = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED,
     val isIncognitoBlocked: Boolean = true,
-    val lockNewInstallsUntilApproved: Boolean = true,
+    val lockNewInstallsUntilApproved: Boolean = false,
     val isScreenAiEnabledGlobally: Boolean = true,
     val customBlacklistPackages: Set<String> = emptySet(),
     val customCurfewWhitelistPackages: Set<String> = emptySet(),
@@ -51,7 +51,8 @@ data class DevicePolicyBundle(
     val lastSelfModifiedAt: Long? = null,
     val waqfaConfig: WaqfaConfig = WaqfaConfig(),
     val version: Long = 1L,
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    val remoteSelfControlResetRequestedAt: Long? = null
 ) {
 
     fun toMap(): Map<String, Any?> {
@@ -99,7 +100,8 @@ data class DevicePolicyBundle(
             "lastSelfModifiedAt" to lastSelfModifiedAt,
             "waqfaConfig" to waqfaConfig.toMap(),
             "version" to version,
-            "updatedAt" to updatedAt
+            "updatedAt" to updatedAt,
+            "remoteSelfControlResetRequestedAt" to remoteSelfControlResetRequestedAt
         )
         map["guardianUid"] = guardianUid
         map["guardianName"] = guardianName
@@ -163,6 +165,7 @@ data class DevicePolicyBundle(
         json.put("deactivationHasQr", deactivationHasQr)
         if (guardianPolicySnapshot != null) json.put("guardianPolicySnapshot", guardianPolicySnapshot)
         if (lastSelfModifiedAt != null) json.put("lastSelfModifiedAt", lastSelfModifiedAt)
+        if (remoteSelfControlResetRequestedAt != null) json.put("remoteSelfControlResetRequestedAt", remoteSelfControlResetRequestedAt)
         json.put("waqfaConfig", waqfaConfig.toJson())
         json.put("version", version)
         json.put("updatedAt", updatedAt)
@@ -203,6 +206,7 @@ data class DevicePolicyBundle(
             dnsHost = CLOUDFLARE_FAMILY_DNS_HOST,
             isYouTubeRestrictedModeEnabled = false,
             isTelegramWebBlocked = true,
+            lockNewInstallsUntilApproved = false,
             guardianUid = null,
             guardianName = null,
             isSupervised = false,
@@ -234,7 +238,7 @@ data class DevicePolicyBundle(
             val wkEndMin = ((map["weekendCurfewEndMinute"] as? Number)?.toInt() ?: com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE).coerceIn(0, 59)
             val vpn = (map["isVpnBlackholeEnabled"] as? Boolean) ?: com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED
             val incognito = (map["isIncognitoBlocked"] as? Boolean) ?: true
-            val lockNew = (map["lockNewInstallsUntilApproved"] as? Boolean) ?: true
+            val lockNew = (map["lockNewInstallsUntilApproved"] as? Boolean) ?: false
 
             val blacklist = (map["customBlacklistPackages"] as? List<*>)?.filterIsInstance<String>()?.toSet() ?: emptySet()
             val whitelist = if (!map.containsKey("customCurfewWhitelistPackages")) {
@@ -274,6 +278,7 @@ data class DevicePolicyBundle(
             val deactivationHasQr = (map["deactivationHasQr"] as? Boolean) ?: false
             val guardianPolicySnapshot = (map["guardianPolicySnapshot"] as? String)?.takeIf { it.isNotBlank() }
             val lastSelfModifiedAt = (map["lastSelfModifiedAt"] as? Number)?.toLong()
+            val remoteResetAt = (map["remoteSelfControlResetRequestedAt"] as? Number)?.toLong()
             val waqfa = WaqfaConfig.fromMap(map["waqfaConfig"])
 
             val version = (map["version"] as? Number)?.toLong() ?: 1L
@@ -315,7 +320,8 @@ data class DevicePolicyBundle(
                 guardianPolicySnapshot = guardianPolicySnapshot,
                 lastSelfModifiedAt = lastSelfModifiedAt,
                 waqfaConfig = waqfa,
-                version = version, updatedAt = updatedAt
+                version = version, updatedAt = updatedAt,
+                remoteSelfControlResetRequestedAt = remoteResetAt
             )
         }
 
@@ -369,6 +375,7 @@ data class DevicePolicyBundle(
                 val deactivationHasQr = json.optBoolean("deactivationHasQr", false)
                 val guardianPolicySnapshot = json.optString("guardianPolicySnapshot", "").takeIf { it.isNotBlank() }
                 val lastSelfModifiedAt = if (json.has("lastSelfModifiedAt") && !json.isNull("lastSelfModifiedAt")) json.optLong("lastSelfModifiedAt") else null
+                val remoteResetAt = if (json.has("remoteSelfControlResetRequestedAt") && !json.isNull("remoteSelfControlResetRequestedAt")) json.optLong("remoteSelfControlResetRequestedAt") else null
                 val waqfa = WaqfaConfig.fromJson(json.optJSONObject("waqfaConfig"))
 
                 DevicePolicyBundle(
@@ -385,7 +392,7 @@ data class DevicePolicyBundle(
                     weekendCurfewEndMinute = json.optInt("weekendCurfewEndMinute", com.drmohammed.antiporn.curfew.CurfewConfig.END_MINUTE).coerceIn(0, 59),
                     isVpnBlackholeEnabled = json.optBoolean("isVpnBlackholeEnabled", com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED),
                     isIncognitoBlocked = json.optBoolean("isIncognitoBlocked", true),
-                    lockNewInstallsUntilApproved = json.optBoolean("lockNewInstallsUntilApproved", true),
+                    lockNewInstallsUntilApproved = json.optBoolean("lockNewInstallsUntilApproved", false),
                     isScreenAiEnabledGlobally = isScreenAiEnabledGlobally,
                     customBlacklistPackages = blacklist,
                     customCurfewWhitelistPackages = whitelist,
@@ -413,7 +420,8 @@ data class DevicePolicyBundle(
                     lastSelfModifiedAt = lastSelfModifiedAt,
                     waqfaConfig = waqfa,
                     version = json.optLong("version", 1L),
-                    updatedAt = json.optLong("updatedAt", 0L)
+                    updatedAt = json.optLong("updatedAt", 0L),
+                    remoteSelfControlResetRequestedAt = remoteResetAt
                 )
             } catch (e: Exception) {
                 try {

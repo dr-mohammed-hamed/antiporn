@@ -1027,4 +1027,21 @@
     <string name="waqfa_btn_cancel">Cancel</string>
     <string name="waqfa_btn_add">Add</string>
     <string name="waqfa_btn_set">Confirm</string>
+
+    <!-- Auto-Freeze New Installs & High-Risk Custom Strings -->
+    <string name="dialog_freeze_new_installs_title">Confirm Auto-Freeze New Installs</string>
+    <string name="dialog_freeze_new_installs_msg">When this option is enabled, any newly installed application will be frozen immediately and cannot run until manually approved from App Manager.\n\nHigh-risk apps will be highlighted with a red badge.\n\nDo you want to enable this?</string>
+    <string name="btn_confirm_freeze_new_installs">Enable Freezing</string>
+    <string name="badge_high_risk_app">High Risk</string>
+    <string name="toast_high_risk_app_suspended">This application was frozen due to high security risks and requires approval</string>
+    <string name="notification_high_risk_app_frozen_title">High-Risk App Suspended</string>
+    <string name="notification_high_risk_app_frozen_msg">%1$s was frozen due to high security risks and is awaiting approval in the dashboard.</string>
+    <!-- Remote Self-Control QR Reset Additions -->
+    <string name="btn_reset_ward_qr_lock">Reset Ward\'s QR Lock</string>
+    <string name="dialog_reset_ward_qr_title">Reset Self-Control QR Lock</string>
+    <string name="dialog_reset_ward_qr_msg">Are you sure you want to reset the QR lock on the ward\'s device?\n\nThe lock will be removed immediately once the ward connects to the internet.</string>
+    <string name="toast_reset_ward_qr_success">QR unlock command sent successfully</string>
+    <string name="toast_reset_ward_qr_failed">Failed to send QR unlock command, please check your network connection</string>
+    <string name="notif_self_control_qr_reset_by_guardian_title">Self-Control QR Lock Reset</string>
+    <string name="notif_self_control_qr_reset_by_guardian_msg">Your guardian has remotely reset and removed the Self-Control QR lock.</string>
 </resources>

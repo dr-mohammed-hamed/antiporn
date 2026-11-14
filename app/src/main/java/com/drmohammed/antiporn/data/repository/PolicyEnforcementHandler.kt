@@ -258,9 +258,7 @@ internal class PolicyEnforcementHandler(
             val immunePackages = CurfewAppResolver.resolveImmunePackages(appContext)
             val refreshedApprovals = queryApprovalsSafely(approvalRepo, "applyPolicyToSystem remaining pending")
             val blockedByZeroTrust = refreshedApprovals.filter {
-                it.isPending || it.isRejected ||
-                    (AppPolicyRegistry.isHighRisk(it.packageName) &&
-                        (it.decidedBy == null || it.decidedBy == "INITIAL_DEVICE_BASELINE" || it.decidedBy == "AUTO_APPROVED_UNLOCKED"))
+                it.isPending || it.isRejected
             }.map { it.packageName }.toSet()
             val packagesToUnsuspend = removedFromBlacklist.filter { pkg ->
                 (!isBlockActive || immunePackages.contains(pkg)) &&
@@ -392,10 +390,7 @@ internal class PolicyEnforcementHandler(
 
     private fun nonBaselineApprovedSet(approvals: List<PendingApprovalEntity>): Set<String> {
         return approvals.filter {
-            it.isApproved &&
-                it.decidedBy != null &&
-                it.decidedBy != "INITIAL_DEVICE_BASELINE" &&
-                it.decidedBy != "AUTO_APPROVED_UNLOCKED"
+            it.isApproved
         }.map { it.packageName }.toSet()
     }
 

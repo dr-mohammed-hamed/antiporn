@@ -27,7 +27,7 @@ class DevicePolicyBundleTest {
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED, policy.isVpnBlackholeEnabled)
         assertTrue(policy.isVpnBlackholeEnabled)
         assertTrue(policy.isIncognitoBlocked)
-        assertTrue(policy.lockNewInstallsUntilApproved)
+        assertFalse(policy.lockNewInstallsUntilApproved)
         assertTrue(policy.isScreenAiEnabledGlobally)
         assertTrue(policy.customBlacklistPackages.isEmpty())
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST, policy.customCurfewWhitelistPackages)
@@ -80,7 +80,8 @@ class DevicePolicyBundleTest {
             guardianPolicySnapshot = "{\"version\":40}",
             lastSelfModifiedAt = 1790000010000L,
             version = 42L,
-            updatedAt = 1790000000000L
+            updatedAt = 1790000000000L,
+            remoteSelfControlResetRequestedAt = 1790000020000L
         )
 
         val map = original.toMap()
@@ -120,6 +121,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.lastSelfModifiedAt, restored.lastSelfModifiedAt)
         assertEquals(original.version, restored.version)
         assertEquals(original.updatedAt, restored.updatedAt)
+        assertEquals(original.remoteSelfControlResetRequestedAt, restored.remoteSelfControlResetRequestedAt)
     }
 
     @Test
@@ -158,7 +160,8 @@ class DevicePolicyBundleTest {
             guardianPolicySnapshot = "{\"version\":4}",
             lastSelfModifiedAt = 1234560500L,
             version = 5L,
-            updatedAt = 123456789L
+            updatedAt = 123456789L,
+            remoteSelfControlResetRequestedAt = 1234560700L
         )
 
         val json = original.toJson()
@@ -198,6 +201,7 @@ class DevicePolicyBundleTest {
         assertEquals(original.lastSelfModifiedAt, restored.lastSelfModifiedAt)
         assertEquals(original.version, restored.version)
         assertEquals(original.updatedAt, restored.updatedAt)
+        assertEquals(original.remoteSelfControlResetRequestedAt, restored.remoteSelfControlResetRequestedAt)
     }
 
     @Test
