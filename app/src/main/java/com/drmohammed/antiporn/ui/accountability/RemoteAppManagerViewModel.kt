@@ -88,7 +88,8 @@ class RemoteAppManagerViewModel(
                     state.curfewVpnBypass != newCurfewVpnBypass ||
                     state.customBlacklist != newBlacklist ||
                     state.protectedApps != newProtected ||
-                    state.customAiScanPackages != newAiScan
+                    state.customAiScanPackages != newAiScan ||
+                    state.isScreenAiEnabledGlobally != policy.isScreenAiEnabledGlobally
                 ) {
                     _uiState.update { current ->
                         current.copy(
@@ -98,6 +99,7 @@ class RemoteAppManagerViewModel(
                             customAiScanPackages = newAiScan,
                             curfewVpnBypass = newCurfewVpnBypass,
                             protectedApps = newProtected,
+                            isScreenAiEnabledGlobally = policy.isScreenAiEnabledGlobally,
                             initialBlacklist = newBlacklist,
                             initialCurfewWhitelist = newCurfewWhitelist,
                             initialAiScanPackages = newAiScan,
@@ -150,7 +152,7 @@ class RemoteAppManagerViewModel(
                     initialCurfewVpnBypass = policy.curfewVpnBypassPackages.toSet(),
                     initialProtectedApps = policy.protectedAppPackages.toSet(),
                     initialLockNewInstalls = policy.lockNewInstallsUntilApproved,
-                    isScreenAiEnabledGlobally = true,
+                    isScreenAiEnabledGlobally = policy.isScreenAiEnabledGlobally,
                     isScreenAiServiceRunning = ScreenAiProjectionService.isRunning,
                     allApps = sortedList,
                     displayedApps = filtered
@@ -221,7 +223,7 @@ class RemoteAppManagerViewModel(
                 initialCurfewVpnBypass = policy.curfewVpnBypassPackages.toSet(),
                 initialProtectedApps = policy.protectedAppPackages.toSet(),
                 initialLockNewInstalls = policy.lockNewInstallsUntilApproved,
-                isScreenAiEnabledGlobally = true,
+                isScreenAiEnabledGlobally = policy.isScreenAiEnabledGlobally,
                 isScreenAiServiceRunning = ScreenAiProjectionService.isRunning,
                 allApps = sortedList,
                 displayedApps = filtered
@@ -256,7 +258,7 @@ class RemoteAppManagerViewModel(
                     isCurfewWhitelisted = policy.customCurfewWhitelistPackages.contains(orphan),
                     isCurfewVpnBypassed = policy.curfewVpnBypassPackages.contains(orphan),
                     isProtected = policy.protectedAppPackages.contains(orphan),
-                    isAiScanTarget = policy.customAiScanPackages.contains(orphan)
+                    isAiScanTarget = policy.customAiScanPackages.contains(orphan) || com.drmohammed.antiporn.ai.core.policy.AiExemptionRegistry.isTarget(orphan)
                 )
             )
         }

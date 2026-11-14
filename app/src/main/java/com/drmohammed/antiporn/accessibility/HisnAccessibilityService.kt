@@ -20,6 +20,7 @@ import timber.log.Timber
  */
 class HisnAccessibilityService : AccessibilityService() {
 
+    private val screenshotExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
     private lateinit var eventBus: ForegroundAppEventBus
     private lateinit var windowFilter: TransientWindowEventFilter
 
@@ -99,6 +100,9 @@ class HisnAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         Timber.tag(TAG).i("HisnAccessibilityService destroyed")
+        try {
+            screenshotExecutor.shutdown()
+        } catch (_: Exception) {}
         if (instance === this) {
             instance = null
         }
@@ -125,7 +129,16 @@ class HisnAccessibilityService : AccessibilityService() {
     fun captureCleanWindowBitmap(onResult: (Bitmap?, Rect) -> Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val interactiveWindow = try {
-                windows.firstOrNull { it.isFocused || it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+                windows.filter { win ->
+                    win.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+                    win.root?.packageName != applicationContext.packageName
+                }.maxByOrNull { win ->
+                    val b = Rect()
+                    win.getBoundsInScreen(b)
+                    val area = (b.right - b.left).toLong() * (b.bottom - b.top).toLong()
+                    val focusBonus = if (win.isFocused) 1_000_000_000L else 0L
+                    focusBonus + area
+                }
             } catch (e: Exception) {
                 null
             }
@@ -141,13 +154,16 @@ class HisnAccessibilityService : AccessibilityService() {
                 try {
                     takeScreenshotOfWindow(
                         interactiveWindow.id,
-                        mainExecutor,
+                        screenshotExecutor,
                         object : TakeScreenshotCallback {
                             override fun onSuccess(screenshotResult: ScreenshotResult) {
                                 val hwBuffer = screenshotResult.hardwareBuffer
                                 val colorSpace = screenshotResult.colorSpace
                                 val bitmap = try {
-                                    Bitmap.wrapHardwareBuffer(hwBuffer, colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
+                                    val wrapped = Bitmap.wrapHardwareBuffer(hwBuffer, colorSpace)
+                                    val copied = wrapped?.copy(Bitmap.Config.ARGB_8888, false)
+                                    try { wrapped?.recycle() } catch (_: Exception) {}
+                                    copied
                                 } catch (e: Exception) {
                                     null
                                 } finally {

@@ -52,6 +52,7 @@ class KltOpticalFlowTrackerTest {
         assertEquals(2, box.ageFrames)
         assertEquals(1000L, box.lastAnchorTimestampMs)
         assertTrue(box.isFemale)
+        assertFalse(box.wasMatchedInCurrentAnchor)
     }
 
     @Test
@@ -503,6 +504,118 @@ class KltOpticalFlowTrackerTest {
         assertTrue(
             "Top video box should remain static despite bottom comments scrolling (got shift: $topBoxShiftY px)",
             topBoxShiftY <= 1.5f
+        )
+    }
+
+    @Test
+    fun testSpatialMerge_duringAnchorUpdate_preservesMatchedFlagsAndPreventsIndexOutOfBounds() {
+        val boxA = TrackedModestyBox.createRectF(0.30f, 0.10f, 0.70f, 0.40f)
+        val boxB = TrackedModestyBox.createRectF(0.30f, 0.38f, 0.70f, 0.70f)
+
+        // Initial anchor creates tracks that merge spatially
+        tracker.initOrUpdateAnchors(listOf(boxA, boxB), 1000, 1000, 1000L)
+        assertEquals(1, tracker.getActiveTrackCount())
+
+        // Update with cross-tile to trigger containment-aware latch (section 4)
+        val coveringTile = TrackedModestyBox.createRectF(0f, 0f, 1f, 1f)
+        tracker.updateAnchorsCrossTile(
+            detections = listOf(boxA),
+            tileNormRect = coveringTile,
+            frameWidth = 1000,
+            frameHeight = 1000,
+            timestampMs = 1100L
+        )
+
+        assertEquals(1, tracker.getActiveTrackCount())
+        val track = tracker.getActiveTracks()[0]
+        assertTrue("Track was matched in anchor", track.wasMatchedInCurrentAnchor)
+    }
+
+    @Test
+    fun testGetPaddedBoxes_returnsDeepCopiesIsolatedFromTracker() {
+        val box = TrackedModestyBox.createRectF(0.2f, 0.2f, 0.6f, 0.6f)
+        tracker.initOrUpdateAnchors(listOf(box), 100, 100, 1000L)
+
+        val padded1 = tracker.getPaddedBoxes()
+        assertEquals(1, padded1.size)
+        val originalLeft = padded1[0].left
+
+        // Mutate the returned RectF
+        padded1[0].left = 0.999f
+
+        // Next call to getPaddedBoxes must be completely unaffected
+        val padded2 = tracker.getPaddedBoxes()
+        assertEquals(originalLeft, padded2[0].left, 0.001f)
+    }
+
+    @Test
+    fun testCrossTileAnchorUpdate_tileEdgeEmaClippingGuard() {
+        // Track initially covering top 0.10f to bottom 0.85f, left 0.15f to right 0.85f
+        val initialTrack = TrackedModestyBox.createRectF(0.15f, 0.10f, 0.85f, 0.85f)
+        tracker.initOrUpdateAnchors(listOf(initialTrack), 1000, 1000, 1000L)
+        assertEquals(1, tracker.getActiveTrackCount())
+
+        // Sub-tile covers [0.20f, 0.20f, 0.80f, 0.80f]
+        val tileRect = TrackedModestyBox.createRectF(0.20f, 0.20f, 0.80f, 0.80f)
+
+        // Detection inside this sub-tile is clipped exactly at all 4 tile borders [0.20f, 0.20f, 0.80f, 0.80f]
+        val clippedDetection = TrackedModestyBox.createRectF(0.20f, 0.20f, 0.80f, 0.80f)
+
+        tracker.updateAnchorsCrossTile(
+            detections = listOf(clippedDetection),
+            tileNormRect = tileRect,
+            frameWidth = 1000,
+            frameHeight = 1000,
+            timestampMs = 1050L
+        )
+
+        assertEquals(1, tracker.getActiveTrackCount())
+        val updatedTrack = tracker.getActiveTracks()[0]
+
+        // Boundary clipping guard must preserve the original track boundaries that extend beyond the tile
+        // Top must NOT be pulled down from 0.10f to 0.20f
+        assertEquals("Top boundary must be preserved without clipping", 0.10f, updatedTrack.boundingBox.top, 0.001f)
+        // Bottom must NOT be pulled up from 0.85f to 0.80f
+        assertEquals("Bottom boundary must be preserved without clipping", 0.85f, updatedTrack.boundingBox.bottom, 0.001f)
+        // Left must NOT be pulled right from 0.15f to 0.20f
+        assertEquals("Left boundary must be preserved without clipping", 0.15f, updatedTrack.boundingBox.left, 0.001f)
+        // Right must NOT be pulled left from 0.85f to 0.80f
+        assertEquals("Right boundary must be preserved without clipping", 0.85f, updatedTrack.boundingBox.right, 0.001f)
+    }
+
+    @Test
+    fun testLargeBoxScrollTracking_fallsBackToGlobalScrollWhenLocalBgPointsInsufficient() {
+        val width = 416
+        val height = 924
+        val displacementY = 40 // 40 px scroll displacement
+
+        val prevBuffer = createSyntheticScrollingRgbaBuffer(width, height, scrollOffsetY = 0)
+        val currBuffer = createSyntheticScrollingRgbaBuffer(width, height, scrollOffsetY = displacementY)
+
+        // Large box covering almost the entire center (x: 5%..95%, y: 15%..85%)
+        // This causes local background points in the track's vertical band to be inside the box (localBgCount < 3)
+        val largeBox = TrackedModestyBox.createRectF(
+            0.05f,
+            150f / height,
+            0.95f,
+            750f / height
+        )
+        tracker.initOrUpdateAnchors(listOf(largeBox), width, height, 1000L)
+
+        // Frame 1
+        tracker.update(prevBuffer.duplicate(), width, height, width * 4, 4, 1016L)
+
+        // Frame 2 with 40px scroll
+        val tracked = tracker.update(currBuffer.duplicate(), width, height, width * 4, 4, 1032L)
+
+        assertEquals(1, tracked.size)
+        val box = tracked[0]
+        val measuredDeltaY = box.rawBoundingBox.top - 150f
+
+        // When localBgCount < 3, tracker must fall back to global scroll and move with the page
+        assertTrue(
+            "Large box should track global scroll motion (expected ~40px, got $measuredDeltaY px)",
+            measuredDeltaY >= 30f
         )
     }
 }

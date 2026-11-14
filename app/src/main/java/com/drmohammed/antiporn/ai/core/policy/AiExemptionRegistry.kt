@@ -69,7 +69,8 @@ object AiExemptionRegistry {
         "com.google.android.youtube",
         "com.snapchat.android",
         "com.twitter.android",
-        "tv.twitch.android.app"
+        "tv.twitch.android.app",
+        "com.google.android.googlequicksearchbox"
     )
 
     /**

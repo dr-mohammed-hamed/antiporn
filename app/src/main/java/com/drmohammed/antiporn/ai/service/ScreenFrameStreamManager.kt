@@ -136,32 +136,53 @@ class ScreenFrameStreamManager(
         val (newWidth, newHeight) = computeVirtualDimensions(realWidth, realHeight)
         if (newWidth == currentVirtualWidth && newHeight == currentVirtualHeight) return
 
-        Log.i(TAG, "Recreating VirtualDisplay on orientation change: ${currentVirtualWidth}x${currentVirtualHeight} -> ${newWidth}x${newHeight}")
+        Log.i(TAG, "Reconfiguring VirtualDisplay on orientation change: ${currentVirtualWidth}x${currentVirtualHeight} -> ${newWidth}x${newHeight}")
         val handler = backgroundHandler ?: return
 
-        try { imageReader?.setOnImageAvailableListener(null, null) } catch (_: Exception) {}
-        try { virtualDisplay?.release() } catch (_: Exception) {}
-        try { imageReader?.close() } catch (_: Exception) {}
+        val vd = virtualDisplay
+        if (vd == null) {
+            setupVirtualDisplay(mp, newWidth, newHeight, handler)
+            return
+        }
 
-        setupVirtualDisplay(mp, newWidth, newHeight, handler)
+        try {
+            val density = context.resources.displayMetrics.densityDpi
+            val newReader = createConfiguredImageReader(newWidth, newHeight, handler)
+
+            try {
+                vd.resize(newWidth, newHeight, density)
+                vd.setSurface(newReader.surface)
+            } catch (e: Exception) {
+                try {
+                    newReader.setOnImageAvailableListener(null, null)
+                    newReader.close()
+                } catch (_: Exception) {}
+                throw e
+            }
+
+            val oldReader = imageReader
+            imageReader = newReader
+            try {
+                oldReader?.setOnImageAvailableListener(null, null)
+                oldReader?.close()
+            } catch (_: Exception) {}
+
+            currentVirtualWidth = newWidth
+            currentVirtualHeight = newHeight
+            frameDifferencer.reset()
+            onHardSceneCutDetected()
+            Log.i(TAG, "VirtualDisplay resized successfully: ${newWidth}x${newHeight}, density=$density")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to resize VirtualDisplay on orientation change", e)
+        }
     }
 
-    private fun setupVirtualDisplay(
-        mediaProjection: MediaProjection,
+    private fun createConfiguredImageReader(
         width: Int,
         height: Int,
         handler: Handler
-    ) {
-        currentVirtualWidth = width
-        currentVirtualHeight = height
-        val (realWidth, realHeight) = getPhysicalScreenBounds()
-        val density = context.resources.displayMetrics.densityDpi
-
-        Log.i(TAG, "Setting up VirtualDisplay: physical=${realWidth}x${realHeight}, virtual=${width}x${height}, density=$density")
-
+    ): ImageReader {
         val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
-        imageReader = reader
-
         reader.setOnImageAvailableListener({ imageReaderInstance ->
             if (!isRunning || isStopping) {
                 try { imageReaderInstance.acquireLatestImage()?.close() } catch (e: Exception) { Log.d(TAG, "Non-critical cleanup: ${e.message}") }
@@ -222,6 +243,24 @@ class ScreenFrameStreamManager(
                 isProcessingFrame.set(false)
             }
         }, handler)
+        return reader
+    }
+
+    private fun setupVirtualDisplay(
+        mediaProjection: MediaProjection,
+        width: Int,
+        height: Int,
+        handler: Handler
+    ) {
+        currentVirtualWidth = width
+        currentVirtualHeight = height
+        val (realWidth, realHeight) = getPhysicalScreenBounds()
+        val density = context.resources.displayMetrics.densityDpi
+
+        Log.i(TAG, "Setting up VirtualDisplay: physical=${realWidth}x${realHeight}, virtual=${width}x${height}, density=$density")
+
+        val reader = createConfiguredImageReader(width, height, handler)
+        imageReader = reader
 
         virtualDisplay = mediaProjection.createVirtualDisplay(
             "ModestyAiVirtualDisplay",

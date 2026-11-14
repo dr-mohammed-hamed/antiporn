@@ -76,7 +76,6 @@ class KltOpticalFlowTracker(
     private val scratchBgDeltasY = FloatArray(MAX_BG_POINTS)
     private val scratchLocalDeltasX = FloatArray(MAX_BG_POINTS)
     private val scratchLocalDeltasY = FloatArray(MAX_BG_POINTS)
-    private val reusablePaddedList = ArrayList<RectF>(MAX_TRACKS)
 
     @Volatile
     var lastGeneralChangeRatio: Float = 0f
@@ -169,7 +168,7 @@ class KltOpticalFlowTracker(
     }
 
     /**
-     * إرجاع صناديق الحياء النشطة مع نسبة توسيع الأمان كقائمة متزامنة وآمنة (Zero-Allocation Atomic Read).
+     * إرجاع صناديق الحياء النشطة مع نسبة توسيع الأمان كقائمة متزامنة وآمنة (Atomic Snapshot Read).
      */
     @Synchronized
     fun getPaddedBoxes(
@@ -177,17 +176,15 @@ class KltOpticalFlowTracker(
         outList: MutableList<RectF>? = null
     ): List<RectF> {
         if (activeTracks.isEmpty()) return emptyList()
-        val target = outList ?: reusablePaddedList
-        while (target.size < activeTracks.size) {
-            target.add(RectF())
-        }
-        while (target.size > activeTracks.size) {
-            target.removeAt(target.size - 1)
+        val result = outList ?: ArrayList<RectF>(activeTracks.size)
+        if (outList != null) {
+            outList.clear()
         }
         for (i in activeTracks.indices) {
-            activeTracks[i].withSafetyPadding(paddingRatio, target[i])
+            val padded = activeTracks[i].withSafetyPadding(paddingRatio)
+            result.add(TrackedModestyBox.createRectF(padded.left, padded.top, padded.right, padded.bottom))
         }
-        return target
+        return result
     }
 
     /**
@@ -293,6 +290,10 @@ class KltOpticalFlowTracker(
         val safeWidth = if (frameWidth > 0) frameWidth else 1
         val safeHeight = if (frameHeight > 0) frameHeight else 1
 
+        for (track in activeTracks) {
+            track.wasMatchedInCurrentAnchor = false
+        }
+
         // 1. تحويل جميع الكشوفات الواردة إلى إحداثيات موحدة [0..1] مع تطبيق الدمج المكاني
         val mergedDetections = KltMathHelper.mergeBoxesSpatially(detections, maxGapNorm = 40f / safeHeight)
         val numDetections = minOf(mergedDetections.size, MAX_TRACKS)
@@ -335,14 +336,51 @@ class KltOpticalFlowTracker(
                 matchedDetectionFlags[bestDetIdx] = true
 
                 val track = activeTracks[bestTrackIdx]
+                track.wasMatchedInCurrentAnchor = true
                 val detBox = scratchNormalizedDetections[bestDetIdx]
                 val alpha = anchorSmoothingAlpha
 
-                // EMA Smoothing على الإحداثيات الموحدة
-                val sLeft = (alpha * detBox.left + (1f - alpha) * track.boundingBox.left).coerceIn(0f, 1f)
-                val sTop = (alpha * detBox.top + (1f - alpha) * track.boundingBox.top).coerceIn(0f, 1f)
-                val sRight = (alpha * detBox.right + (1f - alpha) * track.boundingBox.right).coerceIn(sLeft + 0.001f, 1f)
-                val sBottom = (alpha * detBox.bottom + (1f - alpha) * track.boundingBox.bottom).coerceIn(sTop + 0.001f, 1f)
+                // EMA Smoothing على الإحداثيات الموحدة مع حماية أطراف الشرائح (Tile Boundary Clipping Guard)
+                val rawLeft = if (targetTileRect != null &&
+                    kotlin.math.abs(detBox.left - targetTileRect.left) <= 0.02f &&
+                    track.boundingBox.left < targetTileRect.left
+                ) {
+                    track.boundingBox.left
+                } else {
+                    alpha * detBox.left + (1f - alpha) * track.boundingBox.left
+                }
+
+                val rawTop = if (targetTileRect != null &&
+                    kotlin.math.abs(detBox.top - targetTileRect.top) <= 0.02f &&
+                    track.boundingBox.top < targetTileRect.top
+                ) {
+                    track.boundingBox.top
+                } else {
+                    alpha * detBox.top + (1f - alpha) * track.boundingBox.top
+                }
+
+                val rawRight = if (targetTileRect != null &&
+                    kotlin.math.abs(detBox.right - targetTileRect.right) <= 0.02f &&
+                    track.boundingBox.right > targetTileRect.right
+                ) {
+                    track.boundingBox.right
+                } else {
+                    alpha * detBox.right + (1f - alpha) * track.boundingBox.right
+                }
+
+                val rawBottom = if (targetTileRect != null &&
+                    kotlin.math.abs(detBox.bottom - targetTileRect.bottom) <= 0.02f &&
+                    track.boundingBox.bottom > targetTileRect.bottom
+                ) {
+                    track.boundingBox.bottom
+                } else {
+                    alpha * detBox.bottom + (1f - alpha) * track.boundingBox.bottom
+                }
+
+                val sLeft = rawLeft.coerceIn(0f, 1f)
+                val sTop = rawTop.coerceIn(0f, 1f)
+                val sRight = rawRight.coerceIn(sLeft + 0.001f, 1f)
+                val sBottom = rawBottom.coerceIn(sTop + 0.001f, 1f)
 
                 TrackedModestyBox.setRect(track.boundingBox, sLeft, sTop, sRight, sBottom)
                 TrackedModestyBox.setRect(
@@ -379,7 +417,8 @@ class KltOpticalFlowTracker(
                     validInliers = MAX_POINTS_PER_BOX,
                     ageFrames = 0,
                     lastAnchorTimestampMs = timestampMs,
-                    isFemale = isFemale
+                    isFemale = isFemale,
+                    wasMatchedInCurrentAnchor = false
                 )
                 activeTracks.add(newTrack)
             }
@@ -391,9 +430,8 @@ class KltOpticalFlowTracker(
         // 4. مكافحة الصناديق الزومبي واعية الاحتواء (Containment-Aware Anti-Zombie Latch):
         // لا نحسب غياب الصندوق إلا إذا كانت الشريحة المفحوصة تغطي 80% أو أكثر من مساحته
         if (targetTileRect != null) {
-            for (i in 0 until numTracks) {
-                if (!matchedTrackFlags[i]) {
-                    val track = activeTracks[i]
+            for (track in activeTracks) {
+                if (!track.wasMatchedInCurrentAnchor) {
                     val interArea = KltMathHelper.calculateIntersectionArea(track.boundingBox, targetTileRect)
                     val trackArea = KltMathHelper.calculateArea(track.boundingBox)
                     val coverage = if (trackArea > 0f) interArea / trackArea else 0f
@@ -454,6 +492,7 @@ class KltOpticalFlowTracker(
                         a.confidence = maxOf(a.confidence, b.confidence)
                         a.validInliers = maxOf(a.validInliers, b.validInliers)
                         a.ageFrames = minOf(a.ageFrames, b.ageFrames)
+                        a.wasMatchedInCurrentAnchor = (a.wasMatchedInCurrentAnchor || b.wasMatchedInCurrentAnchor)
                         activeTracks.removeAt(j)
                         mergedAny = true
                     } else {
@@ -621,8 +660,11 @@ class KltOpticalFlowTracker(
                 val rawLocDy = scratchLocalDeltasY[localBgCount / 2]
                 trackDx = if (kotlin.math.abs(rawLocDx) >= 0.5f) rawLocDx else 0f
                 trackDy = if (kotlin.math.abs(rawLocDy) >= 0.5f) rawLocDy else 0f
+            } else if (hasGlobalScroll) {
+                // الرجوع لحركة التمرير العامة للشاشة عند نقص نقاط الجوار المحلي (مثل المنشورات الكبيرة التي تشغل معظم الشاشة)
+                trackDx = globalDx
+                trackDy = globalDy
             } else {
-                // عزل الجوار المحلي: عند نقص نقاط المحيط، لا نسقط في حركة التمرير العامة للشاشة (مثل التعليقات)
                 trackDx = 0f
                 trackDy = 0f
             }
@@ -865,16 +907,23 @@ class KltOpticalFlowTracker(
         height: Int
     ): Float {
         if (prevLuma.isEmpty() || currLuma.isEmpty() || width <= 0 || height <= 0) return 0f
-        val ringThickness = 16
-        val l = (rawBox.left - ringThickness).toInt().coerceIn(0, width - 1)
-        val t = (rawBox.top - ringThickness).toInt().coerceIn(0, height - 1)
-        val r = (rawBox.right + ringThickness).toInt().coerceIn(0, width - 1)
-        val b = (rawBox.bottom + ringThickness).toInt().coerceIn(0, height - 1)
+        val padX = (rawBox.right - rawBox.left) * TrackedModestyBox.DEFAULT_SAFETY_PADDING_RATIO
+        val padY = (rawBox.bottom - rawBox.top) * TrackedModestyBox.DEFAULT_SAFETY_PADDING_RATIO
+        val renderedL = rawBox.left - padX
+        val renderedT = rawBox.top - padY
+        val renderedR = rawBox.right + padX
+        val renderedB = rawBox.bottom + padY
 
-        val boxL = rawBox.left.toInt()
-        val boxT = rawBox.top.toInt()
-        val boxR = rawBox.right.toInt()
-        val boxB = rawBox.bottom.toInt()
+        val ringThickness = 16
+        val l = (renderedL - ringThickness).toInt().coerceIn(0, width - 1)
+        val t = (renderedT - ringThickness).toInt().coerceIn(0, height - 1)
+        val r = (renderedR + ringThickness).toInt().coerceIn(0, width - 1)
+        val b = (renderedB + ringThickness).toInt().coerceIn(0, height - 1)
+
+        val rBoxL = renderedL.toInt()
+        val rBoxT = renderedT.toInt()
+        val rBoxR = renderedR.toInt()
+        val rBoxB = renderedB.toInt()
 
         var changedCount = 0
         var sampleCount = 0
@@ -883,8 +932,8 @@ class KltOpticalFlowTracker(
         for (y in t..b step step) {
             val rowOffset = y * width
             for (x in l..r step step) {
-                // استبعاد أي نقطة تقع داخل مساحة التعتيم
-                if (x in boxL..boxR && y in boxT..boxB) continue
+                // استبعاد أي نقطة تقع داخل مساحة التعتيم المرسومة فعلياً
+                if (x in rBoxL..rBoxR && y in rBoxT..rBoxB) continue
 
                 val idx = rowOffset + x
                 if (idx < prevLuma.size && idx < currLuma.size) {

@@ -55,6 +55,7 @@ class RemoteAppManagerActivity : AppCompatActivity() {
     private lateinit var btnSaveAppManagerChanges: MaterialButton
 
     private lateinit var adapter: RemoteAppsAdapter
+    private var pendingChangedPosition: Int? = null
 
     private val backPressedCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
@@ -156,11 +157,26 @@ class RemoteAppManagerActivity : AppCompatActivity() {
         rvAppsList.layoutManager = LinearLayoutManager(this)
         adapter = RemoteAppsAdapter(
             isLocalMode = isLocalMode,
-            onFreezeToggled = { pkg, isFrozen -> viewModel.setFreeze247(pkg, isFrozen) },
-            onCurfewWhitelistToggled = { pkg, isAllowed -> viewModel.setCurfewWhitelist(pkg, isAllowed) },
-            onCurfewVpnBypassToggled = { pkg, isBypassed -> viewModel.setCurfewVpnBypass(pkg, isBypassed) },
-            onProtectToggled = { pkg, isProtected -> viewModel.setProtectedApp(pkg, isProtected) },
-            onAiScanToggled = { pkg, isTarget -> viewModel.setAiScanTarget(pkg, isTarget) },
+            onFreezeToggled = { pkg, pos, isFrozen ->
+                pendingChangedPosition = pos
+                viewModel.setFreeze247(pkg, isFrozen)
+            },
+            onCurfewWhitelistToggled = { pkg, pos, isAllowed ->
+                pendingChangedPosition = pos
+                viewModel.setCurfewWhitelist(pkg, isAllowed)
+            },
+            onCurfewVpnBypassToggled = { pkg, pos, isBypassed ->
+                pendingChangedPosition = pos
+                viewModel.setCurfewVpnBypass(pkg, isBypassed)
+            },
+            onProtectToggled = { pkg, pos, isProtected ->
+                pendingChangedPosition = pos
+                viewModel.setProtectedApp(pkg, isProtected)
+            },
+            onAiScanToggled = { pkg, pos, isTarget ->
+                pendingChangedPosition = pos
+                viewModel.setAiScanTarget(pkg, isTarget)
+            },
             onQuickUnsuspendClicked = { app -> confirmAndExecuteQuickUnsuspend(app) }
         )
         rvAppsList.adapter = adapter
@@ -224,6 +240,8 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             viewModel.setLockNewInstalls(isChecked)
         }
 
+        val pos = pendingChangedPosition
+        pendingChangedPosition = null
         adapter.submitData(
             apps = state.displayedApps,
             customBlacklist = state.customBlacklist,
@@ -233,7 +251,8 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             protectedApps = state.protectedApps,
             initialCurfewWhitelist = state.initialCurfewWhitelist,
             initialCurfewVpnBypass = state.initialCurfewVpnBypass,
-            isScreenAiEnabledGlobally = state.isScreenAiEnabledGlobally
+            isScreenAiEnabledGlobally = state.isScreenAiEnabledGlobally,
+            changedPosition = pos
         )
     }
 
@@ -314,11 +333,11 @@ class RemoteAppManagerActivity : AppCompatActivity() {
      */
     private class RemoteAppsAdapter(
         private val isLocalMode: Boolean,
-        private val onFreezeToggled: (String, Boolean) -> Unit,
-        private val onCurfewWhitelistToggled: (String, Boolean) -> Unit,
-        private val onCurfewVpnBypassToggled: (String, Boolean) -> Unit,
-        private val onProtectToggled: (String, Boolean) -> Unit,
-        private val onAiScanToggled: (String, Boolean) -> Unit,
+        private val onFreezeToggled: (String, Int, Boolean) -> Unit,
+        private val onCurfewWhitelistToggled: (String, Int, Boolean) -> Unit,
+        private val onCurfewVpnBypassToggled: (String, Int, Boolean) -> Unit,
+        private val onProtectToggled: (String, Int, Boolean) -> Unit,
+        private val onAiScanToggled: (String, Int, Boolean) -> Unit,
         private val onQuickUnsuspendClicked: (InstalledAppDto) -> Unit
     ) : RecyclerView.Adapter<RemoteAppsAdapter.AppViewHolder>() {
 
@@ -341,8 +360,10 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             protectedApps: Set<String>,
             initialCurfewWhitelist: Set<String>,
             initialCurfewVpnBypass: Set<String>,
-            isScreenAiEnabledGlobally: Boolean
+            isScreenAiEnabledGlobally: Boolean,
+            changedPosition: Int? = null
         ) {
+            val listChanged = this.apps !== apps && this.apps != apps
             this.apps = apps
             this.customBlacklist = customBlacklist
             this.customCurfewWhitelist = customCurfewWhitelist
@@ -352,7 +373,12 @@ class RemoteAppManagerActivity : AppCompatActivity() {
             this.initialCurfewWhitelist = initialCurfewWhitelist
             this.initialCurfewVpnBypass = initialCurfewVpnBypass
             this.isScreenAiEnabledGlobally = isScreenAiEnabledGlobally
-            notifyDataSetChanged()
+
+            if (changedPosition != null && !listChanged && changedPosition in apps.indices) {
+                notifyItemChanged(changedPosition)
+            } else {
+                notifyDataSetChanged()
+            }
         }
 
         class AppViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -456,6 +482,8 @@ class RemoteAppManagerActivity : AppCompatActivity() {
 
             holder.switchProtect.isChecked = protectedApps.contains(pkg)
 
+            val isAiTarget = customAiScanPackages.contains(pkg) || com.drmohammed.antiporn.ai.core.policy.AiExemptionRegistry.isTarget(pkg)
+
             if (!isScreenAiEnabledGlobally) {
                 holder.switchAiScanTarget.isChecked = false
                 holder.switchAiScanTarget.isEnabled = false
@@ -465,27 +493,42 @@ class RemoteAppManagerActivity : AppCompatActivity() {
                 holder.switchAiScanTarget.isEnabled = true
                 holder.switchAiScanTarget.alpha = 1.0f
                 holder.tvAiScanDisabledHint.visibility = View.GONE
-                holder.switchAiScanTarget.isChecked = customAiScanPackages.contains(pkg)
+                holder.switchAiScanTarget.isChecked = isAiTarget
             }
 
             holder.switchFreeze247.setOnCheckedChangeListener { _, isChecked ->
-                onFreezeToggled(pkg, isChecked)
+                val pos = holder.bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) {
+                    onFreezeToggled(pkg, pos, isChecked)
+                }
             }
 
             holder.switchAllowInCurfew.setOnCheckedChangeListener { _, isChecked ->
-                onCurfewWhitelistToggled(pkg, isChecked)
+                val pos = holder.bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) {
+                    onCurfewWhitelistToggled(pkg, pos, isChecked)
+                }
             }
 
             holder.switchAllowCurfewInternet.setOnCheckedChangeListener { _, isChecked ->
-                onCurfewVpnBypassToggled(pkg, isChecked)
+                val pos = holder.bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) {
+                    onCurfewVpnBypassToggled(pkg, pos, isChecked)
+                }
             }
 
             holder.switchProtect.setOnCheckedChangeListener { _, isChecked ->
-                onProtectToggled(pkg, isChecked)
+                val pos = holder.bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) {
+                    onProtectToggled(pkg, pos, isChecked)
+                }
             }
 
             holder.switchAiScanTarget.setOnCheckedChangeListener { _, isChecked ->
-                onAiScanToggled(pkg, isChecked)
+                val pos = holder.bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) {
+                    onAiScanToggled(pkg, pos, isChecked)
+                }
             }
         }
     }

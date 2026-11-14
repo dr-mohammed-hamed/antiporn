@@ -20,6 +20,7 @@ data class DevicePolicyBundle(
     val isVpnBlackholeEnabled: Boolean = com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED,
     val isIncognitoBlocked: Boolean = true,
     val lockNewInstallsUntilApproved: Boolean = true,
+    val isScreenAiEnabledGlobally: Boolean = true,
     val customBlacklistPackages: Set<String> = emptySet(),
     val customCurfewWhitelistPackages: Set<String> = emptySet(),
     val customAiScanPackages: Set<String> = emptySet(),
@@ -69,6 +70,7 @@ data class DevicePolicyBundle(
             "isVpnBlackholeEnabled" to isVpnBlackholeEnabled,
             "isIncognitoBlocked" to isIncognitoBlocked,
             "lockNewInstallsUntilApproved" to lockNewInstallsUntilApproved,
+            "isScreenAiEnabledGlobally" to isScreenAiEnabledGlobally,
             "customBlacklistPackages" to customBlacklistPackages.toList(),
             "customCurfewWhitelistPackages" to customCurfewWhitelistPackages.toList(),
             "customAiScanPackages" to customAiScanPackages.toList(),
@@ -119,6 +121,7 @@ data class DevicePolicyBundle(
 
         val blacklistArr = JSONArray().apply { customBlacklistPackages.forEach { put(it) } }
         json.put("customBlacklistPackages", blacklistArr)
+        json.put("isScreenAiEnabledGlobally", isScreenAiEnabledGlobally)
 
         val whitelistArr = JSONArray().apply { customCurfewWhitelistPackages.forEach { put(it) } }
         json.put("customCurfewWhitelistPackages", whitelistArr)
@@ -247,6 +250,7 @@ data class DevicePolicyBundle(
                 ?: (map["browserFilterMode"] as? String)?.toIntOrNull()
                 ?: BROWSER_FILTER_OFF).coerceIn(0, 2)
             val isFullSystemFilteringEnabled = (map["isFullSystemFilteringEnabled"] as? Boolean) ?: false
+            val isScreenAiEnabledGlobally = (map["isScreenAiEnabledGlobally"] as? Boolean) ?: true
             val customBlockedUrls = (map["customBlockedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
             val customAllowedUrls = (map["customAllowedUrls"] as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
@@ -285,6 +289,7 @@ data class DevicePolicyBundle(
                 weekendCurfewEndHour = wkEndHour, weekendCurfewEndMinute = wkEndMin,
                 isVpnBlackholeEnabled = vpn, isIncognitoBlocked = incognito,
                 lockNewInstallsUntilApproved = lockNew,
+                isScreenAiEnabledGlobally = isScreenAiEnabledGlobally,
                 customBlacklistPackages = blacklist,
                 customCurfewWhitelistPackages = whitelist,
                 customAiScanPackages = aiScan,
@@ -341,6 +346,7 @@ data class DevicePolicyBundle(
                 val protectedApps = json.optJSONArray("protectedAppPackages").toStringSet()
                 val browserFilterMode = json.optInt("browserFilterMode", BROWSER_FILTER_OFF).coerceIn(0, 2)
                 val isFullSystemFilteringEnabled = json.optBoolean("isFullSystemFilteringEnabled", false)
+                val isScreenAiEnabledGlobally = json.optBoolean("isScreenAiEnabledGlobally", true)
                 val customBlockedUrls = json.optJSONArray("customBlockedUrls").toStringSet()
                 val customAllowedUrls = json.optJSONArray("customAllowedUrls").toStringSet()
 
@@ -380,6 +386,7 @@ data class DevicePolicyBundle(
                     isVpnBlackholeEnabled = json.optBoolean("isVpnBlackholeEnabled", com.drmohammed.antiporn.curfew.CurfewConfig.DEFAULT_VPN_BLACKHOLE_ENABLED),
                     isIncognitoBlocked = json.optBoolean("isIncognitoBlocked", true),
                     lockNewInstallsUntilApproved = json.optBoolean("lockNewInstallsUntilApproved", true),
+                    isScreenAiEnabledGlobally = isScreenAiEnabledGlobally,
                     customBlacklistPackages = blacklist,
                     customCurfewWhitelistPackages = whitelist,
                     customAiScanPackages = aiScan,

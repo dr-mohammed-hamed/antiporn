@@ -25,7 +25,8 @@ data class TrackedModestyBox(
     var ageFrames: Int,
     var lastAnchorTimestampMs: Long,
     val isFemale: Boolean = true,
-    var lastOuterRingChangeRatio: Float = 0f
+    var lastOuterRingChangeRatio: Float = 0f,
+    var wasMatchedInCurrentAnchor: Boolean = false
 ) {
     /**
      * توسيع الصندوق بنسبة أمان محددة (افتراضياً 12.5% من كل اتجاه) مع حصر الإحداثيات في [0.0, 1.0].

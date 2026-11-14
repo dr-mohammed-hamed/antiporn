@@ -47,6 +47,7 @@ class AiInferenceCoordinator(
     private val isHalalifyInferring = AtomicBoolean(false)
     private var lastAnchorCheckTimeMs: Long = 0L
     private var lastA11yScreenshotAttemptMs: Long = 0L
+    private var consecutiveA11yFailures: Int = 0
 
     private var inferenceBitmap: Bitmap? = null
     private var scratchPixels: IntArray? = null
@@ -68,6 +69,7 @@ class AiInferenceCoordinator(
     private var lastDiagnosticLogMs: Long = 0L
     private var lastHalalifyIdleLogMs: Long = 0L
 
+    private val drawnBoxesLock = Any()
     private val lastDrawnPixelBoxes = ArrayList<RectF>(32)
 
     @Volatile
@@ -97,7 +99,9 @@ class AiInferenceCoordinator(
         blurOverlayManager = ScreenBlurOverlayManager(context).apply {
             isKltTrackingActive = true
             onRegionsCleared = {
-                lastDrawnPixelBoxes.clear()
+                synchronized(drawnBoxesLock) {
+                    lastDrawnPixelBoxes.clear()
+                }
             }
         }
 
@@ -131,6 +135,7 @@ class AiInferenceCoordinator(
         isRunning = true
         isHalalifyInferring.set(false)
         lastAnchorCheckTimeMs = 0L
+        consecutiveA11yFailures = 0
         if (::kltTracker.isInitialized) kltTracker.flush()
     }
 
@@ -185,20 +190,24 @@ class AiInferenceCoordinator(
                     )
                 }
             } else {
-                lastDrawnPixelBoxes.clear()
+                synchronized(drawnBoxesLock) {
+                    lastDrawnPixelBoxes.clear()
+                }
                 blurOverlayManager.updateRegions(emptyList())
             }
         }
 
         // 2. Async Anchor Path: Clean A11y Screenshot OR 4-Stage Rotation (FullFrame + 3 Slices) (4-5 FPS)
+        val a11y = HisnAccessibilityService.instance
+        val isA11ySupported = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) && (a11y != null)
+        val isA11yActive = isA11ySupported && (consecutiveA11yFailures < 3)
+
+        val anchorInterval = if (isA11yActive) 350L else ANCHOR_INTERVAL_MS
         val shouldTriggerAnchor = !isHalalifyInferring.get() &&
-                ((now - lastAnchorCheckTimeMs >= ANCHOR_INTERVAL_MS) || (::kltTracker.isInitialized && !kltTracker.hasActiveTracks()))
+                ((now - lastAnchorCheckTimeMs >= anchorInterval) || (::kltTracker.isInitialized && !kltTracker.hasActiveTracks() && (now - lastAnchorCheckTimeMs >= (if (isA11yActive) 350L else 50L))))
 
         if (shouldTriggerAnchor && isHalalifyInferring.compareAndSet(false, true)) {
-            val a11y = HisnAccessibilityService.instance
-            val canTryA11y = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) &&
-                    (a11y != null) &&
-                    (now - lastA11yScreenshotAttemptMs >= 350L)
+            val canTryA11y = isA11yActive && (now - lastA11yScreenshotAttemptMs >= 350L)
 
             if (canTryA11y) {
                 lastA11yScreenshotAttemptMs = now
@@ -208,37 +217,62 @@ class AiInferenceCoordinator(
                 val startScrollY = accumulatedScrollDy
 
                 a11y?.captureCleanWindowBitmap { cleanBitmap, windowBounds ->
-                    if (cleanBitmap != null && isRunning && captureGen == sceneGenerationId) {
-                        val posted = inferenceHandler?.post {
-                            try {
-                                runHalalifyOnCleanBitmap(
-                                    cleanBitmap = cleanBitmap,
-                                    windowBounds = windowBounds,
-                                    captureGen = captureGen,
-                                    captureTimestamp = captureTimestamp,
-                                    startScrollX = startScrollX,
-                                    startScrollY = startScrollY,
-                                    frameWidth = width,
-                                    frameHeight = height
-                                )
-                            } finally {
+                    if (cleanBitmap != null) {
+                        consecutiveA11yFailures = 0
+                        if (isRunning && captureGen == sceneGenerationId) {
+                            val posted = inferenceHandler?.post {
+                                try {
+                                    runHalalifyOnCleanBitmap(
+                                        cleanBitmap = cleanBitmap,
+                                        windowBounds = windowBounds,
+                                        captureGen = captureGen,
+                                        captureTimestamp = captureTimestamp,
+                                        startScrollX = startScrollX,
+                                        startScrollY = startScrollY,
+                                        frameWidth = width,
+                                        frameHeight = height
+                                    )
+                                } finally {
+                                    try { cleanBitmap.recycle() } catch (_: Exception) {}
+                                    lastAnchorCheckTimeMs = SystemClock.elapsedRealtime()
+                                    isHalalifyInferring.set(false)
+                                }
+                            } ?: false
+                            if (!posted) {
                                 try { cleanBitmap.recycle() } catch (_: Exception) {}
                                 lastAnchorCheckTimeMs = SystemClock.elapsedRealtime()
                                 isHalalifyInferring.set(false)
                             }
-                        } ?: false
-                        if (!posted) {
+                        } else {
                             try { cleanBitmap.recycle() } catch (_: Exception) {}
+                            lastAnchorCheckTimeMs = SystemClock.elapsedRealtime()
                             isHalalifyInferring.set(false)
                         }
                     } else {
-                        // Clean bitmap recycled if skipped/generation mismatch; allow next frame to check MediaProjection
-                        try { cleanBitmap?.recycle() } catch (_: Exception) {}
+                        consecutiveA11yFailures++
+                        Log.d(TAG, "A11y clean capture returned null (consecutive failures: $consecutiveA11yFailures)")
+                        lastAnchorCheckTimeMs = SystemClock.elapsedRealtime()
                         isHalalifyInferring.set(false)
                     }
                 }
-            } else {
+            } else if (!isA11yActive) {
                 dispatchMediaProjectionAnchor(image, width, height, now)
+            } else {
+                isHalalifyInferring.set(false)
+            }
+        }
+    }
+
+    private fun notifyDetectionUpdated(detections: List<com.drmohammed.antiporn.ai.core.model.HalalifyDetection>) {
+        val topFemale = detections.filter { it.isFemale }.maxByOrNull { it.confidence }
+            ?: detections.maxByOrNull { it.confidence }
+        val label = if (topFemale != null) "female" else "clean"
+        val maxConfidence = topFemale?.confidence ?: 0f
+        mainHandler.post {
+            try {
+                onDetectionUpdated(label, maxConfidence)
+            } catch (e: Exception) {
+                Log.d(TAG, "Non-critical error in onDetectionUpdated: ${e.message}")
             }
         }
     }
@@ -256,6 +290,7 @@ class AiInferenceCoordinator(
         if (!isRunning || captureGen != sceneGenerationId) return
         val startHalalify = SystemClock.elapsedRealtime()
         val detections = halalifyDetector.detect(cleanBitmap)
+        notifyDetectionUpdated(detections)
         val halalifyLatency = SystemClock.elapsedRealtime() - startHalalify
         val femaleDetections = detections.filter { it.isFemale }
 
@@ -330,6 +365,7 @@ class AiInferenceCoordinator(
                         if (!isRunning || captureGen != sceneGenerationId) return@post
                         val startHalalify = SystemClock.elapsedRealtime()
                         val detections = halalifyDetector.detect(fullBitmapInstance)
+                        notifyDetectionUpdated(detections)
                         val halalifyLatency = SystemClock.elapsedRealtime() - startHalalify
                         val femaleDetections = detections.filter { it.isFemale }
 
@@ -413,6 +449,7 @@ class AiInferenceCoordinator(
                         if (!isRunning || captureGen != sceneGenerationId) return@post
                         val startHalalify = SystemClock.elapsedRealtime()
                         val detections = halalifyDetector.detect(tileBitmapInstance)
+                        notifyDetectionUpdated(detections)
                         val halalifyLatency = SystemClock.elapsedRealtime() - startHalalify
                         val femaleDetections = detections.filter { it.isFemale }
 
@@ -482,7 +519,9 @@ class AiInferenceCoordinator(
                 )
             }
         } else if (::kltTracker.isInitialized && !kltTracker.hasActiveTracks()) {
-            lastDrawnPixelBoxes.clear()
+            synchronized(drawnBoxesLock) {
+                lastDrawnPixelBoxes.clear()
+            }
             blurOverlayManager.updateRegions(emptyList())
             val nowMs = SystemClock.elapsedRealtime()
             if (nowMs - lastHalalifyIdleLogMs >= 2000L) {
@@ -498,29 +537,31 @@ class AiInferenceCoordinator(
         screenWidth: Int,
         screenHeight: Int
     ): Boolean {
-        if (newBoxes.size != lastDrawnPixelBoxes.size) {
-            updateLastDrawnPixelBoxes(newBoxes, screenWidth, screenHeight)
-            return true
-        }
-        val sw = screenWidth.toFloat()
-        val sh = screenHeight.toFloat()
-        for (i in newBoxes.indices) {
-            val nb = newBoxes[i]
-            val ob = lastDrawnPixelBoxes[i]
-            val nl = nb.left * sw
-            val nt = nb.top * sh
-            val nr = nb.right * sw
-            val nb_ = nb.bottom * sh
-
-            if (kotlin.math.abs(nl - ob.left) >= 1.0f ||
-                kotlin.math.abs(nt - ob.top) >= 1.0f ||
-                kotlin.math.abs(nr - ob.right) >= 1.0f ||
-                kotlin.math.abs(nb_ - ob.bottom) >= 1.0f) {
+        synchronized(drawnBoxesLock) {
+            if (newBoxes.size != lastDrawnPixelBoxes.size) {
                 updateLastDrawnPixelBoxes(newBoxes, screenWidth, screenHeight)
                 return true
             }
+            val sw = screenWidth.toFloat()
+            val sh = screenHeight.toFloat()
+            for (i in newBoxes.indices) {
+                val nb = newBoxes[i]
+                val ob = lastDrawnPixelBoxes[i]
+                val nl = nb.left * sw
+                val nt = nb.top * sh
+                val nr = nb.right * sw
+                val nb_ = nb.bottom * sh
+
+                if (kotlin.math.abs(nl - ob.left) >= 1.0f ||
+                    kotlin.math.abs(nt - ob.top) >= 1.0f ||
+                    kotlin.math.abs(nr - ob.right) >= 1.0f ||
+                    kotlin.math.abs(nb_ - ob.bottom) >= 1.0f) {
+                    updateLastDrawnPixelBoxes(newBoxes, screenWidth, screenHeight)
+                    return true
+                }
+            }
+            return false
         }
-        return false
     }
 
     private fun updateLastDrawnPixelBoxes(
@@ -528,21 +569,23 @@ class AiInferenceCoordinator(
         screenWidth: Int,
         screenHeight: Int
     ) {
-        val sw = screenWidth.toFloat()
-        val sh = screenHeight.toFloat()
-        while (lastDrawnPixelBoxes.size < boxes.size) {
-            lastDrawnPixelBoxes.add(RectF())
-        }
-        while (lastDrawnPixelBoxes.size > boxes.size) {
-            lastDrawnPixelBoxes.removeAt(lastDrawnPixelBoxes.size - 1)
-        }
-        for (i in boxes.indices) {
-            val src = boxes[i]
-            val dst = lastDrawnPixelBoxes[i]
-            dst.left = src.left * sw
-            dst.top = src.top * sh
-            dst.right = src.right * sw
-            dst.bottom = src.bottom * sh
+        synchronized(drawnBoxesLock) {
+            val sw = screenWidth.toFloat()
+            val sh = screenHeight.toFloat()
+            while (lastDrawnPixelBoxes.size < boxes.size) {
+                lastDrawnPixelBoxes.add(RectF())
+            }
+            while (lastDrawnPixelBoxes.size > boxes.size) {
+                lastDrawnPixelBoxes.removeAt(lastDrawnPixelBoxes.size - 1)
+            }
+            for (i in boxes.indices) {
+                val src = boxes[i]
+                val dst = lastDrawnPixelBoxes[i]
+                dst.left = src.left * sw
+                dst.top = src.top * sh
+                dst.right = src.right * sw
+                dst.bottom = src.bottom * sh
+            }
         }
     }
 
@@ -560,7 +603,10 @@ class AiInferenceCoordinator(
         sceneGenerationId++
         accumulatedScrollDx = 0f
         accumulatedScrollDy = 0f
-        lastDrawnPixelBoxes.clear()
+        consecutiveA11yFailures = 0
+        synchronized(drawnBoxesLock) {
+            lastDrawnPixelBoxes.clear()
+        }
         if (::kltTracker.isInitialized) {
             kltTracker.flush()
         }

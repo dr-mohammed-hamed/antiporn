@@ -28,6 +28,7 @@ class DevicePolicyBundleTest {
         assertTrue(policy.isVpnBlackholeEnabled)
         assertTrue(policy.isIncognitoBlocked)
         assertTrue(policy.lockNewInstallsUntilApproved)
+        assertTrue(policy.isScreenAiEnabledGlobally)
         assertTrue(policy.customBlacklistPackages.isEmpty())
         assertEquals(com.drmohammed.antiporn.curfew.CurfewConfig.STATIC_WHITELIST, policy.customCurfewWhitelistPackages)
         assertTrue(policy.curfewVpnBypassPackages.isEmpty())

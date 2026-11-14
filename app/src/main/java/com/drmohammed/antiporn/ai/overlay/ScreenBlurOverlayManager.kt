@@ -289,11 +289,19 @@ class ScreenBlurOverlayManager(
             while (preallocatedMapped.size < rawRegions.size) {
                 preallocatedMapped.add(RectF())
             }
+            val snapshot = ArrayList<RectF>(rawRegions.size)
             for (i in rawRegions.indices) {
                 mapBoundingBox(rawRegions[i], targetWidth, targetHeight, sourceWidth, sourceHeight, preallocatedMapped[i])
+                val mapped = preallocatedMapped[i]
+                val copy = RectF().apply {
+                    left = mapped.left
+                    top = mapped.top
+                    right = mapped.right
+                    bottom = mapped.bottom
+                }
+                snapshot.add(copy)
             }
-            val mappedSublist = preallocatedMapped.subList(0, rawRegions.size)
-            updateRegions(mappedSublist)
+            updateRegions(snapshot)
         }
     }
 
@@ -308,10 +316,6 @@ class ScreenBlurOverlayManager(
         }
 
         if (validRegions.isEmpty()) {
-            if (isStaticLatch && isKltTrackingActive) {
-                // أثناء القفل الثباتي مع تتبع KLT النشط لا نمسح الصناديق لتجنب الوميض
-                return
-            }
             // فك القفل الثباتي وجدولة مؤقت الإزالة (persistenceMs) لمنع تعليق المربع (Ghost Box)
             isStaticLatch = false
             synchronized(lock) {
@@ -327,9 +331,7 @@ class ScreenBlurOverlayManager(
         }
 
         // إعادة ضبط القفل الثباتي وحالة الإزالة المعلقة عند استلام تحديث جديد حتى تتمكن آلية التثبيت من إدارته
-        if (!isKltTrackingActive) {
-            isStaticLatch = false
-        }
+        isStaticLatch = false
         isPendingClear = false
 
         val processedRegions = ArrayList<RectF>(validRegions.size)
@@ -391,8 +393,18 @@ class ScreenBlurOverlayManager(
             overlayScheduler.postDelayed(clearRunnable, persistenceMs)
         }
 
-        // التأكد من ربط الـ Overlay بالـ WindowManager إذا كانت الصلاحية متوفرة
-        if (!isAttached) {
+        // التأكد من ربط الـ Overlay بالـ WindowManager أو ترقية نوع النافذة إذا تم تفعيل AccessibilityService
+        val a11y = com.drmohammed.antiporn.accessibility.HisnAccessibilityService.instance
+        val desiredType = if (a11y != null) {
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+        }
+
+        if (!isAttached || currentAttachedType != desiredType) {
             val attached = attachOverlay()
             if (!attached) return
         }
@@ -523,6 +535,10 @@ class ScreenBlurOverlayManager(
             this.format = PixelFormat.TRANSLUCENT
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 this.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                this.fitInsetsTypes = 0
+                this.fitInsetsSides = 0
             }
         }
         try {

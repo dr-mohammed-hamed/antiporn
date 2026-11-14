@@ -49,8 +49,8 @@ class NudeNetDetector(
     private var inputName: String = "images"
 
     private val inferenceLock = Any()
-    private val floatBuffer: FloatBuffer = FloatBuffer.allocate(1 * 3 * MODEL_INPUT_SIZE * MODEL_INPUT_SIZE)
-    private val pixelArray = IntArray(MODEL_INPUT_SIZE * MODEL_INPUT_SIZE)
+    private var floatBuffer: FloatBuffer? = null
+    private var pixelArray: IntArray? = null
 
     private val letterboxPaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val letterboxDstRect = RectF()
@@ -77,6 +77,9 @@ class NudeNetDetector(
         synchronized(inferenceLock) {
             close()
             return try {
+                floatBuffer = FloatBuffer.allocate(1 * 3 * MODEL_INPUT_SIZE * MODEL_INPUT_SIZE)
+                pixelArray = IntArray(MODEL_INPUT_SIZE * MODEL_INPUT_SIZE)
+
                 val env = OrtEnvironment.getEnvironment()
                 ortEnv = env
 
@@ -115,6 +118,9 @@ class NudeNetDetector(
             val origWidth = bitmap.width
             val origHeight = bitmap.height
 
+            val buffer = floatBuffer ?: FloatBuffer.allocate(1 * 3 * MODEL_INPUT_SIZE * MODEL_INPUT_SIZE).also { floatBuffer = it }
+            val pixels = pixelArray ?: IntArray(MODEL_INPUT_SIZE * MODEL_INPUT_SIZE).also { pixelArray = it }
+
             // 1. حساب قياسات Letterbox (المحافظة على النسبة الأبعاد الأصلية دون تشويه)
             val scale = min(
                 MODEL_INPUT_SIZE.toFloat() / origWidth,
@@ -131,18 +137,18 @@ class NudeNetDetector(
             letterboxDstRect.set(padX, padY, padX + resizedW, padY + resizedH)
             canvas.drawBitmap(bitmap, null, letterboxDstRect, letterboxPaint)
 
-            letterboxed.getPixels(pixelArray, 0, MODEL_INPUT_SIZE, 0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE)
+            letterboxed.getPixels(pixels, 0, MODEL_INPUT_SIZE, 0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE)
 
             // 2. تعبئة البايتات بنمط NCHW [1, 3, 320, 320] مع تطبيع [0, 1]
-            floatBuffer.rewind()
+            buffer.rewind()
             val channelSize = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE
             val rOffset = 0
             val gOffset = channelSize
             val bOffset = channelSize * 2
 
-            val backingArray = floatBuffer.array()
+            val backingArray = buffer.array()
             for (i in 0 until channelSize) {
-                val pixel = pixelArray[i]
+                val pixel = pixels[i]
                 val r = ((pixel shr 16) and 0xFF) / 255.0f
                 val g = ((pixel shr 8) and 0xFF) / 255.0f
                 val b = (pixel and 0xFF) / 255.0f
@@ -151,12 +157,12 @@ class NudeNetDetector(
                 backingArray[gOffset + i] = g
                 backingArray[bOffset + i] = b
             }
-            floatBuffer.position(channelSize * 3)
-            floatBuffer.rewind()
+            buffer.position(channelSize * 3)
+            buffer.rewind()
 
             // 3. تشغيل الاستدلال عبر محرك ONNX بأمان تام لمنع تسريب الذاكرة
             val shape = longArrayOf(1, 3, MODEL_INPUT_SIZE.toLong(), MODEL_INPUT_SIZE.toLong())
-            val tensor = OnnxTensor.createTensor(env, floatBuffer, shape)
+            val tensor = OnnxTensor.createTensor(env, buffer, shape)
 
             val rawOutput = try {
                 session.run(Collections.singletonMap(inputName, tensor)).use { outputs ->
@@ -303,6 +309,8 @@ class NudeNetDetector(
             try { ortEnv?.close() } catch (_: Exception) { }
             ortSession = null
             ortEnv = null
+            floatBuffer = null
+            pixelArray = null
             try {
                 letterboxBitmap?.recycle()
             } catch (_: Exception) { }

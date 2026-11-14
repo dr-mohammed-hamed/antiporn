@@ -20,8 +20,10 @@ class AiExemptionRegistryTest {
         assertTrue(AiExemptionRegistry.isTarget("com.android.chrome"))
         assertTrue(AiExemptionRegistry.isTarget("com.instagram.android"))
         assertTrue(AiExemptionRegistry.isTarget("com.google.android.youtube"))
+        assertTrue(AiExemptionRegistry.isTarget("com.google.android.googlequicksearchbox"))
         assertFalse(AiExemptionRegistry.isExempt("com.android.chrome"))
         assertFalse(AiExemptionRegistry.isExempt("com.instagram.android"))
+        assertFalse(AiExemptionRegistry.isExempt("com.google.android.googlequicksearchbox"))
     }
 
     @Test

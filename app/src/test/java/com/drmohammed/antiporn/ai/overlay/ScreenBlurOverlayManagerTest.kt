@@ -551,6 +551,35 @@ class ScreenBlurOverlayManagerTest {
     }
 
     @Test
+    fun testUpdateRegions_emptyListWithKltTrackingActive_unlatchesAndClears() {
+        val scheduler = TestOverlayScheduler()
+        val manager = ScreenBlurOverlayManager(
+            context = stubContext,
+            scheduler = scheduler,
+            canDrawOverlaysChecker = { false }
+        )
+        manager.isKltTrackingActive = true
+
+        // رصد أولي وتثبيت
+        manager.updateRegions(listOf(createRect(10f, 20f, 100f, 200f)))
+        manager.retainActiveRegions()
+        assertTrue("Latch must be active", manager.isStaticLatch)
+        assertTrue("Tracking must be active", manager.isKltTrackingActive)
+
+        // إرسال قائمة فارغة من المتتبع عند مغادرة المحتوى
+        manager.updateRegions(emptyList())
+
+        assertFalse("Latch must be deactivated on empty update even with KLT active", manager.isStaticLatch)
+        assertEquals("Clear task must be scheduled", 1, scheduler.delayedTasks.size)
+        assertTrue("Regions must remain active until persistence expires", manager.hasActiveRegions)
+
+        // تنفيذ مهمة المسح
+        scheduler.triggerAllDelayed()
+        assertFalse("Regions must be cleared after persistence expires", manager.hasActiveRegions)
+        assertTrue(manager.getActiveRegions().isEmpty())
+    }
+
+    @Test
     fun testRetainActiveRegions_doesNotCancelPendingClearAfterEmptyUpdate() {
         val scheduler = TestOverlayScheduler()
         val manager = ScreenBlurOverlayManager(
@@ -617,6 +646,12 @@ class ScreenBlurOverlayManagerTest {
         // نمط النافذة TYPE_APPLICATION_OVERLAY
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             assertEquals(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, params.type)
+        }
+
+        // إعدادات تجنب إزاحة شريط الحالة / شريط التنقل
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            assertEquals(0, params.fitInsetsTypes)
+            assertEquals(0, params.fitInsetsSides)
         }
     }
 

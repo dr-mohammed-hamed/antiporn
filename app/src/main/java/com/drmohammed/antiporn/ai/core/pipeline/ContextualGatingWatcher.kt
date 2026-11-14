@@ -218,6 +218,13 @@ class ContextualGatingWatcher(
     private fun failClosed(reason: String) {
         Timber.tag(TAG).w("Gating fail-closed: $reason")
         lastQueryFailed = true
+        if (currentForegroundPackage == context.packageName) {
+            if (isTargetAppForeground) {
+                isTargetAppForeground = false
+                onStateChanged?.invoke(false, currentForegroundPackage)
+            }
+            return
+        }
         if (!isTargetAppForeground) {
             isTargetAppForeground = true
             onStateChanged?.invoke(true, currentForegroundPackage)
