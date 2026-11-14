@@ -954,6 +954,15 @@
     <string name="qr_export_print_error">تعذر تشغيل خدمة الطباعة</string>
     <string name="qr_export_save_error_gallery">تعذر حفظ الصورة في المعرض</string>
     <string name="qr_export_save_error">تعذر حفظ الصورة: %s</string>
+    <string name="qr_export_gallery_warning_title">تنبيه هام عند الحفظ في المعرض</string>
+    <string name="qr_export_gallery_warning_message">تم حفظ الصورة في المعرض بنجاح.\n\nتنبيه: كاميرا الهاتف لا تستطيع مسح صورة معروضة على شاشة نفس الهاتف! يجب نقل هذه الصورة لجهاز آخر أو طباعتها لتتمكن من فك القفل.</string>
+    <string name="qr_wizard_acknowledge_checkbox">أقر بأنني قمت بنقل أو طباعة هذا الرمز وسأتمكن من مسحه بكاميرا الهاتف</string>
+    <string name="qr_wizard_btn_test_scan">التالي: اختبار المسح بالكاميرا</string>
+    <string name="qr_wizard_test_scan_title">اختبار مسح رمز الـ QR</string>
+    <string name="qr_wizard_test_scan_desc">امسح الرمز المطبوع أو المعروض على شاشة جهاز آخر لتأكيد حيازتك له قبل تفعيل القفل رسمياً</string>
+    <string name="qr_wizard_test_success_toast">تم التحقق بنجاح! تم تفعيل قفل الـ QR لحماية الإعدادات</string>
+    <string name="qr_emergency_unlock_completed_toast">تم إنهاء انتظار الطوارئ وتعطيل قفل الـ QR بالكامل بنجاح</string>
+    <string name="qr_emergency_trusted_time_offline_hint">يعمل عداد الطوارئ في وضع عدم الاتصال بأمان</string>
 
     <!-- Self Control QR Lock UI -->
     <string name="self_control_qr_card_title">درع تأخير الاندفاعية (رمز الـ QR)</string>

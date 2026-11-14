@@ -379,6 +379,12 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
                 binding.btnEmergencyBypass.text = getString(R.string.qr_emergency_bypass_ready)
                 binding.btnEmergencyBypass.setOnClickListener {
                     if (!isAdded || isRemoving) return@setOnClickListener
+                    qrManager.completeEmergencyUnlock()
+                    android.widget.Toast.makeText(
+                        requireContext().applicationContext,
+                        R.string.qr_emergency_unlock_completed_toast,
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
                     val reqKey = arguments?.getString(EXTRA_REQUEST_KEY)
                     val payload = arguments?.getString(EXTRA_PAYLOAD)
                     if (reqKey != null) {
@@ -464,6 +470,7 @@ class QrScannerBottomSheet : BottomSheetDialogFragment() {
 
     companion object {
         const val TAG = "QrScannerBottomSheet"
+        const val REQUEST_KEY_TEST_SCAN = "qr_scanner_test_scan"
         const val EXTRA_REQUEST_KEY = "extra_request_key"
         const val EXTRA_PAYLOAD = "extra_payload"
         const val RESULT_KEY_VERIFIED = "result_key_verified"

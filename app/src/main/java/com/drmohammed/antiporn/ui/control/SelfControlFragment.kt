@@ -59,13 +59,6 @@ class SelfControlFragment : Fragment() {
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        if (savedInstanceState != null) {
-            (childFragmentManager.findFragmentByTag(QrExportDialog.TAG) as? DialogFragment)?.dismissAllowingStateLoss()
-        }
-    }
-
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -84,15 +77,12 @@ class SelfControlFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        if (isHidden) return
-        selfControlViewModel.checkGateAndRefresh()
+        if (!isHidden) selfControlViewModel.checkGateAndRefresh()
     }
 
     override fun onHiddenChanged(hidden: Boolean) {
         super.onHiddenChanged(hidden)
-        if (!hidden) {
-            selfControlViewModel.checkGateAndRefresh()
-        }
+        if (!hidden) selfControlViewModel.checkGateAndRefresh()
     }
 
     private fun observeViewModel() {
@@ -132,19 +122,17 @@ class SelfControlFragment : Fragment() {
         isQrPolicyLoading = true
         binding.switchQrLockEnabled.isChecked = isQrEnabled
         binding.layoutQrActionButtons.isVisible = isQrEnabled
+        binding.btnShowQrCode.isVisible = false
+        binding.btnRegenerateQrCode.isVisible = isQrEnabled
         isQrPolicyLoading = false
     }
 
     private fun updateLockState(isLocked: Boolean) {
         if (lastLockState == isLocked) return
         lastLockState = isLocked
-        val b = _binding ?: return
-        if (isLocked) {
-            b.layoutSelfControlLocked.visibility = View.VISIBLE
-            b.scrollSelfControl.visibility = View.GONE
-        } else {
-            b.layoutSelfControlLocked.visibility = View.GONE
-            b.scrollSelfControl.visibility = View.VISIBLE
+        _binding?.let { b ->
+            b.layoutSelfControlLocked.isVisible = isLocked
+            b.scrollSelfControl.isVisible = !isLocked
         }
     }
 
@@ -178,13 +166,18 @@ class SelfControlFragment : Fragment() {
             if (isChecked) {
                 if (qrManager.isQrLockEnabled()) {
                     _binding?.layoutQrActionButtons?.isVisible = true
+                    _binding?.btnShowQrCode?.isVisible = false
+                    _binding?.btnRegenerateQrCode?.isVisible = true
                     return@setOnCheckedChangeListener
                 }
+                // Do not arm the lock yet! Keep switch visually off until setup verification test succeeds
+                isQrPolicyLoading = true
+                _binding?.switchQrLockEnabled?.isChecked = false
+                isQrPolicyLoading = false
+
                 if (!qrManager.hasToken()) {
                     qrManager.generateAndSaveNewToken()
                 }
-                qrManager.setQrLockEnabled(true)
-                _binding?.layoutQrActionButtons?.isVisible = true
                 if (!childFragmentManager.isStateSaved && childFragmentManager.findFragmentByTag(QrExportDialog.TAG) == null) {
                     QrExportDialog.newInstance().show(childFragmentManager, QrExportDialog.TAG)
                 }
@@ -200,19 +193,6 @@ class SelfControlFragment : Fragment() {
                 } else {
                     _binding?.layoutQrActionButtons?.isVisible = false
                 }
-            }
-        }
-
-        binding.btnShowQrCode.setOnClickListener {
-            val ctx = context?.applicationContext ?: return@setOnClickListener
-            val qrManager = SelfControlQrManager.getInstance(ctx)
-            if (!qrManager.hasToken()) {
-                qrManager.generateAndSaveNewToken()
-            }
-            if (qrManager.isQrLockEnabled()) {
-                showQrScannerWithFallback(TAG_SHOW_QR_CODE)
-            } else {
-                performAuthorizedQrAction(TAG_SHOW_QR_CODE)
             }
         }
 
@@ -256,6 +236,22 @@ class SelfControlFragment : Fragment() {
     }
 
     private fun registerPersistentQrResultListeners() {
+        childFragmentManager.setFragmentResultListener(
+            QrExportDialog.REQUEST_KEY_SETUP_COMPLETED,
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val enabled = bundle.getBoolean(QrExportDialog.RESULT_KEY_ENABLED, false)
+            val ctx = context?.applicationContext ?: return@setFragmentResultListener
+            val qrManager = SelfControlQrManager.getInstance(ctx)
+            val isQrEnabled = qrManager.isQrLockEnabled() && enabled
+            isQrPolicyLoading = true
+            _binding?.switchQrLockEnabled?.isChecked = isQrEnabled
+            _binding?.layoutQrActionButtons?.isVisible = isQrEnabled
+            _binding?.btnShowQrCode?.isVisible = false
+            _binding?.btnRegenerateQrCode?.isVisible = isQrEnabled
+            isQrPolicyLoading = false
+        }
+
         val allTags = listOf(
             TAG_DISABLE_QR_BARRIER,
             TAG_SHOW_QR_CODE,
@@ -270,6 +266,14 @@ class SelfControlFragment : Fragment() {
             childFragmentManager.setFragmentResultListener(tag, viewLifecycleOwner) { _, bundle ->
                 val verified = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_VERIFIED, false)
                 val bypass = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_EMERGENCY_BYPASS, false)
+                if (bypass) {
+                    isQrPolicyLoading = true
+                    _binding?.switchQrLockEnabled?.isChecked = false
+                    _binding?.layoutQrActionButtons?.isVisible = false
+                    _binding?.btnShowQrCode?.isVisible = false
+                    _binding?.btnRegenerateQrCode?.isVisible = false
+                    isQrPolicyLoading = false
+                }
                 if (verified || bypass) {
                     performAuthorizedQrAction(tag)
                 }
@@ -323,10 +327,10 @@ class SelfControlFragment : Fragment() {
                     .setNegativeButton(android.R.string.cancel, null)
                     .setPositiveButton(R.string.self_control_qr_btn_regenerate_confirm) { _, _ ->
                         qrManager.generateAndSaveNewToken()
-                        qrManager.setQrLockEnabled(true)
+                        qrManager.setQrLockEnabled(false)
                         isQrPolicyLoading = true
-                        _binding?.switchQrLockEnabled?.isChecked = true
-                        _binding?.layoutQrActionButtons?.isVisible = true
+                        _binding?.switchQrLockEnabled?.isChecked = false
+                        _binding?.layoutQrActionButtons?.isVisible = false
                         isQrPolicyLoading = false
                         if (!childFragmentManager.isStateSaved && childFragmentManager.findFragmentByTag(QrExportDialog.TAG) == null) {
                             QrExportDialog.newInstance().show(childFragmentManager, QrExportDialog.TAG)
@@ -334,41 +338,25 @@ class SelfControlFragment : Fragment() {
                     }
                     .show()
             }
-            TAG_NAV_CURFEW -> {
-                val intent = Intent(requireContext(), CurfewSettingsActivity::class.java).apply {
-                    putExtra(CurfewSettingsActivity.EXTRA_IS_REMOTE, false)
-                    putExtra(CurfewSettingsActivity.EXTRA_POLICY_JSON, selfControlViewModel.uiState.value.policy.toJson())
-                }
-                subScreenLauncher.launch(intent)
-            }
-            TAG_NAV_WEB -> {
-                val intent = Intent(requireContext(), WebFilterSettingsActivity::class.java).apply {
-                    putExtra(WebFilterSettingsActivity.EXTRA_IS_REMOTE, false)
-                    putExtra(WebFilterSettingsActivity.EXTRA_POLICY_JSON, selfControlViewModel.uiState.value.policy.toJson())
-                }
-                subScreenLauncher.launch(intent)
-            }
+            TAG_NAV_CURFEW -> launchSubScreen(CurfewSettingsActivity::class.java)
+            TAG_NAV_WEB -> launchSubScreen(WebFilterSettingsActivity::class.java)
             TAG_NAV_APPS -> {
                 val intent = Intent(requireContext(), RemoteAppManagerActivity::class.java).apply {
                     putExtra(RemoteAppManagerActivity.EXTRA_IS_LOCAL, true)
                 }
                 subScreenLauncher.launch(intent)
             }
-            TAG_NAV_WAQFA -> {
-                val intent = Intent(requireContext(), WaqfaSettingsActivity::class.java).apply {
-                    putExtra(WaqfaSettingsActivity.EXTRA_IS_REMOTE, false)
-                    putExtra(WaqfaSettingsActivity.EXTRA_POLICY_JSON, selfControlViewModel.uiState.value.policy.toJson())
-                }
-                subScreenLauncher.launch(intent)
-            }
-            TAG_NAV_OTHER -> {
-                val intent = Intent(requireContext(), OtherSettingsActivity::class.java).apply {
-                    putExtra(OtherSettingsActivity.EXTRA_IS_REMOTE, false)
-                    putExtra(OtherSettingsActivity.EXTRA_POLICY_JSON, selfControlViewModel.uiState.value.policy.toJson())
-                }
-                subScreenLauncher.launch(intent)
-            }
+            TAG_NAV_WAQFA -> launchSubScreen(WaqfaSettingsActivity::class.java)
+            TAG_NAV_OTHER -> launchSubScreen(OtherSettingsActivity::class.java)
         }
+    }
+
+    private fun launchSubScreen(targetClass: Class<*>) {
+        val intent = Intent(requireContext(), targetClass).apply {
+            putExtra(CurfewSettingsActivity.EXTRA_IS_REMOTE, false)
+            putExtra(CurfewSettingsActivity.EXTRA_POLICY_JSON, selfControlViewModel.uiState.value.policy.toJson())
+        }
+        subScreenLauncher.launch(intent)
     }
 
     private fun loadPendingApprovals() {

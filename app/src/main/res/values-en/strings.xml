@@ -425,6 +425,15 @@
     <string name="qr_export_print_error">Failed to start print service</string>
     <string name="qr_export_save_error_gallery">Failed to save image to gallery</string>
     <string name="qr_export_save_error">Failed to save image: %s</string>
+    <string name="qr_export_gallery_warning_title">Important Warning: Saved to Gallery</string>
+    <string name="qr_export_gallery_warning_message">Image saved to gallery successfully.\n\nNotice: The phone camera cannot scan an image displayed on its own screen! You must transfer this image to another device or print it to be able to unlock.</string>
+    <string name="qr_wizard_acknowledge_checkbox">I confirm that I have saved or printed this QR code and can scan it with the camera</string>
+    <string name="qr_wizard_btn_test_scan">Next: Test Scan with Camera</string>
+    <string name="qr_wizard_test_scan_title">QR Code Test Scan</string>
+    <string name="qr_wizard_test_scan_desc">Scan the printed QR code or the one displayed on another screen to confirm possession before activating the lock</string>
+    <string name="qr_wizard_test_success_toast">Verified successfully! QR lock is now active to protect your settings</string>
+    <string name="qr_emergency_unlock_completed_toast">Emergency delay completed. QR lock has been fully disabled successfully</string>
+    <string name="qr_emergency_trusted_time_offline_hint">Emergency timer is running safely in offline mode</string>
 
     <!-- Self Control QR Lock UI -->
     <string name="self_control_qr_card_title">Impulse Delay Shield (QR Code)</string>

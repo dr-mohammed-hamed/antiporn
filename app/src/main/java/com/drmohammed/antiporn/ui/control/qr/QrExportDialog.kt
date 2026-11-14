@@ -1,6 +1,7 @@
 package com.drmohammed.antiporn.ui.control.qr
 
 import android.content.ContentValues
+import android.content.DialogInterface
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
@@ -22,6 +23,8 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -40,13 +43,28 @@ class QrExportDialog : BottomSheetDialogFragment() {
     private lateinit var btnShareQr: MaterialButton
     private lateinit var btnPrintQr: MaterialButton
     private lateinit var btnSaveQrImage: MaterialButton
+    private lateinit var cbAcknowledgePossession: MaterialCheckBox
+    private lateinit var btnProceedTestScan: MaterialButton
     private lateinit var btnCloseExportDialog: MaterialButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState != null) {
-            // Dismiss immediately upon configuration change / theme recreation to prevent unauthorized QR key exposure
-            dismissAllowingStateLoss()
+        parentFragmentManager.setFragmentResultListener(
+            QrScannerBottomSheet.REQUEST_KEY_TEST_SCAN,
+            this
+        ) { _, bundle ->
+            val verified = bundle.getBoolean(QrScannerBottomSheet.RESULT_KEY_VERIFIED, false)
+            if (verified) {
+                val ctx = context?.applicationContext ?: return@setFragmentResultListener
+                val qrManager = SelfControlQrManager.getInstance(ctx)
+                qrManager.setQrLockEnabled(true)
+                Toast.makeText(ctx, R.string.qr_wizard_test_success_toast, Toast.LENGTH_LONG).show()
+                parentFragmentManager.setFragmentResult(
+                    REQUEST_KEY_SETUP_COMPLETED,
+                    Bundle().apply { putBoolean(RESULT_KEY_ENABLED, true) }
+                )
+                dismissAllowingStateLoss()
+            }
         }
     }
 
@@ -73,6 +91,8 @@ class QrExportDialog : BottomSheetDialogFragment() {
         btnShareQr = view.findViewById(R.id.btnShareQr)
         btnPrintQr = view.findViewById(R.id.btnPrintQr)
         btnSaveQrImage = view.findViewById(R.id.btnSaveQrImage)
+        cbAcknowledgePossession = view.findViewById(R.id.cbAcknowledgePossession)
+        btnProceedTestScan = view.findViewById(R.id.btnProceedTestScan)
         btnCloseExportDialog = view.findViewById(R.id.btnCloseExportDialog)
 
         // Resolve or generate QR bitmap
@@ -93,9 +113,25 @@ class QrExportDialog : BottomSheetDialogFragment() {
             saveBitmapToGallery(resolvedBitmap)
         }
 
+        cbAcknowledgePossession.setOnCheckedChangeListener { _, isChecked ->
+            btnProceedTestScan.isEnabled = isChecked
+        }
+
+        btnProceedTestScan.setOnClickListener {
+            launchTestScan()
+        }
+
         btnCloseExportDialog.setOnClickListener {
             dismiss()
         }
+    }
+
+    private fun launchTestScan() {
+        val parentFm = parentFragmentManager
+        if (parentFm.isStateSaved || parentFm.findFragmentByTag(QrScannerBottomSheet.TAG) != null) return
+
+        QrScannerBottomSheet.newInstance(QrScannerBottomSheet.REQUEST_KEY_TEST_SCAN)
+            .show(parentFm, QrScannerBottomSheet.TAG)
     }
 
     private fun shareQrCode(bitmap: Bitmap) {
@@ -191,8 +227,13 @@ class QrExportDialog : BottomSheetDialogFragment() {
                         context.contentResolver.update(uri, contentValues, null, null)
 
                         withContext(Dispatchers.Main) {
-                            if (isAdded) {
-                                Toast.makeText(context, R.string.qr_export_save_success, Toast.LENGTH_LONG).show()
+                            val act = activity
+                            if (isAdded && act != null && !act.isFinishing && !act.isDestroyed) {
+                                MaterialAlertDialogBuilder(act)
+                                    .setTitle(R.string.qr_export_gallery_warning_title)
+                                    .setMessage(R.string.qr_export_gallery_warning_message)
+                                    .setPositiveButton(android.R.string.ok, null)
+                                    .show()
                             }
                         }
                     } else {
@@ -232,8 +273,24 @@ class QrExportDialog : BottomSheetDialogFragment() {
         }
     }
 
+    override fun onDismiss(dialog: DialogInterface) {
+        super.onDismiss(dialog)
+        val ctx = context?.applicationContext
+        if (ctx != null) {
+            val qrManager = SelfControlQrManager.getInstance(ctx)
+            if (!qrManager.isQrLockEnabled()) {
+                parentFragmentManager.setFragmentResult(
+                    REQUEST_KEY_SETUP_COMPLETED,
+                    Bundle().apply { putBoolean(RESULT_KEY_ENABLED, false) }
+                )
+            }
+        }
+    }
+
     companion object {
         const val TAG = "QrExportDialog"
+        const val REQUEST_KEY_SETUP_COMPLETED = "qr_setup_completed"
+        const val RESULT_KEY_ENABLED = "result_key_enabled"
 
         fun newInstance(): QrExportDialog {
             return QrExportDialog()

@@ -4,23 +4,14 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.os.Build
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
-import android.util.Base64
 import android.util.Log
 import com.drmohammed.antiporn.core.time.TrustedTimeProvider
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
-import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.EnumMap
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
 
 /**
  * Manager handling QR-Code lock settings, cryptographically secure token generation,
@@ -46,7 +37,10 @@ class SelfControlQrManager internal constructor(
         }
     },
     private val encryptToken: (String) -> String? = { it },
-    private val decryptToken: (String) -> String? = { it }
+    private val decryptToken: (String) -> String? = { it },
+    private val monotonicTimeProvider: () -> Long = {
+        android.os.SystemClock.elapsedRealtime()
+    }
 ) {
 
     private constructor(context: Context) : this(
@@ -69,18 +63,13 @@ class SelfControlQrManager internal constructor(
                 false
             }
         },
-        { token -> encryptWithKeystore(token) },
-        { stored -> decryptWithKeystore(stored) }
+        { token -> SelfControlQrCrypto.encrypt(token) },
+        { stored -> SelfControlQrCrypto.decrypt(stored) },
+        { android.os.SystemClock.elapsedRealtime() }
     )
 
     companion object {
         private const val TAG = "AntiPorn_QrManager"
-        private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
-        private const val KEYSTORE_ALIAS = "hisn_self_control_qr_token_v1"
-        private const val ENCRYPTED_TOKEN_PREFIX = "enc:v1:"
-        private const val AES_GCM_TRANSFORMATION = "AES/GCM/NoPadding"
-        private const val GCM_TAG_LENGTH_BITS = 128
-        private val keystoreLock = Any()
 
         const val PREFS_NAME = "self_control_qr_prefs"
         const val KEY_QR_LOCK_ENABLED = "qr_lock_enabled"
@@ -89,6 +78,8 @@ class SelfControlQrManager internal constructor(
         const val KEY_EMERGENCY_DELAY_ENABLED = "emergency_delay_enabled"
         const val KEY_EMERGENCY_DELAY_HOURS = "emergency_delay_hours"
         const val KEY_EMERGENCY_DELAY_REQUESTED_AT = "emergency_delay_requested_at"
+        const val KEY_EMERGENCY_DELAY_REQUESTED_ELAPSED_RT = "emergency_delay_requested_elapsed_rt"
+        const val KEY_EMERGENCY_DELAY_IS_OFFLINE_MONOTONIC = "emergency_delay_is_offline_monotonic"
 
         const val DEFAULT_EMERGENCY_DELAY_HOURS = 24
 
@@ -100,70 +91,10 @@ class SelfControlQrManager internal constructor(
                 instance ?: SelfControlQrManager(context.applicationContext).also { instance = it }
             }
         }
-
-        private fun getOrCreateSecretKey(): SecretKey? {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
-            val keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER).apply { load(null) }
-            (keyStore.getKey(KEYSTORE_ALIAS, null) as? SecretKey)?.let { return it }
-            val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_PROVIDER)
-            val spec = KeyGenParameterSpec.Builder(
-                KEYSTORE_ALIAS,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-            )
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setKeySize(256)
-                .build()
-            keyGenerator.init(spec)
-            return keyGenerator.generateKey()
-        }
-
-        private fun encryptWithKeystore(plaintext: String): String? = synchronized(keystoreLock) {
-            try {
-                val secretKey = getOrCreateSecretKey() ?: return null
-                val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
-                cipher.init(Cipher.ENCRYPT_MODE, secretKey)
-                val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
-                val ivB64 = Base64.encodeToString(cipher.iv, Base64.NO_WRAP)
-                val ctB64 = Base64.encodeToString(ciphertext, Base64.NO_WRAP)
-                "$ENCRYPTED_TOKEN_PREFIX$ivB64:$ctB64"
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed encrypting QR lock token via AndroidKeyStore", e)
-                null
-            }
-        }
-
-        private fun decryptWithKeystore(stored: String): String? = synchronized(keystoreLock) {
-            try {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
-                if (!stored.startsWith(ENCRYPTED_TOKEN_PREFIX)) return null
-                val payload = stored.removePrefix(ENCRYPTED_TOKEN_PREFIX)
-                val parts = payload.split(':')
-                if (parts.size != 2) return null
-                val iv = Base64.decode(parts[0], Base64.NO_WRAP)
-                val ciphertext = Base64.decode(parts[1], Base64.NO_WRAP)
-                val keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER).apply { load(null) }
-                val secretKey = keyStore.getKey(KEYSTORE_ALIAS, null) as? SecretKey ?: return null
-                val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
-                cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
-                String(cipher.doFinal(ciphertext), Charsets.UTF_8)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed decrypting QR lock token via AndroidKeyStore", e)
-                null
-            }
-        }
     }
 
-    /**
-     * Checks if the QR code barrier is currently enabled.
-     */
-    fun isQrLockEnabled(): Boolean {
-        return prefs.getBoolean(KEY_QR_LOCK_ENABLED, false)
-    }
+    fun isQrLockEnabled(): Boolean = prefs.getBoolean(KEY_QR_LOCK_ENABLED, false)
 
-    /**
-     * Enables or disables the QR code barrier.
-     */
     fun setQrLockEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_QR_LOCK_ENABLED, enabled).apply()
     }
@@ -173,7 +104,7 @@ class SelfControlQrManager internal constructor(
      */
     fun getSavedToken(): String? {
         val raw = prefs.getString(KEY_SAVED_TOKEN, null) ?: return null
-        if (raw.startsWith(ENCRYPTED_TOKEN_PREFIX)) {
+        if (raw.startsWith(SelfControlQrCrypto.ENCRYPTED_TOKEN_PREFIX)) {
             return decryptToken(raw)
         }
         val encrypted = encryptToken(raw)
@@ -189,25 +120,10 @@ class SelfControlQrManager internal constructor(
         return raw
     }
 
-    /**
-     * Retrieves the stored SHA-256 hash of the lock token.
-     */
-    fun getSavedTokenHash(): String? {
-        return prefs.getString(KEY_SAVED_TOKEN_HASH, null)
-    }
+    fun getSavedTokenHash(): String? = prefs.getString(KEY_SAVED_TOKEN_HASH, null)
 
-    /**
-     * Checks if a valid token or token hash is stored.
-     */
-    fun hasToken(): Boolean {
-        return !getSavedTokenHash().isNullOrBlank() || !getSavedToken().isNullOrBlank()
-    }
+    fun hasToken(): Boolean = !getSavedTokenHash().isNullOrBlank() || !getSavedToken().isNullOrBlank()
 
-    /**
-     * Generates a cryptographically secure random token, computes its SHA-256 hash,
-     * stores encrypted token (when KeyStore is available) and SHA-256 hash in preferences,
-     * and returns the raw token.
-     */
     fun generateAndSaveNewToken(): String {
         val randomBytes = ByteArray(32)
         SecureRandom().nextBytes(randomBytes)
@@ -228,7 +144,6 @@ class SelfControlQrManager internal constructor(
 
     /**
      * Verifies whether [scannedContent] matches the active lock token
-     * by comparing SHA-256 hashes (and direct token fallback if hash is missing)
      * using constant-time comparison to prevent timing attacks.
      */
     fun verifyToken(scannedContent: String): Boolean {
@@ -265,32 +180,11 @@ class SelfControlQrManager internal constructor(
      * Generates a square QR code [com.google.zxing.common.BitMatrix] containing [text] with UTF-8 encoding and minimal 1-block margin.
      */
     fun generateQrMatrix(text: String, sizePx: Int = 512): com.google.zxing.common.BitMatrix {
-        val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java).apply {
-            put(EncodeHintType.CHARACTER_SET, "UTF-8")
-            put(EncodeHintType.MARGIN, 1)
-        }
-        return QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, sizePx, sizePx, hints)
+        return QrBitmapGenerator.generateQrMatrix(text, sizePx)
     }
 
-    /**
-     * Generates a square QR code [Bitmap] containing [text] with UTF-8 encoding and minimal 1-block margin.
-     */
     fun generateQrBitmap(text: String, sizePx: Int = 512): Bitmap {
-        val bitMatrix = generateQrMatrix(text, sizePx)
-        val width = bitMatrix.width
-        val height = bitMatrix.height
-        val pixels = IntArray(width * height)
-
-        for (y in 0 until height) {
-            val offset = y * width
-            for (x in 0 until width) {
-                pixels[offset + x] = if (bitMatrix.get(x, y)) Color.BLACK else Color.WHITE
-            }
-        }
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        return bitmap
+        return QrBitmapGenerator.generateQrBitmap(text, sizePx)
     }
 
     // --- Emergency Delay Logic ---
@@ -320,27 +214,62 @@ class SelfControlQrManager internal constructor(
     }
 
     /**
-     * Initiates an emergency unlock request by recording the current trusted timestamp.
-     * Fails closed (returns false) if network-verified trusted time is unavailable.
+     * Initiates an emergency unlock request by recording current trusted timestamp or monotonic fallback.
      */
     fun requestEmergencyDelay(): Boolean {
-        if (!trustProvider()) {
-            safeLogWarn("Rejecting emergency delay request: trusted network time unavailable")
-            return false
+        val editor = prefs.edit()
+        val elapsedRt = getMonotonicElapsedRealtimeOrNull()
+
+        if (trustProvider()) {
+            val now = getCurrentTimeMsOrNull()
+            if (now != null) {
+                editor.putLong(KEY_EMERGENCY_DELAY_REQUESTED_AT, now)
+                if (elapsedRt != null && elapsedRt > 0L) {
+                    editor.putLong(KEY_EMERGENCY_DELAY_REQUESTED_ELAPSED_RT, elapsedRt)
+                }
+                editor.putBoolean(KEY_EMERGENCY_DELAY_IS_OFFLINE_MONOTONIC, false)
+                editor.apply()
+                return true
+            }
         }
-        val now = getCurrentTimeMsOrNull() ?: run {
-            safeLogWarn("Rejecting emergency delay request: current trusted time unavailable")
-            return false
+
+        // Offline / Curfew Fallback: Record monotonic elapsedRealtime
+        if (elapsedRt != null && elapsedRt > 0L) {
+            val fallbackWallTime = System.currentTimeMillis()
+            editor.putLong(KEY_EMERGENCY_DELAY_REQUESTED_AT, fallbackWallTime)
+            editor.putLong(KEY_EMERGENCY_DELAY_REQUESTED_ELAPSED_RT, elapsedRt)
+            editor.putBoolean(KEY_EMERGENCY_DELAY_IS_OFFLINE_MONOTONIC, true)
+            editor.apply()
+            return true
         }
-        prefs.edit().putLong(KEY_EMERGENCY_DELAY_REQUESTED_AT, now).apply()
-        return true
+
+        safeLogWarn("Rejecting emergency delay request: both trusted time and monotonic clock unavailable")
+        return false
     }
 
     /**
      * Cancels any pending emergency unlock request.
      */
     fun cancelEmergencyDelay() {
-        prefs.edit().remove(KEY_EMERGENCY_DELAY_REQUESTED_AT).apply()
+        prefs.edit()
+            .remove(KEY_EMERGENCY_DELAY_REQUESTED_AT)
+            .remove(KEY_EMERGENCY_DELAY_REQUESTED_ELAPSED_RT)
+            .remove(KEY_EMERGENCY_DELAY_IS_OFFLINE_MONOTONIC)
+            .apply()
+    }
+
+    /**
+     * Completes emergency unlock: disables QR lock, removes token and resets emergency state.
+     */
+    fun completeEmergencyUnlock() {
+        prefs.edit()
+            .putBoolean(KEY_QR_LOCK_ENABLED, false)
+            .remove(KEY_EMERGENCY_DELAY_REQUESTED_AT)
+            .remove(KEY_EMERGENCY_DELAY_REQUESTED_ELAPSED_RT)
+            .remove(KEY_EMERGENCY_DELAY_IS_OFFLINE_MONOTONIC)
+            .remove(KEY_SAVED_TOKEN)
+            .remove(KEY_SAVED_TOKEN_HASH)
+            .apply()
     }
 
     /**
@@ -366,12 +295,26 @@ class SelfControlQrManager internal constructor(
         if (requestedAt <= 0L) return 0L
 
         val durationMs = getEmergencyDelayHours().toLong() * 3600L * 1000L
-        if (!trustProvider()) return durationMs
-        val now = getCurrentTimeMsOrNull() ?: return durationMs
-        val targetTimeMs = requestedAt + durationMs
-        val remaining = targetTimeMs - now
+        val isOfflineMonotonic = prefs.getBoolean(KEY_EMERGENCY_DELAY_IS_OFFLINE_MONOTONIC, false)
 
-        return if (remaining > 0L) remaining else 0L
+        if (trustProvider()) {
+            val now = getCurrentTimeMsOrNull()
+            if (now != null && !isOfflineMonotonic) {
+                val targetTimeMs = requestedAt + durationMs
+                val remaining = targetTimeMs - now
+                return if (remaining > 0L) remaining else 0L
+            }
+        }
+
+        val requestedElapsed = prefs.getLong(KEY_EMERGENCY_DELAY_REQUESTED_ELAPSED_RT, 0L)
+        val currentElapsed = getMonotonicElapsedRealtimeOrNull()
+        if (requestedElapsed > 0L && currentElapsed != null && currentElapsed >= requestedElapsed) {
+            val elapsedSinceRequest = currentElapsed - requestedElapsed
+            val remaining = durationMs - elapsedSinceRequest
+            return if (remaining > 0L) remaining else 0L
+        }
+
+        return durationMs
     }
 
     /**
@@ -381,11 +324,20 @@ class SelfControlQrManager internal constructor(
         val requestedAt = getEmergencyDelayRequestedAt()
         if (requestedAt <= 0L) return false
 
-        // Strict Anti-Tamper: Emergency delay expiration cannot be validated without trusted time
-        if (!trustProvider()) return false
-        if (getCurrentTimeMsOrNull() == null) return false
+        val remainingMs = getEmergencyDelayRemainingMs()
+        if (remainingMs > 0L) return false
 
-        return getEmergencyDelayRemainingMs() <= 0L
+        val isOfflineMonotonic = prefs.getBoolean(KEY_EMERGENCY_DELAY_IS_OFFLINE_MONOTONIC, false)
+        val requestedElapsed = prefs.getLong(KEY_EMERGENCY_DELAY_REQUESTED_ELAPSED_RT, 0L)
+        val currentElapsed = getMonotonicElapsedRealtimeOrNull()
+        val isMonotonicValid = requestedElapsed > 0L && currentElapsed != null && currentElapsed >= requestedElapsed
+
+        return if (isOfflineMonotonic) {
+            isMonotonicValid
+        } else {
+            val isTrusted = trustProvider() && getCurrentTimeMsOrNull() != null
+            isTrusted || isMonotonicValid
+        }
     }
 
     /**
@@ -393,6 +345,15 @@ class SelfControlQrManager internal constructor(
      */
     fun reset() {
         prefs.edit().clear().apply()
+    }
+
+    private fun getMonotonicElapsedRealtimeOrNull(): Long? {
+        return try {
+            monotonicTimeProvider().takeIf { it >= 0L }
+        } catch (e: Throwable) {
+            safeLogError("Injected monotonicTimeProvider failed", e)
+            null
+        }
     }
 
     private fun getCurrentTimeMsOrNull(): Long? {

@@ -101,6 +101,105 @@ class SelfControlQrManagerTest {
     }
 
     @Test
+    fun testCompleteEmergencyUnlock_disablesLockAndClearsTokenAndEmergency() {
+        manager.generateAndSaveNewToken()
+        manager.setQrLockEnabled(true)
+        manager.requestEmergencyDelay()
+
+        assertTrue(manager.isQrLockEnabled())
+        assertTrue(manager.hasToken())
+        assertTrue(manager.isEmergencyDelayRequested())
+
+        manager.completeEmergencyUnlock()
+
+        assertFalse(manager.isQrLockEnabled())
+        assertFalse(manager.hasToken())
+        assertEquals(null, manager.getSavedToken())
+        assertEquals(null, manager.getSavedTokenHash())
+        assertFalse(manager.isEmergencyDelayRequested())
+    }
+
+    @Test
+    fun testEmergencyDelay_offlineMonotonicFallback() {
+        var monotonicTime = 10_000_000L
+        val offlinePrefs = FakeSharedPreferences()
+        val offlineManager = SelfControlQrManager(
+            offlinePrefs,
+            timeProvider = { 0L },
+            trustProvider = { false },
+            monotonicTimeProvider = { monotonicTime }
+        )
+
+        offlineManager.setEmergencyDelayEnabled(true, delayHours = 24)
+        val started = offlineManager.requestEmergencyDelay()
+        assertTrue(started)
+        assertTrue(offlineManager.isEmergencyDelayRequested())
+
+        val expectedTotalMs = 24L * 3600L * 1000L
+        assertEquals(expectedTotalMs, offlineManager.getEmergencyDelayRemainingMs())
+        assertFalse(offlineManager.isEmergencyDelayActiveAndElapsed())
+
+        // Advance monotonic time by 12 hours
+        monotonicTime += 12L * 3600L * 1000L
+        assertEquals(12L * 3600L * 1000L, offlineManager.getEmergencyDelayRemainingMs())
+        assertFalse(offlineManager.isEmergencyDelayActiveAndElapsed())
+
+        // Advance monotonic time by another 12 hours (24h total)
+        monotonicTime += 12L * 3600L * 1000L
+        assertEquals(0L, offlineManager.getEmergencyDelayRemainingMs())
+        assertTrue(offlineManager.isEmergencyDelayActiveAndElapsed())
+    }
+
+    @Test
+    fun testEmergencyDelay_offlineMonotonic_cannotBeBypassedByManipulatingWallClockAndRebooting() {
+        var monotonicTime = 10_000_000L
+        var trustedTime = 0L
+        var isTrusted = false
+        val offlinePrefs = FakeSharedPreferences()
+        val offlineManager = SelfControlQrManager(
+            offlinePrefs,
+            timeProvider = { trustedTime },
+            trustProvider = { isTrusted },
+            monotonicTimeProvider = { monotonicTime }
+        )
+
+        offlineManager.setEmergencyDelayEnabled(true, delayHours = 24)
+        val started = offlineManager.requestEmergencyDelay()
+        assertTrue(started)
+        assertTrue(offlineManager.isEmergencyDelayRequested())
+
+        // Simulate device reboot: monotonic clock resets to 5,000ms
+        monotonicTime = 5_000L
+
+        // Device later connects to internet: NTP trusted time is active in future
+        isTrusted = true
+        trustedTime = System.currentTimeMillis() + 100_000_000L
+
+        // Strict Anti-Tamper Invariant:
+        // Because the emergency delay was started offline without trusted time,
+        // it MUST NOT be elapsed simply because trusted time became available!
+        // Monotonic uptime must be strictly respected.
+        assertFalse(offlineManager.isEmergencyDelayActiveAndElapsed())
+        assertEquals(24L * 3600L * 1000L, offlineManager.getEmergencyDelayRemainingMs())
+    }
+
+    @Test
+    fun testSetupWorkflow_tokenGeneratedWithoutPrematureArming() {
+        assertFalse(manager.isQrLockEnabled())
+        assertFalse(manager.hasToken())
+
+        val token = manager.generateAndSaveNewToken()
+        assertNotNull(token)
+        assertTrue(manager.hasToken())
+        // Crucial invariant: generating token must NOT arm the lock until verification succeeds!
+        assertFalse(manager.isQrLockEnabled())
+
+        // Once verification succeeds, arm explicitly
+        manager.setQrLockEnabled(true)
+        assertTrue(manager.isQrLockEnabled())
+    }
+
+    @Test
     fun testReset_clearsAllState() {
         manager.generateAndSaveNewToken()
         manager.setQrLockEnabled(true)
